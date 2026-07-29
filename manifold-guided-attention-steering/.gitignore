@@ -12,3 +12,8 @@ __pycache__/
 # Editor / OS scratch
 *.tmp
 .DS_Store
+
+# run_all_arms.sh / smoke.sh transient scratch (regenerated per run, not evidence)
+runs/_arms_map.tsv
+runs/_fit_pairs.tsv
+runs/log__smoke.log

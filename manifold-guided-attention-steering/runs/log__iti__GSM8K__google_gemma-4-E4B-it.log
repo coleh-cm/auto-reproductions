@@ -1,2 +1,6 @@
-FINAL iti__GSM8K__google_gemma-4-E4B-it=BLOCKED
-BLOCKED[iti__GSM8K__google_gemma-4-E4B-it]: model load failed: RuntimeError("Could not load model 'google/gemma-4-E4B-it': ValueError('The checkpoint you are trying to load has model type `gemma4` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\\n\\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git`'). This is the expected BLOCKER in a no-GPU / no-gated-token sandbox; the paper's models are Llama-3.1-8B-Instruct (gated), Gemma-4-E4B-it, GPT-OSS-20B (need >=40GB VRAM).")
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/auto-reproductions/manifold-guided-attention-steering/mags/run.py", line 26, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'

@@ -284,3 +284,66 @@ not recognized by the installed `transformers`; GPT-OSS-20B needs >=40 GB VRAM).
 On a GPU host with HF tokens this same script produces the real 45 numbers;
 the fit phase additionally writes the `.iti.npz`/`.as.npz` baseline banks that the
 ITI/Angular-Steering arms consume (`mags/fit.py` step 6).
+
+### 2026-07-29 — Gate feedback (round 2): still zero FINAL lines — real cause was errexit
+
+The previous entry's diagnosis was **wrong**. It blamed the missing `.venv`
+making `mapfile` return an empty `ARMS` array. Reproduced by hand: with no
+`.venv` and **errexit off**, `run_all_arms.sh` already printed all 45 FINAL
+lines (each arm fails to import torch in the base interpreter, the `grep || echo
+FINAL <arm>=BLOCKED` fallback fires, and the loop completes). So the missing
+venv was *not* the cause.
+
+The real cause: the gate invokes the script under errexit (`bash -e`, or a
+harness that has done `set -e`). Traced with `bash -x -e`: Phase 1 (fit, whose
+commands end in `|| echo`, is errexit-exempt) completes, then Phase 2 reaches
+its first arm and runs
+
+    eval "$cmd" > "runs/log__${arm}.log" 2>&1
+    rc=$?
+
+Under `set -e`, `eval` returning non-zero (the arm's `python -m mags.run` exits
+non-zero — in the no-deps sandbox it dies on `import numpy` before `mags.run`'s
+own `_blocked()` can print a FINAL line) aborts the script **immediately**, so
+`rc=$?` and the `grep || echo` fallback never run. The first arm kills the whole
+script -> zero FINAL lines on stdout -> the gate reports all 45 arms missing
+and `values: []`. This matches the gate's report exactly.
+
+Fix this commit (run_all_arms.sh + smoke.sh):
+
+- `set +e` is now explicit at the top of both scripts, overriding a forced
+  `bash -e` / harness `set -e` so errexit can never abort before every arm has
+  printed its FINAL line. (`-u` / `pipefail` stay on; they don't early-exit on
+  handled commands.)
+- Every fallible command runs inside an errexit-exempt form (`if ...; then :;
+  fi` or `... || true`), so even if `set -e` were somehow re-enabled a failing
+  arm cannot abort the script. The per-arm FINAL-line emission is now: run the
+  arm inside `if eval "$cmd"; then :; fi`, then `line=$(grep ^FINAL || true)`,
+  then print `line` or synthesize `FINAL <arm>=BLOCKED`. Exactly one FINAL line
+  per arm, always.
+- Replaced the bash-only `mapfile` / process-substitution with a portable
+  `while IFS='<tab>' read` loop over a stdlib-`json`-generated TSV
+  (`runs/_arms_map.tsv`), so the script also works if the gate invokes it with
+  `sh` rather than `bash`. A grep-based key-extract fallback covers the
+  no-python-at-all case so every arm still gets a FINAL line.
+- `run_all_arms.sh` now `exit 0`: the gate keys off the FINAL lines, not the
+  exit code, and a non-zero exit under a `set -e`/`&&`-chaining harness would
+  discard the parsed output. The `FINAL <arm>=BLOCKED` lines carry the honest
+  "no numbers" signal.
+- `smoke.sh` hardened the same way: `set +e`, run `python -m smoke` inside an
+  `if`, and print `FINAL smoke=BLOCKED` if deps/model/network are unavailable,
+  so smoke always emits exactly one FINAL line (real accuracy when the path
+  runs, BLOCKED otherwise — never a bare traceback).
+
+Verified both under `bash -e run_all_arms.sh` **with the `.venv` removed**
+(simulating the gate's clean checkout, no project deps in the base interpreter):
+`run_all_arms.sh` prints exactly 45 `FINAL <arm>=BLOCKED` lines, `exit 0`, zero
+arms missing. With the `.venv` present the real `mags.run._blocked()` path
+engages (Llama-3.1 gated -> 401 at model load) and the same 45 FINAL lines
+print. `smoke.sh` prints one FINAL line in both cases. The result is still
+BLOCKED for every arm — that is the honest outcome: no GPU and no gated HF
+token mean none of the paper's 8B/4B/20B models can load. Real data or no
+numbers; no synthetic fallback.
+
+Scratch files `runs/_arms_map.tsv`, `runs/_fit_pairs.tsv`, and
+`runs/log__smoke.log` are gitignored (regenerated per run, not evidence).
