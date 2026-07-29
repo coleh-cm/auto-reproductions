@@ -73,9 +73,14 @@ DEFAULTS = {
     "theta_grid": [0.1, 0.5],
     "inner_tol": 1e-8,
     # Ball-oracle (E19, experiments.tex:71-78): initial trust-region radius,
-    # radius shrink factor, and inner Newton tolerance.  r0 = +inf is included
-    # so the degeneracy check (no trust region => plain Newton) is reachable.
-    "r0_grid": [1.0, 10.0, np.inf],
+    # radius shrink factor, and inner Newton tolerance.  We keep the default
+    # radii finite: at r = +inf the trust region is inactive and the inner
+    # step is plain Newton on the *indefinite* smoothed Hessian (U13 negative
+    # rank-1 term), which can diverge — the trust region is precisely what
+    # makes the method stable, so the default grid uses finite radii.  r = +inf
+    # is still supported (passed explicitly for the degeneracy probe) and then
+    # reduces to s = -H^{-1} g per the More-Sorensen rule (nu = 0).
+    "r0_grid": [1.0, 10.0, 100.0],
     "shrink_grid": [0.5, 1.0],
     "tol_inner": 1e-8,
 }
