@@ -1,0 +1,914 @@
+{
+ "paper": {
+  "title": "Manifold-Guided Attention Steering",
+  "arxiv": "2605.21770",
+  "paper_ref": "c8a82a40-c60b-43ce-863f-37fb55cb3e8e",
+  "project_id": "d7735ece-02c4-4228-985c-00834c92b8f3"
+ },
+ "n_arms": 45,
+ "bootstrap": {
+  "method": "percentile",
+  "B": 10000,
+  "seed": 42,
+  "citation": "tex:L699-700"
+ },
+ "arms": [
+  {
+   "benchmark": "MATH-500",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.478,
+   "claimed_ci95": [
+    0.428,
+    0.516
+   ],
+   "claimed_ppl": 1.229,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.86,
+   "claimed_ci95": [
+    0.841,
+    0.879
+   ],
+   "claimed_ppl": 1.196,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.561,
+   "claimed_ci95": [
+    0.494,
+    0.64
+   ],
+   "claimed_ppl": 1.121,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.562,
+   "claimed_ci95": [
+    0.515,
+    0.609
+   ],
+   "claimed_ppl": 2.978,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.498,
+   "claimed_ci95": [
+    0.456,
+    0.54
+   ],
+   "claimed_ppl": 1.227,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.855,
+   "claimed_ci95": [
+    0.836,
+    0.874
+   ],
+   "claimed_ppl": 1.335,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.573,
+   "claimed_ci95": [
+    0.494,
+    0.646
+   ],
+   "claimed_ppl": 1.136,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.548,
+   "claimed_ci95": [
+    0.501,
+    0.595
+   ],
+   "claimed_ppl": 2.25,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.506,
+   "claimed_ci95": [
+    0.462,
+    0.55
+   ],
+   "claimed_ppl": 1.232,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.857,
+   "claimed_ci95": [
+    0.839,
+    0.876
+   ],
+   "claimed_ppl": 1.335,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.591,
+   "claimed_ci95": [
+    0.512,
+    0.665
+   ],
+   "claimed_ppl": 1.131,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.546,
+   "claimed_ci95": [
+    0.499,
+    0.593
+   ],
+   "claimed_ppl": 2.214,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.492,
+   "claimed_ci95": [
+    0.456,
+    0.542
+   ],
+   "claimed_ppl": 1.295,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.858,
+   "claimed_ci95": [
+    0.839,
+    0.876
+   ],
+   "claimed_ppl": 1.271,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.591,
+   "claimed_ci95": [
+    0.518,
+    0.665
+   ],
+   "claimed_ppl": 1.152,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.555,
+   "claimed_ci95": [
+    0.508,
+    0.602
+   ],
+   "claimed_ppl": 2.291,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.53,
+   "claimed_ci95": [
+    0.486,
+    0.574
+   ],
+   "claimed_ppl": 1.227,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.867,
+   "claimed_ci95": [
+    0.848,
+    0.886
+   ],
+   "claimed_ppl": 1.194,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.604,
+   "claimed_ci95": [
+    0.524,
+    0.677
+   ],
+   "claimed_ppl": 1.13,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "meta-llama/Llama-3.1-8B-Instruct",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.574,
+   "claimed_ci95": [
+    0.527,
+    0.621
+   ],
+   "claimed_ppl": 2.97,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table1"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.614,
+   "claimed_ci95": [
+    0.572,
+    0.656
+   ],
+   "claimed_ppl": 1.107,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.899,
+   "claimed_ci95": [
+    0.887,
+    0.911
+   ],
+   "claimed_ppl": 1.71,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.56,
+   "claimed_ci95": [
+    0.482,
+    0.634
+   ],
+   "claimed_ppl": 1.231,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "unsteered",
+   "metric": "accuracy",
+   "claimed": 0.587,
+   "claimed_ci95": [
+    0.543,
+    0.635
+   ],
+   "claimed_ppl": 5.169,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.646,
+   "claimed_ci95": [
+    0.604,
+    0.688
+   ],
+   "claimed_ppl": 1.121,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.913,
+   "claimed_ci95": [
+    0.897,
+    0.927
+   ],
+   "claimed_ppl": 1.293,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.463,
+   "claimed_ci95": [
+    0.384,
+    0.537
+   ],
+   "claimed_ppl": 1.267,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "iti",
+   "metric": "accuracy",
+   "claimed": 0.557,
+   "claimed_ci95": [
+    0.511,
+    0.604
+   ],
+   "claimed_ppl": 5.053,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.566,
+   "claimed_ci95": [
+    0.522,
+    0.61
+   ],
+   "claimed_ppl": 1.279,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.9,
+   "claimed_ci95": [
+    0.883,
+    0.915
+   ],
+   "claimed_ppl": 1.416,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.518,
+   "claimed_ci95": [
+    0.445,
+    0.592
+   ],
+   "claimed_ppl": 1.334,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "angular-steering",
+   "metric": "accuracy",
+   "claimed": 0.548,
+   "claimed_ci95": [
+    0.501,
+    0.595
+   ],
+   "claimed_ppl": 5.475,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.604,
+   "claimed_ci95": [
+    0.562,
+    0.646
+   ],
+   "claimed_ppl": 1.13,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.874,
+   "claimed_ci95": [
+    0.856,
+    0.892
+   ],
+   "claimed_ppl": 1.107,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.433,
+   "claimed_ci95": [
+    0.36,
+    0.506
+   ],
+   "claimed_ppl": 1.272,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "contrastive-decoding",
+   "metric": "accuracy",
+   "claimed": 0.593,
+   "claimed_ci95": [
+    0.546,
+    0.639
+   ],
+   "claimed_ppl": 4.748,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "alpha_plausibility": 0.1,
+    "beta": 0.5,
+    "amateur": {
+     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+     "google/gemma-4-E4B-it": "google/gemma-3-1b-it"
+    },
+    "note": "CD paper defaults; amateur choice unstated in MAGS paper"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MATH-500",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.648,
+   "claimed_ci95": [
+    0.606,
+    0.69
+   ],
+   "claimed_ppl": 1.108,
+   "eval_n": 500,
+   "train_source": "TIGER-Lab/MathInstruct",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "GSM8K",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.913,
+   "claimed_ci95": [
+    0.898,
+    0.928
+   ],
+   "claimed_ppl": 1.21,
+   "eval_n": 1319,
+   "train_source": "openai/gsm8k train",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "HumanEval",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.604,
+   "claimed_ci95": [
+    0.524,
+    0.677
+   ],
+   "claimed_ppl": 1.281,
+   "eval_n": 164,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "MBPP(sanitized-test)",
+   "model": "google/gemma-4-E4B-it",
+   "arm": "mags",
+   "metric": "accuracy",
+   "claimed": 0.604,
+   "claimed_ci95": [
+    0.557,
+    0.649
+   ],
+   "claimed_ppl": 5.059,
+   "eval_n": 427,
+   "train_source": "codeparrot/apps",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table2"
+  },
+  {
+   "benchmark": "SMILES-molecular-generation",
+   "model": "openai/gpt-oss-20b",
+   "arm": "unsteered",
+   "metric": "validity_pct",
+   "claimed": 50.4,
+   "secondary_metric": "autodock_gpu_affinity_kcal_mol",
+   "claimed_secondary": -7.36,
+   "eval_n": 500,
+   "train_source": "UNSTATED in paper (SPEC \u00a74.18)",
+   "config": {},
+   "citation": "paper/latex_src/neurips_2026.tex Table 4 (tab:molgen, tex:L539-543)"
+  },
+  {
+   "benchmark": "SMILES-molecular-generation",
+   "model": "openai/gpt-oss-20b",
+   "arm": "angular-steering",
+   "metric": "validity_pct",
+   "claimed": 51.4,
+   "secondary_metric": "autodock_gpu_affinity_kcal_mol",
+   "claimed_secondary": -7.44,
+   "eval_n": 500,
+   "train_source": "UNSTATED in paper (SPEC \u00a74.18)",
+   "config": {
+    "angle_deg": 30,
+    "note": "best of ablation tex:L654-665; matches main-table MATH-500 0.506"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table 4 (tab:molgen, tex:L539-543)"
+  },
+  {
+   "benchmark": "SMILES-molecular-generation",
+   "model": "openai/gpt-oss-20b",
+   "arm": "iti",
+   "metric": "validity_pct",
+   "claimed": 57.8,
+   "secondary_metric": "autodock_gpu_affinity_kcal_mol",
+   "claimed_secondary": -7.2,
+   "eval_n": 500,
+   "train_source": "UNSTATED in paper (SPEC \u00a74.18)",
+   "config": {
+    "K": 96,
+    "alpha": 0.5,
+    "note": "best of ablation tex:L640-642; matches main-table MATH-500 0.498"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table 4 (tab:molgen, tex:L539-543)"
+  },
+  {
+   "benchmark": "SMILES-molecular-generation",
+   "model": "openai/gpt-oss-20b",
+   "arm": "mags",
+   "metric": "validity_pct",
+   "claimed": 54.8,
+   "secondary_metric": "autodock_gpu_affinity_kcal_mol",
+   "claimed_secondary": -7.54,
+   "eval_n": 500,
+   "train_source": "UNSTATED in paper (SPEC \u00a74.18)",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "k,q are SPEC defaults (paper unstated); K=3,alpha=1.0 from ablation best tex:L605,L613-628"
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table 4 (tab:molgen, tex:L539-543)"
+  },
+  {
+   "benchmark": "SMILES-molecular-generation",
+   "model": "openai/gpt-oss-20b",
+   "arm": "mags-u",
+   "metric": "validity_pct",
+   "claimed": 54.8,
+   "secondary_metric": "autodock_gpu_affinity_kcal_mol",
+   "claimed_secondary": -7.56,
+   "eval_n": 500,
+   "train_source": "UNSTATED in paper (SPEC \u00a74.18)",
+   "config": {
+    "k": 4,
+    "q": 95,
+    "K": 3,
+    "alpha": 1.0,
+    "note": "two independent manifolds, union of head sets; tex:L378-379",
+    "objectives": [
+     "validity",
+     "affinity"
+    ],
+    "union": true
+   },
+   "citation": "paper/latex_src/neurips_2026.tex Table 4 (tab:molgen, tex:L539-543)"
+  }
+ ]
+}

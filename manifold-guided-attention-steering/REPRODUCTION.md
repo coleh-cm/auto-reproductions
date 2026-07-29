@@ -18,7 +18,8 @@
 - [x] Saved PDF-extracted paper text to `paper/paper_pdf_extracted.txt`
 - [x] Fetched and unpacked LaTeX source from arXiv e-print to `paper/latex_src/`
       (main file: `paper/latex_src/neurips_2026.tex`, refs: `paper/latex_src/refs.bib`)
-- [ ] SPEC.md (method spec with equations, shapes, citations)
+- [x] SPEC.md (method spec with equations, shapes, citations)
+- [x] arms.json (45 arms: 40 reasoning/code + 5 molecular, with claimed values + CIs)
 - [ ] Implementation
 - [ ] Review rounds
 - [ ] Readiness gates
@@ -73,9 +74,33 @@ Gemma-4-E4b-it); molecular generation / SMILES validity + binding affinity
 **Headline Table 1 (Llama) results:** MATH-500 MAGS 0.530 vs unsteered 0.478;
 GSM8K 0.867 vs 0.860; HumanEval 0.604 vs 0.561; MBPP 0.574 vs 0.562.
 
-## Known gaps / things the paper does not specify (to track in SPEC.md)
+### 2026-07-29 — SPEC.md + arms.json
+
+- Verified no upstream code: no link in the LaTeX source or on the arXiv abs page;
+  GitHub API searches (title, MAGS+steering variants, Rose-STL-Lab org, author i6li)
+  all returned zero. Implementing from scratch.
+- Model availability confirmed on HuggingFace: `google/gemma-4-E4B-it` exists
+  (42 layers, 8 heads, head_dim 256 — note d_h ≠ hidden/H); `openai/gpt-oss-20b`
+  (24 layers, 64 heads, head_dim 64); `meta-llama/Llama-3.1-8B-Instruct` (gated;
+  public arch: 32 layers, 32 heads, head_dim 128). Datasets: TIGER-Lab/MathInstruct,
+  openai/gsm8k, HuggingFaceH4/MATH-500, codeparrot/apps, google-research-datasets/mbpp
+  all resolve.
+- SPEC.md written: full algorithm (offline manifold fit + Algorithm-1 inference),
+  symbol/shape table, 13 equation citations into paper/latex_src/neurips_2026.tex,
+  22-item list of what the paper leaves unstated with adopted defaults, frozen
+  component interfaces, 8-row hazard list (SVD axis, centring, decode-only steering,
+  hook placement).
+- arms.json: 45 arms (2 models × 4 benchmarks × 5 methods = 40 reasoning arms from
+  Tables 1–2 incl. bootstrap CIs teeth; 5 molecular arms from Table 3) with claimed
+  values as the numbers-gate contract.
+- Angular Steering baseline pinned to Vu & Nguyen (arXiv:2510.26243) target-angle
+  rotation in Span(d_feat, d_PC0); reference code exists (github.com/lone17/angular-steering).
+
+## Known gaps / things the paper does not specify (canonical list now in SPEC.md §4)
 
 - Exact value of `q` (threshold percentile) and `k` (subspace rank) per benchmark/model
 - How many heads K are monitored per benchmark (top-1/top-3 in ablation; Table 1/2 config unclear)
 - Fine details: hook placement for per-head head-output capture across model families
 - GPT-OSS-20B molecular setup (prompt, target protein, docking pipeline details)
+- Mean-vs-max aggregation inconsistency between §3.4 (max, AUROC diagnostic) and §4 (mean, head selection)
+- One-pair-vs-all-traces tension between text (tex:L399) and Eq. (2) summation

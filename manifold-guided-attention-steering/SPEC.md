@@ -1,0 +1,178 @@
+# SPEC: Manifold-Guided Attention Steering (MAGS)
+
+- **Paper:** *Manifold-Guided Attention Steering* — Li, Guruprasad, Sengupta, Satish, D'Antoni, Yu (UCSD), 2026
+- **arXiv:** 2605.21770 (v1, 2026-05-20) · **paper_ref:** c8a82a40-c60b-43ce-863f-37fb55cb3e8e · **project_id:** d7735ece-02c4-4228-985c-00834c92b8f3
+- **Authoritative source for all maths/tables/numbers:** `paper/latex_src/neurips_2026.tex` (arXiv e-print LaTeX). PDF text extraction `paper/paper_pdf_extracted.txt` is prose-only and is NOT trusted for equations. All citations below are `paper/latex_src/neurips_2026.tex:<line-range>` and are grep-able.
+
+## 0. Upstream code
+
+- Paper contains **no** code link (grep for `github|code available|href` over the LaTeX source: no matches).
+- arXiv abstract page for 2605.21770 lists no code link.
+- GitHub searches (2026-07-29, via api.github.com): `"manifold guided attention steering"` → 0 repos; `"MAGS attention steering language model"` → 0; `"attention steering correctness manifold"` → 0; `mags steering` within org `Rose-STL-Lab` (68 repos) → 0; user `i6li` → 0.
+- **Verdict: no upstream code exists. We implement from scratch.**
+
+## 1. The method as an algorithm
+
+There is **no training loss and no gradient update** — MAGS is a training-free inference-time intervention. The "fit" is descriptive statistics (means + SVD) over collected activations. The "update rule" is the in-place activation correction of Eq. (9).
+
+### Phase A — Offline manifold construction (per model × benchmark)
+
+**Inputs.**
+
+- A corpus of paired traces: problems `P = {p_1..p_N}`, `S ≤ 8` sampled traces `T_i = {τ_i,1..τ_i,S}` per problem, binary label `y_τ ∈ {0,1}` (1 = correct final answer). Only problems with `|T_i^+| ≥ 1` **and** `|T_i^-| ≥ 1` are kept (tex:L398–399).
+- A monitored layer set `Lmon` (Llama diagnostic used `{8,16,24,31}`; tex:L296) and, per layer, all `H` heads.
+- Fresh forward pass capture of per-head outputs `A_τ^{(l,h)} ∈ R^{L_τ×d_h}` for every trace `τ` and every `(l,h)` in the monitored set (tex:L179–185).
+
+**Steps.** For every monitored head `(l,h)`:
+
+1. Per-problem per-class means over all token steps: `μ_{c,i}^{(l,h)}, μ_{e,i}^{(l,h)} ∈ R^{d_h}` — Eq. (2), tex:L192–199.
+2. Contrastive difference `δ_i^{(l,h)} = μ_{e,i}^{(l,h)} − μ_{c,i}^{(l,h)} ∈ R^{d_h}` — Eq. (3), tex:L201–207.
+3. Stack `D^{(l,h)} ∈ R^{N×d_h}` whose i-th row is `δ_i` (the paper prints the transpose `D^⊤ ∈ R^{d_h×N}`) — Eq. (4), tex:L220–228.
+4. Compact SVD `D^{(l,h)} = U Σ V^⊤` with `U ∈ R^{N×r}`, `Σ ∈ R^{r×r}`, `V^⊤ ∈ R^{r×d_h}`, `r = min(N, d_h)`; take `B^{(l,h)} = (V_{:,1:k})^⊤ ∈ R^{k×d_h}` (rows orthonormal) — Eq. (5), tex:L229–243. **This is the only "learning": an SVD. No loss, no iterations.**
+5. Global correct centroid `μ_c^{(l,h)} ∈ R^{d_h}` over all problems × correct traces × token steps — Eq. (6), tex:L245–254.
+6. Threshold calibration: compute `d_t^{(l,h)}` (Eq. 7) over **every token step of every correct train trace**; set `τ^{(l,h)}` to the `q`-th percentile of that pooled set — Eq. (8), tex:L279–285. (See §4: `q` is never given a value.)
+7. Head selection: on a held-out problem split, per head compute the trajectory-level score as the **mean** of `{d_t}` over the trajectory, and the AUROC between that score and the trace label `y_τ`; rank all monitored heads by AUROC and keep top-`K` (tex:L304–305). *Note the aggregation tension — see §4 item 6.*
+
+**Artifacts:** `{B^{(l,h)}, μ_c^{(l,h)}, τ^{(l,h)}, auroc^{(l,h)}}` for the selected top-`K` heads (Algorithm 1 `Require`, tex:L352).
+
+### Phase B — Inference with steering (Algorithm 1, tex:L348–374)
+
+Per decode step `t` (after the normal forward pass computes attention for the step):
+
+for each monitored head `(l,h)` in layer order:
+  1. `v ← a_t^{(l,h)} − μ_c^{(l,h)}`                       (halo: R^{d_h})
+  2. `d ← ‖ B^{(l,h)} v ‖²`                               (scalar, cost O(k·d_h))
+  3. if `d > τ^{(l,h)}`: `a_t^{(l,h)} ← a_t^{(l,h)} − α · B^{(l,h)⊤} (B^{(l,h)} v)` **in place, before the o_proj `W_O^{(l)}` consumes the head output** (Eq. 9, tex:L307–317; α ∈ (0,1], tex:L317)
+
+At `α=1` this is exactly `μ_c + P_⊥(a_t − μ_c)` with `P_⊥ = I − B^⊤B` — Eq. (10), tex:L319–330 — i.e. discard only the error-subspace component of the centred activation. The correction is applied to the concat-of-heads input of `W_O^{(l)}` via a pre-hook on that projection (tex:L356–357, L367–368).
+
+Per-step overhead `O(K·k·d_h)` (tex:L376).
+
+### MAGS^u (multi-objective union, molecular task)
+
+For each objective `c_j` (validity; binding affinity), fit an independent manifold per §A and select its own top-`K` head set `H_j`. At inference, steer the **union** of head sets; each head is corrected only through its own objective's manifold (tex:L378–379). (Collision handling across objectives: §4 item 12.)
+
+## 2. Symbols, with shapes
+
+| Symbol | Shape | Meaning |
+|---|---|---|
+| `N` | scalar | # retained problems (papers' eval N: MATH-500 500, GSM8K 1319, HumanEval 164, MBPP 427 — tex:L710–713, L756–759; fit-N is the retained train-problem count) |
+| `S` | scalar | traces sampled per problem, `S ≤ 8` (tex:L399) |
+| `L_τ` | scalar | # tokens of trace τ considered (see §4 item 7 on prompt vs generated tokens) |
+| `L`, `H` | scalars | model layers, heads/layer |
+| `d_h` | scalar | head output dim (Llama-3.1-8B: 128 = 4096/32; Gemma-4-E4B-it: 256; GPT-OSS-20B: 64) |
+| `a_t^{(l,h,τ)}` | `[d_h]` | head `h`'s attention output (A·V product) at token t, layer l, trace τ — **before** `W_O` (tex:L356–357) |
+| `A_τ^{(l,h)}` | `[L_τ, d_h]` | per-trace stack of the above — Eq. (1), tex:L179–185 |
+| `μ_{c,i}^{(l,h)}`, `μ_{e,i}^{(l,h)}` | `[d_h]` | per-class means weighted by token count — Eq. (2) |
+| `δ_i^{(l,h)}` | `[d_h]` | contrastive difference — Eq. (3) |
+| `D^{(l,h)}` | `[N, d_h]` (paper prints `D^⊤: [d_h, N]`) | difference matrix — Eq. (4) |
+| `U, Σ, V^⊤` | `[N,r], [r,r], [r,d_h]`, `r=min(N,d_h)` | compact SVD of `D` (tex:L231) |
+| `B^{(l,h)}` | `[k, d_h]` | error-subspace basis (top-k rows of V^⊤, orthonormal) — Eq. (5) |
+| `μ_c^{(l,h)}` | `[d_h]` | global correct centroid — Eq. (6) |
+| `d_t^{(l,h)}` | scalar | `‖B(a_t − μ_c)‖²` — Eq. (7) |
+| `τ^{(l,h)}` | scalar | q-th percentile of correct-trace scores — Eq. (8). Symbol collision: same letter as trace τ elsewhere; context disambiguates |
+| `k` | scalar | subspace rank (UNSTATED, §4 item 1) |
+| `K` | scalar | # monitored/steered heads (§4 item 2) |
+| `q` | scalar | threshold percentile (UNSTATED, §4 item 1) |
+| `α` | scalar ∈ (0,1] | steering strength — Eq. (9) |
+| `P_⊥^{(l,h)}` | `[d_h, d_h]` | `I − B^⊤B`, projector on complement — tex:L319 |
+| `W_O^{(l)}` | `[d_model, H·d_h]` | attention output projection (concat over heads) |
+| `x_{1:prompt}` | `[T_prompt]` int | prompt token ids (Algorithm 1 Require) |
+
+## 3. Equations to implement (with citations)
+
+All in `paper/latex_src/neurips_2026.tex`:
+
+| # | Equation | Citation | Notes |
+|---|---|---|---|
+| (1) | `A_τ^{(l,h)} ∈ R^{L_τ×d_h}` | L179–185 | activation capture layout |
+| (2) | per-class means `μ_{c,i}, μ_{e,i}` | L192–199 (`\label{eq:mu}`) | token-count weighted average over traces of one problem |
+| (3) | `δ_i = μ_{e,i} − μ_{c,i}` | L201–207 (`\label{eq:diff_vec}`) | per problem |
+| (4) | `D^⊤ = [δ_1 … δ_P] ∈ R^{d_h×N}` | L220–228 (`\label{eq:diff_matrix_transpose}`) | printed as transpose; we store `D: [N, d_h]` |
+| (5) | `B = (V_{:,1:k})^⊤ ∈ R^{k×d_h}` from `D = UΣV^⊤` | L229–243 (`\label{eq:basis}`) | compact SVD; `torch.linalg.svd(D, full_matrices=False)` gives `Vh == V^⊤`; `B = Vh[:k]` |
+| (6) | global `μ_c` | L245–254 (`\label{eq:global_mean}`) | token-count weighting across problems and traces |
+| (7) | `d_t = ‖B(a_t − μ_c)‖²` | L266–275 (`\label{eq:proximity}`) | trigger score |
+| (8) | fire iff `d_t > τ^{(l,h)}`; `τ` = q-th pctile over correct-trace token steps | L279–285 (`\label{eq:trigger}`) | compare against **pooled per-token** scores, not per-trace |
+| (9) | `ã = a − α B^⊤ B (a − μ_c)` | L308–317 (`\label{eq:correction}`) | in place, before `W_O` |
+| (10) | `ã = μ_c + P_⊥(a − μ_c)` | L319–330 (`\label{eq:correction_proj}`) | α=1 special case; implement (9), property-test against (10) |
+| (11–13) | Proposition 1 + proof | L335–346, L585–600 | `<ã,v> = <a,v>` ∀v: Bv=0; use as a **unit invariant test**: correction must not alter any complement direction |
+| Alg. 1 | full decode loop | L348–374 | monitor in layer order; hook = pre-hook on `W_O`; complete forward, then sample x_{t+1} |
+
+Validation experiment (§3.4, tex:L294–298): fit on 70% of problems (problem-level split so traces of one problem never cross splits), evaluate per-head trajectory AUROC on the 30% held-out, trajectory score = **max** over `{d_t}` of the trace, threshold chosen on the train split by maximizing balanced accuracy. Figure 3 (tex:L287–292) marks heads with AUROC > 0.65. This experiment doubles as our **degeneracy-check harness**: if learned B's carry detectable signal (many heads with AUROC substantially > 0.5), the manifold fit is sane.
+
+## 4. What the paper does NOT state (gaps → defaults we adopt)
+
+These are exactly the places where we must **not** pretend to know the paper's choice. Defaults marked `→` are reproduction decisions, not paper facts.
+
+1. **`k` (subspace rank) — never given.** Only hint: the visualisation projects onto the "top-4 principal components of the contrastive error subspace" (tex:L564). `→ k=4` for main runs; sweep `{2,4,8,16}` in sensitivity.
+2. **`q` (threshold percentile, Eq. 8) — never given.** `→ q=95` (percentile over pooled correct-trace token scores); sweep `{90,95,99}`.
+3. **`K` (monitored/steered heads) for the main tables — never given.** Ablation (tex:L605, L613–628) covers only top-1/top-3 on Llama/MATH-500; both reach 0.530 at α=1.0. `→ K=3`.
+4. **`α` for main-table MAGS rows other than MATH-500/Llama — never given.** Ablation's best is α=1.0. `→ α=1.0` everywhere; MATH-500 ablation curve reproduced for the quarterly check.
+5. **Monitored layer set for steering** — the diagnostic uses layers `{8,16,24,31}` for Llama-32l (tex:L296); whether steering restricts to those layers or searches all `L×H` heads at all layers is unstated. For Gemma-4-E4B-it (42 layers) / GPT-OSS-20B (24 layers) no monitored set is given anywhere. `→ Llama: {8,16,24,31}; Gemma: {10,21,31,41} (evenly spaced); GPT-OSS: {6,12,18,23}`; top-K selection ranked within all heads of the monitored layers.
+6. **Aggregation inconsistency**: §3.4 uses **max** over steps for the trajectory AUROC (tex:L298); §4 head selection uses **mean** proximity over the trajectory (tex:L305). We implement both; max for the AUROC diagnostic, mean for production head selection (as §4 literally says).
+7. **Which token positions count as the trace** (`t=1..L_τ`): prompt tokens included or generated-only is unstated. The shared prompt would cancel in `δ` per problem but would shift `μ_c` (Eq. 6). `→ generated tokens only` for both means and μ_c.
+8. **Held-out split for head selection**: fraction and relation to the 70/30 diagnostic split unstated. `→ 70/15/15 problem-level split: manifold-train / head-select(held-out) / report-only AUROC test`.
+9. **Evaluation decoding config** — greedy vs sampling, temperature, top-p, max_new_tokens, #samples per problem: **all unstated** (bootstrap N equals the full test set size, and HumanEval is pass@1). `→ greedy (do_sample=False), max_new_tokens=1024 (math), 512 (code), one completion per problem`.
+10. **Trace-collection sampling config** (temperature etc. of the ≤8 samples) — unstated. `→ temperature=1.0, top_p=0.95, n=8, stop at EOS`; keep exactly the paper's keep-if-both-ripen rule.
+11. **One pair vs all traces**: text says "one correct solution and one incorrect" (tex:L399) but Eq. (2) sums over *all* traces in `T_i^±`. `→ implement Eq. (2) as written (all retained traces)`; a one-pair variant is a review-time variant, not the default.
+12. **MAGS^u collision handling**: "naturally yields disjoint head sets" (tex:L379) — behaviour when two objectives select the same head is unstated. `→ each physical head is steered once; if selected by two objectives, the objective with the higher held-out AUROC owns it`.
+13. **Prompt templates / answer extraction** — unstated. `→ model's HuggingFace chat template; MATH/GSM8K scored by `math_verify`-style boxed/number extraction; GSM8K strip `####`; code scored by executing canonical tests (HumanEval: official harness; MBPP: sanitized split test asserts; N=427 matches MBPP-sanitized test)`. 
+14. **Perplexity protocol** — PPL of what, under which model: unstated. `→ perplexity of the generated completion tokens under the *unsteered* base model, averaged over problems` (secondary metric, not gated).
+15. **ITI adaptation mechanics** beyond "correct/incorrect traces as contrast sets" (tex:L394) — probe type, intervened activations: unstated. `→ per-head logistic-probe on the trace-mean head output, top-K heads by held-out probe accuracy (K ∈ {24,48,96}); intervention `a += α·σ_h·v_h` every decode step (original ITI convention, Li et al. 2023); α ∈ {0.5,1,5}`.
+16. **Angular Steering adaptation mechanics** — "fixed 2D rotation in the mean-difference span across all layers" (tex:L394): extraction points, raw-vs-normalised activations, offset-vs-target rotation: unstated. `→ Vu & Nguyen (arXiv:2510.26243) target-angle form with plane Span(d_feat, d_PC0) from difference-in-means candidate directions over all pre-attn/pre-mlp norm outputs (their §4.4–4.6), correct-vs-incorrect traces as the two contrast sets, rotate all layers, sweep target angle 0°..330° step 30° (tex:L654–665); default 30° (best per ablation)`. AS reference code exists at github.com/lone17/angular-steering (cited by that paper, usable as reference for plane construction).
+17. **Contrastive Decoding specifics** — amateur model per family and CD hyperparameters: unstated. `→ α_plausibility=0.1, β=0.5 (CD paper defaults); amateur: Llama-3.2-1B-Instruct for Llama-3.1-8B-Instruct, gemma-3-1b-it for Gemma-4-E4B-it; excluded for GPT-OSS (paper's own exclusion, tex:L527)`.
+18. **Molecular task specifics** — target protein, molecule prompts, SMILES corpus for contrastive pairs, high/low binding-affinity cutoff, AutoDock-GPU parameters, GPT-OSS precision: **all unstated**. `→ will be pinned at implementation time from AutoDock-GPU defaults; treat Table 3 as a stretch target.`
+19. **Seeds** — only the bootstrap seed (=42, tex:L700) is given. Trace-sampling and any eval sampling seeds: unstated. `→ seed=42 everywhere needed`, recorded in run manifest.
+20. **`ℓ_bip` (attention-shift visualisation layer, tex:L678) and KDE bandwidth (Fig 4) — unstated (visualisation only, not gated).**
+21. **Precision**: weights fp16 on RTX 4090 for the two 8B-class models (tex:L692); GPT-OSS ran on H200 (tex:L693) — precision unstated (Hub default is mxfp4 for experts).
+22. **Model naming**: "Gemma-4-E4b-it" (tex:L387) is `google/gemma-4-E4B-it` on HF (exists as of 2026-07; 42 layers, 8 heads, head_dim 256, bf16). Llama-3.1-8B-Instruct config (32 layers, 32 Q-heads / 8 KV-heads, head_dim 128) is the standard public architecture. GPT-OSS-20B: 24 layers, 64 heads, head_dim 64.
+
+## 5. Component interfaces (frozen — parallel agents build against these)
+
+All tensors little-endian numpy arrays on disk; fp32 for fitted parameters, fp16 only for raw activations.
+
+1. **`TraceStore` (trace collection output)** — JSONL, one record per retained problem:
+   `{problem_id, benchmark, prompt_text, gold, traces: [{text, token_ids: [T_gen], correct: bool, act_path}]}`.
+   `act_path` → `.npz`: `A: [T_gen, L_mon, H, d_h] fp16` aligned to `token_ids`; `layers: [L_mon] int32`.
+   Positions are **generated tokens only** (§4 item 7).
+2. **`ManifoldBank` (fit output, one file per model×benchmark)** — `.npz` + JSON manifest:
+   per selected/monitored head: `B__l{l}_h{h}: [k, d_h] fp32`, `muc__l{l}_h{h}: [d_h] fp32`, `thresh__l{l}_h{h}: fp32 scalar`, `auroc__l{l}_h{h}: fp32 scalar`.
+   Manifest: `{model_id, benchmark, k, q, K, alpha, layers_monitored, split_seeds, n_problems_fit, n_problems_select, selected_heads: [[l,h], ...], git_sha}`.
+3. **`HookRegistry` (steering runtime)** — model-family adapter exposing, per layer `l`, a `nn.Module` whose input is `[bsz, seq, H·d_h]` with head-contiguous layout (view `[bsz, seq, H, d_h]`):
+   - Llama: `model.layers[l].self_attn.o_proj`
+   - Gemma-4 (text stack): `model.language_model.layers[l].self_attn.o_proj` *(exact attr verified at implementation time against transformers version)*
+   - GPT-OSS: `model.layers[l].self_attn.o_proj` *(attention output is 64 heads × 64 dims, contiguous)*
+   Corrections apply to **decode steps only** (`seq==1` chunks / last position of prefill: §4 item 9 follow-up — prefill positions are not steered, they are only scored).
+4. **`SteeringController`** — derives from `ManifoldBank`: `score_hook(pre_input) -> modified_pre_input`; per monitored head per decode position implements Eq. (7)–(9) in fp32 with the in-place semantics of Algorithm 1. Batch size 1 for eval; scores recorded to a per-run `steering_log.jsonl` (`{problem, t, head, d, fired}`) for diagnostics.
+5. **`BaselineSteerer` interface** — same hook injection point; three implementations: `ITISteerer` (K, α as §4.15), `AngularSteerer` (target angle as §4.16, plane from candidate directions at ALL layers, applied at every layer), `ContrastiveDecoder` (expert/amateur `generate` wrapper computing CD logits, no hooks), `UnsteeredRunner` (no hooks).
+6. **`EvalHarness`** — `run(benchmark, model, arm_charge) -> {n, acc, ppl, per_problem: [{id, correct: 0/1, ppl}], path}`; math: boxed-extraction exact match; code: sandboxed test execution, timeout 10 s; GSM8K: numeric match. Bootstrap CIs: percentile method, B=10_000, seed=42 (tex:L700) over `per_problem.correct`.
+7. **`arms.json`** — root of repo; schema `{benchmark, model, arm, metric, claimed, claimed_ci95, config, notes}`. This file is the numbers-gate contract (§6).
+8. **Run manifest** — every eval run writes `runs/<ts>__<arm>__<benchmark>__<model>/manifest.json` with seeds, model revision SHAs, generation config, hooks config, git SHA.
+
+## 6. Arms (the comparisons the paper makes → arms.json)
+
+**Reasoning/code**: 2 models × 4 benchmarks × 5 methods = **40 arms**. Methods: `unsteered`, `iti`, `angular-steering`, `contrastive-decoding`, `mags`. Claimed values from Table 1 (tex:L420–441) and Table 2 (tex:L466–487); CIs from tex:L717–743 / L763–789.
+
+**Molecular**: 1 model (`openai/gpt-oss-20b`) × 5 methods — `unsteered`, `angular-steering`, `iti`, `mags`, `mags-u` (CD excluded by the paper, tex:L527) = **5 arms**, two metrics each (validity %, docking kcal/mol), Table 3 (tex:L539–543).
+
+Arm configs:
+- `mags`: `k=4 (§4.1 default), q=95 (§4.2 default), K=3, α=1.0`, per-§5.5 hooks on monitored layers.
+- `mags-u`: two manifolds (validity, affinity), union head set, same k/q/K/α defaults.
+- `iti`: `K=96, α=0.5` (best of tex:L640–642, matches main-table MATH-500 0.498).
+- `angular-steering`: `angle=30°` (best of tex:L654–665, matches main-table 0.506).
+- `contrastive-decoding`: `α_p=0.1, β=0.5`, amateur per §4.17.
+
+The full arm table (45 rows) with claimed accuracy/PPL/validity/affinity per benchmark×model is written to `arms.json` alongside this SPEC. The ablation grid (tex:L613–668: MAGS 6 configs, ITI 9, AS 12 on MATH-500/Llama) is a **secondary** arm set used for the sensitivity check, not for the headline comparison.
+
+Claimed headline (what the numbers gate checks first): MATH-500, Llama-3.1-8B-Instruct — unsteered 0.478 vs MAGS 0.530 (Δ +5.2 pts); Gemma — 0.614 vs 0.648 (Δ +3.4 pts).
+
+## 7. Hazards / things that will otherwise silently be wrong
+
+- SVD convention: `torch.linalg.svd` returns `Vh` = `V^⊤`; Eq. (5) takes its top rows directly — no transpose of the principal components. `B` rows must be orthonormal (assert ‖B B^⊤ − I‖ < 1e-4).
+- `D` is `[N, d_h]` (rows = problems). Taking top singular vectors of `D^⊤` instead would produce vectors in problem-space — wrong axis, trains fine, wrong method.
+- `μ_c` token-count weighting (denominator `Σ_i Σ_{τ∈T_i^+} L_τ`) must pool token counts, not trace counts.
+- Threshold pool: Eq. (8) percentiles act over **per-token** scores pooled across correct traces — not per-trace maxima or means.
+- The correction subtracts the projection of the **centred** activation: `B^⊤B(a − μ_c)`, and then **re-adds nothing centre-wise** — it does NOT subtract `B^⊤B·a`. Off-by-centreing is a silent method change.
+- Hook must fire on the input to `W_O` (pre-o_proj), i.e. attention outputs pre-projection, per tex:L356–357 — not on the residual stream and not post-o_proj.
+- Decode-only steering (§4.9): prefill pass-through must not be rewritten, or prompts get re-centred too.
+- Gemma-4-E4B-it: `H=8` heads × `d_h=256` = 2048 ≠ `d_model=2560` — do not derive d_h as hidden/H; read `config.head_dim`.
