@@ -132,10 +132,12 @@ def main(argv=None):
     fit_idx = idx[:n_fit].tolist()
     sel_idx = idx[n_fit:n_fit + n_sel].tolist()
     report_idx = idx[n_fit + n_sel:].tolist()
-    if not sel_idx:
-        sel_idx = fit_idx   # fall back if too few problems
-    if not report_idx:
-        report_idx = sel_idx if sel_idx else fit_idx   # fall back if too few
+    # Degenerate small-N: leave the held-out splits EMPTY rather than aliasing the
+    # fit split. Aliasing fit_idx reintroduces train-data selection bias that
+    # manifold.py explicitly guards against (heads scored on the fit split get
+    # inflated held-out AUROCs); with empty splits fit_manifold_bank assigns
+    # m.auroc=0.5 (chance) and fit_iti_bank/fit_as_bank fall back gracefully. Real
+    # benchmarks have n>>7 so this is latent; smoke uses synthetic fixtures.
     fit_pids = [paired[i][0].id for i in fit_idx]
     sel_pids = [paired[i][0].id for i in sel_idx]
     report_pids = [paired[i][0].id for i in report_idx]
@@ -174,7 +176,7 @@ def main(argv=None):
           f"{len(iti_bank.heads)} monitored)")
 
     as_bank = fit_as_bank(
-        all_acts, model_id=args.model, benchmark=args.benchmark,
+        all_acts, fit_pids, model_id=args.model, benchmark=args.benchmark,
         angle_deg=config.AS_DEFAULT_ANGLE_DEG, layers_monitored=monitored,
     )
     as_path = args.out.replace(".npz", ".as.npz")

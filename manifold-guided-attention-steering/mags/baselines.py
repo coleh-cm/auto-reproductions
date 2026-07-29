@@ -129,8 +129,11 @@ def fit_iti_bank(all_head_acts: dict, train_pids: list, select_pids: list, *,
         if n < 1e-12:
             continue
         direction = (-coef / n)            # toward CORRECT (y=0), the desired class
-        # held-out probe accuracy
-        if sel.problems() and len({t for pid in sel.problems() for t in [0, 1]}) >= 2:
+        # held-out probe accuracy. The functional class-presence check is the
+        # inner `len(np.unique(yte)) >= 2` below; the outer guard only needs to
+        # confirm the held-out split is non-empty (the prior set-comprehension
+        # over the literal [0,1] was a no-op that always read len 2).
+        if sel.problems():
             Xte, yte = [], []
             for pid in sel.problems():
                 for t in sel.correct[pid]:
@@ -182,14 +185,24 @@ class ITIController:
 
 
 # ---------------------------------------------------------------------------
-# Angular Steering (SPEC §4.16): Vu & Nguyen target-angle rotation in the
+# Angular Steering (SPEC §4.16): Vu & Nguyen FIXED-OFFSET rotation in the
 # Span(d_feat, d_PC0) plane, applied across all monitored layers, every decode step.
 #   d_feat = difference-in-means direction (mean_incorrect - mean_correct) over the
 #            pooled per-head activations of that layer — the contrastive direction
 #            (SPEC §4.16; correct vs incorrect traces as the contrast set, tex:L394).
-#   d_PC0 = first principal component of the pooled activations of that layer.
-#   Rotation = TARGET-ANGLE form (Vu & Nguyen): rotate each activation so its angle
-#            in the (d_feat, d_PC0) plane becomes the target angle (not a fixed offset).
+#   d_PC0 = first principal component of the per-(l,h) candidate difference-in-means
+#            directions (Vu & Nguyen §4.5).
+#   Rotation = FIXED-OFFSET form (Vu & Nguyen Eq. 1, "Rotation by an Offset Angle"):
+#            every activation is rotated by the SAME constant angle theta; theta=0
+#            is the IDENTITY. The paper (tex:L394) says "a fixed 2D rotation in the
+#            mean-difference span across all layers", and the ablation Table 4
+#            (tex:L654-665) confirms the offset form: 0deg ~ unsteered (0.488 vs
+#            0.478), with 360deg-periodic accuracy and worst at 90-120deg — the
+#            signature of a constant-offset rotation, NOT the target-angle form
+#            (Eq. 2) which at 0deg would force every activation onto d_feat (the
+#            "incorrect" direction) and crash accuracy. The prior impl used the
+#            target-angle form (delta = target - cur); this is the corrected
+#            fixed-offset form (delta = theta, a constant).
 #
 # Adaptation note: original AS rotates the residual stream; our hook infrastructure
 # is the per-head attention output (pre-W_O). We apply the per-layer rotation to each
@@ -252,31 +265,49 @@ class ASBank:
                   open(path_manifest, "w"), indent=2)
 
 
-def fit_as_bank(all_head_acts: dict, *, model_id: str, benchmark: str,
-                angle_deg: float, layers_monitored: list) -> ASBank:
+def fit_as_bank(all_head_acts: dict, train_pids: list, *, model_id: str,
+                benchmark: str, angle_deg: float, layers_monitored: list) -> ASBank:
     """Build a SINGLE global (d_feat, d_PC0) plane from the contrastive activation
-    set, pooled across all monitored layers/heads/traces/token-steps.
+    set, pooled across all monitored layers/heads, RESTRICTED to the train split
+    (SPEC §4.8 split discipline; fit_iti_bank and fit_manifold_bank already
+    restrict to train_pids/select_pids). The prior impl iterated ALL problems,
+    leaking the held-out select/report splits and giving AS ~30% more contrastive
+    data than MAGS/ITI.
 
-    d_feat = unit(mean_incorrect - mean_correct) — the contrastive direction
-    (SPEC §4.16; correct vs incorrect traces as the contrast set, tex:L394).
-    d_PC0 = top-1 right singular vector of the pooled centered activations.
+    d_feat = unit(mean_incorrect - mean_correct) over the pooled TRAIN contrastive
+             activations — the contrastive direction (tex:L394; SPEC §4.16).
+    d_PC0 = first principal component of the per-(l,h) candidate difference-in-
+             means directions (Vu & Nguyen §4.5: "PCA on the candidate directions
+             d_feat^i and select the first principal component, d_PC0"). Each
+             candidate delta^(l,h) = mean_incorrect^(l,h) - mean_correct^(l,h)
+             over the train traces. The prior impl took PC1 of pooled RAW
+             activations, which captures dominant token/magnitude variance rather
+             than cross-layer feature-direction variance and changes the plane.
     Both are [d_h] directions; head_dim is constant across layers for every
     supported model, so one global plane applies at every layer's per-head output.
-    The plane is computed from the monitored layers' captured activations (the
-    contrastive set) and reused at all layers at inference — the "fixed rotation
-    across all layers" the paper describes.
+    The plane is reused at all layers at inference — the "fixed rotation across
+    all layers" the paper describes.
     """
+    train_set = set(train_pids)
     c_all = []   # pooled correct activations [M_c, d_h]
     i_all = []   # pooled incorrect activations [M_i, d_h]
+    candidates = []   # per-(l,h) difference-in-means directions [n_cand, d_h]
     for (l, h), ha in all_head_acts.items():
         if l not in layers_monitored:
             continue
+        c_h, i_h = [], []
         for pid in ha.problems():
+            if pid not in train_set:
+                continue
             for t in ha.correct[pid]:
-                c_all.append(t)            # [T, d_h]
+                c_h.append(t); c_all.append(t)
             for t in ha.incorrect[pid]:
-                i_all.append(t)
-    if not c_all or not i_all:
+                i_h.append(t); i_all.append(t)
+        if c_h and i_h:
+            delta = (np.concatenate(i_h, axis=0).mean(axis=0)
+                     - np.concatenate(c_h, axis=0).mean(axis=0))
+            candidates.append(delta)
+    if not c_all or not i_all or not candidates:
         # degenerate: fall back to an axis-aligned plane so the controller still
         # has a valid orthonormal basis (a real fit never reaches here)
         d_h = next(iter(all_head_acts.values())).correct[
@@ -290,11 +321,12 @@ def fit_as_bank(all_head_acts: dict, *, model_id: str, benchmark: str,
     c_all = np.concatenate(c_all, axis=0)        # [M_c, d_h]
     i_all = np.concatenate(i_all, axis=0)        # [M_i, d_h]
     d_feat = (i_all.mean(axis=0) - c_all.mean(axis=0))    # difference-in-means
-    # d_PC0 from pooled centered activations (correct+incorrect combined)
-    pooled = np.concatenate([c_all, i_all], axis=0)
-    pooled_c = pooled - pooled.mean(axis=0)
+    # d_PC0 = PC1 of the per-(l,h) candidate difference-in-means directions
+    # (Vu & Nguyen §4.5), NOT PC1 of pooled raw activations.
+    C = np.stack(candidates, axis=0)             # [n_candidates, d_h]
+    Cc = C - C.mean(axis=0, keepdims=True)
     try:
-        _, _, Vh = np.linalg.svd(pooled_c, full_matrices=False)
+        _, _, Vh = np.linalg.svd(Cc, full_matrices=False)
         d_pc0 = Vh[0]
     except Exception:
         d_pc0 = np.zeros_like(d_feat); d_pc0[0] = 1.0
@@ -316,21 +348,23 @@ def fit_as_bank(all_head_acts: dict, *, model_id: str, benchmark: str,
 
 
 class AngularSteeringController:
-    """Target-angle Angular Steering (SPEC §4.16). Rotates each head's attention
-    output in the global (d_feat, d_PC0) plane so its angle becomes the target
-    angle. The SAME fixed plane is applied at EVERY layer (paper tex:L394 "a fixed
-    2D rotation ... across all layers"; SPEC §4.16 "rotate all layers"; SPEC §5.5
-    "applied at every layer"). ``hook_layers='all'`` asks the HookRegistry to
-    install W_O pre-hooks on every layer so the rotation reaches non-monitored
-    layers too (the prior implementation only rotated the monitored subset, which
-    made AS behave like a targeted method rather than the uniform-across-all-layers
-    baseline the paper compares against)."""
+    """Fixed-offset Angular Steering (SPEC §4.16; Vu & Nguyen Eq. 1). Rotates each
+    head's attention output in the global (d_feat, d_PC0) plane by the SAME constant
+    angle theta (a fixed offset). theta=0 is the IDENTITY (matches the ablation
+    Table 4 0deg~unsteered signature, tex:L654). The SAME fixed plane is applied at
+    EVERY layer (paper tex:L394 "a fixed 2D rotation ... across all layers"; SPEC
+    §4.16 "rotate all layers"; SPEC §5.5 "applied at every layer").
+    ``hook_layers='all'`` asks the HookRegistry to install W_O pre-hooks on every
+    layer so the rotation reaches non-monitored layers too (the prior
+    implementation only rotated the monitored subset, which made AS behave like a
+    targeted method rather than the uniform-across-all-layers baseline the paper
+    compares against)."""
     # request hooks on ALL layers (registry resolves 'all' to range(n_layers))
     hook_layers = "all"
 
     def __init__(self, as_bank: ASBank, angle_deg: float | None = None):
-        self.target = float(np.deg2rad(angle_deg if angle_deg is not None
-                                       else as_bank.angle_deg))
+        self.theta = float(np.deg2rad(angle_deg if angle_deg is not None
+                                      else as_bank.angle_deg))
         self.plane = as_bank.plane      # the single global ASPlane
 
     def __call__(self, layer, x_heads):
@@ -343,10 +377,12 @@ class AngularSteeringController:
         a = out[0, 0]                      # [H, dh]
         comp_feat = a @ d_feat             # [H]
         comp_pc0 = a @ d_pc0               # [H]
-        # current angle of each head in the plane
-        cur = np.arctan2(comp_pc0, comp_feat)            # [H]
-        delta = self.target - cur                          # rotate to target
-        cos, sin = np.cos(delta), np.sin(delta)
+        # FIXED-OFFSET rotation by the constant theta (Vu & Nguyen Eq. 1): every
+        # activation rotated by the same angle; theta=0 is the identity. The prior
+        # target-angle form (delta = target - cur) rotated each activation TO theta
+        # and at 0deg forced every head onto d_feat (the "incorrect" direction) —
+        # a different intervention that cannot reproduce the ablation.
+        cos, sin = np.cos(self.theta), np.sin(self.theta)
         new_feat = cos * comp_feat - sin * comp_pc0
         new_pc0 = sin * comp_feat + cos * comp_pc0
         a_new = a + (new_feat - comp_feat)[:, None] * d_feat \

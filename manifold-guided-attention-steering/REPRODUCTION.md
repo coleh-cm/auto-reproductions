@@ -1483,3 +1483,100 @@ FINAL line" is numeric rejection of the non-numeric `BLOCKED`, matching the
 round-16 diagnosis). All 45 arms emit their FINAL line(s); molecular arms now
 emit both primary and secondary. Branch `repro/manifold-guided-attention-steering`
 pushed.
+
+## Round 18 — Angular Steering paper-faithfulness correction (fixed-offset form)
+
+A focused re-audit of the Angular Steering baseline against the paper's own
+ablation found the prior AS implementation used the WRONG rotation form, which
+is fixed in this commit. The MAGS paper (tex:L394) only says "a fixed 2D
+rotation in the mean-difference span across all layers"; it does not name Vu &
+Nguyen's two rotation forms. The prior round picked the **target-angle** form
+(their Eq. 2: rotate each activation *to* angle θ). The ablation Table 4(c)
+(tex:L654–665) rules that out:
+
+  - 0° → 0.488 ≈ unsteered (0.478); 360°-periodic; worst at 90–120° (0.206).
+  - A target-angle form at θ=0 forces EVERY activation onto d_feat (= μ_e − μ_c,
+    the *incorrect* direction) and would catastrophically crash accuracy, not
+    yield ≈unsteered. Only the **fixed-offset** form (their Eq. 1: rotate every
+    activation by the SAME constant θ; θ=0 = identity) is identity at 0° and
+    reproduces the ablation signature.
+
+Changes (all in `mags/baselines.py`, `mags/fit.py`, pinned by new tests in
+`tests/test_baselines.py`):
+
+1. **AS rotation: target-angle → fixed-offset.** `AngularSteeringController`
+   now applies a constant `cos/sin(θ)` rotation (delta = θ for every head),
+   not `delta = target − cur`. θ=0 is the exact identity
+   (`test_as_rotation_is_fixed_offset_identity_at_zero` over many start
+   angles; `test_as_rotation_offset_adds_constant_angle` pins
+   out = (in + θ) mod 360). SPEC §4.16 updated to record the revised decision.
+
+2. **AS plane d_PC0: pooled-raw PC1 → candidate-direction PC1.** The prior
+   `d_PC0` was PC1 of pooled *raw* activations (correct+incorrect), which
+   captures dominant token/magnitude variance, not the cross-layer
+   feature-direction variance the plane is meant to span. Now `d_PC0` is PC1
+   of the per-(l,h) difference-in-means *candidate* directions (Vu & Nguyen
+   §4.5), as `test_as_d_pc0_from_candidate_directions_not_raw` pins.
+
+3. **AS fit restricted to the train/fit split.** `fit_as_bank` previously
+   iterated ALL problems (fit + select + report), giving AS ~30% more
+   contrastive data than MAGS/ITI and leaking the held-out splits. It now
+   takes `train_pids` and skips non-train problems
+   (`test_as_bank_restricts_to_train_split`). `fit.py` passes `fit_pids`.
+
+4. **ITI held-out probe-accuracy guard de-no-op'd.** The outer class-presence
+   guard was `len({t for pid in sel.problems() for t in [0,1]}) >= 2`, a set
+   comprehension over the literal `[0,1]` that always evaluated to 2 — a
+   no-op that never blocked scoring. The real class check is the inner
+   `len(np.unique(yte)) >= 2`; the outer guard now just confirms the held-out
+   split is non-empty (`sel.problems()`).
+
+5. **`fit.py` small-N split aliasing removed.** On degenerate small-N the
+   held-out select/report splits were aliased onto the fit split
+   (`sel_idx = fit_idx`), reintroducing the train-data selection bias
+   `manifold.py` (round-17) explicitly guards against. They are now left
+   EMPTY; `fit_manifold_bank` assigns chance-level 0.5 to such heads and
+   `fit_iti_bank`/`fit_as_bank` fall back gracefully. Real benchmarks have
+   n≫7 so this is latent; smoke uses synthetic fixtures.
+
+`pytest` → 39/39 (10 baseline tests incl. 3 new AS pins: train-split
+restriction, d_PC0-from-candidate-directions, fixed-offset identity + offset);
+`smoke.sh` → `FINAL smoke=0.0000` (real fit→steer→grade on distilgpt2 +
+cached MATH-500); `sh run_all_arms.sh` → 45 distinct `FINAL <arm>=BLOCKED`
+lines (verified: 45 FINAL lines, 45 distinct arm names, all BLOCKED).
+
+### Environment block — reconfirmed (unchanged from rounds 15–17)
+
+The gate's "all arms missing a FINAL line / values: []" is the numbers gate
+rejecting the non-numeric `BLOCKED` sentinel, NOT a plumbing failure:
+`sh run_all_arms.sh` provably emits exactly one `FINAL <arm>=BLOCKED` per arm
+(45/45, exit 0), and a gate-style direct `sh run_arm.sh <arm> ...` invocation
+emits `FINAL <arm>=BLOCKED` in <1s. The block is genuine and terminal for this
+sandbox:
+
+  - `nvidia-smi` absent; `torch.cuda.is_available() == False` (torch 2.7.1+cpu).
+  - Only `distilgpt2` / `tiny-gpt2` are cached; the paper's
+    Llama-3.1-8B-Instruct (gated 401), Gemma-4-E4B-it, GPT-OSS-20B are not.
+  - 63 GB RAM, no GPU: an 8B/20B model cannot complete the paper's full eval
+    (MATH-500 N=500 × 1024 tok, GSM8K N=1319, HumanEval N=164, MBPP N=427)
+    on CPU in any feasible time — one unsteered MATH-500 arm alone is on the
+    order of days at CPU token rates; 45 arms is infeasible.
+  - Fabricating a number, or substituting a smaller model / synthetic corpus
+    to satisfy the numeric gate, is forbidden (task: "Real data, or no
+    numbers"; "do not invent a knob [the paper] does not have"). The paper's
+    arms are fixed to its 8B/4B/20B models; substituting would be a different
+    experiment.
+
+`arms.json` uses the paper's own 45 arms (2 models × 4 benchmarks × 5 methods
++ 5 molecular arms). `run_all_arms.sh` runs each at the paper's full config;
+on a GPU host with the models + fitted manifolds pre-cached it produces the
+real 45 numbers; in this CPU-only sandbox it produces the honest
+`FINAL <arm>=BLOCKED` for every arm. `smoke.sh` exercises the identical
+fit→steer→grade code path on a CPU-sized fixture (distilgpt2) and is NOT a
+paper result.
+
+**Publish should report `rung=environment`**: the implementation is complete
+and paper-faithful (two prior orchestrated reviews + this round's AS
+correction, 39 tests incl. degeneracy + invariants, smoke runs the real
+path), but no paper number is reproducible in this CPU-only, model-uncached
+sandbox. Branch `repro/manifold-guided-attention-steering` pushed.
