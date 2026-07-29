@@ -262,12 +262,21 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
         train_loss = loss_sum / max(loss_count, 1)
 
         # --- per-epoch validation (model in eval mode => dropout off) ---
+        # The M5 retrain arm (load_mnist_full_train) passes an EMPTY valid set
+        # (no leak). When valid is empty, eval_clean/eval_fgsm return NaN, so we
+        # skip checkpoint selection entirely and keep the FINAL state (no early
+        # stopping) -- the retrain arm trains for the fixed chosen epoch count.
+        valid_empty = int(x_valid.size(0)) == 0
         model.eval()
-        clean_acc = float(eval_clean(model, x_valid, y_valid))
-        clean_valid_error = 1.0 - clean_acc
-        adv_valid_error = float(
-            eval_fgsm(model, x_valid, y_valid, float(cfg.eps)).error_rate
-        )
+        if valid_empty:
+            clean_valid_error = float("nan")
+            adv_valid_error = float("nan")
+        else:
+            clean_acc = float(eval_clean(model, x_valid, y_valid))
+            clean_valid_error = 1.0 - clean_acc
+            adv_valid_error = float(
+                eval_fgsm(model, x_valid, y_valid, float(cfg.eps)).error_rate
+            )
 
         history.append(
             {
@@ -277,19 +286,24 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
             }
         )
 
-        if cfg.early_stop == "adversarial":
-            metric = adv_valid_error
-        else:
-            metric = clean_valid_error
-
-        if metric < best_metric:
-            best_metric = metric
+        if valid_empty:
+            # no validation signal -> keep the latest state, no early stop
             best_state_dict = copy.deepcopy(model.state_dict())
             patience_counter = 0
         else:
-            patience_counter += 1
-            if patience_counter >= cfg.patience:
-                break
+            if cfg.early_stop == "adversarial":
+                metric = adv_valid_error
+            else:
+                metric = clean_valid_error
+
+            if metric < best_metric:
+                best_metric = metric
+                best_state_dict = copy.deepcopy(model.state_dict())
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= cfg.patience:
+                    break
 
         if reached_max_steps:
             break

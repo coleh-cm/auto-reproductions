@@ -4,7 +4,7 @@
       "mean_test_error": 0.8865000009536743,
       "per_seed": [
         {
-          "epochs_chosen": 1,
+          "epochs_chosen": 2,
           "seed": 0,
           "test_accuracy": 0.11349999904632568,
           "test_error": 0.8865000009536743
@@ -12,13 +12,13 @@
       ]
     },
     "baseline": {
-      "mean_test_error": 0.600600004196167,
+      "mean_test_error": 0.0656999945640564,
       "per_seed": [
         {
-          "epochs_chosen": 1,
+          "epochs_chosen": 2,
           "seed": 0,
-          "test_accuracy": 0.399399995803833,
-          "test_error": 0.600600004196167
+          "test_accuracy": 0.9343000054359436,
+          "test_error": 0.0656999945640564
         }
       ]
     }
@@ -39,7 +39,7 @@
     "pieces": 5,
     "select_criterion_adv": "adversarial-valid",
     "select_criterion_base": "clean-valid",
-    "select_max_epochs": 1,
+    "select_max_epochs": 2,
     "units": 64
   },
   "milestone": "M5",
