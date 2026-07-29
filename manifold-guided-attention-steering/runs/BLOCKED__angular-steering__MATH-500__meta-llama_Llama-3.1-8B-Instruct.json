@@ -1,4 +1,0 @@
-{
-  "arm": "angular-steering__MATH-500__meta-llama_Llama-3.1-8B-Instruct",
-  "blocked_reason": "model load failed: RuntimeError(\"Could not load model 'meta-llama/Llama-3.1-8B-Instruct': OSError('You are trying to access a gated repo.\\\\nMake sure to have access to it at https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct.\\\\n401 Client Error. (Request ID: Root=1-6a6a5a6d-123b35e1607671305e629ba7;adee41fb-eb55-4019-b35b-fc0682e1ce0d)\\\\n\\\\nCannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct/resolve/main/config.json.\\\\nAccess to model meta-llama/Llama-3.1-8B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in.'). This is the expected BLOCKER in a no-GPU / no-gated-token sandbox; the paper's models are Llama-3.1-8B-Instruct (gated), Gemma-4-E4B-it, GPT-OSS-20B (need >=40GB VRAM).\")"
-}
