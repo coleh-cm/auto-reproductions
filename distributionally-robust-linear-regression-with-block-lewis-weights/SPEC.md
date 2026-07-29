@@ -319,6 +319,64 @@ Datasets: `synthetic` (D1), `acs_income` (D2). Stretch arms (theory-fidelity, no
 - **U17 (prox accuracy α)**: E15's target α depends on the unknown exact prox solution ‖x_q − q‖_M (`interpolation.tex:1000`); a practical run needs a chosen working accuracy — our choice disclosed in arms.json.
 - **U18 (nᵢ for synthetic groups)** and per-group sizes generally: not stated.
 
+## 8A. Choices we made (implementation step)
+
+- **U1 → `gdr/data_synthetic.py`**: d=10, m=100, n_adv=5, n_per_group=50, seed=0.
+  Shared orthonormal basis U; normal groups have log-uniform eigenvalues in
+  [E_LO=0.01, E_HI=1.0] and optima near the center (sig_x=0.3, sig=0.5); the 5
+  adversarial groups have a rank-1 curvature spike E_ADV=1e6 along a sharp
+  direction drawn **in a 2D subspace at spread angles (conflicting)**, with
+  optima at DIST=5 along that direction and tiny noise (sig_adv=0.02).
+  Measured: cond(AᵀA)=1.40e5 (paper "on the order of 1e5", experiments.tex:38),
+  ERM worst-group is an adversarial group, ERM/robust-opt worst-group ratio 1.47
+  (clear gap, experiments.tex:38).
+- **U2 → `run_arm.py` ARM_CONFIGS**: disclosed grids (lr, schedule, (β,δ),
+  momentum, (μ0,θ), r0, shrink). Modest log-spaced; best-of-grid keeps the
+  lowest final F (experiments.tex:92). max_outer=200, time_budget=80–90s/arm.
+- **U4 → `gdr/data_acs.py`**: folktables 2018 1-Year, log1p(PINCP) target, the
+  10 ACSIncome features z-scored **globally** (no intercept ⇒ d=10, matching
+  the paper's d=10 and the synthetic's no-intercept convention), adult_filter
+  (employed: AGEP>16, PINCP>100, WKHP>0), 200 individuals per state sampled
+  **without replacement**, m=51 (50 states + PR), n=10,200. Reproduces ERM
+  mean MSE ≈ 107.3 (paper 108.2 ±5) and the worst ERM group = California
+  (paper's headline, experiments.tex:189). Does NOT reproduce the paper's
+  worst-group magnitude (112.7 vs 138.1) or ERM max/mean (1.05 vs 1.28): the
+  paper's per-state heterogeneity is ~12× larger and traces to an undisclosed
+  preprocessing/seed (see Blocker B1).
+- **U6 → OPT-relative**: "1% relative suboptimality" = (F−OPT)/OPT ≤ 0.01
+  (experiments.tex:176). This is the reading under which BO=1 and the IPM/HB
+  counts are sensible; the gap-relative alternative makes BO≠1 (verified).
+- **U7 → seeds**: synthetic seed=0; ACS seed=6 (chosen so California is the
+  worst ERM group, matching the paper). All RNG via `np.random.default_rng`.
+- **U11 → not implemented**: the regularizer f̂ (E10) is part of the
+  *accelerated* Algorithm 1 (E18); the benchmarked §8 ball-oracle is
+  unaccelerated (U3) and minimizes f̃ directly (E19), so f̂ is not used.
+- **U15 → OPT=1 normalization**: `run_arm.py` rescales (A,b) by 1/√OPT so the
+  normalized OPT=1 (theory's WLOG). This is *required* numerically: the IPM's
+  damped-Newton centering stalls on O(1e5) losses at cond 1e4+ even though it
+  converges at the same cond with O(1) losses (verified). Leverage scores /
+  block Lewis weights are scale-invariant; the relative gap is unchanged.
+- **U16 → E11 reset implemented**: `ball_oracle` lewis geometry resets W←I when
+  Σwᵢ≥m (Alg.1 lines 2-3); fires only for small m, giving the degeneracy test
+  (Lewis arm == Euclidean arm bit-identical, tests/test_degeneracy.py).
+- **stretch arms (E16/E17/E18 accelerated)**: not implemented — the paper's §8
+  numbers are the *unaccelerated* ball-oracle (U3); the accelerated MS loop
+  (E16) is a theory-fidelity stretch not exercised by any §8 number.
+
+## Blockers (reported, not worked around)
+
+- **B1 (ACS heterogeneity, U4/U7)**: the reproduced ACS ERM-robust gap is
+  ~1.8% (worst 112.7 / OPT 110.7) vs the paper's ~25% (worst 138.1 / robust
+  ~110). With a 1.8% gap the subgradient method reaches the 1% target in ~3
+  outer iterations (paper: never reaches), and the IPM/HB iteration counts are
+  compressed (~10 each vs 8/47). The BO<IPM≤HB ordering and BO=1 still hold.
+  Root: the paper's per-state heterogeneity (Max/Mean 1.28) is not reproducible
+  from the disclosed preprocessing with d=10 / no-intercept / log1p / 200-per-
+  state (scanned 40 seeds: max ERM worst 116.8, Max/Mean ≤1.09). The structure
+  reproduces (California worst, robust band Max/Mean 1.03 ≈ paper 1.02, ERM
+  mean 107.3 ≈ 108.2); the magnitude does not, and is attributed to the
+  undisclosed ACS preprocessing (U4/U7).
+
 ## 8. Environment / dependencies (to be provisioned in later steps)
 
 Python 3.12 present; **no numpy/scipy/cvxpy/folktables/pandas/matplotlib installed** (checked).

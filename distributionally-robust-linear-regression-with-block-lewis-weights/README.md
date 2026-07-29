@@ -102,58 +102,95 @@ docker run --rm gdr-block-lewis          # runs smoke_imports.py
 
 ## Running the experiments
 
-The experiment entrypoint (`gdr/runner.py` per SPEC §4) and the arm
-configurations (`arms.json` per SPEC §5) are produced by the implementation
-step. Once present, the intended interface is:
-
 ```bash
-# run one arm on one dataset (SPEC §4 frozen interface)
-.venv/bin/python -m gdr.runner --arm ball_oracle_lewis --dataset synthetic
-.venv/bin/python -m gdr.runner --arm ball_oracle_lewis --dataset acs_income
+# prove the toolchain resolves and the E20 epigraph QCQP solves (env smoke)
+.venv/bin/python smoke_imports.py
 
-# the 7 arms x 2 datasets comparison of §8 (subgradient, smoothed_gd/hb/nesterov,
-# ipm, ball_oracle_euclidean, ball_oracle_lewis) + the CVXPY opt_reference
-.venv/bin/python -m gdr.runner --all
+# one arm on one dataset (prints FINAL <dataset>_<arm>=<iters-to-1%>)
+.venv/bin/python run_arm.py --arm ball_oracle --geometry lewis --dataset synthetic --seed 0
+.venv/bin/python run_arm.py --arm ipm                  --dataset acs_income --seed 6
+
+# all 7 method arms x 2 datasets + opt_reference (the §8 comparison)
+bash run_all_arms.sh                 # prints one FINAL line per (dataset, arm)
+
+# a tiny end-to-end smoke (same code path, finishes in ~1 min; NOT a result)
+bash smoke.sh
 ```
 
-Until the implementation lands, `smoke_imports.py` is the runnable proof that
-the environment is correct.
+Each arm prints exactly `FINAL <dataset>_<arm>=<value>` where `<value>` is the
+arm's own outer iterations to reach 1% relative worst-group suboptimality
+`(F−OPT)/OPT ≤ 0.01` (T1, `experiments.tex:176`), or `NR` if not reached within
+budget. Full per-arm histories are written to `results/<dataset>_<arm>.json`
+(committed, not gitignored).
 
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # equation-invariant + degeneracy gates (SPEC §5 T5)
+.venv/bin/python -m pytest -q     # 12 tests: degeneracy + equation invariants (SPEC T5)
 ```
 
-## Target numbers (§8)
+`tests/test_degeneracy.py` — the method at its no-op setting must reproduce the
+baseline exactly: (D1) the Lewis ball-oracle at the E11 reset (Σwᵢ≥m ⇒ W←I) is
+bit-identical to the Euclidean ball-oracle; (D2) the p=2 interpolating objective
+reduces to plain least squares (ERM). `tests/test_invariants.py` — Lemma 6.1
+(`|f̃−f| ≤ β log m + δ`), the E6 block-Lewis overestimate & `‖w‖₁ ≤ 2(d+1)`,
+the E7 residual sandwich, smoothed grad/Hessian finite-difference + PSD,
+p-objective gradient finite-difference, subgradient validity, ball-oracle
+monotonicity.
 
-**ACS Income, cost to reach 1% relative worst-group suboptimality**
-(`tab:acs_runtime`, `experiments.tex:171-186`):
+## Results (this reproduction)
 
-| Method                  | Iterations to 1% gap | Wall-clock (s) |
-|-------------------------|----------------------|----------------|
-| Subgradient             | — (not reached)      | —              |
-| Smoothed Heavy-Ball     | 47                   | 0.062          |
-| IPM                     | 8                    | 0.066          |
-| Ball-Oracle (Euclidean) | 1                    | 0.019          |
-| Ball-Oracle (Lewis)     | 1                    | 0.019          |
+**Synthetic (D1, seed=0; cond(AᵀA)=1.40e5; ERM/robust worst-group ratio 1.47)**
+— T4 is qualitative (`experiments.tex:106-109`): subgradient=NR, all smoothed
+first-order=NR (plateau), ipm=4, ball_oracle_euclidean=4, ball_oracle_lewis=4.
+Matches the paper: IPM and both ball-oracle arms reach the 1% target while
+first-order methods plateau above it; IPM reaches the lowest final loss.
 
-Gate semantics (SPEC §5 T1–T5): both ball-oracle arms reach the target in ≤ 2
-outer iterations with strict ordering `iters(BO) < iters(IPM) ≤ iters(HB)` and
-the subgradient arm does not reach 1% within budget; the synthetic instance
-shows IPM lowest, both BO arms strictly decreasing and beating the first-order
-plateau, Lewis ≤ Euclidean finally; the E6/E7/E9/Lemma-6.1 unit checks hold.
-Exact counts depend on undisclosed hyperparameter grids (U2), so the honest
-gate is ordering + boundedness, not exact-equality.
+**ACS Income (D2, seed=6; California is the worst ERM group; ERM mean 107.3)**
+— T1 gate (`experiments.tex:171-186`):
+
+| Method                  | Paper (iters to 1%) | This repro |
+|-------------------------|---------------------|------------|
+| Subgradient             | — (not reached)     | 3 (reaches) |
+| Smoothed Heavy-Ball     | 47                  | 10         |
+| IPM                     | 8                   | 10         |
+| Ball-Oracle (Euclidean) | 1                   | 1          |
+| Ball-Oracle (Lewis)     | 1                   | 1          |
+
+Gate: BO arms ≤ 2 ✓; ordering `iters(BO)=1 < iters(IPM)=10 ≤ iters(HB)=10` ✓
+(paper `1 < 8 < 47`); subgradient reaches 1% ✗ (paper: never). The ordering and
+BO=1 reproduce; the subgradient-NR condition and the IPM/HB magnitudes do not,
+because the reproduced ACS ERM-robust gap is ~1.8% vs the paper's ~25% (Blocker
+B1 below). T3 (report-only): ERM mean 107.3 (paper 108.2 ±5 ✓), worst state
+California ✓, robust Max/Mean 1.030 (paper 1.02 ✓); ERM worst 112.7 (paper
+138.1 ✗), ERM Max/Mean 1.051 (paper 1.28 ✗).
+
+## Blocker B1 (ACS heterogeneity, U4/U7)
+
+The paper's per-state heterogeneity (ERM Max/Mean 1.28, worst 138.1) is **not
+reproducible** from the disclosed preprocessing with `d=10` / no-intercept /
+`log1p(PINCP)` / 200-per-state: a 40-seed scan caps the ERM worst at 116.8
+(Max/Mean ≤ 1.09). With the faithful setup the reproduced ERM-robust gap is
+~1.8% (vs the paper's ~25%), so the subgradient method reaches the 1% target
+(the paper reports it never does) and the IPM/HB counts are compressed. The
+**structure** reproduces — California is the worst ERM group, the robust
+optimum narrows the band to Max/Mean ≈ 1.03 (paper 1.02), ERM mean ≈ 107.3
+(paper 108.2) — but the **magnitude** does not, and is attributed to the
+undisclosed ACS preprocessing/seed (U4/U7). This is a partial-reproduction
+blocker on the T1 subgradient-NR condition and the T3 magnitudes; the
+`iters(BO) < iters(IPM) ≤ iters(HB)` ordering and `BO = 1` hold.
 
 ## Notes / open risks (carried from SPEC §7)
 
 - The benchmarked ball-oracle arms are **unaccelerated** (`experiments.tex:78`),
-  so §8's numbers do not exercise Theorem 1's Algorithm 1 as written (U3).
+  so §8's numbers do not exercise Theorem 1's Algorithm 1 as written (U3); the
+  accelerated MS-oracle arms (E16/E17/E18) are a theory-fidelity stretch not
+  exercised by any §8 number and are not implemented here.
 - The synthetic data recipe is not in the paper (U1); the "included Jupyter
   notebook" (`experiments.tex:38`) is absent from the arXiv tarball — the
-  concrete generator is our declared choice in `arms.json`.
-- ACS data download via `folktables` needs network at run time (D2); the
-  synthetic instance (D1) is fully self-contained.
-- ACS preprocessing (year/horizon, standardization, subsample scheme/seed, log
-  transform) is unspecified (U4); declared choices live in `arms.json`.
+  concrete generator (`gdr/data_synthetic.py`) is our declared choice.
+- ACS data (51 state PUMS CSVs, ~575 MB) are gitignored; download with
+  `scripts/download_acs.py` (or `folktables` `get_data(download=True)`).
+- All open choices are recorded in SPEC.md §8A; the OPT=1 normalization (U15)
+  is required numerically (the IPM's damped-Newton centering stalls on O(1e5)
+  losses at cond 1e4+ but converges at the same cond with O(1) losses).

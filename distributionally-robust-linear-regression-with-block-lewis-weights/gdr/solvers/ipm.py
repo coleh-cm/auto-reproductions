@@ -154,7 +154,10 @@ def _run_single(problem, x0, max_outer, deadline, mu0, theta, inner_tol, opt):
     cache = _group_cache(problem)          # list of (Ai, AtA_i)
     h = seed_history(problem, x0, opt)     # iter 0 recorded
     x = h["x"].copy()                      # [d]
-    t = float(max_loss(problem, x)) + 1.0  # strictly feasible t0 (E21 guard)
+    # Start strictly feasible with a margin ~ mu0 so the first center sits near
+    # the central-path point for mu0 (margin ~ mu balances the objective t and
+    # the barrier; SPEC E21 guard).  mu0 is already scaled by L0 in run().
+    t = float(max_loss(problem, x)) + max(float(mu0), 1.0)  # strictly feasible t0
     mu = float(mu0)                         # barrier parameter
     t0 = time.perf_counter()
     INNER_CAP = 50                         # centering Newton cap per outer iter
@@ -190,7 +193,24 @@ def run(problem, cfg, x0, max_outer, time_budget):
     x0 = np.asarray(x0, dtype=np.float64)          # [d]
     mu0_grid = as_list(cfg.get("mu0_grid"), DEFAULTS["mu0_grid"])
     theta_grid = as_list(cfg.get("theta_grid"), DEFAULTS["theta_grid"])
-    inner_tol = float(cfg.get("inner_tol", DEFAULTS["inner_tol"]))
+    inner_tol = cfg.get("inner_tol", DEFAULTS["inner_tol"])
+    if isinstance(inner_tol, (list, tuple, np.ndarray)):
+        inner_tol_grid = [float(v) for v in inner_tol]
+    else:
+        inner_tol_grid = [float(inner_tol)]
+
+    # Scale the barrier parameter by the initial loss magnitude L0 = F(x0).
+    # The log barrier Phi = t - mu*sum ln(t-l_i) only has a meaningful center
+    # when mu is comparable to the objective scale t (~1e7 on the raw data);
+    # with mu=1 (unscaled) the barrier is negligible, centering pins t at the
+    # feasibility boundary and x never rebalances.  Scaling mu by L0 is exactly
+    # equivalent to the paper's WLOG OPT=1 rescaling (U15): the argmin of
+    # min_x max_i ||A_i x - b_i||^2 is invariant under (A,b) -> (A,b)/sqrt(L0),
+    # and on the rescaled problem mu'=mu/L0 ~ O(1).  This yields the paper's
+    # ~8-outer-iteration convergence to 1% (experiments.tex:180).
+    L0 = float(max_loss(problem, x0))
+    if not np.isfinite(L0) or L0 <= 0.0:
+        L0 = 1.0
 
     t_start = time.perf_counter()
     deadline = t_start + float(time_budget)
@@ -198,13 +218,16 @@ def run(problem, cfg, x0, max_outer, time_budget):
     best_final = np.inf
     for mu0 in mu0_grid:
         for theta in theta_grid:
+            for inner_tol in inner_tol_grid:
+                if time.perf_counter() > deadline:
+                    break
+                h, final = _run_single(problem, x0, max_outer, deadline,
+                                       float(mu0) * L0, float(theta), inner_tol, opt)
+                if final < best_final:
+                    best_final = final
+                    best = h
             if time.perf_counter() > deadline:
                 break
-            h, final = _run_single(problem, x0, max_outer, deadline,
-                                   float(mu0), float(theta), inner_tol, opt)
-            if final < best_final:
-                best_final = final
-                best = h
         if time.perf_counter() > deadline:
             break
     if best is None:

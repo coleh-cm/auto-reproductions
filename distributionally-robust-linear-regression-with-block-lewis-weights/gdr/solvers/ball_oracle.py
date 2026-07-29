@@ -154,10 +154,14 @@ def _run_single(problem, M, x0, max_outer, deadline,
 
 
 def _tol_inner_list(cfg):
-    """Parse the tol_inner grid: tol_inner_grid (list) or single tol_inner."""
+    """Parse the tol_inner grid: accept a list under tol_inner_grid or tol_inner,
+    or a single scalar under tol_inner (SPEC sec5 grid convention)."""
     if cfg.get("tol_inner_grid") is not None:
         return [float(v) for v in as_list(cfg["tol_inner_grid"], [])]
-    return [float(cfg.get("tol_inner", DEFAULTS["tol_inner"]))]
+    tol = cfg.get("tol_inner", DEFAULTS["tol_inner"])
+    if isinstance(tol, (list, tuple, np.ndarray)):
+        return [float(v) for v in tol]
+    return [float(tol)]
 
 
 def run(problem, cfg, x0, max_outer, time_budget):

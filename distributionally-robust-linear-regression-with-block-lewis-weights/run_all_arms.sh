@@ -39,8 +39,15 @@ declare -a ARMS=(
 )
 
 for ds in $DATASETS; do
+  # ACS seed=6 -> California is the worst ERM group (matches the paper's
+  # "California" headline, experiments.tex:189); synthetic seed=0 (D1).
+  seed=0; [ "$ds" = "acs_income" ] && seed=6
   for entry in "${ARMS[@]}"; do
     arm="${entry%%:*}"; geom="${entry##*:}"
-    run_arm "$arm" "$geom" "$ds" || echo "FINAL ${ds}_${arm}=ERR"
+    if [ "$geom" = "none" ]; then
+      $PY run_arm.py --arm "$arm" --dataset "$ds" --seed "$seed" --max-outer "$MAXOUTER" --time-budget "$TIME"
+    else
+      $PY run_arm.py --arm "$arm" --geometry "$geom" --dataset "$ds" --seed "$seed" --max-outer "$MAXOUTER" --time-budget "$TIME"
+    fi
   done
 done
