@@ -59,11 +59,22 @@ cd "$(dirname "$0")"
 export PYTHONUNBUFFERED=1
 mkdir -p runs manifolds
 
-# Force OFFLINE for any real model load: Tier 1 already proved the model is
-# cached, so offline load uses the cache; a partial cache raises in <1s instead
-# of hanging on a blackholed network. (We never download inside this script.)
-export HF_HUB_OFFLINE=1
-export TRANSFORMERS_OFFLINE=1
+# Force OFFLINE (models + datasets) unless the reproducer opts in with
+# MAGS_ONLINE=1. This is the round-13 root-cause fix for the recurring "all arms
+# missing a FINAL line" gate failure: a cached model + token + blackholed net
+# let an arm proceed past the model precheck to `load_dataset`, which HANGS
+# online until the gate kills it -> zero FINAL lines. Offline makes every
+# uncached resource fast-fail (ConnectionError in <1s) -> one honest
+# FINAL=BLOCKED line per arm in <1s, regardless of token/network/CUDA. A real
+# GPU host pre-caches models+datasets (README) — offline loads the cache — or
+# sets MAGS_ONLINE=1 to download. The per-arm `python -m mags.run` / `mags.fit`
+# modules ALSO force offline at import (defense-in-depth for direct invocation),
+# so this export is belt-and-suspenders.
+if [ "${MAGS_ONLINE:-0}" != "1" ]; then
+    export HF_HUB_OFFLINE=1
+    export TRANSFORMERS_OFFLINE=1
+    export HF_DATASETS_OFFLINE=1
+fi
 export HF_HUB_ETAG_TIMEOUT="${HF_HUB_ETAG_TIMEOUT:-10}"
 export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-10}"
 # Per-command wall-clock backstops (only a safety net; on a no-cache host Tier 1

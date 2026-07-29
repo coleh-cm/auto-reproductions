@@ -25,41 +25,38 @@ import json
 import os
 import sys
 
-# --- offline fast-fail (round-4 gate fix) -------------------------------------
-# The gate runs in a Docker image that HAS torch/transformers but has NO model
-# cache and (typically) NO network. transformers' default ONLINE mode then hangs
-# on every `from_pretrained` call until the gate's overall timeout -> the script
-# is killed before a single `FINAL <arm>=...` line prints -> the gate reports
-# every arm "missing a FINAL line" with `values: []`. We default to OFFLINE
-# (HF_HUB_OFFLINE=1 / TRANSFORMERS_OFFLINE=1) when NO HuggingFace token is
-# discoverable, so an uncached model raises an OSError in well under a second
-# instead of hanging; run.py's try/except turns that into one honest
-# `FINAL <arm>=BLOCKED` line. A real GPU host that ran `huggingface-cli login`
-# (token stored at $HF_HOME/token) OR exported HF_TOKEN is detected here and
-# left in online mode so the models can download; pre-cached models load under
-# offline=1 too. This runs at module scope using only stdlib, BEFORE any
-# transformers import, so it also protects arms invoked directly (not just via
-# run_all_arms.sh).
-def _has_hf_token():
-    if os.environ.get("HF_TOKEN") or os.environ.get("HF_HUB_TOKEN"):
-        return True
-    for p in (
-        os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "token"),
-        os.path.expanduser("~/.huggingface/token"),
-    ):
-        try:
-            if os.path.isfile(p) and open(p).read().strip():
-                return True
-        except OSError:
-            pass
-    return False
-
-
-if not _has_hf_token():
+# --- offline fast-fail (round-13 root-cause fix) -------------------------------
+# THE GATE FAILURE (rounds 1-12): every one of the 45 arms reported "missing a
+# FINAL line" with `values: []`, despite a dozen in-sandbox "fixes" that all
+# printed 45 FINAL lines locally. Root cause: the gate environment can have a
+# HuggingFace token present (so the round-4 "offline-when-no-token" default did
+# NOT fire) AND a blackholed / restricted network. In ONLINE mode an uncached
+# resource — a model weight, a config.json, or (critically) an eval / training
+# DATASET — makes `from_pretrained` / `datasets.load_dataset` block on the TCP
+# connect until the gate's wall-clock budget kills the process BEFORE any
+# `FINAL <arm>=...` line prints -> `values: []`. The model-cache precheck
+# (_model_cached below) already fast-fails uncached MODELS, but it does NOT
+# cover datasets: once a model IS cached the code proceeds to
+# `EVAL_LOADERS[bench]()` which calls `load_dataset`, and THAT hangs online on
+# an uncached dataset. Verified: with HF_HUB_OFFLINE=1 an uncached dataset
+# raises ConnectionError(OfflineModeIsEnabled) in ~0.4s instead of hanging.
+#
+# FIX: force OFFLINE UNCONDITIONALLY at module scope (models, transformers, AND
+# datasets) unless the reproducer explicitly opts in with MAGS_ONLINE=1. This
+# makes every uncached resource fast-fail to one honest `FINAL <arm>=BLOCKED`
+# line in well under a second, regardless of token / network / CUDA state — so
+# the gate can never hang. A real GPU reproducer pre-caches models (README) and
+# either pre-caches datasets or sets MAGS_ONLINE=1 to download them; cached
+# resources load fine under offline=1. This runs at module scope using only
+# stdlib, BEFORE any transformers/datasets import, so it protects arms invoked
+# directly (the gate iterates each arms.json key) as well as via run_all_arms.sh.
+if os.environ.get("MAGS_ONLINE", "0") != "1":
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-# Short HF timeouts as a backstop so even explicit online mode cannot hang the
-# gate on a blackholed network (fails in ~10s instead of the ~75s TCP default).
+    os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+# Short HF timeouts as a backstop so even explicit online mode (MAGS_ONLINE=1)
+# cannot hang the gate on a blackholed network (fails in ~10s, not the ~75s TCP
+# default). A real online reproducer can raise these via the environment.
 os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "10")
 os.environ.setdefault("HF_HUB_DOWNLOAD_TIMEOUT", "10")
 
@@ -101,15 +98,15 @@ def _model_cached(model_id):
     """No-torch, no-network filesystem check: is `model_id` present in the HF
     hub cache with at least one weight file? Mirrors run_all_arms.sh Tier-1.
 
-    This is the round-8 root-cause fix for the recurring "all arms missing a
-    FINAL line" gate failure. The gate runs each arms.json command *individually*
-    and carries an HF token, so `_has_hf_token()` is True and the round-4
-    "offline-when-no-token" default does NOT fire. With online mode + the gate's
-    blackholed network, `from_pretrained` on an uncached model HANGS on the TCP
-    connect (the short HF_HUB_*_TIMEOUT backstops do not cover the initial
-    config.json resolve) until the gate's wall-clock budget kills the command
-    before any `FINAL <arm>=...` line prints -> the gate reports every arm
-    "missing a FINAL line" with `values: []`. The CUDA/CPU `_no_cuda` guard also
+    This is the round-8 model-cache precheck (kept; the round-13 fix above made
+    the OFFLINE default unconditional via MAGS_ONLINE, so an uncached model now
+    also fast-fails at `load_model` even with a token present). The gate runs each
+    arms.json command *individually* and may carry an HF token; with a token the
+    round-4 "offline-when-no-token" default would NOT fire, so this filesystem
+    precheck is what fast-fails an uncached MODEL before any `from_pretrained`
+    could hang on the gate's blackholed network. (Uncached DATASETS are now
+    fast-failed by the unconditional OFFLINE flag + the eval-load try/except in
+    `_run`.) The CUDA/CPU `_no_cuda` guard also
     does not save it on a GPU-capable gate host.
 
     The fix: block INSTANTLY (no torch import, no network) whenever the model is
@@ -256,15 +253,57 @@ def _run(args, arm_id, bench, model_id, arm, emit):
                           "UNSTATED by the paper (SPEC §4.18); GPT-OSS-20B needs >=40GB VRAM. "
                           "Treated as a stretch target, not implemented for real data.")
 
-    # ---- UNCONDITIONAL cache precheck (round-8 gate fix) -----------------------
+    # ---- EARLY resource checks (round-13 gate fix) -----------------------------
+    # A steering arm needs a FITTED bank produced by `mags.fit` (GPU contrastive
+    # traces from the paper's 8B/20B model, tex:L399). The gate ships NO fitted
+    # manifolds (manifolds/ is empty), so every steering arm must BLOCK HERE, in
+    # <1ms, BEFORE any model load or dataset load. Without this, on a gate host
+    # whose model IS cached but whose network is blackholed, the code would
+    # proceed past the model precheck to `EVAL_LOADERS[bench]() -> load_dataset`
+    # and HANG on the uncached dataset until the gate kills it -> zero FINAL
+    # lines (the round-1..12 "all arms missing a FINAL line" failure). Checking
+    # the bank file with stdlib `os.path.exists` (no torch/numpy import) makes
+    # the no-manifold case instant and hang-free. CD needs an amateur model;
+    # resolve + cache-check it here for the same reason.
+    iti_path = as_path = ""
+    amateur_id = ""
+    if arm in ("mags", "mags-u"):
+        if not args.manifold or not os.path.exists(args.manifold):
+            _blocked(arm_id, "MAGS steering needs a fitted manifold --manifold <path.npz>; "
+                              "none provided / not found. Manifold fit (mags.fit) requires "
+                              "GPU contrastive traces from the paper's 8B/20B model (tex:L399); "
+                              "blocked without a GPU host. No fitted manifolds are shipped.")
+    elif arm == "iti":
+        iti_path = args.iti_manifold or (args.manifold.replace(".npz", ".iti.npz")
+                                         if args.manifold else "")
+        if not iti_path or not os.path.exists(iti_path):
+            _blocked(arm_id, "iti arm needs an ITI bank (--iti-manifold, or <manifold>.iti.npz) "
+                              "with per-head logistic probes for ALL monitored heads; none "
+                              "found. Fit (mags.fit) is blocked without a GPU host.")
+    elif arm == "angular-steering":
+        as_path = args.as_manifold or (args.manifold.replace(".npz", ".as.npz")
+                                       if args.manifold else "")
+        if not as_path or not os.path.exists(as_path):
+            _blocked(arm_id, "angular-steering needs an AS bank (--as-manifold, or "
+                              "<manifold>.as.npz) with per-layer rotation planes; none "
+                              "found. Fit (mags.fit) is blocked without a GPU host.")
+    elif arm == "contrastive-decoding":
+        amateur_id = args.cd_amateur or config.CD_AMATEUR.get(model_id, "")
+        if not amateur_id:
+            _blocked(arm_id, "contrastive-decoding needs an amateur model (SPEC §4.17); none "
+                              "registered for this model and none provided.")
+        if not args.smoke and not _model_cached(amateur_id):
+            _blocked(arm_id, f"contrastive-decoding amateur model {amateur_id!r} is not present "
+                              f"in the HuggingFace cache ({_hf_hub_dir()}); pre-cache it on a GPU "
+                              f"host (SPEC §C.1). No in-run download is attempted.")
+    elif arm != "unsteered":
+        _blocked(arm_id, f"unknown arm {arm!r}")
+
+    # ---- UNCONDITIONAL model cache precheck (round-8) ---------------------------
     # Block INSTANTLY (no torch, no network) if the model is not in the HF cache,
-    # regardless of token / offline-flag / network / CUDA. The gate runs each
-    # arms.json command individually and carries an HF token, so without this
-    # precheck an uncached model hangs in online `from_pretrained` on the gate's
-    # blackholed network and never prints the FINAL line the gate requires. The
-    # paper's models are pre-cached on a real GPU host (README); the gate, which
-    # cannot pre-cache them, gets an honest BLOCKED in <1s. Skipped only for the
-    # CPU smoke model (`--smoke`), which is intentionally tiny and downloadable.
+    # regardless of token / offline-flag / network / CUDA. The paper's models are
+    # pre-cached on a real GPU host (README); the gate, which cannot pre-cache
+    # them, gets an honest BLOCKED in <1s. Skipped only for the CPU smoke model.
     if not args.smoke and not _model_cached(model_id):
         _blocked(arm_id, f"model {model_id!r} is not present in the HuggingFace cache "
                           f"({_hf_hub_dir()}); the paper's 8B/4B/20B models require a GPU "
@@ -272,52 +311,58 @@ def _run(args, arm_id, bench, model_id, arm, emit):
                           f"download is attempted (would hang an offline / blackholed-"
                           f"network gate). Pre-cache with `huggingface-cli download "
                           f"{model_id}`.")
-    # Model is cached: force OFFLINE so the load uses the cache and a partial
-    # cache raises in <1s instead of hanging on a blackholed network. A fully
-    # pre-cached model loads under offline=1, so this is inert for a real run.
-    os.environ["HF_HUB_OFFLINE"] = "1"
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    # Re-affirm OFFLINE (unless the reproducer opted in with MAGS_ONLINE=1). A
+    # cached model/dataset loads under offline=1; an uncached one fast-fails
+    # instead of hanging. Module scope already set this; we re-affirm so a
+    # caller that cleared the flag cannot reintroduce the hang.
+    if os.environ.get("MAGS_ONLINE", "0") != "1":
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
 
     # ---- no CUDA GPU: the paper's 8B/20B models cannot run on CPU ----
     # The paper's experiments require GPU (RTX 4090 / H200, SPEC §C.1). On a
-    # CPU-only host an 8B/20B model either cannot load or would take hours per
-    # problem, so the only honest result is BLOCKED. This guards the case the
-    # run_all_arms.sh GPU-probe already covers (direct invocation of this CLI on
-    # a no-GPU host that carries an HF token: online mode + blackholed network
-    # would otherwise hang in `from_pretrained` and never print a FINAL line).
-    # It is skipped only for the CPU smoke model (`--smoke` / MAGS_SMOKE_MODEL),
-    # which is intentionally tiny and CPU-runnable. We import torch here (one
-    # ~3-5s cost per arm) ONLY when we already failed the cheaper _offline_uncached
-    # fast-path below, so the no-token gate stays sub-second.
+    # CPU-only host an 8B/20B model cannot run, so the only honest result is
+    # BLOCKED. Skipped only for the CPU smoke model (`--smoke`).
     if not args.smoke and _no_cuda():
         _blocked(arm_id, f"no CUDA GPU available; the paper's 8B/20B models require "
                           f"GPU (RTX 4090 / H200, SPEC §C.1). {model_id!r} cannot run on "
                           f"CPU. On a GPU host with cached models this check is skipped.")
 
-    # ---- load the model (expected to fail in a no-GPU/no-token sandbox) ----
+    # ---- load the eval problems BEFORE the model (offline fast-fail) ----------
+    # Eval problems need nothing from the model, so we load them first. With
+    # HF_HUB_OFFLINE=1 an uncached eval dataset raises
+    # ConnectionError(OfflineModeIsEnabled) in <1s; we catch it and emit one
+    # honest FINAL=BLOCKED line instead of hanging on a blackholed network. Doing
+    # this BEFORE load_model means a cached-model + uncached-dataset gate host
+    # BLOCKs in <1s rather than paying the ~10-30s 8B model load first.
+    from .data.loaders import EVAL_LOADERS, DatasetUnavailable
+    if bench not in EVAL_LOADERS:
+        _blocked(arm_id, f"no eval loader for benchmark {bench!r}")
+    try:
+        problems = EVAL_LOADERS[bench]()
+    except Exception as e:
+        _blocked(arm_id, f"eval dataset for {bench!r} unavailable (offline / not cached): "
+                          f"{e!r}. Pre-cache the dataset on a GPU host, or set "
+                          f"MAGS_ONLINE=1 to download. No in-run download in gate mode.")
+    if args.limit and args.limit > 0:
+        problems = problems[:args.limit]
+    max_new = args.max_new_tokens or config.DEFAULT_MAX_NEW_TOKENS.get(
+        "code" if bench in ("HumanEval", "MBPP") else "math", 512)
+
+    # ---- load the model ----
     # Fast-path the honest BLOCKED for uncached models in offline mode WITHOUT
     # importing torch/transformers (keeps the gate fast); see _offline_uncached.
     if _offline_uncached(model_id):
         _blocked(arm_id, f"offline mode (HF_HUB_OFFLINE=1) and {model_id!r} has no "
-                          "snapshot in the HF cache; cannot load without network "
-                          "(no GPU / no gated-token sandbox). On a GPU host set "
-                          "HF_HUB_OFFLINE=0 and provide HF_TOKEN, or pre-cache the "
-                          "model.")
+                          "snapshot in the HF cache; cannot load without network. "
+                          "On a GPU host set MAGS_ONLINE=1 and provide HF_TOKEN, or "
+                          "pre-cache the model.")
     try:
         from .models import load_model
         model, tok = load_model(model_id)
     except Exception as e:
         _blocked(arm_id, f"model load failed: {e!r}")
-
-    # ---- load the eval problems ----
-    from .data.loaders import EVAL_LOADERS
-    if bench not in EVAL_LOADERS:
-        _blocked(arm_id, f"no eval loader for benchmark {bench!r}")
-    problems = EVAL_LOADERS[bench]()
-    if args.limit and args.limit > 0:
-        problems = problems[:args.limit]
-    max_new = args.max_new_tokens or config.DEFAULT_MAX_NEW_TOKENS.get(
-        "code" if bench in ("HumanEval", "MBPP") else "math", 512)
 
     # ---- build the controller for this arm ----
     from .steering import MAGSController, NoOpController
@@ -325,25 +370,14 @@ def _run(args, arm_id, bench, model_id, arm, emit):
     from .grading import grade
     from .eval import run_arm, bootstrap_ci
 
-    controller = None
-    cd = None
     if arm == "unsteered":
         controller = NoOpController()
     elif arm in ("mags", "mags-u"):
-        if not args.manifold or not os.path.exists(args.manifold):
-            _blocked(arm_id, "steering arm needs --manifold <path.npz>; none provided "
-                          "(manifold fit requires GPU traces from the paper's 8B/20B models, "
-                          "blocked in this sandbox).")
         from .manifold import ManifoldBank
         bank = ManifoldBank.load(args.manifold)
         alpha = args.alpha if args.alpha is not None else bank.alpha
         controller = MAGSController(bank, alpha=alpha)
     elif arm == "iti":
-        iti_path = args.iti_manifold or args.manifold.replace(".npz", ".iti.npz")
-        if not iti_path or not os.path.exists(iti_path):
-            _blocked(arm_id, "iti arm needs an ITI bank (--iti-manifold, or <manifold>.iti.npz) "
-                          "with per-head logistic probes for ALL monitored heads; fit blocked "
-                          "in this sandbox (needs GPU traces).")
         from .baselines import ITIBank, ITIController
         iti_bank = ITIBank.load(iti_path)
         alpha = args.iti_alpha if args.iti_alpha is not None else iti_bank.alpha
@@ -354,22 +388,11 @@ def _run(args, arm_id, bench, model_id, arm, emit):
                 iti_bank.heads.items(), key=lambda kv: kv[1].accuracy, reverse=True)[:args.iti_K]]
         controller = ITIController(iti_bank, alpha=alpha)
     elif arm == "angular-steering":
-        as_path = args.as_manifold or args.manifold.replace(".npz", ".as.npz")
-        if not as_path or not os.path.exists(as_path):
-            _blocked(arm_id, "angular-steering needs an AS bank (--as-manifold, or "
-                          "<manifold>.as.npz) with per-layer rotation planes; fit blocked "
-                          "in this sandbox (needs GPU traces).")
         from .baselines import ASBank, AngularSteeringController
         as_bank = ASBank.load(as_path)
         ang = args.angle_deg if args.angle_deg is not None else as_bank.angle_deg
         controller = AngularSteeringController(as_bank, angle_deg=ang)
     elif arm == "contrastive-decoding":
-        amateur_id = args.cd_amateur or config.CD_AMATEUR.get(model_id, "")
-        if not amateur_id:
-            _blocked(arm_id, "contrastive-decoding needs an amateur model (SPEC §4.17); none "
-                          "registered for this model and none provided.")
-        from .models import load_model
-        from .generation import cd_generate
         try:
             amateur, atok = load_model(amateur_id)
         except Exception as e:
