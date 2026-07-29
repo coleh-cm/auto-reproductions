@@ -34,7 +34,47 @@
 
 ## Log
 
-### 2026-07-29 — Setup
+### 2026-07-29 — Round 5: gate "missing FINAL line" root-cause + fix
+
+- **Symptom (gate feedback):** every one of the 45 arms reported "missing a FINAL
+  line" with `values: []` — i.e. the gate captured ZERO `FINAL <arm>=<value>`
+  lines from `run_all_arms.sh`, despite rounds 1-4 of FINAL-line fixes.
+- **Root cause (reproduced in-sandbox):** the gate carries a HuggingFace token
+  (`HF_TOKEN`), so `run.py`'s round-4 "default to OFFLINE when no token" guard
+  does NOT fire. With a token present the hub enters ONLINE mode; on the gate's
+  blackholed network `from_pretrained` hangs instead of fast-failing. The
+  `run_all_arms.sh` per-arm loop only prints a `FINAL` line *after* the arm
+  command returns, so a hang in Phase-1 fit / early Phase-2 arms means the gate's
+  wall-clock budget kills the script before any `FINAL` line prints. Verified
+  directly: a token-set `run_all_arms.sh` was still running at 90 s with only
+  29/45 FINAL lines (vs. the round-4 no-token run that finished in ~61 s).
+- **Fix:** `run_all_arms.sh` now runs a single bounded (`timeout 60`) capability
+  probe — `import torch; torch.cuda.is_available()` — **before** any fit/eval.
+  The paper's experiments REQUIRE GPU (RTX 4090 / H200, Appendix C); a CPU-only
+  host (the gate, any CI runner) provably cannot run an 8B/20B model, so the only
+  honest result there is `BLOCKED` for every arm. On no CUDA the script emits all
+  45 `FINAL <arm>=BLOCKED` lines in well under a second and exits 0, independent
+  of token / cache / network state. On a real GPU host the probe returns CUDA
+  and the full Phase-1/Phase-2 pipeline runs for real (unchanged). `smoke.sh` is
+  unaffected (it runs the CPU-tiny `distilgpt2` via `python -m smoke` on purpose,
+  not this script).
+- **Defense-in-depth:** `mags/run.py` also gained a `_no_cuda()` fast-fail guard
+  (skipped for `--smoke`), so a *direct* `python -m mags.run` invocation on a
+  no-GPU host that carries a token no longer hangs in online `from_pretrained`
+  — it prints `FINAL <arm>=BLOCKED` in ~0.6 s. This protects the contract that
+  every arm prints exactly one FINAL line even if the gate ever invokes arms
+  individually rather than via `run_all_arms.sh`.
+- **Verification in this sandbox (CPU-only, torch CPU build, token set):**
+  `HF_TOKEN=x bash run_all_arms.sh` → 45/45 `FINAL <arm>=BLOCKED` lines in 0.6 s
+  (was: hung >90 s, 29/45 lines). All 45 emitted arm names match `arms.json`
+  keys exactly (`diff` clean). `smoke.sh` → `FINAL smoke=0.0000`. `pytest` →
+  28 passed (degeneracy + invariants + grading + baselines).
+- **What this is NOT:** this is a gate-plumbing fix, not new evidence. The
+  numbers remain BLOCKED (no GPU / no gated token in this sandbox); the real
+  Tables 1-3 still require a GPU host with cached/gated models, which this
+  pass cannot provide. `publish_reproduction` is intentionally not called here.
+
+
 
 - Repository cloned to `/root/auto-reproductions` over HTTPS using `$GITHUB_TOKEN`.
 - Reproduction folder: `/root/auto-reproductions/manifold-guided-attention-steering` (recorded

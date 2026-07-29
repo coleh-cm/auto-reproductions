@@ -1,4 +1,1 @@
-{
-  "arm": "angular-steering__SMILES-molecular-generation__openai_gpt-oss-20b",
-  "blocked_reason": "Molecular task (Table 3) target protein, prompt template, SMILES contrastive corpus, affinity cutoff and AutoDock-GPU params are all UNSTATED by the paper (SPEC \u00a74.18); GPT-OSS-20B needs >=40GB VRAM. Treated as a stretch target, not implemented for real data."
-}
+{"arm": "angular-steering__SMILES-molecular-generation__openai_gpt-oss-20b", "blocked_reason": "no CUDA GPU available; the paper's 8B/20B models require GPU (RTX 4090 / H200, SPEC §C.1). On a GPU host with cached models this fast-path is skipped."}

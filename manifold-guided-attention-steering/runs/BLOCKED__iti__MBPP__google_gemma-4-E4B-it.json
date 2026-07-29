@@ -1,4 +1,1 @@
-{
-  "arm": "iti__MBPP__google_gemma-4-E4B-it",
-  "blocked_reason": "model load failed: RuntimeError(\"Could not load model 'google/gemma-4-E4B-it': ValueError('The checkpoint you are trying to load has model type `gemma4` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\\\\n\\\\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git`'). This is the expected BLOCKER in a no-GPU / no-gated-token sandbox; the paper's models are Llama-3.1-8B-Instruct (gated), Gemma-4-E4B-it, GPT-OSS-20B (need >=40GB VRAM).\")"
-}
+{"arm": "iti__MBPP__google_gemma-4-E4B-it", "blocked_reason": "no CUDA GPU available; the paper's 8B/20B models require GPU (RTX 4090 / H200, SPEC §C.1). On a GPU host with cached models this fast-path is skipped."}

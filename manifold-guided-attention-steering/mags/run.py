@@ -75,6 +75,22 @@ os.environ.setdefault("HF_HUB_DOWNLOAD_TIMEOUT", "10")
 # it lazily too so the module can never fail to load on a missing dependency.
 
 
+def _no_cuda():
+    """Return True if torch is importable but reports no CUDA GPU. Returns False
+    (i.e. does NOT block) if torch is missing — a missing torch is handled by the
+    catch-all in main() which still emits one `FINAL <arm>=BLOCKED` line, and we
+    do not want to pay a torch import here when the import itself would fail.
+    Used to fast-fail the paper's GPU-only models on a CPU host."""
+    try:
+        import torch
+    except Exception:
+        return False
+    try:
+        return not torch.cuda.is_available()
+    except Exception:
+        return True
+
+
 def _offline_uncached(model_id):
     """Cheap, no-torch check used to fast-path the BLOCKED line. Returns True ONLY
     when (a) we are in offline mode (HF_HUB_OFFLINE=1, the round-4 default for a
@@ -167,6 +183,22 @@ def _run(args, arm_id, bench, model_id, arm, emit):
                           "contrastive corpus, affinity cutoff and AutoDock-GPU params are all "
                           "UNSTATED by the paper (SPEC §4.18); GPT-OSS-20B needs >=40GB VRAM. "
                           "Treated as a stretch target, not implemented for real data.")
+
+    # ---- no CUDA GPU: the paper's 8B/20B models cannot run on CPU ----
+    # The paper's experiments require GPU (RTX 4090 / H200, SPEC §C.1). On a
+    # CPU-only host an 8B/20B model either cannot load or would take hours per
+    # problem, so the only honest result is BLOCKED. This guards the case the
+    # run_all_arms.sh GPU-probe already covers (direct invocation of this CLI on
+    # a no-GPU host that carries an HF token: online mode + blackholed network
+    # would otherwise hang in `from_pretrained` and never print a FINAL line).
+    # It is skipped only for the CPU smoke model (`--smoke` / MAGS_SMOKE_MODEL),
+    # which is intentionally tiny and CPU-runnable. We import torch here (one
+    # ~3-5s cost per arm) ONLY when we already failed the cheaper _offline_uncached
+    # fast-path below, so the no-token gate stays sub-second.
+    if not args.smoke and _no_cuda():
+        _blocked(arm_id, f"no CUDA GPU available; the paper's 8B/20B models require "
+                          f"GPU (RTX 4090 / H200, SPEC §C.1). {model_id!r} cannot run on "
+                          f"CPU. On a GPU host with cached models this check is skipped.")
 
     # ---- load the model (expected to fail in a no-GPU/no-token sandbox) ----
     # Fast-path the honest BLOCKED for uncached models in offline mode WITHOUT

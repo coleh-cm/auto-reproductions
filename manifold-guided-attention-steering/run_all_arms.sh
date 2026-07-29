@@ -111,6 +111,52 @@ if [ ! -s "$ARMS_TSV" ]; then
         | sed -e 's/^"//' -e 's/"[[:space:]]*:$//' >> "$ARMS_TSV" || true
 fi
 
+# --- capability probe: can this host run the paper's 8B/20B GPU arms? -------
+# The paper's experiments REQUIRE GPU (RTX 4090 / H200, SPEC §C.1 / Appendix C).
+# A CPU-only host — the automated gate, a CI runner — cannot load or run an
+# 8B/20B model in any reasonable time, so the ONLY honest result there is
+# BLOCKED for every arm. We detect "no CUDA GPU" with a single bounded torch
+# import and, if true, emit all `FINAL <arm>=BLOCKED` lines immediately
+# (sub-second) and exit 0. This is the fix for the recurring gate failure
+# "arms missing a FINAL line / values: []":
+#   - With NO HuggingFace token, the round-4 offline default already made an
+#     uncached model fast-fail; BUT
+#   - the gate carries an HF token (and possibly a partial model cache), which
+#     defeats the offline default -> `from_pretrained` enters ONLINE mode and
+#     hangs on a blackholed network (verified: a token-set run was still going
+#     at 90s with only 29/45 FINAL lines). The gate's wall-clock budget then
+#     kills the script mid-Phase-1, BEFORE any per-arm FINAL line prints, so the
+#     gate reports every arm "missing a FINAL line" with `values: []`.
+#   - The GPU probe is independent of token / cache / network state: a CPU host
+#     fast-paths to all-BLOCKED in well under a second regardless of whether a
+#     token is set. A real GPU host passes the probe and runs the full
+#     Phase-1/Phase-2 pipeline for real. smoke.sh is unaffected (it runs a
+#     CPU-tiny model on purpose via `python -m smoke`, not this script).
+_probe_gpu() {
+    [ "$HAVE_PYTHON" = 1 ] || { echo NOCUDA; return; }
+    timeout 60 "$PYTHON" - <<'PY' 2>/dev/null || echo NOCUDA
+try:
+    import torch
+except Exception:
+    print("NOCUDA")
+else:
+    print("CUDA" if torch.cuda.is_available() else "NOCUDA")
+PY
+}
+if [ "$(_probe_gpu)" != "CUDA" ]; then
+    mkdir -p runs
+    while IFS='	' read -r arm cmd; do
+        [ -z "$arm" ] && continue
+        reason="no CUDA GPU available; the paper's 8B/20B models require GPU (RTX 4090 / H200, SPEC §C.1). On a GPU host with cached models this fast-path is skipped."
+        printf 'FINAL %s=BLOCKED\n' "$arm"
+        { printf 'FINAL %s=BLOCKED\n' "$arm"; \
+          printf 'BLOCKED[%s]: %s\n' "$arm" "$reason"; } > "runs/log__${arm}.log"
+        printf '{"arm": "%s", "blocked_reason": "%s"}\n' "$arm" "$reason" \
+            > "runs/BLOCKED__${arm}.json" 2>/dev/null || true
+    done < "$ARMS_TSV"
+    exit 0
+fi
+
 # --- Phase 1: fit manifolds for steering arms (skip molecular, fully blocked) ---
 if [ "$HAVE_PYTHON" = 1 ]; then
     "$PYTHON" - <<'PY' > runs/_fit_pairs.tsv 2>/dev/null || true
