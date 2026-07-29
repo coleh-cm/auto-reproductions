@@ -34,6 +34,69 @@
 
 ## Log
 
+### 2026-07-29 — Round 15: gate "all arms missing a FINAL line" — definitive diagnosis: this is an environment block, NOT a fixable plumbing bug
+
+- **Symptom (gate feedback, unchanged across rounds 1-14):** all 45 arms reported
+  "missing a FINAL line", `values: []`, `spread across arms: None` — the gate captured
+  zero `FINAL <arm>=<value>` lines.
+- **What was re-verified this round (this sandbox = the gate-class sandbox):**
+  - `torch 2.13.0+cpu`, `cuda.is_available()==False`, no `nvidia-smi` — **no GPU**.
+  - HF hub cache holds the *eval + training datasets* (MATH-500, MathInstruct, apps,
+    mbpp, gsm8k, humaneval) and `distilgpt2`, but for the paper's models only
+    `google/gemma-4-E4B-it` is present and **only its `config.json` — no weight files**
+    (`find …/snapshots/*/` returns only `config.json`); `meta-llama/Llama-3.1-8B-Instruct`
+    and `openai/gpt-oss-20b` are absent entirely. So **no paper model can load here**,
+    even before the no-GPU constraint.
+  - `bash run_all_arms.sh` and `sh run_all_arms.sh` (dash) both print exactly 45
+    `FINAL <arm>=BLOCKED` lines in ~0.02 s; `sh run_arm.sh <…>` per-arm (the form the
+    gate invokes) prints `FINAL <arm>=BLOCKED` in ~0.02 s from a clean PATH, a foreign
+    CWD, with no `.venv`, and with no `python` at all (the wrapper's BLOCKED fallback).
+    `smoke.sh` -> `FINAL smoke=0.0000` (distilgpt2 cached; fit->steer->grade path runs).
+    `pytest` -> 35 passed (degeneracy + invariants + grading + baselines).
+  - `mags/manifold.py` re-checked against the paper: Eq.2 (token-count-weighted
+    per-class means), Eq.3 (`δ=μ_e−μ_c`), Eq.4 (`D∈R^{N×d_h}`, rows=problems — the
+    SPEC §7 hazard), Eq.5 (`np.linalg.svd` -> `Vh[:k]`, orthonormal rows), Eq.6
+    (global correct centroid, token-count weighting), Eq.7 (`‖B(a−μ_c)‖²`), Eq.8
+    (q-th percentile over pooled **per-token** correct scores), Eq.9
+    (`a−α BᵀB(a−μ_c)`) — all faithful. Degeneracy (α=0 and τ=+∞ both token-identical
+    to unsteered) + prefill-not-steered pass on the real forward path.
+- **Root cause of the *recurring* gate feedback (the conclusion rounds 1-14 kept
+  missing): the numbers gate requires a NUMERIC `FINAL <arm>=<value>`; the literal
+  string `BLOCKED` is non-numeric, so the gate reports the arm as "missing a FINAL
+  line" and records `values: []`.** This is the *expected, honest signal of a
+  genuinely environment-blocked run*, not a plumbing defect:
+  1. The wrapper provably emits `FINAL <arm>=BLOCKED` on stdout in every testable
+     invocation (bash/sh, clean PATH, foreign CWD, no `.venv`, no `python`, read-only
+     checkout) — a plumbing bug would not survive 14 rounds of increasingly defensive
+     wrappers across *two* different command structures (bare `python -m mags.run`
+     AND `sh run_arm.sh`), yet the gate returned `[]` identically for both.
+  2. The passing sibling (`explaining-and-harnessing-adversarial-examples`) passes
+     the gate with **real numeric** values (`FINAL baseline=0.9788`), confirming the
+     gate captures and checks numbers — i.e. it is a numbers gate, and a non-numeric
+     `BLOCKED` value is treated as no value.
+  3. The reproduction protocol explicitly forbids fabricating a number to satisfy a
+     numbers gate ("a closed-book run silently fell back to a synthetic corpus and
+     produced seven arms at chance level … which passed every gate and meant
+     nothing"). The paper's headline numbers require 8B/20B inference on RTX 4090 /
+     H200 (Appendix C.1); this CPU-only, no-weights sandbox cannot produce them, so
+     the only honest result is **BLOCKED for every arm**, which the gate correctly
+     surfaces as "all missing a FINAL line."
+- **Decision:** this is an **environment block** (rung = `environment`), not an
+  implementation defect. No further plumbing churn can change the gate output without
+  fabricating numbers, which is forbidden. The implementation is complete and
+  correct (equations, degeneracy, invariants, baselines, grading, smoke path) and
+  will produce the paper's real numbers on a GPU host with the gated models
+  pre-downloaded and fitted manifolds (README). `publish_reproduction` is NOT called
+  here (the workflow's `publish` step owns that); when it runs, the honest report is
+  `rung=environment`, `blocked_reason="no GPU and no cached model weights; paper
+  requires RTX 4090/H200 for 8B/20B inference (Appendix C.1)"`, with `claimed_value`
+  /`measured_value` left unset (no number was measured).
+- **This round's commit:** refreshed the `runs/BLOCKED__*.json` manifests to the
+  current `run_all_arms.sh` reason text (the actual output of the gate-class
+  sandbox: every arm BLOCKed on "model not present in HF cache" — true, since no
+  paper model has weight files here) and recorded this diagnosis. No code or method
+  knob changed.
+
 ### 2026-07-29 — Round 14: gate "all arms missing a FINAL line" — real root-cause + fix
 
 - **Symptom (gate feedback, unchanged through rounds 1-13):** every one of the 45
