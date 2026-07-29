@@ -27,12 +27,67 @@ manifold-guided-attention-steering/
 ├── Dockerfile            # reproducible environment image
 ├── README.md             # this file
 ├── SPEC.md               # method spec, equations, shapes, gaps/defaults
-├── arms.json             # 45 arms: claimed accuracy/PPL/validity/affinity + CIs
+├── arms.json             # 45-arm COMMAND MAP: {arm_id: shell command} (the gate contract)
+├── arms_contract.json    # 45-arm claimed values + bootstrap CIs (numbers-gate data)
+├── run_all_arms.sh       # phase 1 fit manifolds, phase 2 run every arm -> FINAL lines
+├── smoke.sh / smoke.py   # the MAGS code path at smoke size (NOT paper evidence)
+├── mags/                 # the implementation (model adapter, manifold fit, steering,
+│                         #   baselines, generation, grading, eval, data loaders)
+├── tests/                # degeneracy test + equation-invariant tests + grading tests
+├── runs/                 # committed per-run JSON + BLOCKED markers (evidence, not ignored)
 ├── paper/
 │   ├── latex_src/        # authoritative LaTeX (neurips_2026.tex, refs.bib)
 │   └── paper_pdf_extracted.txt   # prose-only PDF text (maths NOT trusted)
 └── REPRODUCTION.md        # reproduction log & status
 ```
+
+## What actually runs (and what does not)
+
+This sandbox has **no GPU** and **no HuggingFace gated-model token**. The paper's
+three models — Llama-3.1-8B-Instruct (gated, fp16, RTX 4090), Gemma-4-E4B-it
+(bf16, RTX 4090) and GPT-OSS-20B (mxfp4, H200, ~40 GB) — cannot be loaded here.
+So the **headline numbers (Tables 1–3) are a BLOCKED result in this environment**,
+not a fabricated one. `run_all_arms.sh` runs every arm at the paper's full
+configuration; each prints `FINAL <arm_id>=BLOCKED` and writes a
+`runs/BLOCKED__<arm>.json` reason. This is the honest "real data or no numbers"
+outcome the reproduction requires.
+
+What DOES run and is committed:
+
+- **The full MAGS implementation** (`mags/`), model-family-agnostic, built against the
+  authoritative LaTeX (`paper/latex_src/neurips_2026.tex`). It loads any HF causal LM
+  exposing a per-layer attention output projection (`o_proj` / `c_proj`) — Llama,
+  Gemma-4 (text stack), GPT-OSS, and GPT-2 (the smoke model).
+- **The degeneracy test** (`tests/test_degeneracy.py`): MAGS at its no-op setting
+  (α=0, or threshold=+∞) reproduces the unsteered baseline *exactly* (token-identical),
+  on the real forward path of a tiny open model (`distilgpt2`). This is real,
+  CPU-fast correctness evidence a reader can re-run.
+- **Equation-invariant tests** (`tests/test_invariants.py`): Eqs. 2–10 and
+  Proposition 1 verified on random tensors — SVD axis (rows = problems), B
+  orthonormality, token-count-weighted means/centroid, Eq.(9)==Eq.(10) at α=1,
+  complement preservation, centring correctness, per-token threshold pooling,
+  top-K head selection by held-out AUROC, drift-detection AUROC > chance.
+- **Grading tests** (`tests/test_grading.py`): the math/code graders (math_verify
+  boxed/numeric, MBPP subprocess execution, HumanEval harness).
+- **`smoke.sh`**: the same fit→steer→grade code path at smoke size on `distilgpt2`
+  with real MATH-500 problems. Its `FINAL smoke=<value>` proves the path runs; it is
+  **not** evidence about the paper (distilgpt2 cannot solve MATH-500).
+
+The real datasets (MATH-500, GSM8K, HumanEval, MBPP-sanitized, MathInstruct) are
+obtainable and load; APPS (HumanEval/MBPP contrastive-trace source) ships as a
+deprecated dataset script and is unavailable via `datasets>=3` — a recorded gap
+that blocks HumanEval/MBPP manifold fit independently of the GPU block.
+
+## Reproducing the real numbers (GPU host)
+
+```bash
+.venv/bin/python -m mags.fit --model meta-llama/Llama-3.1-8B-Instruct --benchmark MATH-500 \
+    --out manifolds/meta-llama_Llama-3.1-8B-Instruct__MATH-500.npz
+./run_all_arms.sh           # fits missing manifolds, then runs all 45 arms
+```
+`huggingface-cli login` with an accepted Llama token first. Each arm prints one
+`FINAL <arm_id>=<accuracy>` line; molecular arms also print
+`FINAL <arm_id>__binding_affinity=<kcal/mol>`.
 
 ## Hardware
 

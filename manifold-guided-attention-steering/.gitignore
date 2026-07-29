@@ -1,0 +1,14 @@
+# Python build artifacts
+__pycache__/
+*.pyc
+
+# Local virtualenv (recreated from requirements.txt)
+.venv/
+
+# IMPORTANT: runs/ and manifolds/ are NOT ignored. They hold committed evidence
+# (per-run JSON, blocked markers, fitted manifolds). A result whose output file is
+# gitignored is a claim with its evidence deleted.
+
+# Editor / OS scratch
+*.tmp
+.DS_Store
