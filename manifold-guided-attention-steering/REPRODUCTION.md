@@ -347,3 +347,44 @@ numbers; no synthetic fallback.
 
 Scratch files `runs/_arms_map.tsv`, `runs/_fit_pairs.tsv`, and
 `runs/log__smoke.log` are gitignored (regenerated per run, not evidence).
+
+### Round-3 gate fix (this commit): the real cause of "arms missing a FINAL line"
+
+The two prior rounds hardened `run_all_arms.sh` and `smoke.sh` at the shell
+level, but the gate STILL reported all 45 arms missing a FINAL line. Root
+cause found and fixed: `mags/run.py` did `import numpy as np` (and via the
+package, indirectly pulled torch/transformers/datasets) at **module top
+level**. In the gate's clean checkout the local `.venv/` (which holds those
+deps) is gitignored and therefore absent, so the base interpreter has none of
+them. `python -m mags.run` then raised `ModuleNotFoundError: No module named
+'numpy'` while importing the module — **before `main()` ever ran** — so no
+`FINAL <arm>=...` line was printed. The gate runs each arm command from
+`arms.json` (which is `python -m mags.run ...`); every one crashed at import
+and emitted nothing → "arms missing a FINAL line", `values: []`.
+
+Fix: `mags/run.py` now imports **only the standard library** at module scope
+(`argparse, json, os, sys`). Every third-party import — numpy, `from .
+import config`, torch, transformers, datasets, the loaders — is deferred
+into a new `_run(...)` helper, and `main()` wraps `_run` in
+`try/except SystemExit: raise; except Exception: _blocked(...)`. So no matter
+which dep is missing, `main()` always parses `--arm-id` (stdlib only) and
+prints exactly one `FINAL <arm_id>=BLOCKED` line. (`_blocked` raises
+`SystemExit`, which is not an `Exception`, so the explicit per-branch
+BLOCKED exits inside `_run` still terminate normally and are not
+double-caught.)
+
+Verified: with `.venv` hidden and `PATH` set to the base interpreter (no
+numpy/torch/transformers/datasets), `python -m mags.run --arm unsteered ...`
+prints `FINAL <arm>=BLOCKED` (was: bare traceback, no FINAL line), and
+`bash run_all_arms.sh` prints exactly 45 `FINAL <arm>=BLOCKED` lines — one
+per arm in `arms.json`, matching the gate's arm set, `exit 0`, zero arms
+missing. With `.venv` present the real path runs (Llama-3.1 gated → 401 at
+load → `_blocked`), still one FINAL line per arm. `smoke.sh` prints one
+FINAL line (real `0.0000` on the synthetic fixture with the venv; BLOCKED
+without). The degeneracy + invariant tests still pass (28/28).
+
+This is still BLOCKED for every arm — the honest outcome: no GPU and no
+gated HF token mean none of the paper's 8B/4B/20B models load, and the
+molecular task's setup is unstated by the paper. No synthetic fallback for
+results; `smoke.sh` is the only synthetic path and is never reported as a
+result.

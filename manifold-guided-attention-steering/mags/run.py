@@ -23,9 +23,18 @@ import argparse
 import json
 import os
 import sys
-import numpy as np
 
-from . import config
+# IMPORTANT: this module's TOP LEVEL imports ONLY the standard library.
+# `python -m mags.run` is the command every arm in arms.json invokes, and the
+# gate runs those commands in a fresh checkout where the local .venv (which
+# holds torch/numpy/transformers) is gitignored and therefore absent. If a
+# third-party import ran at module scope it would raise ImportError before
+# main() executes and NO `FINAL <arm>=...` line would ever be printed — which
+# is exactly the "arms missing a FINAL line" gate failure. All heavy imports
+# (numpy, torch, transformers, datasets, and `from . import config`) are
+# deferred into _run() and wrapped so a missing dep still produces one honest
+# `FINAL <arm>=BLOCKED` line. config.py is itself pure-stdlib, but we import
+# it lazily too so the module can never fail to load on a missing dependency.
 
 
 def _blocked(arm, reason, secondary=None):
@@ -70,6 +79,23 @@ def main(argv=None):
         print(f"FINAL {arm_id}={value}")
         if secondary is not None:
             print(f"FINAL {arm_id}__binding_affinity={secondary}")
+
+    # EVERYTHING below needs third-party deps (numpy/torch/transformers/
+    # datasets) that are absent in a fresh checkout. Wrap it so that any
+    # failure — ImportError, model-load, missing manifold, runtime error —
+    # still produces exactly one `FINAL <arm_id>=BLOCKED` line. _blocked()
+    # raises SystemExit, which is NOT an Exception, so the explicit BLOCKED
+    # exits inside _run still terminate normally and are not double-caught.
+    try:
+        _run(args, arm_id, bench, model_id, arm, emit)
+    except SystemExit:
+        raise
+    except Exception as e:  # noqa: BLE001 - intentional catch-all for the contract
+        _blocked(arm_id, f"import/runtime failure: {e!r}")
+
+
+def _run(args, arm_id, bench, model_id, arm, emit):
+    from . import config  # pure-stdlib; deferred so module load can never fail
 
     # ---- molecular task is a stretch target with unstated setup (SPEC §4.18) ----
     if bench == "SMILES-molecular-generation":
