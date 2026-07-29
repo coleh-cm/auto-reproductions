@@ -47,6 +47,39 @@ def test_iti_bank_fits_probes_and_reaches_large_K():
         assert 0.0 <= hd.sigma <= 1.0
 
 
+def test_iti_K_override_keeps_int_pair_form():
+    """Regression for the round-19 blocker: the --iti-K override in mags.run rewrites
+    iti_bank.selected_heads; it MUST produce [[l,h],...] int pairs (the form
+    ITIController consumes), NOT [(l,h), ITIHead] tuples. The buggy form
+    ``[list(h) for h in sorted(bank.heads.items(), ...)[:K]]`` made each entry a
+    [(l,h), ITIHead] list, so ``tuple(h)`` in ITIController hashed an unhashable
+    ITIHead and raised TypeError, crashing every --iti-K ITI arm. This test
+    reproduces the override logic and asserts ITIController builds for K in
+    {24,48,96}."""
+    rng = np.random.default_rng(7)
+    all_acts, pids = _make_all_acts(rng, n_heads_per_layer=4, layers=(0, 1))
+    bank = fit_iti_bank(all_acts, pids[:8], pids[8:], model_id="m", benchmark="b",
+                       K=8, alpha=0.5, layers_monitored=[0, 1])
+    # Simulate the corrected mags.run --iti-K override path for the ablation grid.
+    for K in (24, 48, 96):
+        bK = bank
+        bK.K = K
+        bK.selected_heads = [[l, h] for (l, h), _ in sorted(
+            bK.heads.items(), key=lambda kv: kv[1].accuracy, reverse=True)[:K]]
+        # every entry must be a 2-int pair (NOT contain an ITIHead)
+        for entry in bK.selected_heads:
+            assert len(entry) == 2 and all(isinstance(x, int) for x in entry), \
+                f"K={K}: selected_heads entry {entry!r} must be [l,h] ints, not " \
+                f"[(l,h), ITIHead] (the round-19 blocker)"
+        # ITIController must construct without TypeError (the bug raised here)
+        ctrl = ITIController(bK, alpha=0.5)
+        assert len(ctrl._selected) == len(bK.selected_heads)
+        # and the controller actually intervenes (smoke)
+        import torch
+        x = torch.zeros(1, 1, len(bK.selected_heads), 8)
+        assert ctrl(0, x) is not None
+
+
 def test_iti_intervention_is_static_and_oriented():
     """SPEC §4.15: a += alpha * sigma_h * v_h every step (static; no dependence on the
     current activation). v_h oriented toward the CORRECT class."""

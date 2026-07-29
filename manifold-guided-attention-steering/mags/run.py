@@ -392,8 +392,9 @@ def _run(args, arm_id, bench, model_id, arm, emit):
         # honor --iti-K to override the bank's K (ablation grid {24,48,96})
         if args.iti_K:
             iti_bank.K = args.iti_K
-            iti_bank.selected_heads = [list(h) for h in sorted(
-                iti_bank.heads.items(), key=lambda kv: kv[1].accuracy, reverse=True)[:args.iti_K]]
+            iti_bank.selected_heads = [[l, h] for (l, h), _ in sorted(
+                iti_bank.heads.items(), key=lambda kv: kv[1].accuracy,
+                reverse=True)[:args.iti_K]]
         controller = ITIController(iti_bank, alpha=alpha)
     elif arm == "angular-steering":
         from .baselines import ASBank, AngularSteeringController
@@ -405,18 +406,39 @@ def _run(args, arm_id, bench, model_id, arm, emit):
             amateur, atok = load_model(amateur_id)
         except Exception as e:
             _blocked(arm_id, f"amateur model load failed: {e!r}")
-        # CD uses a custom greedy loop, not the controller hook path
+        # CD uses a custom greedy loop, not the controller hook path. PPL is still
+        # the conditional PPL of the completion under the UNSTEERED base model
+        # (the expert run unsteered, SPEC §4.14), so we compute it per problem and
+        # write the same results JSON the other arms write (reproduces the CD PPL
+        # column the paper reports, tex:L433/L479).
+        from .generation import cd_generate, perplexity_of
+        from .eval import bootstrap_ci
         corrects = []
+        ppls = []
+        per_problem = []
         for prob in problems:
-            completion, _ = cd_generate(
+            completion, gen_ids, prompt_ids = cd_generate(
                 model, amateur, tok, prob.prompt_text, max_new_tokens=max_new,
                 alpha_plausibility=config.CD_DEFAULT_ALPHA_PLAUS,
                 beta=config.CD_DEFAULT_BETA,
             )
-            corrects.append(int(grade(bench, completion, prob)))
+            ok = grade(bench, completion, prob)
+            ppl = float("nan")
+            try:
+                ppl = perplexity_of(model, tok, token_ids=gen_ids,
+                                    prompt_ids=prompt_ids)
+            except Exception:
+                ppl = float("nan")
+            corrects.append(int(ok))
+            ppls.append(ppl)
+            per_problem.append({"id": prob.id, "correct": int(ok), "ppl": ppl,
+                                "completion": completion})
         acc, ci = bootstrap_ci(corrects)
-        emit(f"{acc:.4f}")
-        return
+        import numpy as _np
+        valid_ppls = [p for p in ppls if not _np.isnan(p)]
+        mean_ppl = float(_np.mean(valid_ppls)) if valid_ppls else float("nan")
+        result = {"n": len(problems), "acc": acc, "ci95": ci, "ppl": mean_ppl,
+                  "per_problem": per_problem}
     else:
         _blocked(arm_id, f"unknown arm {arm!r}")
 
@@ -425,8 +447,11 @@ def _run(args, arm_id, bench, model_id, arm, emit):
     # model as the ppl_model. For CD the "base" is the expert; for steering arms the
     # base is the same model run unsteered (the controller only changes generation,
     # so scoring the completion under the raw model gives the unsteered-base PPL).
-    result = run_arm(model, tok, model_id, controller, bench, problems,
-                     max_new_tokens=max_new, grading=grade, ppl_model=model)
+    # CD builds `result` in its own branch above (custom cd_generate loop, no
+    # controller hook), so it skips the shared run_arm path.
+    if arm != "contrastive-decoding":
+        result = run_arm(model, tok, model_id, controller, bench, problems,
+                         max_new_tokens=max_new, grading=grade, ppl_model=model)
     # Per-arm config manifest (SPEC §5.8): record the open hyperparameters the
     # paper left unstated (k/q/K/alpha/monitored_layers) and the decoding config
     # so each run is self-describing. Steering-arm params come from the loaded

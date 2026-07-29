@@ -101,7 +101,23 @@ def load_mathinstruct(limit=None) -> list:
     """MathInstruct (MATH-500 contrastive-trace source, tex:L398). Returns problems
     keyed by instruction; we keep only the MATH subset where 'source' contains 'MATH'
     to match the paper's MATH-500 manifold (diagnostic uses Math-Instruct traces from
-    Llama-3.1-8B-Instruct, tex:L296). Each row's `output` ends with a boxed answer."""
+    Llama-3.1-8B-Instruct, tex:L296).
+
+    Gold is extracted per source (SPEC 4.23, realized keep-set):
+      - MATH_train CoT: trailing ``\\boxed{...}`` (the MATH grader, mags.grading.grade_math,
+        also extracts boxed from a generated trace, so the gold/trace graders match).
+      - college_math: multiple-choice letter from ``The answer is <X>.`` (all 1840 rows
+        end this way; the generated trace is graded by boxed-letter match).
+    Sources excluded (recorded in SPEC 4.23):
+      - math50k_camel: free-form prose with no reliable single-answer marker (only ~90 of
+        49484 carry a boxed; the rest end in prose like 'D approx 1.46497.' or are
+        non-single-answer). Parsing a gold from prose would inject noisy contrastive
+        labels and corrupt the manifold, so camel is excluded.
+      - MATH_train PoT: Python programs whose gold is the executed stdout; grading a
+        generated PoT trace needs a program-execution grader distinct from the MATH
+        boxed grader and out of scope for the MATH-500 (boxed-answer) manifold, so PoT
+        is excluded.
+    """
     from datasets import load_dataset
     d = load_dataset("TIGER-Lab/MathInstruct")["train"]
     out = []
@@ -112,7 +128,7 @@ def load_mathinstruct(limit=None) -> list:
         # MathInstruct mixes MATH and GSM8K-derived items; keep MATH-sourced for MATH-500.
         if "MATH" not in src and "math" not in src.lower():
             continue
-        ans = _extract_boxed(r["output"])
+        ans = _extract_mathinstruct_gold(src, r["output"])
         if ans is None:
             continue
         out.append(Problem(
@@ -179,6 +195,25 @@ def _extract_boxed(text: str) -> str | None:
     if depth != 0:
         return None
     return text[i:j - 1].strip()
+
+
+def _extract_mathinstruct_gold(source: str, output: str) -> str | None:
+    """Per-source gold extraction for MathInstruct (SPEC 4.23 realized keep-set).
+
+    MATH_train CoT -> trailing boxed; college_math -> multiple-choice letter. Returns
+    None for sources we exclude (camel free-form prose, MATH_train PoT) so the caller
+    drops them rather than fitting a manifold on unreliable labels.
+    """
+    import re
+    ans = _extract_boxed(output)
+    if ans is not None:
+        return ans
+    # college_math: every row ends with "The answer is <letter>." (verified 1840/1840)
+    if "college_math" in source:
+        m = re.search(r"answer is\s+([A-D])\b", output, re.I)
+        if m:
+            return m.group(1).upper()
+    return None
 
 
 EVAL_LOADERS = {

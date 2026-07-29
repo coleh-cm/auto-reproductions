@@ -132,3 +132,32 @@ def test_grade_math_multi_boxed_scores_last_answer():
     pred2 = r"intermediate $\boxed{3}$ then $\boxed{\dfrac{1}{2}}$"
     assert grade_math(pred2, r"\dfrac{1}{2}"), "last boxed dfrac must pass"
     assert not grade_math(pred2, "3"), "intermediate boxed must not be scored"
+
+
+def test_mathinstruct_gold_extraction_per_source():
+    """Round-19 major-fix regression: load_mathinstruct's gold extraction must keep
+    MATH_train CoT (boxed) AND college_math (multiple-choice letter), and must NOT
+    silently drop college_math for lacking a boxed marker. The prior boxed-only
+    filter kept only ~11.3k of the ~13.2k intended MATH-sourced corpus and
+    discarded ALL 1840 college_math rows."""
+    from mags.data.loaders import _extract_mathinstruct_gold
+    # MATH_train CoT: trailing boxed -> boxed content
+    assert _extract_mathinstruct_gold(
+        "data/CoT/MATH_train.json",
+        r"...so the area is $\boxed{108\pi}$. The answer is 108\pi") == r"108\pi"
+    # college_math: "The answer is B." -> letter (boxed absent)
+    assert _extract_mathinstruct_gold(
+        "data/CoT/college_math.json",
+        "...It's possible for G to be cyclic. The answer is B.") == "B"
+    # camel free-form prose (no boxed, not college_math) -> None (dropped, recorded)
+    assert _extract_mathinstruct_gold(
+        "data/CoT/math50k_camel.json",
+        "D = log(5)/log(3)\n\nD \u2248 1.46497") is None
+    # MATH_train PoT (python, no boxed) -> None (dropped, recorded)
+    assert _extract_mathinstruct_gold(
+        "data/PoT/MATH_train.json",
+        "def f(x):\n    return 3**(x/2)\n\nprint(f(6))") is None
+    # a camel row that itself carries a boxed is still kept (boxed takes priority)
+    assert _extract_mathinstruct_gold(
+        "data/CoT/math50k_camel.json",
+        r"therefore $\boxed{7}$") == "7"

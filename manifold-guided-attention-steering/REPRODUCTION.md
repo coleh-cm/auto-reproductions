@@ -1580,3 +1580,76 @@ and paper-faithful (two prior orchestrated reviews + this round's AS
 correction, 39 tests incl. degeneracy + invariants, smoke runs the real
 path), but no paper number is reproducible in this CPU-only, model-uncached
 sandbox. Branch `repro/manifold-guided-attention-steering` pushed.
+
+## Round 19 — orchestrated faithfulness review fixes (4 verified findings)
+
+Ran a 5-component adversarial faithfulness review (data, manifold-core, fit,
+eval, baselines) against the authoritative LaTeX (`paper/latex_src/neurips_2026.tex`),
+with a refute-by-default verify phase. 5 findings raised, 4 verified, 1
+dropped (unconfirmable citation). All 4 verified findings fixed; 2 new
+regression tests added (41 tests pass, smoke runs).
+
+### BLOCKER — ITI `--iti-K` override crashed every ITI arm (baselines-1)
+`mags/run.py:393-396` rewrote `iti_bank.selected_heads` as
+`[list(h) for h in sorted(iti_bank.heads.items(), ...)[:K]]`. Since
+`.items()` yields `((l,h), ITIHead)` tuples, `list(h)` produced
+`[(l,h), ITIHead]`, NOT the `[[l,h],...]` int-pair list `ITIController`
+expects. `ITIController` did `self._selected[tuple(h)] = iti_bank.heads[tuple(h)]`,
+i.e. `heads[((l,h), ITIHead)]`, which hashes the unhashable `ITIHead` ->
+`TypeError`, caught by the run.py catch-all -> `FINAL iti__...=BLOCKED`.
+Every ITI arm in arms.json passes `--iti-K 96`, so the override always fired:
+even on a GPU host with cached models, the ITI baseline could never produce a
+real number. NOT recorded in SPEC. **Fix:** `[[l, h] for (l, h), _ in sorted(...)]`
+(run.py:395-397). Regression test `test_iti_K_override_keeps_int_pair_form`
+constructs `ITIController` after the override for K in {24,48,96} and asserts
+each entry is a 2-int pair. Verified the ITI arm path now BLOCKs only for the
+honest environment reason (no GPU/cached model), not the override crash.
+
+### MAJOR — MathInstruct boxed-only gold filter dropped ~85% of SPEC 4.23's
+### intended MATH-500 contrastive corpus (data-1)
+`load_mathinstruct` set `gold = _extract_boxed(output)` and dropped any row
+whose reference output had no `\boxed{}`. The docstring falsely claimed "each
+row's output ends with a boxed answer." Verified on the cached dataset: this
+kept only 11,328 of the ~73k MATH-sourced rows — `college_math` (1840,
+100% dropped, all end with "The answer is B."), `math50k_camel` (49484,
+99.8% dropped, free-form prose), `MATH_train PoT` (10632, ~100% dropped,
+Python programs). The boxed filter was an unrecorded deviation narrowing
+SPEC 4.23's recorded keep-set to MATH_train CoT only. **Fix:**
+`_extract_mathinstruct_gold(source, output)` (loaders.py) — boxed first, then
+multiple-choice letter for `college_math`. Excludes camel (free-form prose,
+no reliable single-answer gold without noisy parsing) and MATH_train PoT
+(needs a program-execution grader distinct from the MATH boxed grader, out of
+scope for the boxed-answer MATH-500 manifold). Realized keep-set ≈ 13,168
+(MATH_train CoT 11,237 + college_math 1,840 + boxed-camel 90 + 1 boxed-PoT).
+SPEC 4.23 updated with the realized keep-set and the honest exclusion
+rationale; false docstring removed. Regression test
+`test_mathinstruct_gold_extraction_per_source` pins per-source behaviour.
+
+### MINOR — Contrastive-Decoding arm omitted the PPL the paper reports
+### (eval-1 + baselines-2, same issue reported twice)
+The CD branch ran its own loop that collected only correctness, emitted
+accuracy, and returned before the shared `run_arm(...)` call that computes
+conditional PPL under the unsteered base model. `cd_generate` returned no
+`prompt_ids`, so the PPL protocol used by every other arm could not be
+invoked. The paper reports a PPL column for CD in Table 1 (tex:L433) and
+Table 2 (tex:L479); SPEC 4.14 does not exempt CD. **Fix:** `cd_generate`
+now returns `prompt_ids` (generation.py:108); the CD branch computes
+`perplexity_of(model, token_ids=gen_ids, prompt_ids=prompt_ids)` per problem
+(the expert run unsteered = the base), writes the same results JSON as the
+other arms, and the shared `run_arm` call is skipped for CD (it builds
+`result` itself). PPL is secondary/non-gated; CD accuracy was already
+correct.
+
+### Dropped (1) — data-2 (mathqa substring over-keep)
+Reviewer could not locate the cited files in its sandbox working directory
+(empty workspace, not the repro repo) and refuted on unconfirmable citations.
+Not a real finding.
+
+### Environment block (unchanged, re-confirmed this round)
+aarch64 CPU-only, no GPU (`nvidia-smi` absent, `torch.cuda.is_available()==False`),
+Llama-3.1-8B-Instruct gated with no HF token; the downloadable Gemma-4-E4B-it
+/ GPT-OSS-20B cannot run the paper's full manifold-fit + eval (MATH-500 N=500
+× 1024 tok, GSM8K N=1319, etc.) on CPU within any gate timeout. The honest
+state remains "no numbers / BLOCKED" for all 45 arms — a blocked result to
+report, not a cue to substitute synthetic data (smoke.sh is for the code-path
+check only, never a paper result). Branch `repro/manifold-guided-attention-steering` pushed.

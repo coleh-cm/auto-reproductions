@@ -105,7 +105,8 @@ def cd_generate(expert, amateur, tok, prompt_text, max_new_tokens=1024,
         logits_e = out_e.logits[:, -1, :]
         logits_a = out_a.logits[:, -1, :]
     gen_ids = torch.tensor(generated, dtype=torch.long).unsqueeze(0)
-    return tok.decode(gen_ids[0], skip_special_tokens=True), gen_ids[0].cpu().numpy()
+    return (tok.decode(gen_ids[0], skip_special_tokens=True),
+            gen_ids[0].cpu().numpy(), ids[0].cpu().numpy())
 
 
 @torch.no_grad()
