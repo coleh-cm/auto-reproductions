@@ -1,6 +1,2 @@
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/root/auto-reproductions/manifold-guided-attention-steering/mags/run.py", line 26, in <module>
-    import numpy as np
-ModuleNotFoundError: No module named 'numpy'
+FINAL mags__MATH-500__google_gemma-4-E4B-it=BLOCKED
+BLOCKED[mags__MATH-500__google_gemma-4-E4B-it]: model load failed: ModuleNotFoundError("No module named 'torch'")
