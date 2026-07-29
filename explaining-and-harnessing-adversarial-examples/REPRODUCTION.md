@@ -71,3 +71,23 @@
   input gradient) and the baseline arm. The full milestone experiments may re-enable dropout;
   this runner does not. The monitor-best checkpoint (`result.best_state_dict`) is loaded
   before evaluation, matching the paper's protocol.
+- 2026-07-29: **Bug #2 found by adversarial review and fixed in `train._apply_max_col_norm`.**
+  The clamp used `p.norm(dim=0)` for ALL 2-D weights. That is correct for `_MaxoutLayer.W`
+  (shape `[in, out]` -> per-output-unit norm over the input axis), but WRONG for the readout
+  `nn.Linear(units, n_classes).weight`, which PyTorch stores as `[out=n_classes, in=units]`;
+  there `dim=0` reduces over the 10 output classes, giving the per-INPUT-unit norm -- not the
+  per-OUTPUT-class norm pylearn2 `max_col_norm` 1.9365 constrains. The readout's real
+  constraint silently no-op'd, and the self-check passed tautologically (it asserted the same
+  wrong axis). Fix: clamp the per-output-unit norm explicitly per layout -- `dim=0` for the
+  `[in,out]` maxout layers, `dim=1` for the `[out,in]` readout -- and fix the self-check to
+  assert the correct axes. Added `test_max_col_norm_clamps_correct_output_axis` (forces an
+  over-normed readout row, checks the row norm is clamped). The fix changed training dynamics
+  (baseline 200-step accuracy 0.8727 -> 0.884) confirming the constraint now actually applies;
+  the eps=0==baseline degeneracy still holds bit-identically (13/13 tests pass).
+- 2026-07-29: **Adversarial review (orchestrate, 7 parallel reviewers).** 6/7 components
+  approved; the single real finding was the max_col_norm axis bug above (now fixed). All
+  equations verified line-by-line against `paper/source/iclr2015.tex`: E1 (tex:309),
+  E2 (tex:235/239, no clipping), E5 (tex:401-404), E6 (tex:411, uniform-direction imprecision
+  recorded as the paper's own, SPEC sec6 item 21), E7 (tex:486-488, alpha=0.5, stop-grad
+  tex:559-561), E8 (tex:595, RBF no minus sign). Degeneracy (eps=0==baseline EXACT) confirmed
+  by reviewers and by tests.

@@ -182,3 +182,30 @@ def test_fgsm_maxout_inf_norm():
     eta = eps * grad.sign()
     assert torch.equal(eta.abs().max(), torch.tensor(eps))
     assert torch.equal(fgsm(m, x, y, eps), x + eta)
+
+
+def test_max_col_norm_clamps_correct_output_axis():
+    """External maxout recipe (pylearn2 max_col_norm 1.9365) constrains each
+    OUTPUT unit's incoming-weight L2 norm. _MaxoutLayer.W is [in,out] so that
+    is norm over dim 0; the readout nn.Linear.weight is [out=n_classes,in]
+    (PyTorch convention) so that is norm over dim 1. The earlier bug clamped
+    dim 0 for ALL 2-D weights, which clamped the per-INPUT-unit norm (over 10
+    classes) on the readout -- the wrong axis -- and could leave a readout
+    class's incoming vector over 1.9365 undetected. This test forces an
+    over-normed readout row and checks the fix clamps the row norm (dim 1),
+    not the column norm (dim 0)."""
+    from fgsm_repro.train import _apply_max_col_norm, _MAX_COL_NORM
+    torch.manual_seed(0)
+    m = MaxoutMLP(units=12, pieces=5, n_classes=10, seed=0)
+    # Blow up the readout rows so each OUTPUT class has incoming-norm >> 1.9365
+    with torch.no_grad():
+        m.readout.weight.mul_(50.0)
+    pre_row = m.readout.weight.norm(dim=1).max().item()  # per-output-class norm
+    pre_col = m.readout.weight.norm(dim=0).max().item()  # per-input-unit norm
+    assert pre_row > _MAX_COL_NORM, pre_row
+    _apply_max_col_norm(m, _MAX_COL_NORM)
+    post_row = m.readout.weight.norm(dim=1).max().item()
+    assert post_row <= _MAX_COL_NORM + 1e-5, f"readout row norm {post_row} > {_MAX_COL_NORM}"
+    # maxout layer W columns (per-output-unit) are also clamped
+    for layer in (m.layer0, m.layer1):
+        assert layer.W.norm(dim=0).max().item() <= _MAX_COL_NORM + 1e-5

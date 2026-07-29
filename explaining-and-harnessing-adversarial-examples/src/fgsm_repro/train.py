@@ -108,30 +108,45 @@ def _set_init_seed(model: Any, seed: int) -> None:
         fn(int(seed))
 
 
-def _apply_max_col_norm(model: MaxoutMLP, max_col_norm: float) -> None:
-    """External maxout recipe: clamp the L2-norm of every *column* of every 2-D
-    weight matrix in the MaxoutMLP to ``max_col_norm`` AFTER each SGD step
-    (pylearn2 mnist_pi.yaml, max_col_norm 1.9365). Not paper-stated.
+def _apply_max_col_norm(model: "MaxoutMLP", max_col_norm: float) -> None:
+    """External maxout recipe: clamp the L2-norm of every *column* (i.e. every
+    OUTPUT unit's incoming-weight vector) of each maxout weight matrix to
+    ``max_col_norm`` AFTER each SGD step (pylearn2 mnist_pi.yaml,
+    max_col_norm 1.9365). Not paper-stated.
 
-    This operates DIRECTLY on the model's parameters (``_MaxoutLayer.W`` of
-    layer0/layer1 and the readout ``nn.Linear.weight``); we deliberately do
-    NOT duck-type a ``model.apply_max_col_norm`` method (MaxoutMLP exposes
-    none), so the constraint cannot silently no-op. The 1-D bias parameters
-    are left untouched.
+    This operates DIRECTLY on the MaxoutMLP weight matrices. The 1-D bias
+    parameters are left untouched. We clamp the per-output-unit norm for EACH
+    weight matrix explicitly, because the two layer kinds store their weights
+    on DIFFERENT axes:
+      - ``_MaxoutLayer.W`` has shape ``[in, out]``  -> each column W[:, j] is
+        one output unit's incoming weights -> norm over ``dim=0``.
+      - the readout ``nn.Linear(units, n_classes).weight`` has shape
+        ``[out=n_classes, in=units]`` (PyTorch convention) -> each output
+        class's incoming weights are a ROW -> norm over ``dim=1``.
+    pylearn2 ``max_col_norm`` constrains the per-OUTPUT-unit incoming-weight
+    L2 norm, so we must reduce over the INPUT axis of each matrix. Using a
+    blanket ``p.norm(dim=0)`` for all 2-D weights (the prior bug) clamped the
+    wrong axis on the readout (per-INPUT-unit norm over 10 classes instead of
+    per-OUTPUT-class norm over 240 units) and silently no-op'd on the readout's
+    real constraint; the self-check below asserts the correct axis too.
 
-    Column convention: for a weight matrix ``W`` of shape ``[in, out]`` each
-    column ``W[:, j]`` is one outgoing unit's incoming weights; its L2 norm is
-    clamped to ``max_col_norm`` (rescaled in place only when it exceeds the
-    bound, so under-normed columns are unchanged).
+    Rescaling: multiply each output unit's column/row by
+    ``min(1, max_col_norm / norm)`` so under-normed units are unchanged and
+    only over-normed units are shrunk (in place).
     """
     with torch.no_grad():
-        for p in model.parameters():
-            if p.dim() != 2:
-                continue  # skip 1-D biases
-            norms = p.norm(dim=0, keepdim=True)  # [1, out]
-            # scale = min(1, max_col_norm / norm); rescale only over-normed cols.
+        # _MaxoutLayer.W : [in, out] -> per-output norm over the input axis (dim 0)
+        for layer in (model.layer0, model.layer1):
+            W = layer.W  # [in, out]
+            norms = W.norm(dim=0, keepdim=True)  # [1, out]
             factor = (max_col_norm / norms.clamp_min(1e-12)).clamp(max=1.0)
-            p.mul_(factor)
+            W.mul_(factor)
+        # readout nn.Linear.weight : [out=n_classes, in=units] -> per-output norm
+        # over the input axis (dim 1).
+        Rw = model.readout.weight  # [n_classes, units]
+        norms = Rw.norm(dim=1, keepdim=True)  # [n_classes, 1]
+        factor = (max_col_norm / norms.clamp_min(1e-12)).clamp(max=1.0)
+        Rw.mul_(factor)
 
 
 def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
@@ -385,13 +400,16 @@ def _self_check() -> str:
         "E7 must reduce to the clean cost when eps=0."
     )
 
-    # Sanity: confirm max_col_norm is actually enforced (a fresh maxout model
-    # trained a few steps should have all 2-D weight column norms <= 1.9365).
+    # Sanity: confirm max_col_norm is actually enforced on every output unit's
+    # incoming-weight vector. _MaxoutLayer.W is [in,out] -> norm over dim 0;
+    # the readout nn.Linear.weight is [out,in] -> norm over dim 1 (PyTorch
+    # convention). A blanket p.norm(dim=0) (the prior bug) would assert the
+    # wrong axis on the readout and pass tautologically.
     max_col = 0.0
-    for p in model_clean.parameters():
-        if p.dim() == 2:
-            max_col = max(max_col, p.norm(dim=0).max().item())
-    lines.append(f"max column-norm after training (<=1.9365 expected): {max_col:.6f}")
+    for layer in (model_clean.layer0, model_clean.layer1):
+        max_col = max(max_col, layer.W.norm(dim=0).max().item())
+    max_col = max(max_col, model_clean.readout.weight.norm(dim=1).max().item())
+    lines.append(f"max per-output column-norm after training (<=1.9365 expected): {max_col:.6f}")
     assert max_col <= 1.9365 + 1e-5, (
         f"max_col_norm not enforced: column norm {max_col} > 1.9365"
     )
