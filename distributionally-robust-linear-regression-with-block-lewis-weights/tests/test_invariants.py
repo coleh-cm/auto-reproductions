@@ -253,3 +253,52 @@ def test_ball_oracle_monotone(small_problem, small_problem_opt):
 def run_arm_help(arm, cfg, prob, x0, opt):
     from gdr.runner import run_arm
     return run_arm(arm, cfg, prob, x0, opt, max_outer=8, time_budget=60.0)
+
+
+# ---------------------------------------------------------------------------
+# First-order arms make real end-to-end progress (NOT a no-op / broken arm).
+#
+# The smoke gate checks only `FINAL smoke=ok`; the four first-order arms report
+# `iters_to_5%=None` there because they PLATEAU above 5% on the heterogeneous
+# instance -- exactly the paper's §8 T4 finding ("first-order methods' plateau",
+# experiments.tex:107).  A plateau reads identically to a broken arm (one that
+# returns x0) from the gate's perspective, so this test machine-enforces the
+# distinction: every first-order arm must DECREASE the worst-group loss F from
+# its ERM warm start (final gap STRICTLY below the initial gap) and stay finite.
+# A no-op solver returning x0 fails (final == initial); a divergent solver fails
+# (non-finite / increasing).  This is the cheapest real evidence the baselines
+# actually optimize, complementing the per-arm invariants above.
+# ---------------------------------------------------------------------------
+FIRST_ORDER_ARMS = {
+    "subgradient": {"lr_grid": [1e-3, 1e-2, 1e-1],
+                    "schedule_grid": ["const", "1/sqrt_t"]},
+    "smoothed_gd": {"lr_grid": [1e-3, 1e-2, 1e-1],
+                    "beta_grid": [1e-1], "delta_grid": [1e-1]},
+    "smoothed_hb": {"lr_grid": [1e-3, 1e-2, 1e-1], "momentum_grid": [0.9],
+                    "beta_grid": [1e-1], "delta_grid": [1e-1]},
+    "smoothed_nesterov": {"lr_grid": [1e-3, 1e-2, 1e-1], "momentum_grid": [0.9],
+                          "beta_grid": [1e-1], "delta_grid": [1e-1]},
+}
+
+
+@pytest.mark.parametrize("arm,cfg", list(FIRST_ORDER_ARMS.items()),
+                         ids=list(FIRST_ORDER_ARMS))
+def test_first_order_arm_makes_progress(small_problem, small_problem_opt, arm, cfg):
+    prob = small_problem
+    _xstar, opt = small_problem_opt
+    # production convention (U15): rescale so OPT == 1, putting arms on an O(1)
+    # loss scale (the IPM needs this; the first-order grids are tuned to it).
+    s = float(np.sqrt(opt))
+    pn = dict(prob); pn["A"] = prob["A"] / s; pn["b"] = prob["b"] / s
+    opt_n = 1.0
+    x0 = np.linalg.lstsq(pn["A"], pn["b"], rcond=None)[0]   # ERM warm start
+    cfg = dict(cfg); cfg["opt"] = opt_n
+    from gdr.runner import run_arm
+    h = run_arm(arm, cfg, pn, x0, opt_n, max_outer=60, time_budget=60.0)
+    gaps = h["gap"]
+    g0, gN = float(gaps[0]), float(gaps[-1])
+    # every recorded gap must be finite (no divergence to inf/NaN)
+    assert all(np.isfinite(g) for g in gaps), (arm, gaps)
+    # the arm must strictly decrease the worst-group suboptimality from the warm
+    # start -- a no-op / broken arm would leave gN == g0.
+    assert gN < g0 - 1e-6, (arm, "no progress: init", g0, "final", gN)

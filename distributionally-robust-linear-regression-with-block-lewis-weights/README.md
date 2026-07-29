@@ -126,7 +126,7 @@ budget. Full per-arm histories are written to `results/<dataset>_<arm>.json`
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 19 tests: degeneracy + equation invariants (SPEC T5)
+.venv/bin/python -m pytest -q     # 23 tests: degeneracy + equation invariants (SPEC T5)
 ```
 
 `tests/test_degeneracy.py` — the method at its no-op setting must reproduce the
@@ -137,7 +137,8 @@ reduces to plain least squares (ERM). `tests/test_invariants.py` — Lemma 6.1
 the E7 residual sandwich, smoothed grad/Hessian finite-difference + PSD,
 p-objective gradient finite-difference, **Lemma 7.2 strong-convexity of ‖·‖ₚ²**,
 **lewis_warm_start D-exponent** (p=∞/2/4/8), subgradient validity, ball-oracle
-**per-iteration f̃-monotonicity** (via the recorded `x_traj`).
+**per-iteration f̃-monotonicity** (via the recorded `x_traj`), **first-order arms
+make end-to-end progress** (the smoke `iters_to_5%=None` plateau is not a no-op).
 
 ## Results (this reproduction)
 

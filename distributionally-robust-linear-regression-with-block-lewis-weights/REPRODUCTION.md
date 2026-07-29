@@ -40,12 +40,13 @@
 - `gdr/data_synthetic.py` (D1) and `gdr/data_acs.py` (D2).
 - `run_arm.py` (per-arm entrypoint, OPT=1 normalization U15, cached OPT),
   `arms.json`, `run_all_arms.sh`, `smoke.sh`.
-- `tests/`: 19 tests pass — degeneracy (Lewis-at-reset == Euclidean bit-identical;
+- `tests/`: 23 tests pass — degeneracy (Lewis-at-reset == Euclidean bit-identical;
   p=2 objective == least squares) + invariants (Lemma 6.1, E6 overestimate &
   ‖w‖₁≤2(d+1), E7 residual sandwich, smoothed grad/Hess finite-diff & PSD,
   p-grad finite-diff, **Lemma 7.2 strong-convexity of ‖·‖ₚ²** (Round-6),
   **lewis_warm_start D-exponent** p=∞/2/4/8 (Round-6), subgradient validity,
-  ball-oracle **per-iteration f̃-monotonicity** via x_traj (Round-6)).
+  ball-oracle **per-iteration f̃-monotonicity** via x_traj (Round-6),
+  **first-order arms make end-to-end progress** (Round-7)).
 
 ### Numbers (committed in `results/`)
 
@@ -292,3 +293,35 @@ seeds (synthetic 0, ACS 6 = California worst), U11 (f̂ not used — §8 is
 unaccelerated), U15 (OPT=1 normalization, required for the IPM), U16 (E11 reset
 implemented + degeneracy test). Stretch accelerated arms (E16/E17/E18) not
 implemented (no §8 number exercises them; U3).
+
+### Round-7: machine-check the first-order plateau is not a broken arm
+
+- Feedback (this pass): the smoke prints `iters_to_5%=None` for the four
+  first-order arms (subgradient, smoothed_gd/_hb/_nesterov). Round-5 made the
+  smoke print `gap=<init>-><final>` so the plateau reads as progress (not
+  `None=broken`), and Round-6's orchestration confirmed the plateau is genuine
+  (matches the paper's headline §8 T4 finding, experiments.tex:107). But the
+  smoke GATE checks only `FINAL smoke=ok`; the init->final print is a
+  human-readable diagnostic, NOT a machine-checked invariant. A no-op arm
+  returning the warm start x0 would still pass the gate (`FINAL smoke=ok`) while
+  showing `init == final` — indistinguishable from a genuine plateau to anyone
+  who does not read the stderr line.
+- Fix: `tests/test_invariants.py` adds `test_first_order_arm_makes_progress`
+  (4 parametrized cases, one per first-order arm). Each runs the arm on the
+  small normalized problem (OPT==1, U15) from the ERM warm start for 60 outer
+  iterations and asserts (a) every recorded gap is finite (no divergence) and
+  (b) `final gap < init gap - 1e-6` — i.e. the arm strictly decreases the
+  worst-group loss F from its warm start. A no-op solver returning x0 fails
+  (final == initial); a divergent solver fails (non-finite / increasing).
+  Adversarially verified: forcing `final == initial` is rejected by the
+  assertion. This is the cheapest real evidence the baselines actually
+  optimize, complementing the per-arm invariants (test count 19 → 23).
+- Verified the plateau claim itself this pass: on the smoke problem with wider
+  grids + 200 iters the first-order arms keep improving (subgradient
+  0.223→0.139, smoothed_gd 0.223→0.134, smoothed_nesterov 0.223→0.060) but do
+  not cross 5% on this hard instance — confirming the `iters_to_5%=None` is a
+  genuine rate plateau (the paper's 1/ε² / smoothing-floor behavior), not a
+  stuck arm. Reproducibility re-confirmed: synthetic (Lewis=3 ≤ Euclidean=9,
+  IPM=5) and ACS (BO_lewis=1, subgradient=3) reproduce the committed
+  `results/run_all.log` FINAL lines exactly from the current code. No
+  production arm or committed result changed; only the test suite.
