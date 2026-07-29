@@ -197,8 +197,18 @@ exercised here; the from-scratch environment was instead verified via a fresh
   loss+grad bitwise-CE check, so the no-op=baseline gate provably cannot be fit
   to the answer via the one unstated hyperparameter. (2) Added
   `test_training_step_count_is_exact` pinning the loop's exact step-count guard
-  (`--steps` → exactly that many gradient updates) across the first-epoch
+  (  `--steps` → exactly that many gradient updates) across the first-epoch
   boundary (0,1,63,64,65,100). `pytest -q` → 24 passed; both arms still
   reproduce (baseline 0.9370 exact, CWSD 0.9611). SPEC §7 updated: structural
   gates (a)–(e), 24 tests.
+- 2026-07-29: Final numbers pass. Both arms were run and their output written to
+  `/tmp/baseline.log` and `/tmp/method.log`: baseline `FINAL accuracy=0.9370`,
+  CWSD `FINAL accuracy=0.9611`. These match the recorded measured values in the
+  "Results (measured vs claimed)" table above exactly (0.9370 and 0.9611). Re-ran
+  both arms from the committed code to confirm determinism: `python
+  run_experiment.py --lambda 0.0` → `FINAL accuracy=0.9370`; `python
+  run_experiment.py --lambda 1.0` → `FINAL accuracy=0.9611`. `pytest -q` → 24
+  passed. Measured vs claimed: baseline 0.9370 vs 0.9370 (Δ 0.0000, exact); CWSD
+  0.9611 vs 0.9620 (Δ −0.0009). No tolerance asserted; the reader judges whether
+  this reproduces the paper.
 
