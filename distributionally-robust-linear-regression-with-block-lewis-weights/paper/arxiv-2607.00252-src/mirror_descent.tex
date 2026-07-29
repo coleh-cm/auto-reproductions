@@ -1,0 +1,145 @@
+\section{Mirror Descent with Inexact Updates}
+\label{sec:mirror_descent}
+
+\paragraph{Notation warning.} This section is meant to be a self-contained, standalone analysis of mirror descent under inexact updates. The notation is chosen to be consistent with most material we could find on mirror descent and therefore conflicts with the notation used in the rest of the paper.
+
+In this section, we give an analysis of unconstrained mirror descent when each Bregman proximal problem is solved only approximately (\Cref{alg:mirror_descent}). Although we expect that this is a standard fact about mirror descent, we could not find an appropriate reference. Hence, we produce it here.
+
+\begin{algorithm}[H]
+\caption{\textsf{ApproximateMirrorDescent}: Implements mirror descent to optimize convex and differentiable $f$ given $L$-relative smoothness and $\mu$-relative strong convexity in the reference $h$ when we may not be able to solve each proximal problem exactly.}
+\label{alg:mirror_descent}
+\begin{algorithmic}[1]
+\Require Initial point $\vx_0$, iteration count $T$.
+\State Define \begin{equation*}
+    \begin{aligned}
+    D_{h}(\vx,\vy) &\coloneqq h(\vx)-h(\vy)-\ip{\nabla h(\vy),\vx-\vy} \\
+    \xstar &\coloneqq \argmin{\vx\in\R^d} f(\vx)
+    \end{aligned}.
+\end{equation*}
+\For{$i = 1, \dots, T$}
+    \State $\xstar_i = \argmin{\xtilde \in \R^d} f(\vx_{i-1}) + \ip{\nabla f(\vx_{i-1}), \xtilde-\vx_{i-1}} + LD_h(\xtilde,\vx_{i-1})$ \label{line:mirror_descent_exact} \Comment{We may only be able to approximate $\xstar_i$ -- see the next line.}
+    \State Let $\vx_i$ be an approximate stationary point for the above objective.\label{line:mirror_descent_approx}
+\EndFor
+\Return $\argmin{0 \le i \le T} f(\vx_i)$
+\end{algorithmic}
+\end{algorithm}
+
+In \Cref{alg:mirror_descent}, we assume that the function $f$ is $\mu$-relatively strongly convex and $L$-smooth in a \textit{reference function} $h$. This means that for all $\vx,\vy\in\R^d$, we have
+\begin{align*}
+    \mu D_h(\vx,\vy) \le f(\vx) - f(\vy) - \ip{\nabla f(\vy), \vx-\vy} \le  LD_h(\vx,\vy).
+\end{align*}
+Using \cite[Proposition 1.1]{lfn18}, when $f$ is twice-differentiable, this condition is equivalent to asking for all $\vx\in\R^d$, 
+\begin{align*}
+    \mu \nabla^2 h(\vx) \preceq \nabla^2 f(\vx) \preceq L\nabla^2 h(\vx).
+\end{align*}
+We are now ready to state the performance guarantee of \Cref{alg:mirror_descent}. See \Cref{thm:gp_mirror_descent}.
+
+\begin{theorem}
+\label{thm:gp_mirror_descent}
+Let index $j$ be the index output by \Cref{alg:mirror_descent}. Let $\triangle_i$ be defined such that
+\begin{align*}
+    \triangle_i \coloneqq \nabla f(\vx_{i-1}) + L\inparen{\nabla h(\vx_i) - \nabla h(\vx_{i-1})}.
+\end{align*}
+Then, we have
+\begin{align*}
+    f(\vx_j)-f(\xstar) \le L\inparen{1-\frac{\mu}{L}}^TD_h(\xstar,\vx_0)+\max_{1\le i \le n}\ip{\triangle_i,\vx_i-\xstar}.
+\end{align*}
+\end{theorem}
+
+To prove \Cref{thm:gp_mirror_descent}, we begin with a few standard facts about the mirror descent iterations.
+
+\begin{lemma}
+\label{lemma:gp_md_threepoint}
+Let $\vy\in\R^d$ be arbitrary. We have
+\begin{align*}
+    \ip{\nabla f(\vx_{i-1}), \vx_i-\vy} = L\inparen{D_h(\vy,\vx_{i-1})-D_h(\vy,\vx_i)-D_h(\vx_i,\vx_{i-1})} + \ip{\triangle_i, \vx_i-\vy}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_md_threepoint}]
+By the three point identity (see, e.g., \cite[Equation (A.9)]{syls16}), we have
+\begin{align*}
+    D_h(\vy,\vx_{i-1})-D_h(\vy,\vx_i)-D_h(\vx_i,\vx_{i-1})&=-\ip{\nabla h(\vx_i)-\nabla h(\vx_{i-1}),\vx_i-\vy} \\
+    &= \frac{1}{L}\ip{\nabla f(\vx_{i-1})-\triangle_i,\vx_i-\vy},
+\end{align*}
+completing the proof of \Cref{lemma:gp_md_threepoint}.
+\end{proof}
+\begin{lemma}[Mirror descent lemma under approximate stationary point updates]
+\label{lemma:gp_md_singlestep}
+Let $\vy\in\R^d$ be arbitrary. For every iteration $i$, we have
+\begin{align*}
+    f(\vx_i)-f(\vy) \le (L-\mu)D_h(\vy,\vx_{i-1}) - LD_h(\vy,\vx_i) + \ip{\triangle_i,\vx_i-\vy}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_md_singlestep}]
+The definition of $\mu$-relative strong convexity tells us that
+\begin{align*}
+    f(\vx_{i-1})-f(\vy) \le \ip{\nabla f(\vx_{i-1}), \vx_{i-1}-\vy} - \mu D_h(\vy,\vx_{i-1}).
+\end{align*}
+We now write
+\begin{align*}
+    f(\vx_i)-f(\vy) &\le f(\vx_{i-1})-f(\vy) + \ip{\nabla f(\vx_{i-1}), \vx_i-\vx_{i-1}} + LD_h(\vx_i,\vx_{i-1}) & \text{($L$-RS)} \\
+    &\le \ip{\nabla f(\vx_{i-1}), \vx_i-\vy}-\mu D_h(\vy,\vx_{i-1}) + LD_h(\vx_i,\vx_{i-1}) & \text{($\mu$-RSC)} \\
+    &\le (L-\mu)D_h(\vy,\vx_{i-1}) - LD_h(\vy,\vx_i) + \ip{\triangle_i,\vx_i-\vy}, & \text{(\Cref{lemma:gp_md_threepoint})}
+\end{align*}
+completing the proof of \Cref{lemma:gp_md_singlestep}.
+\end{proof}
+
+We now have the tools to complete the proof of \Cref{thm:gp_mirror_descent}.
+
+\begin{proof}[Proof of \Cref{thm:gp_mirror_descent}]
+Let $E_i \coloneqq f(\vx_i)-f(\xstar)-\ip{\triangle_i,\vx_i-\xstar}$. Substituting $\vy=\xstar$ and rearranging the conclusion of \Cref{lemma:gp_md_singlestep} gives
+\begin{align*}
+    E_i \le (L-\mu)D_h(\xstar,\vx_{i-1})-LD_h(\xstar,\vx_i).
+\end{align*}
+We multiply both sides by $\inparen{\frac{L}{L-\mu}}^i$ and write
+\begin{align*}
+    \inparen{\frac{L}{L-\mu}}^iE_i \le \frac{L^i}{(L-\mu)^{i-1}}D_h(\xstar,\vx_{i-1})-\frac{L^{i+1}}{(L-\mu)^{i}}D_h(\xstar,\vx_i).
+\end{align*}
+Adding over all $T$ iterations yields
+\begin{align*}
+    \sum_{i=1}^T \inparen{\frac{L}{L-\mu}}^iE_i \le LD_h(\xstar,\vx_0)-\inparen{\frac{L}{L-\mu}}^TLD_h(\xstar,\vx_T) \le LD_h(\xstar,\vx_0).
+\end{align*}
+Expanding out the definition of $E_i$ and rearranging gives
+\begin{align*}
+    \sum_{i=1}^T \inparen{\frac{L}{L-\mu}}^i(f(\vx_i)-f(\xstar)) \le LD_h(\xstar,\vx_0) + \sum_{i=1}^T \inparen{\frac{L}{L-\mu}}^i\ip{\triangle_i,\vx_i-\xstar}.
+\end{align*}
+By the geometric series summation formula, we define and have
+\begin{align*}
+    C_T \coloneqq \sum_{i=1}^T \inparen{\frac{L}{L-\mu}}^i = \frac{L}{\mu}\inparen{\inparen{1+\frac{\mu}{L-\mu}}^T-1}.
+\end{align*}
+Let $j$ be the index that \Cref{alg:mirror_descent} returns. It is easy to check that
+\begin{align*}
+    \sum_{i=1}^T \inparen{\frac{L}{L-\mu}}^i(f(\vx_i)-f(\xstar)) \ge C_T\inparen{f(\vx_j)-f(\xstar)}
+\end{align*}
+and
+\begin{align*}
+    \sum_{i=1}^T \inparen{\frac{L}{L-\mu}}^i\ip{\triangle_i,\vx_i-\xstar} \le C_T\max_{1 \le i \le n}\ip{\triangle_i,\vx_i-\xstar}.
+\end{align*}
+This gives us
+\begin{align*}
+    f(\vx_j)-f(\xstar) \le \frac{L}{C_T}D_h(\xstar,\vx_0)+\max_{1 \le i \le n}\ip{\triangle_i,\vx_i-\xstar}.
+\end{align*}
+Finally, notice that
+\begin{align*}
+    \frac{L}{C_T} = \frac{\mu}{\inparen{1+\frac{\mu}{L-\mu}}^T-1} \le L\inparen{1-\frac{\mu}{L}}^T.
+\end{align*}
+Combining everything completes the proof of \Cref{thm:gp_mirror_descent}.
+\end{proof}
+
+Finally, we add another useful lemma that quantifies the descent, if any, in the objective value between iterations.
+
+\begin{lemma}
+\label{lemma:gp_md_descent}
+For every iteration $i$, we have
+\begin{align*}
+    f(\vx_i)-f(\vx_{i-1}) \le -LD_h(\vx_{i-1},\vx_i) + \ip{\triangle_i,\vx_i-\vx_{i-1}}.
+\end{align*}
+In particular, if $\ip{\triangle_i,\vx_{i}-\vx_{i-1}} \le LD_h(\vx_{i-1},\vx_i)$, then iteration $i$ is a descent step.
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_md_descent}]
+We substitute $\vy=\vx_{i-1}$ in the conclusion of \Cref{lemma:gp_md_singlestep}. This gives
+\begin{align*}
+    f(\vx_i)-f(\vx_{i-1}) \le -LD_h(\vx_{i-1},\vx_i) + \ip{\triangle_i,\vx_i-\vx_{i-1}},
+\end{align*}
+completing the proof of \Cref{lemma:gp_md_descent}.
+\end{proof}

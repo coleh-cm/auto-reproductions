@@ -1,0 +1,105 @@
+\section{Block Lewis Weights and their Properties}
+\label{sec:blw_to_l2}
+
+In this section, we introduce \textit{block Lewis weights} and explore some of their properties. Several of these statements can be found in \cite{jlls23,mo23}, but we include definitions and proofs here for self-completion.
+
+We first need to define \textit{leverage scores}.
+
+\begin{definition}[Leverage scores]
+\label{defn:leverage_score}
+For a matrix $\mA\in\R^{n \times d}$ with rows $\va_1,\dots,\va_n$, let $\tau_j$ denote the $j$th \textit{leverage score} of $\mA$, which we define to be
+\begin{align*}
+    \tau_j(\mA) \coloneqq \max_{\vx\in\R^d\setminus \inbraces{0}} \frac{\ip{\va_j,\vx}^2}{\norm{\mA\vx}_2^2} = \va_j^{\top}\inparen{\mA^{\top}\mA}^{-1}\va_j\enspace.
+\end{align*}
+\end{definition}
+
+We now introduce the main object of interest in this section, \Cref{defn:blw}. Our version of the definition is adapted from \cite[Definition 1.2]{mo23} (there, we set $p_1=\dots=p_m=2$, let their $\mW = \mI$, replace $\vlambda$ with $\vw/\norm{\vw}_1$, and rescale $\Fstar$ appropriately).
+
+\begin{definition}[Adapted from {\cite[Definition 1.2]{mo23}}]
+\label{defn:blw}
+Let $\vw \in \R^m_{\ge 0}$ and $\mW \in \R^{n \times n}_{\ge 0}$ be a diagonal matrix for which for all $j \in S_i$, we have $\mW_{jj} = w_i$. Let $p > 0$. We say that $\vw$ is a block Lewis overestimate if for all $i \in [m]$, we have
+\begin{align*}
+    \frac{\sum_{j \in S_i} \tau_j\inparen{\mW^{\frac{1}{2}-\frac{1}{p}}\mA}}{w_i} \le 1\enspace.
+\end{align*}
+\end{definition}
+
+The main reason that \Cref{defn:blw} is interesting is that it gives us a formula with which we can relate the level sets of the group norm $\gnorm{\cdot}{p}$ to $\ell_2$. See \Cref{thm:blw_to_l2}. % This result was proven under a change of basis in \cite[Lemma 3.16]{mo23}, but we include a self-contained proof here anyway. \nnote{uncomment for camera ready}
+
+\begin{theorem}[Block Lewis weights give us ellipsoidal approximations to $\gnorm{\cdot}{p}$]
+\label{thm:blw_to_l2}
+Let $p \ge 2$. If $\vw$ is a block Lewis overestimate, then for all $\vx\in\R^d$, we have
+\begin{align*}
+    \frac{\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_2}{\norm{\vw}_1^{\frac{1}{2}-\frac{1}{p}}} \le \gnorm{\mA\vx}{p} \le \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_2\enspace.
+\end{align*}
+\end{theorem}
+
+We prove \Cref{thm:blw_to_l2} in \Cref{sec:blw_to_l2}. An analogous statement can also be shown for $p\le2$, but since we do not use it in this paper, we do not write it here.
+
+Observe that if we can get $\vw$ that satisfies \Cref{defn:blw} and for which $\norm{\vw}_1 = \rank{\mA}$, then \Cref{thm:blw_to_l2} gives us the optimal relationship between $\ell_2$ and $\gnorm{\cdot}{p}$ whenever $\rank{\mA} \le m$. Furthermore, for intuition, suppose $p=\infty$. By John's theorem, we know that for any symmetric convex body, there exists an ellipsoid such that the ellipsoid approximates the convex body up to a $\sqrt{d}$ distortion. Moreover, this is worst-case tight (e.g. the best distortion we can get when we approximate $\ell_1^d$ with $\ell_2$ is $\sqrt{d}$). Thus, assuming we can find $\norm{\vw}_1 \approx \rank{\mA}$, in this case, we get a guarantee that is similar to what John's theorem tells us.
+
+Now, assuming we can find a low-distortion ellipsoidal approximation to the level sets of our loss, we get that the ``effective'' diameter of our problem is $\sim \sqrt{d}$. Combining this and the discussion in \Cref{sec:gp_reg_overview_blw} (or, more formally, \Cref{thm:optimal_ms_acceleration}), we can see why we should expect an iteration complexity of $\sim d^{1/3}$ (or better, if we can find a better ellipsoid).
+
+What is left is whether weights $\vw$ satisfying \Cref{defn:blw} with small sum can be found. To this end, we invoke \cite[Algorithm 2]{mo23}.
+
+\begin{theorem}[{\cite[Algorithm 2 and Lemma 5.6]{mo23}}]
+\label{thm:gp_regression_blw_alg}
+There exists an algorithm that returns a block Lewis overestimate $\vw$ for which $\norm{\vw}_1 \le 2\rank{\mA}$. The algorithm runs in $O(\log m)$ linear system solves with matrices of the form $\mA^{\top}\mD\mA$ for nonnegative diagonal $\mD$.
+\end{theorem}
+
+Thus, by applying \Cref{thm:gp_regression_blw_alg} as a preprocessing step, we get an $\ell_2$ geometry under which we can run the accelerated proximal algorithms. As an example of the power of this, observe the following.
+
+\begin{lemma}
+\label{lemma:gp_regression_initialization}
+Consider the matrix $\widehat{\mA} \coloneqq \mA \vert \vb \in \R^{n \times (d+1)}$ that is formed by appending the column vector $\vb$ to the right of the matrix $\mA$. If we have a vector $\vw$ of block Lewis overestimates for the matrix $\widehat{\mA}$, then there exists an algorithm that finds an initialization $\vx_0$ for which
+\begin{equation*}
+    \begin{aligned}
+        \norm{\vx_0-\xstar}_{\mA^{\top}\mW^{\frac{1}{2}-\frac{1}{p}}\mA} &\le 2\inparen{2\rank{\mA}}^{\frac{1}{2}-\frac{1}{p}}\gnorm{\mA\xstar-\vb}{p} \\
+        \gnorm{\mA\vx_0-\vb}{p} &\le \inparen{2\rank{\mA}}^{\frac{1}{2}-\frac{1}{p}}\gnorm{\mA\xstar-\vb}{p}
+    \end{aligned}\enspace .
+\end{equation*}
+The algorithm runs in $1$ linear system solve in $\widehat{\mA}^{\top}\mD\widehat{\mA}$.
+\end{lemma}
+
+\begin{proof}[Proof of \Cref{lemma:gp_regression_initialization}]
+ By \Cref{thm:blw_to_l2}, our weights $\vw$ are such that for all $\vx\in\R^n$ and reals $c \in \R$,
+\begin{align*}
+    \frac{\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx-c\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2}{(2(d+1))^{\frac{1}{2}-\frac{1}{p}}} \le \gnorm{\mA\vx-c\vb}{p} \le \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx-c\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2.
+\end{align*}
+Let $\vx_0$ be the solution to the least squares regression problem
+\begin{align*}
+    \vx_0 &\coloneqq \argmin{\vx\in\R^d} \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx-\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2 = \inparen{\mA^{\top}\mW^{1-\frac{2}{p}}\mA}^{-1}\mA^{\top}\mW^{\frac{1}{2}-\frac{1}{p}}\vb.
+\end{align*}
+It is easy to see that computing $\vx_0$ amounts to $1$ linear system solve in $\mA^{\top}\mD\mA$.
+
+Next, let $\mM \coloneqq \mA^{\top}\mW^{1-\frac{2}{p}}\mA$ and observe that
+\begin{align*}
+    \norm{\vx_0-\xstar}_{\mM} &= \norm{\inparen{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx_0-\mW^{\frac{1}{2}-\frac{1}{p}}\vb} - \inparen{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\xstar-\mW^{\frac{1}{2}-\frac{1}{p}}\vb}}_2 \\
+    &\le 2\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\xstar-\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2 \le 2\inparen{2d}^{\frac{1}{2}-\frac{1}{p}}\gnorm{\mA\xstar-\vb}{p}.
+\end{align*}
+Finally, write
+\begin{align*}
+    \gnorm{\mA\vx_0-\vb}{p} &\le \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx_0-\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2 \\
+    &\le \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\xstar-\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2 \le \inparen{2d}^{\frac{1}{2}-\frac{1}{p}}\gnorm{\mA\xstar-\vb}{p},
+\end{align*}
+giving us the conclusion of \Cref{lemma:gp_regression_initialization}.
+\end{proof}
+
+\begin{proof}[Proof of \Cref{thm:blw_to_l2}]
+Let $\vlambda \coloneqq \vw/\norm{\vw}_1$ and $\mLambda \coloneqq \mW/\norm{\vw}_1$. It is easy to check that $\vlambda$ is a probability measure on $[m]$. When $p \ge 2$, using monotonicity of $L_p$ norms taken under probability measures, we get
+\begin{align*}
+    \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx}_2^p}^{\frac{1}{p}} = \inparen{\sum_{i=1}^m \lambda_i\norm{\lambda_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^p}^{\frac{1}{p}} \ge \inparen{\sum_{i=1}^m \lambda_i\norm{\lambda_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^2}^{1/2}.
+\end{align*}
+Expanding the RHS and substituting $\lambda_i = w_i/\norm{\vw}_1$ gives
+\begin{align*}
+    \gnorm{\mA\vx}{p} \ge \frac{\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_2}{\norm{\vw}_1^{\frac{1}{2}-\frac{1}{p}}}.
+\end{align*}
+For the ``hard'' direction, we will use \Cref{defn:blw} in a nontrivial way. Notice that
+\begin{align*}
+    &\inparen{\sum_{i=1}^m w_i\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^p}^{\frac{1}{p}} = \inparen{\sum_{i=1}^m w_i\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^2\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^{p-2}}^{\frac{1}{p}} \\
+    &\le \inparen{\sum_{i=1}^m w_i\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^2 \cdot \max_{\vx\in\R^d\setminus\inbraces{0}}\frac{\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^{p-2}}{\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_2^{p-2}}}^{\frac{1}{p}} \\
+    &= \inparen{\sum_{i=1}^m w_i\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^2 \cdot \inparen{\max_{\vx\in\R^d\setminus\inbraces{0}}\frac{\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^{2}}{\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_2^{2}}}^{\frac{p}{2}-1}\cdot\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_{2}^{p-2}}^{\frac{1}{p}} \\
+    &\le \inparen{\sum_{i=1}^m w_i\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^2 \cdot \inparen{\frac{\sum_{j\in S_i}\tau_j\inparen{\mW^{\frac{1}{2}-\frac{1}{p}}\mA}}{w_i}}^{\frac{p}{2}-1}\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_{2}^{p-2}}^{\frac{1}{p}} \\
+    &\overset{\text{\Cref{defn:blw}}}{\le} \inparen{\sum_{i=1}^m w_i\norm{w_i^{-\frac{1}{p}}\mA_{S_i}\vx}_2^2\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_{2}^{p-2}}^{\frac{1}{p}} = \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx}_2,
+\end{align*}
+so combining our upper and lower bounds gives the conclusion of \Cref{thm:blw_to_l2}.
+\end{proof}

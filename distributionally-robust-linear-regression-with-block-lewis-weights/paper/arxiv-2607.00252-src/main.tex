@@ -1,0 +1,73 @@
+\documentclass[11pt]{article}
+
+% -------------------------------------------------------
+% DEFINED COMMANDS
+% -------------------------------------------------------
+\usepackage[table,xcdraw,dvipsnames]{xcolor}
+
+\usepackage{newpxmath}
+\usepackage{newpxtext}
+\input{includes}
+\usepackage{todonotes}
+\usepackage{fullpage}
+\allowdisplaybreaks
+\input{commands}
+\usepackage{tikz}
+
+
+
+% \setlength{\topmargin}{-0.6 in}
+% \setlength{\textwidth}{6.5 in}
+% \setlength{\textheight}{8.5 in}
+% \setlength{\headsep}{0.75 in}
+\usepackage[margin=1in]{geometry}
+
+\setlength{\parindent}{2mm}
+\setlength{\parskip}{1.5mm}
+
+
+\allowdisplaybreaks
+
+\usepackage[
+backref=true,
+natbib=true,
+style=trad-alpha,
+maxalphanames=8,
+sorting=nyt
+]{biblatex}
+\addbibresource{ref.bib}
+
+\setlength{\emergencystretch}{3em}
+\numberwithin{equation}{section}
+
+\usepackage{subcaption}
+
+
+% \notestrue %% COMMENT OUT BEFORE SUBMITTING OR UPLOADING
+
+% -------------------------------------------------------
+\title{Distributionally Robust Linear Regression With Block Lewis Weights}
+% \author{Naren Sarayu Manoj \thanks{Supported by NSF Award ECCS-2216899} \\
+% Department of Computer Science\\
+% Toyota Technological Institute Chicago\\
+% Chicago, IL 60637, USA \\
+% \texttt{nsm@ttic.edu} \\
+% \And
+% Kumar Kshitij Patel \thanks{This work was partly done while the author was a fellow at the Simons Institute for Theory of Computing.} \\
+% Institute for Foundations of Data Science\\
+% Yale University\\
+% New Haven, CT 06510, USA \\
+% \texttt{kkpatel@ttic.edu} \\
+% % \AND
+% % Coauthor \\
+% % Affiliation \\
+% % Address \\
+% % \texttt{email}
+% }
+\author{Naren Sarayu Manoj\thanks{TTIC. Email: \url{nsm@ttic.edu}. Supported by NSF Award ECCS-2216899} \and Kumar Kshitij Patel\thanks{Institute for Foundations of Data Science, Yale University. Email: \url{kumarkshitij.patel@yale.edu}. This work was partly done while the author was a Fellow at the Simons Institute for the Theory of Computing.}}
+
+\begin{document}
+\input{body}
+\newpage
+\printbibliography
+\end{document}
