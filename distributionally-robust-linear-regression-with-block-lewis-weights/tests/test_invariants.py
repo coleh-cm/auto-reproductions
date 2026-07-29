@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from gdr.lewis import block_lewis_weights, geometry_M, leverage_scores, should_reset_W
+from gdr.lewis import block_lewis_weights, geometry_M, leverage_scores, should_reset_W, lewis_warm_start, wls_init
 from gdr.objectives import smoothed, smoothed_grad_hess, p_objective, p_grad_hess
 from gdr.problem import group_losses, group_norms, max_loss, max_loss_unsquared
 
@@ -108,6 +108,32 @@ def test_e7_residual_sandwich(small_problem):
 
 
 # ---------------------------------------------------------------------------
+# E9 weighted-least-squares warm start: D = W (p=inf) or D = W^{1-2/p} (finite p)
+# (SPEC.md:114; other_proofs.tex:74 corrected by U14).  lewis_warm_start must
+# apply the p-dependent exponent to the per-row weight before wls_init.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("p", [np.inf, 2.0, 4.0, 8.0])
+def test_lewis_warm_start_D_exponent(small_problem, p):
+    prob = small_problem
+    off, m = prob["offsets"], prob["m"]
+    w = block_lewis_weights(prob, p=p)
+    if should_reset_W(w, m):
+        pytest.skip("E11 reset fires for this problem; D = ones, exponent N/A")
+    x0, w_rows, _reset = lewis_warm_start(prob, p=p)
+    # the per-row D returned must equal w_i^{1-2/p} per block (or w_i for p=inf)
+    exp = 1.0 if np.isinf(p) else (1.0 - 2.0 / float(p))
+    w_D = w ** exp if exp != 1.0 else w
+    expected_rows = np.repeat(w_D, np.diff(off))
+    assert np.allclose(w_rows, expected_rows, atol=0, rtol=0), (p, w_rows[:3], expected_rows[:3])
+    # and x0 must equal wls_init with that D (independent recomputation)
+    x0_ref = wls_init(prob, expected_rows)
+    assert np.allclose(x0, x0_ref, atol=1e-12), (p, x0, x0_ref)
+    # p=inf is a no-op (exp=1): w_rows == raw w repeated
+    if np.isinf(p):
+        assert np.allclose(w_rows, np.repeat(w, np.diff(off)), atol=0, rtol=0)
+
+
+# ---------------------------------------------------------------------------
 # p-objective (E5) gradient vs finite differences
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("p", [2.0, 4.0, 8.0])
@@ -126,6 +152,37 @@ def test_p_grad_finite_diff(small_problem, p):
     # compare against the gradient magnitude, not an absolute floor.
     scale = np.maximum(np.abs(g), np.abs(gfd)).max() + 1e-12
     assert np.max(np.abs(g - gfd)) / scale < 1e-4, (p, np.max(np.abs(g - gfd)), scale)
+
+
+# ---------------------------------------------------------------------------
+# Strong convexity of the p-objective (Lemma 7.2 / strong_convexity_gp,
+# interpolation.tex:51-61; "main new technical tool", body.tex:96):
+#   f(x+d) >= f(x) + <grad f(x), d> + (4/2^p) ||A d||_{G_p}^p
+# where f(x) = ||A x - b||_{G_p}^p = sum_i ||r_i||_2^p = p_objective(x, p) and
+# ||A d||_{G_p}^p = sum_i ||A_{S_i} d||_2^p (the homogeneous group p-norm, b=0).
+# The finite-difference test only checks grad/obj CONSISTENCY; this checks the
+# objective's actual strong-convexity FORM (catches a wrong exponent that is
+# self-consistent with its own derivatives).
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("p", [2.0, 4.0, 8.0])
+def test_p_objective_strong_convexity(small_problem, p):
+    prob = small_problem
+    A, off, m = prob["A"], prob["offsets"], prob["m"]
+    rng = np.random.default_rng(7)
+    kp = 4.0 / (2.0 ** p)  # the paper's strong-convexity constant (4/2^p)
+    for _ in range(50):
+        x = rng.standard_normal(prob["d"])
+        d = rng.standard_normal(prob["d"])
+        fx = p_objective(prob, x, p)
+        fxd = p_objective(prob, x + d, p)
+        _, g, _ = p_grad_hess(prob, x, p)
+        # ||A d||_{G_p}^p = sum_i ||A_{S_i} d||_2^p  (homogeneous; b=0)
+        Ad_gp_p = 0.0
+        for i in range(m):
+            Adi = A[off[i]:off[i + 1], :] @ d
+            Ad_gp_p += float(np.sqrt(Adi @ Adi) ** p)
+        lower = fx + float(g @ d) + kp * Ad_gp_p
+        assert fxd >= lower - 1e-6, (p, fxd, lower, fx, fxd - lower)
 
 
 # ---------------------------------------------------------------------------
@@ -153,13 +210,17 @@ def test_subgradient_validity(small_problem):
 # increase the smoothed objective, and the center update keeps the better point)
 # ---------------------------------------------------------------------------
 def test_ball_oracle_monotone(small_problem, small_problem_opt):
-    """T5: ball-oracle outer iterates are non-increasing in F.  The fixed-ball
-    subproblem (E19) minimizes f_tilde over {||x-q||_M <= r} with q in the ball,
-    so f_tilde(x) <= f_tilde(q) is GUARANTEED each outer step; F = max_i ||r_i||^2
-    (the squared worst-group loss the paper plots) is only empirically monotone
-    and holds under the OPT=1 normalization production uses (run_arm.py, U15) with
-    a realistic radius.  We assert both: f_tilde strictly non-increasing (the
-    paper's invariant), and F non-increasing under normalization.
+    """T5: the GUARANTEED invariant is that the smoothed surrogate f_tilde is
+    non-increasing across outer iterations (the inner trust-region solve
+    minimizes f_tilde over {||x-q||_M <= r} with q in the ball, body.tex:31 /
+    E19; the damped-Newton line search makes f_tilde monotone each step).  The
+    paper only claims F = max_i ||r_i||^2 'steadily decrease[s]' EMPIRICALLY
+    (experiments.tex:107), NOT as a theorem.  We assert the guaranteed
+    per-iteration f_tilde non-increasing invariant (via the recorded x_traj),
+    and check F-monotonicity only as the empirical observation the paper makes
+    (not as a guarantee).  A no-op solver returning x0 would FAIL the
+    per-iteration f_tilde check unless f_tilde(x0) is already a fixed point,
+    so this is genuine evidence the solver optimizes, not false security.
     """
     prob = small_problem
     xstar, opt = small_problem_opt
@@ -172,18 +233,21 @@ def test_ball_oracle_monotone(small_problem, small_problem_opt):
            "beta_grid": [beta], "delta_grid": [delta], "tol_inner": 1e-8, "opt": 1.0}
     h = run_arm_help("ball_oracle", cfg, pn, x0, 1.0)
     gaps = h["gap"]                                   # F - 1 (normalized)
-    # F non-increasing under normalization + realistic radius
+
+    # GUARANTEED invariant: f_tilde non-increasing across outer iterations
+    # (per-iteration, via x_traj).  This is what "damped Newton" (experiments.tex:71)
+    # actually guarantees; the prior start-vs-end check was false security.
+    xs = h.get("x_traj")
+    assert xs is not None and len(xs) == len(gaps), "ball_oracle must record x_traj"
+    f_tildes = [float(smoothed(pn, np.asarray(xk), beta, delta)) for xk in xs]
+    for k in range(1, len(f_tildes)):
+        assert f_tildes[k] <= f_tildes[k - 1] + 1e-9, (k, f_tildes[:k + 1])
+
+    # EMPIRICAL observation only (experiments.tex:107, NOT a theorem): F is
+    # non-increasing on the normalized instance because the line search kills
+    # overshoot.  Asserted as the paper's reported behavior, not as a guarantee.
     for k in range(1, len(gaps)):
         assert gaps[k] <= gaps[k - 1] + 1e-6, (k, gaps[:k + 1])
-    # f_tilde (the smoothed surrogate the inner solve minimizes) is non-increasing
-    # — the guaranteed invariant of the fixed-ball subproblem (E19).
-    from gdr.objectives import smoothed
-    xs = h.get("x_traj") if "x_traj" in h else None
-    # the runner does not expose per-iter x; recompute f_tilde at the recorded
-    # final x and confirm it is <= f_tilde at x0 (the start)
-    f0_tilde = smoothed(pn, x0, beta, delta)
-    f_final_tilde = smoothed(pn, np.asarray(h["x"]), beta, delta)
-    assert f_final_tilde <= f0_tilde + 1e-9, (f_final_tilde, f0_tilde)
 
 
 def run_arm_help(arm, cfg, prob, x0, opt):

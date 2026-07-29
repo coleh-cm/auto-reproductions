@@ -126,7 +126,7 @@ budget. Full per-arm histories are written to `results/<dataset>_<arm>.json`
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 12 tests: degeneracy + equation invariants (SPEC T5)
+.venv/bin/python -m pytest -q     # 19 tests: degeneracy + equation invariants (SPEC T5)
 ```
 
 `tests/test_degeneracy.py` — the method at its no-op setting must reproduce the
@@ -135,14 +135,15 @@ bit-identical to the Euclidean ball-oracle; (D2) the p=2 interpolating objective
 reduces to plain least squares (ERM). `tests/test_invariants.py` — Lemma 6.1
 (`|f̃−f| ≤ β log m + δ`), the E6 block-Lewis overestimate & `‖w‖₁ ≤ 2(d+1)`,
 the E7 residual sandwich, smoothed grad/Hessian finite-difference + PSD,
-p-objective gradient finite-difference, subgradient validity, ball-oracle
-monotonicity.
+p-objective gradient finite-difference, **Lemma 7.2 strong-convexity of ‖·‖ₚ²**,
+**lewis_warm_start D-exponent** (p=∞/2/4/8), subgradient validity, ball-oracle
+**per-iteration f̃-monotonicity** (via the recorded `x_traj`).
 
 ## Results (this reproduction)
 
-**Synthetic (D1, seed=0; cond(AᵀA)=1.40e5; ERM/robust worst-group ratio 1.47)**
-— T4 is qualitative (`experiments.tex:106-109`): subgradient=NR, all smoothed
-first-order=NR (plateau, HB final 9.1%), ipm=6, ball_oracle_euclidean=9,
+**Synthetic (D1, seed=0, DIST=5.0; cond(AᵀA)=1.40e5; ERM/robust worst-group ratio 1.47)**
+— T4 is qualitative (`experiments.tex:106-109`): subgradient=NR (plateau ≈10.0%),
+all smoothed first-order=NR (plateau ≈9.1%), ipm=5, ball_oracle_euclidean=9,
 ball_oracle_lewis=5 (both final 0.34%). Matches the paper: IPM reaches the lowest
 final loss; both BO arms strictly decrease the gap over outer iterations and
 beat the first-order plateau; **Lewis ≤ Euclidean** — both BO arms reach the

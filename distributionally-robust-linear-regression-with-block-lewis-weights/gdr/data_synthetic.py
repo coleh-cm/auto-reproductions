@@ -41,7 +41,13 @@ def make_synthetic(
     E_LO: float = 0.01,
     E_HI: float = 1.0,
     E_ADV: float = 1.0e6,       # curvature of the adversarial sharp direction
-    DIST: float = 8.0,          # how far adversarial optima sit along their sharp direction
+    DIST: float = 5.0,          # how far adversarial optima sit along their sharp direction
+                               # (SPEC §8A / arms.json _dataset_overrides record DIST=5.0 as
+                               #  the disclosed choice; this default must match that record.
+                               #  DIST only scales b via x_star=center+DIST*v, so after the
+                               #  OPT=1 normalization in run_arm the relative gaps — and thus
+                               #  the gate FINAL lines — are invariant under DIST scaling;
+                               #  only the absolute OPT/loss scale changes, by (DIST'/DIST)^2.)
     sig_x: float = 0.3,         # spread of normal-group optima around the center
     sig: float = 0.5,           # noise scale for normal groups
     sig_adv: float = 0.02,      # noise scale for adversarial groups (very small)

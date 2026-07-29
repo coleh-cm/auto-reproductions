@@ -40,10 +40,12 @@
 - `gdr/data_synthetic.py` (D1) and `gdr/data_acs.py` (D2).
 - `run_arm.py` (per-arm entrypoint, OPT=1 normalization U15, cached OPT),
   `arms.json`, `run_all_arms.sh`, `smoke.sh`.
-- `tests/`: 12 tests pass — degeneracy (Lewis-at-reset == Euclidean bit-identical;
+- `tests/`: 19 tests pass — degeneracy (Lewis-at-reset == Euclidean bit-identical;
   p=2 objective == least squares) + invariants (Lemma 6.1, E6 overestimate &
   ‖w‖₁≤2(d+1), E7 residual sandwich, smoothed grad/Hess finite-diff & PSD,
-  p-grad finite-diff, subgradient validity, ball-oracle monotonicity).
+  p-grad finite-diff, **Lemma 7.2 strong-convexity of ‖·‖ₚ²** (Round-6),
+  **lewis_warm_start D-exponent** p=∞/2/4/8 (Round-6), subgradient validity,
+  ball-oracle **per-iteration f̃-monotonicity** via x_traj (Round-6)).
 
 ### Numbers (committed in `results/`)
 
@@ -53,16 +55,18 @@ recorded in each JSON); `results/run_all.log` is the one-line-per-arm summary
 regenerated from those files. The exact iteration counts are timing- and
 grid-sensitive (U2) and the honest gate is the *ordering* (SPEC T1).
 
-Synthetic (D1, seed=0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative:
-subgradient=NR, smoothed_gd/_hb/_nesterov=NR (plateau ≈9.1%), ipm=6,
-ball_oracle_euclidean=9, ball_oracle_lewis=5.
+Synthetic (D1, seed=0, DIST=5.0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative:
+subgradient=NR (plateau ≈10.0%), smoothed_gd/_hb/_nesterov=NR (plateau ≈9.1%),
+ipm=5, ball_oracle_euclidean=9, ball_oracle_lewis=5.
 Matches the paper: IPM reaches the lowest final loss (≈0); both BO arms strictly
 decrease the gap over outer iterations and beat the first-order plateau (all
 first-order = NR); **Lewis ≤ Euclidean** — both BO arms reach the 0.34%
 smoothing floor, Lewis in 5 outer iterations vs Euclidean's 9 (the paper's
 "very slight benefit from Lewis", experiments.tex:109). Both BO curves are
 monotone non-increasing in the smoothed objective (damped Newton, see Round-2
-fixes).
+fixes). (Numbers are from the DIST=5.0 construction that matches the SPEC §8A
+/ arms.json disclosed choice — see Round-6; the prior commit's ipm=6 was from a
+DIST=8.0 default that did not match the documented choice.)
 
 ACS Income (D2, seed=6, California worst, ERM mean 107.3) — T1 gate:
 ball_oracle_euclidean=1, ball_oracle_lewis=1, ipm=10, smoothed_hb=10,
@@ -176,6 +180,100 @@ T3 (report-only): ERM mean 107.3 (paper 108.2 ±5 ✓), worst state California
   visible (a broken arm would show `init == final`); added a comment stating
   the first-order plateau is the expected paper behavior. No production code
   or committed result changed; only the smoke's diagnostic output.
+
+### Round-6: parallel adversarial review of all 5 components (orchestration)
+
+Ran a 15-agent orchestration (5 review components in parallel, each finding
+adversarially refuted). Result: 3 confirmed issues, 7 refuted. The feedback
+focus (first-order baseline arm) returned ZERO confirmed bugs — the plateau is
+genuine, matching the paper's headline claim (experiments.tex:107). Independent
+verification confirms: synthetic `smoothed_gd` is 100% monotone non-increasing
+(300/300 steps) converging to the smoothing floor 0.0909; the smoke floor is the
+genuine β·log(m)+δ bound (β=0.1,δ=0.1,m=10 → 0.33 unsquared → worst-case F-gap
+floor (1+0.33)²−1 = 0.77; observed 0.159 sits below it). The subgradient has no
+smoothing floor (nonsmooth F) so its smoke plateau is just too-few iters for the
+1/ε² rate — smoke-only, not paper evidence. No production arm changed.
+
+Three fixes (all from the review's confirmed findings):
+
+- **`gdr/lewis.py:182-195` — finite-p warm-start used wrong D (bug, latent).**
+  `lewis_warm_start` passed the raw block weights `w` as the diagonal D in
+  `wls_init` for ALL p, but SPEC E9 (SPEC.md:114) requires D = W for p=∞ OR
+  D = W^{1−2/p} for finite p (other_proofs.tex:74, corrected by U14). For p=∞
+  the exponent 1−2/p = 1 so D=w is correct (this is the only production path:
+  `ball_oracle` hard-codes p=∞, and `lewis_warm_start` has zero callers), so
+  no committed result changed. But the finite-p branch silently used the p=∞
+  formula — an internal inconsistency (it threads p into `block_lewis_weights`
+  to get p-correct weights, then drops the 1−2/p exponent when forming D).
+  Fix: apply `exp = 1 if isinf(p) else 1−2/p` and `w_D = w**exp` before
+  `np.repeat`. Added `test_lewis_warm_start_D_exponent` (4 cases: p=∞,2,4,8)
+  pinning the fix; the p=∞ case asserts the no-op (w_rows == raw w).
+
+- **`gdr/solvers/ipm.py:222-234` — misleading μ-scaling equivalence comment.**
+  The comment claimed scaling μ by L0 = F(x₀) is "exactly equivalent to the
+  paper's WLOG OPT=1 rescaling (U15)". It is not: L0 is the *start* loss F(x₀),
+  not the optimum, so 1/√L0 rescaling makes the *initial* loss 1 (opt' = opt/L0
+  ≠ 1), whereas the paper rescales by 1/√opt so the *optimum* is 1
+  (body.tex:511-514). The heuristic itself is sound (puts μ on an O(1) scale
+  relative to the loss; paper discloses no μ₀ values, U2) and on the
+  OPT=1-normalized problem `run_arm.py` already applies, L0 ~ O(1) so this is a
+  near-no-op there. Fix: comment now states it is an L0=1 (not OPT=1) rescaling,
+  distinguishes it from the paper's normalization, and notes `run_arm.py` applies
+  the real OPT=1 normalization upstream. No code change — behavior unchanged.
+
+- **`data/README.md:6` — census URL pointer wrong (minor).** README said "see
+  `gdr/data_acs.py` for the census URLs and state-FIPS map", but
+  `gdr/data_acs.py` holds only the state-FIPS map (no URL string); the census
+  base URL and download/extraction logic live in `scripts/download_acs.py`.
+  Fix: pointer now directs to `scripts/download_acs.py` for the URL/logic and
+  `gdr/data_acs.py` for the FIPS map.
+
+Seven refuted findings (verifiers proved the code correct): the log1p target
+(disclosed U4, negligible, doesn't change the worst group), the block-Lewis
+T-vs-(T−1) iteration count (stale comment, MO25 averages T terms, guarantee
+holds), the p=∞ scale of `p_objective` (the paper itself puts finite-p and p=∞
+on different scales, body.tex:27), three IPM/ball-oracle docstring nits (behavior
+matches the paper), and the subgradient final-vs-min selection (standard reading
+of "within this budget"; plateau genuine either way). None required a change.
+
+Three further consistency/test-strength changes made this round (not review
+findings — discovered while re-checking the staged review fixes):
+
+- **`gdr/data_synthetic.py` DIST default 8.0 → 5.0 (consistency bug, latent).**
+  SPEC §8A and `arms.json _dataset_overrides` both record `DIST=5.0` as the
+  disclosed synthetic choice, but `make_synthetic`'s default was `DIST=8.0`, so
+  `run_arm.py --dataset synthetic` (which calls `make_synthetic(seed=…)` with no
+  DIST) built the *undocumented* DIST=8 instance. The committed synthetic
+  results were therefore from a construction that did not match the recorded
+  choice. Fix: default is now 5.0 (matching SPEC/arms.json), with a comment
+  noting DIST only scales the adversarial targets so, after the OPT=1
+  normalization, the *relative* gaps (and thus the gate FINAL lines) are
+  near-invariant under DIST — only the absolute OPT/loss scale changes.
+  All synthetic results regenerated from DIST=5.0 so every file now carries
+  the same opt (5.18e6); the prior files mixed opt=1.33e7 (ipm/BO/opt_ref,
+  DIST=8) with opt=5.18e6 (first-order, DIST=5). Numbers shifted within noise:
+  ipm 6→5, BO_euc=9 (unchanged), BO_lewis=5 (unchanged); the ordering
+  (Lewis ≤ Euclidean; first-order plateau; IPM≈0) and the T4 qualitative
+  findings all still hold. `results/run_all.log` regenerated from the files.
+
+- **`gdr/solvers/ball_oracle.py` records `x_traj` (per-outer-iteration center).**
+  The prior `test_ball_oracle_monotone` only compared f̃ at start vs end — a
+  no-op solver returning x0 would pass it whenever f̃(x0) is a fixed point, so
+  it was false security. Fix: `_run_single` now appends each outer center to
+  `history['x_traj']`, and the test asserts f̃ is non-increasing at EVERY
+  consecutive pair (the guaranteed invariant the inner trust-region solve
+  gives, body.tex:31 / E19). F-monotonicity is now checked only as the
+  empirical observation the paper reports (experiments.tex:107), not as a
+  theorem. A no-op solver cannot satisfy the per-iteration f̃ check.
+
+- **`tests/test_invariants.py` adds Lemma 7.2 strong-convexity test.** The
+  finite-difference tests only check grad/obj *consistency* (a wrong exponent
+  that is self-consistent with its own derivatives would pass). The new
+  `test_p_objective_strong_convexity` checks the actual strong-convexity FORM
+  f(x+d) ≥ f(x)+⟨∇f,d⟩+(4/2^p)‖Ad‖_{𝒢_p}^p (interpolation.tex:51-61, the
+  "main new technical tool", body.tex:96) at p=2,4,8 over 50 random (x,d)
+  pairs — the cheapest real evidence the objective has the curvature the
+  paper's proximal analysis relies on. (Test count 12 → 19.)
 
 ### Blocker B1 (ACS heterogeneity, U4/U7)
 The reproduced ACS ERM-robust gap is ~1.8% vs the paper's ~25%, so the

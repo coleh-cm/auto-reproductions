@@ -165,8 +165,16 @@ def _solve_region(problem, M, q, r, beta, delta, tol_inner):
 
 def _run_single(problem, M, x0, max_outer, deadline,
                 r0, shrink, beta, delta, tol_inner, opt):
-    """One (r0, shrink, beta, delta, tol_inner) run.  Returns (history, final F)."""
+    """One (r0, shrink, beta, delta, tol_inner) run.  Returns (history, final F).
+
+    Records the center ``q`` after each outer step in ``history['x_traj']``
+    (a list of python lists, JSON-serializable) so callers can verify the
+    guaranteed per-iteration invariant of the inner trust-region solve — that
+    the smoothed surrogate f_tilde is non-increasing across outer iterations
+    (body.tex:31 / E19) — rather than only start-vs-final.
+    """
     h = seed_history(problem, x0, opt)     # iter 0 recorded
+    h["x_traj"] = [np.asarray(x0, dtype=np.float64).tolist()]  # iter 0 center
     q = h["x"].copy()                      # [d]  center
     r = float(r0)                          # scalar  trust-region radius
     t0 = time.perf_counter()
@@ -180,6 +188,7 @@ def _run_single(problem, M, x0, max_outer, deadline,
         r = shrink * r                     # shrink radius (experiments.tex:78)
         h["iter"].append(k)
         h["gap"].append(gap_now(problem, x, opt))
+        h["x_traj"].append(np.asarray(q, dtype=np.float64).tolist())
         t_elapsed = time.perf_counter() - t0
         h["time"].append(t_elapsed)
         if h["gap"][-1] <= 0.0:

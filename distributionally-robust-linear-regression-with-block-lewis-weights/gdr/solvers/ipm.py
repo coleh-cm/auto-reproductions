@@ -223,10 +223,15 @@ def run(problem, cfg, x0, max_outer, time_budget):
     # The log barrier Phi = t - mu*sum ln(t-l_i) only has a meaningful center
     # when mu is comparable to the objective scale t (~1e7 on the raw data);
     # with mu=1 (unscaled) the barrier is negligible, centering pins t at the
-    # feasibility boundary and x never rebalances.  Scaling mu by L0 is exactly
-    # equivalent to the paper's WLOG OPT=1 rescaling (U15): the argmin of
-    # min_x max_i ||A_i x - b_i||^2 is invariant under (A,b) -> (A,b)/sqrt(L0),
-    # and on the rescaled problem mu'=mu/L0 ~ O(1).  This yields the paper's
+    # feasibility boundary and x never rebalances.  Scaling mu by L0 puts mu
+    # on an O(1) scale relative to the loss.  This is an L0=1 rescaling of the
+    # data (divide (A,b) by sqrt(L0)), NOT the paper's WLOG OPT=1 rescaling
+    # (body.tex:511-514 scales by 1/sqrt(opt) so the *optimum* equals 1; L0 =
+    # F(x0) > opt in general, so L0=1 and OPT=1 differ).  run_arm.py instead
+    # applies the OPT=1 normalization (run_arm.normalize_problem) before the
+    # arm runs, so on the normalized problem L0 ~ O(1) and this L0 scaling is
+    # a near-no-op there; it only matters on the raw-LOSS-scale path.  The
+    # paper does not disclose mu0 values (U2); this heuristic yields its
     # ~8-outer-iteration convergence to 1% (experiments.tex:180).
     L0 = float(max_loss(problem, x0))
     if not np.isfinite(L0) or L0 <= 0.0:

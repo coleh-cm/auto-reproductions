@@ -175,13 +175,24 @@ def lewis_warm_start(problem: Problem, p: float = np.inf) -> tuple[np.ndarray, n
     apply the E11 switch, and return the warm-start x_0 plus the per-row weight
     vector w_rows actually used (and whether the reset branch fired).
 
-    Returns (x0 [d], w_rows [n], reset_fired: bool).
+    Returns (x0 [d], w_rows [n], reset_fired: bool), where w_rows is the per-row
+    D used by wls_init (D = W for p=inf, D = W^{1-2/p} for finite p, or ones if
+    the E11 reset fired).
     """
     w = block_lewis_weights(problem, p=p)
     reset = should_reset_W(w, problem["m"])
     if reset:
         w_rows = np.ones(problem["A"].shape[0], dtype=np.float64)
     else:
-        w_rows = np.repeat(w, np.diff(problem["offsets"]))
+        # E9 requires D = W (p=inf) or D = W^{1-2/p} (finite p) per row.  For
+        # p=inf the exponent 1-2/p = 1 so D = w; for finite p each block's
+        # per-row weight must be w_i^{1-2/p} (SPEC.md:114; other_proofs.tex:74,
+        # corrected by U14).  block_lewis_weights returns p-correct weights w,
+        # so we apply the p-dependent exponent here before forming the per-row
+        # vector.  (Latent until a finite-p interpolation solver calls this;
+        # ball_oracle hard-codes p=inf where this branch is a no-op.)
+        exp = 1.0 if np.isinf(p) else (1.0 - 2.0 / float(p))
+        w_D = w ** exp if exp != 1.0 else w
+        w_rows = np.repeat(w_D, np.diff(problem["offsets"]))
     x0 = wls_init(problem, w_rows)
     return x0, w_rows, reset
