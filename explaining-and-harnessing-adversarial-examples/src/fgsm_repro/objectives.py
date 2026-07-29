@@ -130,3 +130,53 @@ def adversarial_train_cost(
     loss_clean = cross_entropy_cost(model, x, y)
     loss_adv = cross_entropy_cost(model, x_tilde, y)
     return alpha * loss_clean + (1.0 - alpha) * loss_adv
+
+
+# --------------------------------------------------------------------------- #
+# M7: noise-training controls (tex:555-557)
+# --------------------------------------------------------------------------- #
+def noise_train_cost(
+    model: Classifier,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    eps: float,
+    noise_type: str,
+    alpha: float = 0.5,
+    gen: "torch.Generator | None" = None,
+) -> torch.Tensor:
+    """Noise-training control cost (M7, tex:555-557).
+
+    The paper's control experiments train on a mixture of clean examples and
+    examples with RANDOM additive noise of max-norm <= eps, generated two ways:
+      * ``"bernoulli"``: each pixel gets +eps or -eps (tex:555
+        "randomly adding $\\pm\\eps$ to each pixel") -- eta = eps * b,
+        b ~ Bernoulli-sign{+1,-1} i.i.d.  ||eta||_inf == eps exactly.
+      * ``"uniform"``:   each pixel gets u ~ U(-eps, eps) (tex:556
+        "adding noise in $U(-\\eps, \\eps)$") -- ||eta||_inf <= eps.
+
+    Cost form mirrors E7's mixture (alpha=0.5):
+        L = alpha*J(theta, x, y) + (1-alpha)*J(theta, x + eta, y).
+    The noise is regenerated every batch (like FGSM adversarial training,
+    tex:490-491). eta is detached (no gradient through the noise sampling).
+
+    This is the paper's CONTROL for FGSM adversarial training -- it is expected
+    to be a WEAKER regularizer than FGSM (the paper reports it confers little
+    benefit, tex:555-557). Comparing FGSM-vs-noise is the point of M7.
+    """
+    x = x.detach()
+    if noise_type == "bernoulli":
+        # +/- eps per pixel, i.i.d. sign. ||eta||_inf == eps exactly.
+        signs = torch.randint(
+            0, 2, x.shape, generator=gen, dtype=torch.float32, device=x.device
+        ).mul_(2.0).sub_(1.0)
+        eta = (eps * signs).detach()
+    elif noise_type == "uniform":
+        eta = (eps * (2.0 * torch.rand(
+            x.shape, generator=gen, dtype=torch.float32, device=x.device
+        ).sub_(1.0))).detach()  # U(-eps, eps)
+    else:
+        raise ValueError(f"unknown noise_type {noise_type!r}")
+    x_noisy = (x + eta).detach()
+    loss_clean = cross_entropy_cost(model, x, y)
+    loss_noisy = cross_entropy_cost(model, x_noisy, y)
+    return alpha * loss_clean + (1.0 - alpha) * loss_noisy

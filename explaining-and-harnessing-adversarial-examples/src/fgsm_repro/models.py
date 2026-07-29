@@ -197,6 +197,68 @@ class MaxoutMLP(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# M9: Maxout trunk with independent sigmoid top (rubbish sigmoid-top arm)
+# ---------------------------------------------------------------------------
+class SigmoidTopMLP(nn.Module):
+    """Maxout trunk + independent per-class SIGMOID top (M9, tex:908-909).
+
+    The paper's rubbish appendix contrasts a maxout+softmax net with the same
+    net whose top layer is changed to "independent sigmoids" (tex:908-909,
+    "Changing the top layer to independent sigmoids dropped the error rate to
+    68%"). Each class k has an independent logistic output
+    p(y=k|x) = sigmoid(readout_k(h1)); a rubbish sample is an "error" iff ANY
+    class's sigmoid probability > 0.5 (tex:906 "assigning a probability greater
+    than 0.5 to any class"). ``logits`` returns the raw pre-sigmoid readout
+    scores [B, K]; callers apply sigmoid per class. The trunk (two maxout
+    layers + input dropout) is identical to ``MaxoutMLP`` so the comparison
+    isolates the top layer.
+    """
+
+    def __init__(
+        self,
+        units: int = 240,
+        pieces: int = 5,
+        in_dim: int = 784,
+        n_classes: int = 10,
+        dropout_input_include: float = 1.0,
+        dropout_hidden_include: float = 1.0,
+        seed: int = 0,
+    ):
+        super().__init__()
+        self.n_classes = n_classes
+        self.trunk = MaxoutMLP(
+            units=units, pieces=pieces, in_dim=in_dim, n_classes=n_classes,
+            dropout_input_include=dropout_input_include,
+            dropout_hidden_include=dropout_hidden_include, seed=seed,
+        )
+        # Reuse the trunk's two maxout layers but REPLACE its softmax readout
+        # with an independent-sigmoid readout (same irange .005 / zero bias).
+        self.readout = nn.Linear(units, n_classes)
+        with torch.no_grad():
+            nn.init.uniform_(self.readout.weight, -0.005, 0.005)
+            nn.init.zeros_(self.readout.bias)
+
+    def set_seed(self, seed: int) -> None:
+        self.trunk.set_seed(seed)
+
+    def _hidden(self, x: torch.Tensor) -> torch.Tensor:
+        """Run the trunk up to (but excluding) the readout -> [B, units]."""
+        m = self.trunk
+        h_in = m._apply_dropout(x, m.dropout_input_include)
+        h0 = m.layer0(h_in)
+        h0 = m._apply_dropout(h0, m.dropout_hidden_include)
+        h1 = m.layer1(h0)
+        return h1
+
+    def logits(self, x: torch.Tensor) -> torch.Tensor:
+        """Pre-sigmoid readout scores [B, K]. Apply sigmoid for per-class probs."""
+        return self.readout(self._hidden(x))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.logits(x)
+
+
+# ---------------------------------------------------------------------------
 # M8: RBF network
 # ---------------------------------------------------------------------------
 class RBFNet(nn.Module):

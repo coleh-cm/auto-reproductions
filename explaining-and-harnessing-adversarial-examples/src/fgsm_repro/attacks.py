@@ -89,3 +89,33 @@ def sample_rubbish(n: int, dim: int, gen: torch.Generator) -> torch.Tensor:
     Returns a float32 tensor of shape [n, dim].
     """
     return torch.randn(n, dim, generator=gen, dtype=torch.float32)
+
+
+def fgsm_logreg(
+    w: torch.Tensor,
+    b: torch.Tensor,
+    x: torch.Tensor,
+    y_pm: torch.Tensor,
+    eps: float,
+) -> torch.Tensor:
+    """FGSM for binary logistic regression (M2, Algorithm C / E6, tex:407-411).
+
+    For the linear model J = E zeta(-y(w.x+b)) the per-example input gradient
+    is  dJ/dx = -y * sigmoid(-y s) * w, whose sign is -y * sign(w) (the sigmoid
+    factor is strictly positive) -- independent of x. The exact worst-case
+    max-norm perturbation is therefore
+
+        eta = -eps * y * sign(w)        (per-example; tex:407-411)
+
+    so x_tilde = x + eta = x - eps*y*sign(w). No clipping (SPEC §6 item 12).
+    Returns the detached adversarial batch.
+
+    NOTE: the paper's DISPLAYED E6 (tex:411) uses the UNIFORM direction
+    eta = -eps*sign(w) (the y=+1 case); the per-exact worst case used here is
+    eta = -eps*y*sign(w) (SPEC §6 item 21). We use the exact worst case so the
+    attack is the true adversary (this is what the paper *intends* -- the
+    adversary maximises the loss per example).
+    """
+    sign_w = torch.sign(w).unsqueeze(0)          # [1, F]
+    eta = (-eps * y_pm.unsqueeze(1) * sign_w)   # [B, F]
+    return (x.detach() + eta).detach()

@@ -199,3 +199,29 @@ def eval_rubbish(
     else:
         mean_conf = 0.0
     return AttackEval(error_rate=error_rate, mean_confidence_on_errors=mean_conf, n=n)
+
+
+def eval_rubbish_sigmoid(
+    model: Classifier, n: int, dim: int, seed: int
+) -> AttackEval:
+    """Appendix rubbish examples, INDEPENDENT-SIGMOID top (M9, tex:908-909).
+
+    Same protocol as ``eval_rubbish`` but with per-class independent sigmoid
+    outputs: p(y=k|x) = sigmoid(logit_k(x)). A rubbish sample is an "error"
+    iff ANY class probability > 0.5 (tex:906 "assigning a probability greater
+    than 0.5 to any class"). Confidence = mean over the erroring subset of
+    the MAX per-class sigmoid probability; 0.0 if none.
+    """
+    model.eval()
+    gen = torch.Generator().manual_seed(seed)
+    x = sample_rubbish(n, dim, gen)
+    with torch.no_grad():
+        probs = torch.sigmoid(model.logits(x))   # [B, K] independent sigmoids
+        max_prob = probs.max(dim=1).values
+    wrong = max_prob > 0.5
+    error_rate = wrong.float().mean().item()
+    if wrong.sum() > 0:
+        mean_conf = max_prob[wrong].mean().item()
+    else:
+        mean_conf = 0.0
+    return AttackEval(error_rate=error_rate, mean_confidence_on_errors=mean_conf, n=n)

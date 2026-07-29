@@ -35,7 +35,7 @@ from typing import Any, Literal, Optional, Protocol, TYPE_CHECKING
 
 import torch
 
-from fgsm_repro.objectives import adversarial_train_cost, cross_entropy_cost
+from fgsm_repro.objectives import adversarial_train_cost, cross_entropy_cost, noise_train_cost
 from fgsm_repro.eval import eval_clean, eval_fgsm
 from fgsm_repro.models import MaxoutMLP
 
@@ -64,6 +64,10 @@ class TrainConfig:
     patience: int = 100
     max_steps: Optional[int] = None
     init_seed: Optional[int] = None
+    # M7 noise-training control (tex:555-557). When set to "bernoulli" or
+    # "uniform", each batch trains on a clean/noise mixture (alpha=0.5) instead
+    # of the FGSM clean/adv mixture. None disables it (clean or adv_train path).
+    noise_train: Optional[Literal["bernoulli", "uniform"]] = None
 
 
 @dataclass
@@ -169,6 +173,10 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
 
     gen = torch.Generator()
     gen.manual_seed(int(cfg.seed))
+    # Separate generator for M7 noise sampling (so the noise stream does not
+    # perturb the batch-shuffle stream).
+    noise_gen = torch.Generator()
+    noise_gen.manual_seed(int(cfg.seed) + 1)
 
     optimizer = torch.optim.SGD(
         model.parameters(), lr=float(cfg.lr), momentum=float(cfg.momentum)
@@ -212,7 +220,13 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
             xb = x_train[idx]
             yb = y_train[idx]
 
-            if cfg.adv_train:
+            if cfg.noise_train is not None:
+                # M7 control (tex:555-557): clean/noise mixture (no FGSM).
+                loss = noise_train_cost(
+                    model, xb, yb, float(cfg.eps), cfg.noise_train,
+                    float(cfg.alpha), gen=noise_gen,
+                )
+            elif cfg.adv_train:
                 loss = adversarial_train_cost(
                     model, xb, yb, float(cfg.eps), float(cfg.alpha)
                 )
