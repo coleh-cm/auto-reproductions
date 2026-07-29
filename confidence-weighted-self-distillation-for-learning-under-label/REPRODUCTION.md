@@ -133,10 +133,17 @@ exercised here; the from-scratch environment was instead verified via a fresh
   distinguishable, CLI rejection test now asserts the diagnostic went to stderr,
   the degeneracy `w==0` sub-check made non-circular (probes `make_target` with a
   `p_tilde != Y` and relies on `array_equal(t, Y)` as the witness), the
-  finite-difference gradient check extended to all four params (W1/b1 are the
-  ReLU-backprop path, the most error-prone), and `--noise-rate` documented in
-  the SPEC §5 / README CLI synopsis. `pytest -q` → 23 passed; both arms still
-  reproduce (baseline 0.9370 exact, CWSD 0.9611).
+   finite-difference gradient check extended to all four params (W1/b1 are the
+   ReLU-backprop path, the most error-prone), and `--noise-rate` documented in
+   the SPEC §5 / README CLI synopsis. `pytest -q` → 23 passed; both arms still
+   reproduce (baseline 0.9370 exact, CWSD 0.9611).
+- 2026-07-29: Setup step re-executed for a new reproduction pass (same
+  paper_ref `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id): re-cloned
+  the reproductions repository into `$HOME`, re-asserted `/root/.repro_dir`
+  (absolute folder path, no trailing newline), and verified `paper/paper.md`
+  byte-identical to the provided paper text — one whitespace drift found and
+  corrected (Eq. (2) block: the single-space filler line between `)` and `,`
+  had been saved as an empty line). Header (title, date, Status) confirmed.
 
 ## Target numbers
 
