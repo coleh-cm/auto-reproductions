@@ -562,3 +562,77 @@ this environment, and the molecular task's setup is unstated by the paper
 synthetic path and is never reported as a result. A GPU host that pre-caches
 the models runs the same script for real (Tier 1/2 pass → Phase 1 fit →
 Phase 2 eval → `FINAL <arm>=<accuracy>`).
+
+## Round 7 — actual root cause of the recurring "all arms missing a FINAL line"
+
+**Symptom (gate feedback, rounds 1–6).** Every one of the 45 arms reported
+`missing a FINAL line` with `values: []` — `run_all_arms.sh` printed ZERO
+`FINAL <arm>=...` lines. The prior six rounds each fixed a *real* bug (missing
+`.venv` on PATH, errexit aborting the loop, numpy-at-module-scope, online
+`from_pretrained` hang on a blackholed network, a CUDA-only fast-path) but the
+gate kept reporting the same symptom after every one. They never found the
+actual failure mode because they kept *adding* shell complexity while testing
+only under `bash`.
+
+**Root cause (reproduced in-sandbox).** The numbers gate invokes
+`run_all_arms.sh` as **`sh run_all_arms.sh`**, and on the gate host `/bin/sh` is
+**dash**. Every prior version of `run_all_arms.sh` used bash-only syntax —
+process substitution `< <(...)`, `mapfile -t`, `declare -A` (associative
+arrays), `${var//pat/re}`, `[[ ]]` — that **dash rejects at parse time**.
+Reproduced directly:
+
+    $ sh run_all_arms.sh   # the OLD script
+    run_all_arms.sh: 115: Syntax error: redirection unexpected
+    $ echo $?            # 1, ZERO `FINAL` lines on stdout
+
+A parse-time crash prints nothing and exits non-zero, so the gate sees zero
+`FINAL` lines for all 45 arms and reports `values: []` / `spread across arms:
+None`. The sibling reproduction that *passes* the gate
+(`explaining-and-harnessing-adversarial-examples/run_all_arms.sh`) has **zero
+bashisms** (`sh -n` clean, no `mapfile`/`< <(...)`/`${//}`/`[[`), which is why
+it survives `sh`. This is why six rounds of "fix the FINAL line" under `bash`
+never moved the gate: the script never got past dash's parser.
+
+**Fix (this round).** Rewrote `run_all_arms.sh` to be **POSIX-sh-compatible**
+so it runs identically under `dash` and `bash`, while preserving the round-6
+fast filesystem-gate logic (no torch, no network, sub-second on the gate):
+
+- Replaced **process substitution** `< <(...)` with pipes and
+  `while read ... done < file` (reading from one file, writing to another —
+  portable, no subshell-variable-loss issue because state is kept in files).
+- Replaced **`mapfile` + `declare -A`** with a `cut | awk '!seen[$0]++'`
+  distinct-model list and a `model<TAB>1|0` lookup TSV consulted via
+  `awk -F '\t'` (POSIX awk). No associative arrays.
+- Replaced **`${var//pat/re}`** with `sed 's|/|--|g'` / `tr` / a `_json_esc`
+  sed helper.
+- Replaced **`[[ ]]`** with `[ ]`; replaced **`$'\t'`** with
+  `_TAB="$(printf '\t')"`.
+- Kept `set +e` (overrides a forced `bash -e`/`sh -e`) and `set -u`; **dropped
+  `pipefail`** (not portable to all dash builds) and instead end every fallible
+  pipe with `|| true` or feed it into an `if`.
+
+The shebang stays `#!/usr/bin/env bash` (correct for direct `./` execution);
+the *body* is POSIX so `sh run_all_arms.sh` no longer crashes.
+
+**Verified (empirically, this sandbox).**
+- `sh -n` and `bash -n` both clean (parse OK under dash and bash).
+- `sh run_all_arms.sh` (dash) with an empty HF cache, no token → **45/45**
+  `FINAL <arm>=BLOCKED` lines, `exit 0`, in ~0.05 s (was: parse crash → 0
+  lines). Same with `HF_TOKEN` set (round-5 scenario), with `sh -e`, with
+  `bash -e`, and with **no `python` on PATH at all** (grep key fallback) — 45
+  FINAL lines in every case.
+- Faked a cached Llama snapshot + no CUDA → the Llama arms BLOCK with the
+  *cached-but-no-CUDA* (Tier-2) reason and the rest with the *not-cached*
+  reason; still 45 lines. (Tier-2 reached only when ≥1 model cached.)
+- All 45 emitted arm names **exactly equal** the `arms.json` keys (no missing,
+  no extra) — verified by diffing parsed stdout against the JSON.
+- `bash run_all_arms.sh` (this sandbox, `.venv` present, no CUDA, no models) →
+  45/45 `FINAL <arm>=BLOCKED`. `smoke.sh` → `FINAL smoke=0.0000`. `pytest` →
+  28/28.
+
+**Status: still BLOCKED for every arm** — the honest outcome (no GPU, no
+cached/gated 8B/4B/20B models; molecular setup unstated). The change is
+plumbing: it makes the gate *see* the 45 honest BLOCKED lines it was already
+logically producing. No synthetic fallback; real numbers still require a GPU
+host that pre-caches the models (the Phase-1/Phase-2 runnable path is
+unchanged and runs for real when Tier 1+2 pass).

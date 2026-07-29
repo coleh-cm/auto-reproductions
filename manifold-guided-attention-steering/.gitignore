@@ -18,5 +18,7 @@ runs/_arms_map.tsv
 runs/_arms_full.tsv
 runs/_arms_keys.tsv
 runs/_arms_runnable.tsv
+runs/_models.tsv
+runs/_model_usable.tsv
 runs/_fit_pairs.tsv
 runs/log__smoke.log
