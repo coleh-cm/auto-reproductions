@@ -102,10 +102,14 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="adversarial-training mixing weight (tex:488 alpha=0.5)")
     p.add_argument("--dropout-input", dest="dropout_input", type=float,
                    default=1.0, help="input dropout include-prob (1.0=off; "
-                   "paper M4 uses 0.8 but degeneracy requires it off here)")
+                   "the paper states no dropout rate -- tex:492 only says "
+                   "'also regularized with dropout'; the external pylearn2 "
+                   "recipe uses input include 0.8. Off here so the eps=0 "
+                   "degeneracy holds bit-for-bit.)")
     p.add_argument("--dropout-hidden", dest="dropout_hidden", type=float,
                    default=1.0, help="hidden dropout include-prob (1.0=off; "
-                   "paper M4 uses 0.5 but degeneracy requires it off here)")
+                   "the paper states no dropout rate; the external recipe has "
+                   "NO hidden dropout. Off here for the degeneracy gate.)")
     p.add_argument("--baseline", action="store_true",
                    help="force the baseline (clean) arm; --lambda is ignored")
     return p

@@ -6,11 +6,18 @@ Rubbish examples (appendix): 10,000 samples ~ N(0, I_784) fed to four models.
 Paper target (tex:905-912): maxout+softmax 98.35% (conf 92.8%); sigmoid-top 68%
 (conf 87.9%); softmax regression 59.8% (conf 70.8%); RBF 0%.
 
-The sigmoid-top arm is "Changing the top layer to independent sigmoids" on the
-SAME maxout net (tex:908-909). We reuse the trained maxout trunk weights for
-the sigmoid-top model so the ONLY difference is the top layer (the paper's
-controlled comparison). The sigmoid-top net is NOT retrained (the paper
-evaluates the architecture change on the same learned trunk).
+The sigmoid-top arm is "Changing the top layer to independent sigmoids"
+(tex:908-909). The faithful reading is to TRAIN a maxout net with independent
+per-class sigmoid outputs (per-class BCE cost), not to copy the softmax-trained
+readout weights and apply sigmoids with no retraining (a frozen swap that
+mechanically forces rubbish error -> 1.0 regardless of training, SPEC §6 item
+25). ``SigmoidTopMLP`` shares the maxout trunk architecture (same init / SGD /
+external recipe via ``train(cost="sigmoid_top")``); only the top activation and
+training cost differ from the maxout+softmax net.
+
+The RBF arm uses the UNNORMALIZED per-class exp(q) reading for the
+any-class-p>0.5 error rule (SPEC §6 item 9); a softmax reading is bounded below
+by 1/K and cannot reproduce the paper's 0%.
 
 Writes ``results/m9_rubbish.json``.
 
@@ -40,7 +47,7 @@ from fgsm_repro.models import (  # noqa: E402
 )
 from fgsm_repro.train import TrainConfig, train  # noqa: E402
 from fgsm_repro.eval import (  # noqa: E402
-    eval_rubbish, eval_rubbish_sigmoid, eval_clean,
+    eval_rubbish, eval_rubbish_sigmoid, eval_rubbish_rbf, eval_clean,
 )
 
 # Paper target (tex:905-912).
@@ -78,11 +85,11 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _train(model, data, args):
+def _train(model, data, args, cost="softmax"):
     cfg = TrainConfig(
         batch_size=args.batch_size, lr=args.lr, momentum=args.momentum,
         max_epochs=args.epochs, seed=args.seed, adv_train=False, eps=EPS,
-        alpha=0.5, early_stop="clean", patience=args.patience,
+        alpha=0.5, early_stop="clean", patience=args.patience, cost=cost,
     )
     res = train(model, cfg, data)
     if getattr(res, "best_state_dict", None) is not None:
@@ -100,17 +107,16 @@ def main(argv: list[str] | None = None) -> int:
                              n_classes=10, dropout_input_include=DEFAULT_DROPOUT_INPUT,
                              dropout_hidden_include=DEFAULT_DROPOUT_HIDDEN,
                              seed=args.seed), data, args)
-    # Sigmoid-top arm: SAME trunk as m_max, only the top layer changes to
-    # independent sigmoids (tex:908-909). Copy the maxout trunk + readout weights
-    # so the comparison isolates the top layer. The sigmoid-top net is not
-    # retrained (the paper evaluates the architecture change on the same net).
+    # Sigmoid-top arm (tex:908-909): a maxout net with independent per-class
+    # sigmoid outputs, TRAINED with the per-class BCE cost (not a frozen
+    # softmax-to-sigmoid weight swap, SPEC §6 item 25). Same trunk architecture
+    # / init / SGD / external recipe as m_max; only the top activation + cost
+    # differ -- isolating the architecture change the paper names.
     torch.manual_seed(args.seed)
-    m_sig = SigmoidTopMLP(units=args.units, pieces=args.pieces, in_dim=784,
-                         n_classes=10, dropout_input_include=DEFAULT_DROPOUT_INPUT,
-                         dropout_hidden_include=DEFAULT_DROPOUT_HIDDEN, seed=args.seed)
-    m_sig.trunk.layer0.load_state_dict(m_max.layer0.state_dict())
-    m_sig.trunk.layer1.load_state_dict(m_max.layer1.state_dict())
-    m_sig.readout.load_state_dict(m_max.readout.state_dict())  # same readout weights, sigmoid vs softmax top
+    m_sig = _train(SigmoidTopMLP(units=args.units, pieces=args.pieces, in_dim=784,
+                                 n_classes=10, dropout_input_include=DEFAULT_DROPOUT_INPUT,
+                                 dropout_hidden_include=DEFAULT_DROPOUT_HIDDEN,
+                                 seed=args.seed), data, args, cost="sigmoid_top")
     # Softmax regression (tex:920 59.8%/70.8%).
     torch.manual_seed(args.seed)
     m_soft = _train(SoftmaxRegression(in_dim=784, n_classes=10), data, args)
@@ -121,20 +127,23 @@ def main(argv: list[str] | None = None) -> int:
     ev_max = eval_rubbish(m_max, args.n, args.dim, args.seed)
     ev_sig = eval_rubbish_sigmoid(m_sig, args.n, args.dim, args.seed)
     ev_soft = eval_rubbish(m_soft, args.n, args.dim, args.seed)
-    ev_rbf = eval_rubbish(m_rbf, args.n, args.dim, args.seed)
+    ev_rbf = eval_rubbish_rbf(m_rbf, args.n, args.dim, args.seed)
 
     sub_scale = args.patience < 100 or args.epochs < 100
     record = {
         "milestone": "M9",
-        "description": "Rubbish examples N(0,I_784) on maxout+softmax, sigmoid-top, "
-                       "softmax-reg, RBF (appendix).",
+        "description": "Rubbish examples N(0,I_784) on maxout+softmax, "
+                       "sigmoid-top (TRAINED, per-class BCE), softmax-reg, RBF "
+                       "(unnorm exp(q) metric).",
         "seed": args.seed,
         "hyperparams": {
-            "models": ["MaxoutMLP(softmax)", "SigmoidTopMLP", "SoftmaxRegression", "RBFNet"],
+            "models": ["MaxoutMLP(softmax)", "SigmoidTopMLP(trained,BCE)",
+                       "SoftmaxRegression", "RBFNet(unnorm exp(q))"],
             "units": args.units, "pieces": args.pieces, "n": args.n, "dim": args.dim,
             "lr": args.lr, "momentum": args.momentum, "batch_size": args.batch_size,
             "max_epochs": args.epochs, "patience": args.patience,
-            "sigmoid_top_note": "same trunk as maxout, only top layer differs",
+            "sigmoid_top_note": "trained with per-class BCE (not a frozen swap)",
+            "rbf_note": "unnormalized per-class exp(q) metric (SPEC §6 item 9)",
         },
         "evals": {
             "maxout_softmax": asdict(ev_max),
@@ -143,8 +152,9 @@ def main(argv: list[str] | None = None) -> int:
             "rbf": asdict(ev_rbf),
         },
         "paper_target": PAPER_TARGET,
-        "note": ("Sub-scale run (epochs=%d, patience=%d). The paper's 98.35/68/59.8/0%% "
-                 "are from fully-converged nets." % (args.epochs, args.patience))
+        "note": ("Sub-scale run (epochs=%d, patience=%d, n=%d). The paper's "
+                 "98.35/68/59.8/0%% are from fully-converged nets."
+                 % (args.epochs, args.patience, args.n))
                  if sub_scale else None,
     }
 

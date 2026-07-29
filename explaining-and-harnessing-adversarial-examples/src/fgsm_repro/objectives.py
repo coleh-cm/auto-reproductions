@@ -141,23 +141,28 @@ def noise_train_cost(
     y: torch.Tensor,
     eps: float,
     noise_type: str,
-    alpha: float = 0.5,
     gen: "torch.Generator | None" = None,
 ) -> torch.Tensor:
-    """Noise-training control cost (M7, tex:555-557).
+    """Noise-training control cost (M7, tex:555-557) -- NOISE-ONLY batches.
 
-    The paper's control experiments train on a mixture of clean examples and
-    examples with RANDOM additive noise of max-norm <= eps, generated two ways:
-      * ``"bernoulli"``: each pixel gets +eps or -eps (tex:555
-        "randomly adding $\\pm\\eps$ to each pixel") -- eta = eps * b,
-        b ~ Bernoulli-sign{+1,-1} i.i.d.  ||eta||_inf == eps exactly.
-      * ``"uniform"``:   each pixel gets u ~ U(-eps, eps) (tex:556
-        "adding noise in $U(-\\eps, \\eps)$") -- ||eta||_inf <= eps.
+    The paper's control: "we trained a maxout network with noise based on
+    randomly adding $\\pm\\eps$ to each pixel, or adding noise in
+    $U(-\\eps, \\eps)$" (tex:555-556). The prose reads as training on NOISY
+    inputs (every example perturbed by random noise of max-norm <= eps); it does
+    NOT state a clean/noisy mixture. We therefore train on noise-only batches:
+        L = J(theta, x + eta, y)         # no clean term, no alpha
+    with eta regenerated every batch (like FGSM adversarial training,
+    tex:490-491) and detached (no gradient through the noise sampling).
 
-    Cost form mirrors E7's mixture (alpha=0.5):
-        L = alpha*J(theta, x, y) + (1-alpha)*J(theta, x + eta, y).
-    The noise is regenerated every batch (like FGSM adversarial training,
-    tex:490-491). eta is detached (no gradient through the noise sampling).
+    Noise forms:
+      * ``"bernoulli"``: eta = eps * b, b ~ Bernoulli-sign{+1,-1} i.i.d.
+        (tex:555 "randomly adding $\\pm\\eps$ to each pixel"); ||eta||_inf == eps.
+      * ``"uniform"``:   eta ~ U(-eps, eps) per pixel (tex:556); ||eta||_inf <= eps.
+
+    SPEC §6 item 27 records this choice (the prior implementation used an
+    unpapered 0.5-clean/0.5-noisy alpha-mixture mirroring E7; the prose does
+    not state a mixture, so noise-only is the faithful reading and is a HARDER
+    control -- more noise exposure -- for the paper's "noise << FGSM" claim).
 
     This is the paper's CONTROL for FGSM adversarial training -- it is expected
     to be a WEAKER regularizer than FGSM (the paper reports it confers little
@@ -177,6 +182,57 @@ def noise_train_cost(
     else:
         raise ValueError(f"unknown noise_type {noise_type!r}")
     x_noisy = (x + eta).detach()
-    loss_clean = cross_entropy_cost(model, x, y)
-    loss_noisy = cross_entropy_cost(model, x_noisy, y)
-    return alpha * loss_clean + (1.0 - alpha) * loss_noisy
+    return cross_entropy_cost(model, x_noisy, y)
+
+
+# --------------------------------------------------------------------------- #
+# M9: independent-sigmoid top cost (tex:908-909 "independent sigmoids")
+# --------------------------------------------------------------------------- #
+def sigmoid_top_cost(model: Classifier, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """Per-class independent-sigmoid training cost (M9 sigmoid-top, tex:908-909).
+
+    The paper's rubbish appendix contrasts a maxout+softmax net with the same
+    net whose top layer is "independent sigmoids" (tex:908-909). For independent
+    per-class sigmoid outputs p(y=k|x) = sigmoid(logit_k), the faithful training
+    cost is the sum over classes of per-class binary cross-entropy against the
+    one-hot label, averaged over the batch (the standard multilabel cost):
+
+        J = (1/B) sum_b sum_k BCE(sigmoid(logit_k(x_b)), 1[y_b == k]).
+
+    This TRAINS the sigmoid-top net (SPEC §6 item 25), rather than copying the
+    softmax-trained readout weights and applying sigmoids with no retraining
+    (which mechanically forces rubbish error -> 1.0 regardless of training).
+    ``model.logits`` returns the pre-sigmoid readout scores [B, K].
+    """
+    logits = model.logits(x)  # [B, K]
+    k = logits.shape[-1]
+    target = F.one_hot(y, num_classes=k).to(logits.dtype)  # [B, K]
+    return F.binary_cross_entropy_with_logits(logits, target, reduction="mean")
+
+
+# --------------------------------------------------------------------------- #
+# M-L1: L1 weight-decay control (Section 5, tex:426-433)
+# --------------------------------------------------------------------------- #
+def l1_first_layer_penalty(model: Classifier, coeff: float) -> torch.Tensor:
+    """L1 weight-decay penalty on the FIRST maxout layer (Section 5, tex:426-433).
+
+    The paper's Section 5 contrast of adversarial training vs L1 weight decay
+    applies L1 decay to "the first layer": "When applying L1 weight decay to the
+    first layer, we found that even a coefficient of .0025 was too large, and
+    caused the model to get stuck with over 5% error on the training set"
+    (tex:429-432). We add ``coeff * ||W_0||_1`` (sum of absolute values of the
+    first maxout layer's incoming weights) to the training cost -- the standard
+    L1 weight-decay form (a penalty ADDED to the cost; the paper notes this is
+    more pessimistic than adversarial training, which SUBTRACTS the penalty from
+    the activation, tex:418-424).
+
+    Returns a graph-attached zero for models without a first maxout layer so the
+    same trainer can call it generically.
+    """
+    layer0 = getattr(model, "layer0", None)
+    if layer0 is None and hasattr(model, "trunk"):
+        layer0 = getattr(model.trunk, "layer0", None)
+    if layer0 is None or coeff == 0.0:
+        return torch.zeros((), dtype=torch.float32)
+    W = layer0.W  # [in, out]
+    return coeff * W.abs().sum()

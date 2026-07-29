@@ -77,7 +77,15 @@ multi-core CPUs, a ~7x slowdown observed).
 **Excluded arms** (recorded, not run): GoogLeNet/ImageNet Fig. 1 (tex:378-383; 2014 DistBelief
 weights unavailable); MP-DBM ε=0.25 → 97.5% (tex:793-800; a separate paper's model);
 CIFAR-10 conv maxout E2 (tex:340-341, 910-912, 936-941; beyond the MNIST core, architecture
-exists only externally).
+exists only externally); **rotation-based adversarial examples / rotational hidden-layer
+perturbations** (tex:346-347, 562-584) — a negative result the paper reports as a weaker
+regularizer than additive FGSM, with no quantified MNIST number; excluded as it would
+require a differentiable rotation operator and yields no headline claim; **the trained-to-zero-
+on-Gaussian-rubbish maxout arm** (tex:963-965) — the paper reports it confers NO clean-test
+reduction (unlike adversarial training); excluded as it requires a per-class rubbish training
+protocol and reproduces only a null result (no regularization benefit). Both exclusions are
+recorded here rather than silently omitted; the L1 weight-decay control (Section 5, the one
+named *quantified* control the paper reports with numbers) IS now implemented (item 28).
 
 ---
 
@@ -290,10 +298,34 @@ Model definitions:
    (negative-definiteness for boundedness), initialization, and how "confidence" is computed for
    it are ALL unstated. Note the exp has **no minus sign** — boundedness requires the learned β
    to be negative-definite; nothing enforces that.
+   **Multiclass-extension consequence (adversarial review, fixed):** the natural multiclass
+   extension of the binary form is the INDEPENDENT per-class reading `p_k(x)=exp(q_k(x))`
+   (each in (0,1] when β_k is neg-definite), NOT a softmax over the q_k. A 10-way softmax
+   `max_k softmax(q)_k` is bounded below by 1/K=0.1, so it **structurally cannot** reproduce
+   the paper's RBF confidence-on-mistakes 1.2%, clean-confidence 60.6%, or rubbish-error 0%
+   (tex:600-604, 923). We therefore use the unnormalized `exp(q_k)` for the confidence and
+   the rubbish any-class-p>0.5 rule, and `argmax(q_k)` (normalization-invariant, identical to
+   the softmax argmax) for the error rate (`eval.eval_fgsm_rbf`, `eval.eval_clean_confidence_rbf`,
+   `eval.eval_rubbish_rbf`). The RBF training cost remains the softmax cross-entropy over q
+   (the implied 10-way training cost, §6 item 8) — the argmax prediction is unchanged; only
+   the confidence/threshold metrics switch to the unnormalized form. β is a free parameter
+   with a negative-definite init (−0.01·I) — the faithful reading of E8 (the exp is a valid
+   probability only when β is neg-semi-definite); the metric fix is what restores the paper's
+   confidence-decay phenomenology, not the init.
 10. **Conv maxout for CIFAR-10**: architecture entirely external (cifar10.yaml); preprocessing
     described only as "yields a standard deviation of roughly 0.5" via a hyperlink (tex:343-345).
 11. **Ensemble combination rule** (mean probs vs mean logits) and the exact attack objective for
-    "perturb the entire ensemble" (tex:822) unstated.
+    "perturb the entire ensemble" (tex:822) unstated. **Scoring-side aggregation (adversarial
+    review, fixed):** the paper's "the ensemble gets an error rate of 91.1%" (tex:822) does not
+    define how the ensemble's prediction is formed. The natural reading is the error of the
+    ensemble's *aggregated* prediction, not the mean of the members' individual error rates. We
+    form the ensemble prediction as `argmax(mean_m softmax(member_m logits))` (mean-prob voting)
+    and report that as the headline `ensemble_targeted_error` / `single_member_targeted_error`
+    (`experiments/e1_ensemble.py`). The single-member arm averages over which member is targeted
+    (attack member j, score the ensemble, average the error over j) since the paper names no
+    target member. The prior per-member-mean statistic is kept as a secondary diagnostic
+    (`mean_per_member_*`). The attack-side objective (gradient of the mean CE over members,
+    `fgsm_ensemble`) is unchanged.
 
 Evaluation protocol:
 12. **Clipping**: paper never says whether x̃ is clipped to [0,1]; displayed method does not clip
@@ -359,12 +391,17 @@ Evaluation protocol:
      the paper's 99% measures). The E6 *training loss* uniform-direction imprecision (item 21)
      is a separate object (`adversarial_logreg_cost`) and is not used in the M2 attack.
 25. **M9 sigmoid-top arm**: the paper says only "Changing the top layer to independent sigmoids"
-     (tex:908-909) on the maxout net. It does not state whether the sigmoid-top net is retrained
-     or evaluated on the same learned trunk. **Choice: `SigmoidTopMLP` reuses the trained
-     maxout trunk + readout weights (copied), so the ONLY difference from the maxout+softmax net
-     is the top activation (sigmoid per class vs softmax).** The sigmoid-top net is NOT retrained
-     — this isolates the architecture change (the paper's controlled comparison). Documented in
-     `experiments/m9_rubbish.py`. Error = any per-class sigmoid > 0.5 (`eval_rubbish_sigmoid`).
+    (tex:908-909) on the maxout net. It does not state whether the sigmoid-top net is retrained
+    or evaluated on the same learned trunk. **Choice (adversarial review, fixed):** `SigmoidTopMLP`
+    is TRAINED with the per-class independent-sigmoid BCE cost
+    `J = mean_b sum_k BCE(sigmoid(logit_k), 1[y=k])` (`objectives.sigmoid_top_cost`,
+    `train(cost="sigmoid_top")`), sharing the maxout trunk architecture / init / SGD / external
+    recipe (so the M9 comparison trains identically to the maxout+softmax net); only the top
+    activation and training cost differ. The prior implementation copied the softmax-trained
+    readout weights and applied sigmoids with NO retraining — a frozen swap that mechanically
+    forces rubbish error -> 1.0 on N(0,I) noise regardless of training (P(any logit>0) -> 1);
+    that measured the swap, not the paper's model. Error = any per-class sigmoid > 0.5
+    (`eval_rubbish_sigmoid`).
 26. **M5 protocol choices**: the paper states the M5 protocol (adversarial-valid early stop →
      retrain on 60k → 5-seed mean, tex:501-512) but not the patience for the adversarial-valid
      criterion, the ε for the adversarial validation set, or the retrain optimizer. **Choices:
@@ -373,8 +410,30 @@ Evaluation protocol:
      SGD + external maxout recipe as the selection phase.** The baseline arm selects on
      clean-valid error (the original maxout recipe, tex:501-503); the adversarial arm selects on
      adversarial-valid error (tex:503-505). Full 1600-unit/patience-100/5-seed scale is
-     infeasible on this CPU; `experiments/m5_large_advtrain.py` defaults to a documented
-     sub-scale and exposes the full-scale knobs.
+    infeasible on this CPU; `experiments/m5_large_advtrain.py` defaults to a documented
+    sub-scale and exposes the full-scale knobs.
+ 27. **M7 noise-training mixture (adversarial review, fixed):** the paper says "we trained a
+      maxout network with noise based on randomly adding $\pm\eps$ to each pixel, or adding
+      noise in $U(-\eps, \eps)$" (tex:555-556) -- it does NOT state a clean/noisy mixture.
+      **Choice: train on NOISE-ONLY batches** (`L = J(theta, x + eta, y)`, no clean term, no
+      alpha; `objectives.noise_train_cost`), the prose reading of "trained ... with noise".
+      The prior implementation used an unpapered 0.5-clean/0.5-noisy alpha-mixture mirroring
+      E7, which halved the noise pressure on the very control the paper uses to argue noise is
+      inferior to FGSM. Noise-only is both the faithful reading and a HARDER control (more
+      noise exposure) for the paper's "noise << FGSM" claim. Noise is regenerated per batch
+      (tex:490-491) and detached. Tested by `test_noise_train_cost_is_noise_only` /
+      `test_noise_train_cost_no_clean_mixture_term`.
+ 28. **L1 weight-decay control (Section 5, tex:426-433; adversarial review, fixed):** the
+      paper's Section-5 contrast of adversarial training vs L1 weight decay was previously
+      omitted entirely with no exclusion record. **Now implemented** as
+      `experiments/m_l1_weight_decay.py`: adds `coeff * ||layer0.W||_1` (the L1 penalty on the
+      FIRST maxout layer's incoming weights) to the training cost (`train.l1_first_layer_coeff`,
+      `objectives.l1_first_layer_penalty`), sweeps the paper's "too large" 0.0025 and a smaller
+      0.00025, and reports clean TRAIN + TEST error and FGSM error. The paper's qualitative
+      claim: 0.0025 is too pessimistic (>5% TRAIN error); smaller coefficients train but confer
+      no regularization benefit. The L1 penalty is ADDED to the cost (standard weight decay);
+      the paper notes this is more pessimistic than adversarial training, which SUBTRACTS the
+      penalty from the activation (tex:418-424).
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):

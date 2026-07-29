@@ -7,6 +7,17 @@ SINGLE member.
 Paper target (tex:819-825): ensemble-targeted FGSM error 91.1%; single-member-
 targeted FGSM error 87.9%.
 
+ERROR METRIC (SPEC §6 item 11): the paper says "The ensemble gets an error rate
+of 91.1%" (tex:822) without defining the aggregation. The natural reading is
+the error of the ENSEMBLE'S aggregated prediction, not the mean of the members'
+individual error rates. We form the ensemble prediction as argmax of the MEAN
+of the members' softmax probabilities (mean-prob voting) and report that as the
+headline ``ensemble_targeted_error`` / ``single_member_targeted_error``. The
+single-member arm averages over which member is targeted (attack member j,
+score the ensemble, average the error over j) -- the paper does not name a
+target member. The prior per-member-mean statistic is kept as a secondary
+diagnostic (``mean_per_member_*``).
+
 Writes ``results/e1_ensemble.json``.
 
 Runnable::
@@ -28,6 +39,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 import torch  # noqa: E402
+import torch.nn.functional as F  # noqa: E402
 
 from fgsm_repro.data import load_mnist  # noqa: E402
 from fgsm_repro.models import MaxoutMLP  # noqa: E402
@@ -86,8 +98,33 @@ def _train_member(seed: int, data, args) -> MaxoutMLP:
     return model
 
 
+def _ensemble_predict(models, x) -> torch.Tensor:
+    """Ensemble prediction = argmax of the MEAN of members' softmax probs.
+
+    The paper's "the ensemble gets an error rate of ..." (tex:822) most
+    naturally means the error of the ensemble's combined prediction; mean-prob
+    voting is the standard combination (SPEC §6 item 11).
+    """
+    for m in models:
+        m.eval()
+    with torch.no_grad():
+        probs = torch.zeros((x.shape[0], 10), dtype=torch.float32)
+        for m in models:
+            probs = probs + F.softmax(m.logits(x), dim=-1)
+        probs = probs / len(models)
+    return probs.argmax(dim=1)
+
+
 def _ensemble_error(models, x_adv, y) -> float:
-    """Mean over members of each member's error rate on x_adv."""
+    """Headline E1 metric: error rate of the ensemble's aggregated prediction
+    on x_adv (mean-prob argmax)."""
+    pred = _ensemble_predict(models, x_adv)
+    return float((pred != y).float().mean().item())
+
+
+def _mean_per_member_error(models, x_adv, y) -> float:
+    """Secondary diagnostic: mean over members of each member's individual
+    error rate on x_adv (the prior implementation's statistic)."""
     errs = []
     for m in models:
         m.eval()
@@ -113,10 +150,21 @@ def main(argv: list[str] | None = None) -> int:
     # Ensemble-targeted FGSM: gradient of mean CE over members (91.1%).
     x_adv_ens = fgsm_ensemble(models, x_test, y_test, EPS)
     ens_error = _ensemble_error(models, x_adv_ens, y_test)
+    ens_mean_per_member = _mean_per_member_error(models, x_adv_ens, y_test)
 
-    # Single-member-targeted FGSM: attack member 0, evaluate on the whole ensemble (87.9%).
-    x_adv_single = fgsm(models[0], x_test, y_test, EPS)
-    single_error = _ensemble_error(models, x_adv_single, y_test)
+    # Single-member-targeted FGSM: attack EACH member in turn, score the
+    # ensemble (mean-prob argmax) on those adversarials, and AVERAGE the
+    # ensemble error over the targeted member (the paper does not name a
+    # target member; averaging avoids the arbitrary choice of member 0).
+    single_errors = []
+    single_mean_per_member = []
+    for j in range(args.members):
+        x_adv_single = fgsm(models[j], x_test, y_test, EPS)
+        single_errors.append(_ensemble_error(models, x_adv_single, y_test))
+        single_mean_per_member.append(
+            _mean_per_member_error(models, x_adv_single, y_test))
+    single_error = sum(single_errors) / len(single_errors)
+    single_mean_per_member_avg = sum(single_mean_per_member) / len(single_mean_per_member)
 
     clean_accs = [float(eval_clean(m, x_test, y_test)) for m in models]
 
@@ -124,15 +172,22 @@ def main(argv: list[str] | None = None) -> int:
     record = {
         "milestone": "E1",
         "description": "Ensemble of N maxout nets; FGSM ensemble-targeted vs "
-                       "single-member-targeted.",
+                       "single-member-targeted. Headline metric = error of the "
+                       "ensemble's mean-prob prediction (SPEC §6 item 11).",
         "base_seed": args.base_seed,
         "hyperparams": {
             "members": args.members, "units": args.units, "pieces": args.pieces,
             "lr": args.lr, "momentum": args.momentum, "batch_size": args.batch_size,
             "max_epochs": args.epochs, "patience": args.patience, "eps": EPS,
+            "ensemble_prediction": "argmax(mean member softmax probs)",
+            "single_member_arm": "attack each member, average ensemble error",
         },
         "ensemble_targeted_error": ens_error,
         "single_member_targeted_error": single_error,
+        # Secondary diagnostics (the prior per-member-mean statistic).
+        "mean_per_member_error_ensemble_targeted": ens_mean_per_member,
+        "mean_per_member_error_single_targeted": single_mean_per_member_avg,
+        "per_member_single_targeted_errors": single_errors,
         "member_clean_accuracies": clean_accs,
         "paper_target": PAPER_TARGET,
         "note": ("Sub-scale run (members=%d, epochs=%d, patience=%d). The paper's "

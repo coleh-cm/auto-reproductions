@@ -28,8 +28,6 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-import torch.nn.functional as F  # noqa: E402
-
 REPRO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPRO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
@@ -41,7 +39,7 @@ from fgsm_repro.data import load_mnist  # noqa: E402
 from fgsm_repro.models import MaxoutMLP, SoftmaxRegression, RBFNet  # noqa: E402
 from fgsm_repro.train import TrainConfig, train  # noqa: E402
 from fgsm_repro.eval import (  # noqa: E402
-    eval_clean, eval_fgsm, class_agreement,
+    eval_clean, eval_fgsm_rbf, eval_clean_confidence_rbf, class_agreement,
 )
 
 # Paper target (tex:600-604, 679-688).
@@ -115,12 +113,11 @@ def main(argv: list[str] | None = None) -> int:
     m_soft = _train(SoftmaxRegression(in_dim=784, n_classes=10),
                     args.soft_epochs, data, args)
 
-    # RBF FGSM eval (55.4% / 1.2%).
-    rbf_fgsm = eval_fgsm(rbf, x_test, y_test, EPS)
-    # RBF clean confidence = mean over ALL test of the max softmax prob (60.6%).
-    rbf.eval()
-    with torch.no_grad():
-        rbf_clean_conf = float(F.softmax(rbf.logits(x_test), dim=-1).max(1).values.mean())
+    # RBF FGSM eval (55.4% / 1.2%). Uses the UNNORMALIZED per-class exp(q)
+    # reading for confidence (SPEC §6 item 9); error rate uses argmax(q).
+    rbf_fgsm = eval_fgsm_rbf(rbf, x_test, y_test, EPS)
+    # RBF clean confidence = mean over ALL test of max_k exp(q_k) (60.6%).
+    rbf_clean_conf = eval_clean_confidence_rbf(rbf, x_test)
 
     # Section 8 cross-model class agreement (tex:679-688).
     # maxout vs rbf: rbf predicts maxout's class 16.0% over m1 errors, 54.3% both-wrong.
@@ -130,11 +127,19 @@ def main(argv: list[str] | None = None) -> int:
     # softmax vs rbf: rbf predicts softmax's class 53.6% over m1 errors.
     ag_sr = class_agreement(m_soft, rbf, x_test, y_test, EPS)
 
-    sub_scale = args.patience < 100
+    # Sub-scale if ANY model is under-trained: the paper converges each net to
+    # patience-100; we flag any epoch/patience knob below the paper scale.
+    sub_scale = (
+        args.patience < 100
+        or args.rbf_epochs < 100
+        or args.maxout_epochs < 100
+        or args.soft_epochs < 100
+    )
     record = {
         "milestone": "M8",
         "description": "Shallow RBF on MNIST; FGSM eps=0.25; cross-model class "
-                       "agreement (section 8).",
+                       "agreement (section 8). RBF confidence uses the "
+                       "UNNORMALIZED per-class exp(q) reading (SPEC §6 item 9).",
         "seed": args.seed,
         "hyperparams": {
             "models": ["RBFNet", "MaxoutMLP", "SoftmaxRegression"],
@@ -142,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             "lr": args.lr, "momentum": args.momentum, "batch_size": args.batch_size,
             "rbf_epochs": args.rbf_epochs, "maxout_epochs": args.maxout_epochs,
             "soft_epochs": args.soft_epochs, "patience": args.patience, "eps": EPS,
+            "rbf_confidence_metric": "unnorm exp(q_k) (paper binary form, tex:595)",
         },
         "rbf_fgsm_eval": asdict(rbf_fgsm),
         "rbf_clean_confidence": rbf_clean_conf,
@@ -152,9 +158,14 @@ def main(argv: list[str] | None = None) -> int:
             "softmax_vs_rbf": asdict(ag_sr),
         },
         "paper_target": PAPER_TARGET,
-        "note": ("Sub-scale run (patience=%d). The paper notes quadratic models "
-                 "are hard to train with SGD (tex:616-617); the RBF net may "
-                 "underfit." % args.patience) if sub_scale else None,
+        "note": ("Sub-scale run (rbf_epochs=%d, maxout_epochs=%d, soft_epochs=%d, "
+                 "patience=%d). The paper notes quadratic models are hard to train "
+                 "with SGD (tex:616-617); the RBF net may underfit. RBF confidence "
+                 "uses the unnormalized per-class exp(q) reading (SPEC §6 item 9) "
+                 "so it CAN structurally reach the paper's 1.2%/60.6%/0%% (a softmax "
+                 "reading is bounded below by 1/K and cannot)."
+                 % (args.rbf_epochs, args.maxout_epochs, args.soft_epochs,
+                    args.patience)) if sub_scale else None,
     }
 
     out_path = Path(args.out)

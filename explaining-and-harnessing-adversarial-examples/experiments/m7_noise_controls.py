@@ -9,6 +9,11 @@ Paper target (tex:555-557): training with +/-eps pixel flips -> FGSM error 86.2%
 (For comparison FGSM adversarial training drives this down to 17.9% — M6 — so
 noise training is a much WEAKER regularizer, which is the paper's point.)
 
+The noise arms train on NOISE-ONLY batches (every example perturbed by random
+noise of max-norm <= eps, regenerated per batch) -- the prose reading of tex:555-
+556 ("we trained a maxout network with noise based on randomly adding +/-eps
+..."); NO clean/noise alpha-mixture is stated by the paper (SPEC §6 item 27).
+
 Writes ``results/m7_noise_controls.json``.
 
 Runnable::
@@ -82,7 +87,7 @@ def _train_arm(noise_train, data, args) -> MaxoutMLP:
         batch_size=args.batch_size, lr=args.lr, momentum=args.momentum,
         max_epochs=args.epochs, seed=args.seed, adv_train=False, eps=EPS,
         alpha=ALPHA, early_stop="clean", patience=args.patience,
-        noise_train=noise_train,  # None -> clean baseline; "bernoulli"/"uniform" -> M7
+        noise_train=noise_train,  # None -> clean baseline; "bernoulli"/"uniform" -> M7 noise-only
     )
     res = train(model, cfg, data)
     if getattr(res, "best_state_dict", None) is not None:
@@ -110,13 +115,15 @@ def main(argv: list[str] | None = None) -> int:
     record = {
         "milestone": "M7",
         "description": "Noise-training controls (+/-eps flips, U(-eps,eps)) on "
-                       "maxout; FGSM eps=0.25 eval after each.",
+                       "maxout (NOISE-ONLY batches, no clean mixture, SPEC §6 item "
+                       "27); FGSM eps=0.25 eval after each.",
         "seed": args.seed,
         "hyperparams": {
             "model": "MaxoutMLP", "units": args.units, "pieces": args.pieces,
             "lr": args.lr, "momentum": args.momentum, "batch_size": args.batch_size,
             "max_epochs": args.epochs, "patience": args.patience,
             "eps": EPS, "alpha": ALPHA, "dropout_input": DEFAULT_DROPOUT_INPUT,
+            "noise_train_form": "noise-only batches (no clean mixture)",
         },
         "arms": arms,
         "paper_target": PAPER_TARGET,

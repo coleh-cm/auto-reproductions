@@ -51,6 +51,32 @@ def _probs(model: Classifier, x: torch.Tensor) -> torch.Tensor:
     return F.softmax(model.logits(x), dim=-1)
 
 
+def _rbf_unnorm_probs(model: Classifier, x: torch.Tensor) -> torch.Tensor:
+    """RBF UNNORMALIZED per-class probabilities (M8/M9, SPEC §6 item 9).
+
+    The paper prints only the binary RBF form ``p(y=1|x) = exp((x-mu)^T beta
+    (x-mu))`` (E8, tex:595) — a per-class *unnormalized* probability in (0, 1]
+    (bounded by 1 only when beta is negative-definite). For the multiclass
+    extension we take the independent per-class reading ``p_k(x) = exp(q_k(x))``
+    (NOT a softmax over the q_k). This preserves the paper's measured mechanism:
+    confidence decays toward 0 away from the class centres mu_k, so the model is
+    low-confidence on off-manifold inputs (FGSM-pushed, N(0,I) rubbish).
+
+    A 10-way SOFTMAX over the q_k was the prior implementation; its max prob is
+    bounded below by 1/K = 0.1, so it structurally CANNOT reproduce the paper's
+    conf-on-mistakes 1.2% / clean-confidence 60.6% / rubbish-error 0%
+    (tex:600-604, 923). The unnormalized exp(q) reading can. The argmax
+    prediction is unchanged (softmax is monotonic, so argmax(q) == argmax(softmax
+    q)); only the confidence/threshold metrics change.
+
+    The exponent is clamped to <= 80 to avoid float32 overflow if a trained
+    beta drifts positive (which would itself contradict the RBF property); this
+    clamp only affects pathological drift, never a faithful neg-definite beta.
+    """
+    q = model.logits(x)  # [B, K] the quad forms
+    return torch.exp(q.clamp(max=80.0))
+
+
 def _eval_from_probs_pred(
     probs: torch.Tensor, pred: torch.Tensor, y: torch.Tensor
 ) -> AttackEval:
@@ -107,6 +133,37 @@ def eval_fgsm(
         logits = model.logits(x_adv)
         probs = F.softmax(logits, dim=-1)
         pred = logits.argmax(dim=1)
+    return _eval_from_probs_pred(probs, pred, y)
+
+
+def eval_clean_confidence_rbf(model: Classifier, x: torch.Tensor) -> float:
+    """M8 RBF clean confidence = mean over ALL examples of max_k exp(q_k)
+    (paper 60.6%, tex:603). Uses the UNNORMALIZED per-class exp(q) reading
+    (SPEC §6 item 9); a softmax reading is bounded below by 1/K and cannot
+    reproduce the paper's number."""
+    model.eval()
+    with torch.no_grad():
+        probs = _rbf_unnorm_probs(model, x)  # [B, K]
+    return float(probs.max(dim=1).values.mean())
+
+
+def eval_fgsm_rbf(
+    model: Classifier, x: torch.Tensor, y: torch.Tensor, eps: float
+) -> AttackEval:
+    """Evaluate an RBF model on its OWN FGSM adversarial examples (M8, tex:600-604).
+
+    Same construction as ``eval_fgsm`` (the FGSM attack uses the model's
+    training cost J = cross-entropy/softmax over the quad forms, tex:309), but
+    the CONFIDENCE metric uses the UNNORMALIZED per-class exp(q) reading
+    (SPEC §6 item 9). The error rate uses argmax(q) (normalization-invariant,
+    identical to the softmax argmax). No clipping of x_tilde.
+    """
+    model.eval()
+    x_adv = fgsm(model, x, y, eps)
+    with torch.no_grad():
+        logits = model.logits(x_adv)            # [B, K] quad forms
+        probs = torch.exp(logits.clamp(max=80.0))  # unnormalized exp(q)
+        pred = logits.argmax(dim=1)             # == argmax(softmax(q))
     return _eval_from_probs_pred(probs, pred, y)
 
 
@@ -201,6 +258,35 @@ def eval_rubbish(
     return AttackEval(error_rate=error_rate, mean_confidence_on_errors=mean_conf, n=n)
 
 
+def eval_rubbish_rbf(
+    model: Classifier, n: int, dim: int, seed: int
+) -> AttackEval:
+    """Appendix rubbish examples for the RBF model (M9, tex:905-906, 923).
+
+    Draw n ~ N(0, I_dim); for the RBF the per-class probability is the
+    UNNORMALIZED exp(q_k) (SPEC §6 item 9, E8 tex:595). A rubbish sample is an
+    "error" iff ANY class's exp(q_k) > 0.5 (tex:906 "assigning a probability
+    greater than 0.5 to any class"). Confidence = mean over the erroring subset
+    of the max exp(q_k); 0.0 if none. With a negative-definite beta the RBF is
+    far from every mu_k on N(0,I) noise, so exp(q_k) -> 0 and the error rate is
+    ~0 (paper 0%, tex:923) — the structural property a softmax reading cannot
+    reproduce (a 10-way softmax max-prob is bounded below by 0.1).
+    """
+    model.eval()
+    gen = torch.Generator().manual_seed(seed)
+    x = sample_rubbish(n, dim, gen)
+    with torch.no_grad():
+        probs = _rbf_unnorm_probs(model, x)  # [B, K] unnormalized exp(q)
+        max_prob = probs.max(dim=1).values
+    wrong = max_prob > 0.5
+    error_rate = wrong.float().mean().item()
+    if wrong.sum() > 0:
+        mean_conf = max_prob[wrong].mean().item()
+    else:
+        mean_conf = 0.0
+    return AttackEval(error_rate=error_rate, mean_confidence_on_errors=mean_conf, n=n)
+
+
 def eval_rubbish_sigmoid(
     model: Classifier, n: int, dim: int, seed: int
 ) -> AttackEval:
@@ -211,6 +297,12 @@ def eval_rubbish_sigmoid(
     iff ANY class probability > 0.5 (tex:906 "assigning a probability greater
     than 0.5 to any class"). Confidence = mean over the erroring subset of
     the MAX per-class sigmoid probability; 0.0 if none.
+
+    The subject model here is a TRAINED independent-sigmoid net (per-class BCE),
+    not a frozen softmax-to-sigmoid weight swap (SPEC §6 item 25): the paper
+    says "Changing the top layer to independent sigmoids" (tex:908-909), whose
+    natural reading is the architecture trained with the sigmoid-appropriate
+    cost, evaluated on the same N(0,I) rubbish.
     """
     model.eval()
     gen = torch.Generator().manual_seed(seed)

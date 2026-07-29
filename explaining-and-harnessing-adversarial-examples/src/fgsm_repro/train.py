@@ -12,11 +12,13 @@ flagged in a comment below.
 SCOPE (SPEC.md section 6 "External"): the external maxout recipe — lr
 exponential adjust (*1.000004 each step, floor 1e-6), momentum ramp
 (0.5 -> 0.7 linearly by epoch 250), and max_col_norm 1.9365 column-norm
-clamping — is adopted "for M3/M4 arms", i.e. it applies to MaxoutMLP ONLY.
-SoftmaxRegression (M1), LogisticRegression (M2) and RBFNet (M8) train with
-plain fixed-lr / fixed-momentum SGD and NO weight-norm constraint. Applying
-the maxout recipe to M1/M2 is an unstated deviation, so this trainer gates
-every external piece on ``isinstance(model, MaxoutMLP)``.
+clamping — is adopted "for M3/M4 arms", i.e. it applies to MaxoutMLP and to
+SigmoidTopMLP (whose trunk is a MaxoutMLP; the M9 controlled comparison must
+train identically to the maxout+softmax net). SoftmaxRegression (M1),
+LogisticRegression (M2) and RBFNet (M8) train with plain fixed-lr / fixed-
+momentum SGD and NO weight-norm constraint. Applying the maxout recipe to
+M1/M2 is an unstated deviation, so this trainer gates every external piece on
+``is_maxout`` (True for MaxoutMLP and SigmoidTopMLP).
 
 Frozen interface (SPEC.md section 4):
     @dataclass TrainConfig: batch_size, lr, momentum, max_epochs, seed,
@@ -35,9 +37,12 @@ from typing import Any, Literal, Optional, Protocol, TYPE_CHECKING
 
 import torch
 
-from fgsm_repro.objectives import adversarial_train_cost, cross_entropy_cost, noise_train_cost
+from fgsm_repro.objectives import (
+    adversarial_train_cost, cross_entropy_cost, noise_train_cost,
+    sigmoid_top_cost, l1_first_layer_penalty,
+)
 from fgsm_repro.eval import eval_clean, eval_fgsm
-from fgsm_repro.models import MaxoutMLP
+from fgsm_repro.models import MaxoutMLP, SigmoidTopMLP
 
 if TYPE_CHECKING:
     from fgsm_repro.data import MNISTData
@@ -65,9 +70,18 @@ class TrainConfig:
     max_steps: Optional[int] = None
     init_seed: Optional[int] = None
     # M7 noise-training control (tex:555-557). When set to "bernoulli" or
-    # "uniform", each batch trains on a clean/noise mixture (alpha=0.5) instead
-    # of the FGSM clean/adv mixture. None disables it (clean or adv_train path).
+    # "uniform", each batch trains on NOISE-ONLY inputs (no clean mixture,
+    # no alpha) instead of the FGSM clean/adv mixture. None disables it.
     noise_train: Optional[Literal["bernoulli", "uniform"]] = None
+    # M9 sigmoid-top (tex:908-909): when "sigmoid_top", train with the per-class
+    # independent-sigmoid BCE cost (objectives.sigmoid_top_cost) instead of the
+    # softmax cross-entropy. "softmax" (default) is the standard 10-way cost.
+    cost: Literal["softmax", "sigmoid_top"] = "softmax"
+    # M-L1 L1 weight-decay control (Section 5, tex:426-433): coefficient of the
+    # L1 penalty on the FIRST maxout layer's incoming weights, added to the
+    # training cost. 0.0 (default) disables it. Paper: 0.0025 is too large
+    # (>5% train error); smaller confers no regularization benefit.
+    l1_first_layer_coeff: float = 0.0
 
 
 @dataclass
@@ -121,16 +135,29 @@ def _set_init_seed(model: Any, seed: int) -> None:
         fn(int(seed))
 
 
-def _apply_max_col_norm(model: "MaxoutMLP", max_col_norm: float) -> None:
+def _maxout_layers_and_readout(model) -> tuple:
+    """Return (maxout_layer_list, readout_weight) for MaxoutMLP or SigmoidTopMLP.
+
+    MaxoutMLP stores layer0/layer1/readout at the top level; SigmoidTopMLP stores
+    layer0/layer1 under ``.trunk`` and its own readout at the top level. Both
+    layouts expose ``_MaxoutLayer`` instances (with ``.W`` of shape [in,out])
+    and a readout ``nn.Linear.weight`` of shape [out, in].
+    """
+    if hasattr(model, "trunk") and hasattr(model.trunk, "layer0"):
+        return [model.trunk.layer0, model.trunk.layer1], model.readout.weight
+    return [model.layer0, model.layer1], model.readout.weight
+
+
+def _apply_max_col_norm(model, max_col_norm: float) -> None:
     """External maxout recipe: clamp the L2-norm of every *column* (i.e. every
     OUTPUT unit's incoming-weight vector) of each maxout weight matrix to
     ``max_col_norm`` AFTER each SGD step (pylearn2 mnist_pi.yaml,
     max_col_norm 1.9365). Not paper-stated.
 
-    This operates DIRECTLY on the MaxoutMLP weight matrices. The 1-D bias
-    parameters are left untouched. We clamp the per-output-unit norm for EACH
-    weight matrix explicitly, because the two layer kinds store their weights
-    on DIFFERENT axes:
+    Handles both MaxoutMLP and SigmoidTopMLP layouts (see
+    ``_maxout_layers_and_readout``). The 1-D bias parameters are left untouched.
+    We clamp the per-output-unit norm for EACH weight matrix explicitly, because
+    the two layer kinds store their weights on DIFFERENT axes:
       - ``_MaxoutLayer.W`` has shape ``[in, out]``  -> each column W[:, j] is
         one output unit's incoming weights -> norm over ``dim=0``.
       - the readout ``nn.Linear(units, n_classes).weight`` has shape
@@ -147,16 +174,18 @@ def _apply_max_col_norm(model: "MaxoutMLP", max_col_norm: float) -> None:
     ``min(1, max_col_norm / norm)`` so under-normed units are unchanged and
     only over-normed units are shrunk (in place).
     """
+    layers, readout_weight = _maxout_layers_and_readout(model)
     with torch.no_grad():
         # _MaxoutLayer.W : [in, out] -> per-output norm over the input axis (dim 0)
-        for layer in (model.layer0, model.layer1):
+        for layer in layers:
             W = layer.W  # [in, out]
             norms = W.norm(dim=0, keepdim=True)  # [1, out]
             factor = (max_col_norm / norms.clamp_min(1e-12)).clamp(max=1.0)
             W.mul_(factor)
         # readout nn.Linear.weight : [out=n_classes, in=units] -> per-output norm
         # over the input axis (dim 1).
-        Rw = model.readout.weight  # [n_classes, units]
+    with torch.no_grad():
+        Rw = readout_weight  # [n_classes, units]
         norms = Rw.norm(dim=1, keepdim=True)  # [n_classes, 1]
         factor = (max_col_norm / norms.clamp_min(1e-12)).clamp(max=1.0)
         Rw.mul_(factor)
@@ -174,11 +203,12 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
     init_seed = cfg.init_seed if cfg.init_seed is not None else cfg.seed
     _set_init_seed(model, init_seed)
 
-    # External maxout recipe is scoped to MaxoutMLP ONLY (SPEC.md section 6
-    # "External": adopted for M3/M4 arms). Non-maxout models (M1 softmax, M2
-    # logistic, M8 RBF) train with plain fixed-lr / fixed-momentum SGD and no
-    # weight-norm constraint.
-    is_maxout = isinstance(model, MaxoutMLP)
+    # External maxout recipe is scoped to MaxoutMLP and SigmoidTopMLP ONLY
+    # (SPEC.md section 6 "External": adopted for M3/M4 arms; SigmoidTopMLP's
+    # trunk is a MaxoutMLP and the M9 comparison trains identically). Non-
+    # maxout models (M1 softmax, M2 logistic, M8 RBF) train with plain fixed-lr
+    # / fixed-momentum SGD and no weight-norm constraint.
+    is_maxout = isinstance(model, (MaxoutMLP, SigmoidTopMLP))
 
     gen = torch.Generator()
     gen.manual_seed(int(cfg.seed))
@@ -231,17 +261,25 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
             yb = y_train[idx]
 
             if cfg.noise_train is not None:
-                # M7 control (tex:555-557): clean/noise mixture (no FGSM).
+                # M7 control (tex:555-557): noise-only batches (no FGSM, no
+                # clean mixture -- SPEC §6 item 27).
                 loss = noise_train_cost(
-                    model, xb, yb, float(cfg.eps), cfg.noise_train,
-                    float(cfg.alpha), gen=noise_gen,
+                    model, xb, yb, float(cfg.eps), cfg.noise_train, gen=noise_gen,
                 )
             elif cfg.adv_train:
                 loss = adversarial_train_cost(
                     model, xb, yb, float(cfg.eps), float(cfg.alpha)
                 )
+            elif cfg.cost == "sigmoid_top":
+                # M9 independent-sigmoid top (tex:908-909): per-class BCE.
+                loss = sigmoid_top_cost(model, xb, yb)
             else:
                 loss = cross_entropy_cost(model, xb, yb)
+
+            # M-L1 L1 weight-decay control (Section 5, tex:426-433): add the
+            # L1 penalty on the first maxout layer's weights to the cost.
+            if cfg.l1_first_layer_coeff != 0.0:
+                loss = loss + l1_first_layer_penalty(model, cfg.l1_first_layer_coeff)
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
