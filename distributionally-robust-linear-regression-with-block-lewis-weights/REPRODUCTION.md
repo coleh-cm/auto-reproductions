@@ -875,3 +875,41 @@ committed JSONs were restored (no evidence churn — the deterministic gate
 metric `iters_to_rel_gap` is unchanged and already committed). No
 implementation, SPEC, or blocker (B1) changed. Branch
 `repro/block-lewis-gdr` pushed.
+
+### Round-18: 5-component adversarial paper-fidelity review (orchestration) — 0 findings, plus an independent invariant spot-check
+
+Ran a 6th adversarial paper-fidelity review via `orchestrate`: 5 reviewer
+subagents (data pipeline, method core, training loop, evaluation metric+gate,
+baseline arm+degeneracy/invariant tests), each adversarially prompted to find
+departures from STATED paper facts (already-disclosed SPEC U1–U19 choices do
+not count). Result: 0 confirmed findings AND 0 dropped findings — every
+reviewer returned an empty candidate list (no verify subagents were needed).
+This matches the Round-11/13/15 pattern (0 actionable) for this already-hardened
+codebase, but a unanimous-clean result is exactly the kind a lenient panel
+produces, so it was not accepted at face value.
+
+Independent spot-check of the two highest-risk paper-stated invariants a
+unanimous review could miss, run on the live code (not the diff):
+
+- **Lemma 6.1** (E3, `body.tex:230-231`): `|f_tilde_{β,δ}(x) − f(x)| ≤
+  β log m + δ` on 50 random x at the un-normalized synthetic scale (f ≈ 9662),
+  β=δ=0.05. Measured worst `|f_tilde − f| = 0.0500`, bound `0.2803` ⇒ **holds**.
+  (`gdr/objectives.py:101` computes `beta*(a_max + log sum exp(a−a_max))` =
+  `h_max − δ + β·log(...) ≈ f + small`; correct.)
+- **E6 block-Lewis overestimate** (`other_proofs.tex:18-24`): `‖w‖₁ = 16.5 ≤
+  2(d+1) = 22` ✓ and `w ≥ 0` ✓ (`gdr/lewis.py`).
+
+A false alarm during the spot-check is recorded for transparency (the point of
+recording verification, not just successes): a first ad-hoc script indexed
+`group_residuals(p, x)` — which returns a *list* of per-group arrays
+(`gdr/problem.py`) — as if it were a stacked array (`r[off[i]:off[i+1]]` on a
+list), producing a spurious 4-order-of-magnitude "violation" (8173 vs 0.28).
+Re-running with the canonical `max_loss_unsquared` showed the bound holds. The
+false alarm was a bug in the verification *script*, not the implementation; the
+implementation is correct. (Lesson re-confirmed: spot-checks must use the
+canonical interface helpers, not hand-rolled slicing.)
+
+State unchanged: 32/32 tests pass; `smoke.sh` → `FINAL smoke=ok` (feedback
+numbers reproduced); `run_all_arms.sh 300 120` reproduces the committed
+`results/run_all.log` byte-for-byte; no implementation, SPEC, blocker (B1), or
+result JSON changed. Branch `repro/block-lewis-gdr` pushed.
