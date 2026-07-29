@@ -7,110 +7,12 @@ incorrect solution traces as the desired/undesired contrast sets for ITI and AS
 activation set MAGS uses.
 """
 from __future__ import annotations
+from dataclasses import dataclass
 import numpy as np
 import torch
 from sklearn.linear_model import LogisticRegression
 
 from .manifold import HeadProblemActivations, trajectory_score
-
-
-# ---------------------------------------------------------------------------
-# Unsteered
-# ---------------------------------------------------------------------------
-class UnsteeredController:
-    def __call__(self, layer, x_heads):
-        return None
-
-
-# ---------------------------------------------------------------------------
-# ITI (SPEC §4.15): per-head logistic probe on the trace-mean head output;
-# top-K heads by held-out probe accuracy; intervention a += alpha * s_h * v_h every step.
-# Li et al. 2023 convention: shift along the probe direction by alpha * (head's mean
-# activation projected on the probe). We use the difference-in-means direction between
-# incorrect and correct trace-means (the contrastive direction), scaled by the probe's
-# signed magnitude, applied every decode step (static intervention, tex:L394).
-# ---------------------------------------------------------------------------
-class ITIController:
-    def __init__(self, bank, alpha: float, K: int):
-        self.alpha = alpha
-        # build per-head probe direction + sign from the contrastive activation set
-        # stored in the bank's heads (we reuse mu_c as the correct reference and the
-        # direction = -(B^T B)(a-mu_c) is MAGS-specific; for ITI we recompute a plain
-        # difference direction at construction time from the activation store).
-        # Here we only have the fitted manifold, so ITI's direction is taken as the
-        # top-1 right singular vector of D (the dominant error direction), which is the
-        # natural probe direction for a difference-in-means contrast set.
-        self.directions = {}    # (l,h) -> [d_h] unit vector
-        for (l, h), m in bank.heads.items():
-            if m.B.shape[0] >= 1:
-                self.directions[(l, h)] = m.B[0].astype(np.float32)
-        self._selected = set()
-        # select top-K by AUROC (use bank's selected_heads if K matches; else take top-K of all)
-        ranked = sorted(bank.heads.items(), key=lambda kv: kv[1].auroc, reverse=True)
-        for (l, h), _ in ranked[:K]:
-            self._selected.add((l, h))
-
-    def __call__(self, layer, x_heads):
-        bsz, seq, H, dh = x_heads.shape
-        if seq != 1:
-            return None
-        x = x_heads.detach().to(torch.float32).cpu().numpy()
-        modified = False
-        out = x.copy()
-        for (l, h) in self._selected:
-            if l != layer:
-                continue
-            if (l, h) not in self.directions:
-                continue
-            v = self.directions[(l, h)]
-            a = out[0, 0, h, :]           # [dh]
-            # ITI shift: add alpha * (a . v) * v every step (project-then-shift along probe)
-            proj = float(a @ v)
-            out[0, 0, h, :] = a + self.alpha * proj * v
-            modified = True
-        if not modified:
-            return None
-        return torch.from_numpy(out).to(x_heads.device).to(x_heads.dtype).view(bsz, seq, H, dh)
-
-
-def fit_iti_probes(all_head_acts: dict, train_pids: list, select_pids: list):
-    """Optional: fit per-head logistic probes for the held-out-accuracy ranking in §4.15.
-
-    Returns {(l,h): (direction[d_h], accuracy)}. The direction is the LDA-style
-    difference of class-trace-means (the contrastive direction). This is the
-    selection-time counterpart of ITIController (which uses the dominant SVD direction).
-    """
-    out = {}
-    for (l, h), ha in all_head_acts.items():
-        train = _restrict(ha, train_pids)
-        sel = _restrict(ha, select_pids)
-        if not train.problems():
-            continue
-        # trace-level mean feature per trace
-        Xtr, ytr = [], []
-        for pid in train.problems():
-            for t in train.correct[pid]:
-                Xtr.append(t.mean(axis=0)); ytr.append(0)
-            for t in train.incorrect[pid]:
-                Xtr.append(t.mean(axis=0)); ytr.append(1)
-        Xtr = np.asarray(Xtr); ytr = np.asarray(ytr)
-        if len(np.unique(ytr)) < 2:
-            continue
-        clf = LogisticRegression(max_iter=1000).fit(Xtr, ytr)
-        direction = clf.coef_[0].astype(np.float32)
-        direction /= (np.linalg.norm(direction) + 1e-12)
-        # held-out accuracy
-        Xte, yte = [], []
-        for pid in sel.problems():
-            for t in sel.correct[pid]:
-                Xte.append(t.mean(axis=0)); yte.append(0)
-            for t in sel.incorrect[pid]:
-                Xte.append(t.mean(axis=0)); yte.append(1)
-        if not Xte or len(np.unique(yte)) < 2:
-            out[(l, h)] = (direction, 0.5); continue
-        acc = float(clf.score(np.asarray(Xte), np.asarray(yte)))
-        out[(l, h)] = (direction, acc)
-    return out
 
 
 def _restrict(ha: HeadProblemActivations, pids):
@@ -124,70 +26,316 @@ def _restrict(ha: HeadProblemActivations, pids):
 
 
 # ---------------------------------------------------------------------------
-# Angular Steering (SPEC §4.16): Vu & Nguyen target-angle rotation in the
-# Span(d_feat, d_PC0) plane, applied at every layer, every step.
-# d_feat = difference-in-means direction (correct vs incorrect) at the residual/
-# pre-attn output; d_PC0 = first principal component of the pooled activations.
-# We approximate the plane from the contrastive activation set we already have:
-# d_feat = mean(incorrect) - mean(correct) (trace-level), d_PC0 = top-1 right singular
-# vector of D. Rotation applied to the head-output (pre-W_O) at every layer on every
-# decode step. Target angle from the ablation (default 30 deg, tex:L654-665).
+# Unsteered
 # ---------------------------------------------------------------------------
-class AngularSteeringController:
-    def __init__(self, bank, angle_deg: float):
-        self.angle = float(np.deg2rad(angle_deg))
-        # plane per layer: (d_feat, d_pc0) -> 2x d_h orthonormal basis
-        self.planes = {}
-        for (l, h), m in bank.heads.items():
-            # one plane per layer (use the top-AUROC head's geometry as the layer rep)
-            self.planes.setdefault(l, (None, None))
-        # use, per layer, the dominant SVD direction (d_PC0) and the global correct
-        # centroid's complement as d_feat proxy: d_feat = mu_c shifted by B[0].
-        for l in list(self.planes.keys()):
-            # pick the best head in this layer from the bank
-            cands = [(h, m_) for (ll, h), m_ in bank.heads.items() if ll == l]
-            if not cands:
-                continue
-            cands.sort(key=lambda kv: kv[1].auroc, reverse=True)
-            m_best = cands[0][1]
-            d_pc0 = m_best.B[0].astype(np.float32) if m_best.B.shape[0] >= 1 else None
-            if d_pc0 is None:
-                continue
-            d_feat = m_best.mu_c.astype(np.float32) - (m_best.mu_c @ d_pc0) * d_pc0
-            n = np.linalg.norm(d_feat)
-            if n < 1e-8:
-                d_feat = np.zeros_like(d_pc0); d_feat[0] = 1.0
+class UnsteeredController:
+    def __call__(self, layer, x_heads):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# ITI (SPEC §4.15): per-head logistic probe on the trace-mean head output;
+# top-K heads by held-out probe accuracy (K in {24,48,96}); intervention
+#   a += alpha * sigma_h * v_h   every decode step (static; Li et al. 2023).
+# v_h = probe direction oriented toward the DESIRED (correct) class; sigma_h = the
+# probe's held-out accuracy (a fixed per-head scalar). The shift is STATIC (it does
+# not depend on the current activation), per the original ITI convention.
+# ---------------------------------------------------------------------------
+@dataclass
+class ITIHead:
+    layer: int
+    head: int
+    direction: np.ndarray       # [d_h] unit vector, oriented toward CORRECT class
+    sigma: float                # held-out probe accuracy (fixed scalar)
+    accuracy: float = 0.0
+
+
+@dataclass
+class ITIBank:
+    model_id: str
+    benchmark: str
+    K: int
+    alpha: float
+    layers_monitored: list
+    selected_heads: list        # [[l,h], ...] top-K by held-out probe accuracy
+    heads: dict                 # (l,h) -> ITIHead  (ALL monitored heads, not just K)
+    @classmethod
+    def load(cls, path_npz: str, path_manifest: str | None = None) -> "ITIBank":
+        if path_manifest is None:
+            path_manifest = path_npz + ".manifest.json"
+        import json
+        with open(path_manifest) as f:
+            man = json.load(f)
+        z = np.load(path_npz)
+        heads = {}
+        for key_str, info in man["all_heads"].items():
+            l, h = eval(key_str)
+            heads[(l, h)] = ITIHead(
+                layer=l, head=h,
+                direction=z[f"dir__l{l}_h{h}"],
+                sigma=float(z[f"sigma__l{l}_h{h}"]),
+                accuracy=float(info["accuracy"]),
+            )
+        return cls(model_id=man["model_id"], benchmark=man["benchmark"],
+                    K=man["K"], alpha=man["alpha"],
+                    layers_monitored=man["layers_monitored"],
+                    selected_heads=[list(h) for h in man["selected_heads"]],
+                    heads=heads)
+
+    def save(self, path_npz: str, path_manifest: str | None = None):
+        arrays = {}
+        for (l, h), hd in self.heads.items():
+            arrays[f"dir__l{l}_h{h}"] = hd.direction.astype(np.float32)
+            arrays[f"sigma__l{l}_h{h}"] = np.float32(hd.sigma)
+        np.savez(path_npz, **arrays)
+        if path_manifest is None:
+            path_manifest = path_npz + ".manifest.json"
+        import json
+        json.dump({
+            "model_id": self.model_id, "benchmark": self.benchmark,
+            "K": self.K, "alpha": self.alpha,
+            "layers_monitored": self.layers_monitored,
+            "selected_heads": self.selected_heads,
+            "all_heads": {str(k): {"accuracy": v.accuracy} for k, v in self.heads.items()},
+        }, open(path_manifest, "w"), indent=2)
+
+
+def fit_iti_bank(all_head_acts: dict, train_pids: list, select_pids: list, *,
+                 model_id: str, benchmark: str, K: int, alpha: float,
+                 layers_monitored: list) -> ITIBank:
+    """Fit per-head logistic probes (trace-mean features), rank by held-out probe
+    accuracy, keep top-K. Stores ALL monitored heads so K in {24,48,96} is reachable
+    regardless of the MAGS K. Direction oriented toward the CORRECT class
+    (probe predicts y=1 for INCORRECT, so direction = -coef)."""
+    heads = {}
+    accs = []
+    for (l, h), ha in all_head_acts.items():
+        train = _restrict(ha, train_pids)
+        sel = _restrict(ha, select_pids)
+        if not train.problems():
+            continue
+        Xtr, ytr = [], []
+        for pid in train.problems():
+            for t in train.correct[pid]:
+                Xtr.append(t.mean(axis=0)); ytr.append(0)
+            for t in train.incorrect[pid]:
+                Xtr.append(t.mean(axis=0)); ytr.append(1)
+        Xtr = np.asarray(Xtr); ytr = np.asarray(ytr)
+        if len(np.unique(ytr)) < 2:
+            continue
+        clf = LogisticRegression(max_iter=1000).fit(Xtr, ytr)
+        coef = clf.coef_[0].astype(np.float32)
+        n = np.linalg.norm(coef)
+        if n < 1e-12:
+            continue
+        direction = (-coef / n)            # toward CORRECT (y=0), the desired class
+        # held-out probe accuracy
+        if sel.problems() and len({t for pid in sel.problems() for t in [0, 1]}) >= 2:
+            Xte, yte = [], []
+            for pid in sel.problems():
+                for t in sel.correct[pid]:
+                    Xte.append(t.mean(axis=0)); yte.append(0)
+                for t in sel.incorrect[pid]:
+                    Xte.append(t.mean(axis=0)); yte.append(1)
+            if Xte and len(np.unique(yte)) >= 2:
+                acc = float(clf.score(np.asarray(Xte), np.asarray(yte)))
             else:
-                d_feat = d_feat / n
-            self.planes[l] = (d_feat, d_pc0)
+                acc = 0.5
+        else:
+            acc = 0.5
+        heads[(l, h)] = ITIHead(layer=l, head=h, direction=direction, sigma=acc,
+                                   accuracy=acc)
+        accs.append((acc, l, h))
+    accs.sort(reverse=True)
+    selected = [[l, h] for _, l, h in accs[:K]]
+    return ITIBank(model_id=model_id, benchmark=benchmark, K=K, alpha=alpha,
+                   layers_monitored=layers_monitored, selected_heads=selected,
+                   heads=heads)
+
+
+class ITIController:
+    """Static ITI intervention (SPEC §4.15, Li et al. 2023): for each selected head,
+    every decode step apply  a += alpha * sigma_h * v_h  (v_h toward correct, sigma_h =
+    held-out probe accuracy, both fixed)."""
+    def __init__(self, iti_bank: ITIBank, alpha: float | None = None):
+        self.alpha = iti_bank.alpha if alpha is None else alpha
+        self._selected = {}     # (l,h) -> ITIHead
+        for h in iti_bank.selected_heads:
+            self._selected[tuple(h)] = iti_bank.heads[tuple(h)]
+
+    def __call__(self, layer, x_heads):
+        bsz, seq, H, dh = x_heads.shape
+        if seq != 1:
+            return None
+        x = x_heads.detach().to(torch.float32).cpu().numpy()
+        out = x.copy()
+        modified = False
+        for (l, h), hd in self._selected.items():
+            if l != layer:
+                continue
+            # static shift toward the correct class (SPEC §4.15)
+            out[0, 0, h, :] = out[0, 0, h, :] + self.alpha * hd.sigma * hd.direction
+            modified = True
+        if not modified:
+            return None
+        return torch.from_numpy(out).to(x_heads.device).to(x_heads.dtype).view(bsz, seq, H, dh)
+
+
+# ---------------------------------------------------------------------------
+# Angular Steering (SPEC §4.16): Vu & Nguyen target-angle rotation in the
+# Span(d_feat, d_PC0) plane, applied across all monitored layers, every decode step.
+#   d_feat = difference-in-means direction (mean_incorrect - mean_correct) over the
+#            pooled per-head activations of that layer — the contrastive direction
+#            (SPEC §4.16; correct vs incorrect traces as the contrast set, tex:L394).
+#   d_PC0 = first principal component of the pooled activations of that layer.
+#   Rotation = TARGET-ANGLE form (Vu & Nguyen): rotate each activation so its angle
+#            in the (d_feat, d_PC0) plane becomes the target angle (not a fixed offset).
+#
+# Adaptation note: original AS rotates the residual stream; our hook infrastructure
+# is the per-head attention output (pre-W_O). We apply the per-layer rotation to each
+# head's attention output using that layer's plane. This is the closest available hook
+# point and is recorded in REPRODUCTION.md as a documented adaptation (the paper does
+# not specify AS's exact hook location in its reasoning adaptation, tex:L394).
+# ---------------------------------------------------------------------------
+@dataclass
+class ASPlane:
+    layer: int
+    d_feat: np.ndarray          # [d_h] unit, contrastive direction
+    d_pc0: np.ndarray           # [d_h] unit, pooled PC1
+
+
+@dataclass
+class ASBank:
+    model_id: str
+    benchmark: str
+    angle_deg: float
+    layers_monitored: list
+    planes: dict                # layer -> ASPlane
+
+    @classmethod
+    def load(cls, path_npz: str, path_manifest: str | None = None) -> "ASBank":
+        import json
+        if path_manifest is None:
+            path_manifest = path_npz + ".manifest.json"
+        with open(path_manifest) as f:
+            man = json.load(f)
+        z = np.load(path_npz)
+        planes = {}
+        for l in man["layers_monitored"]:
+            planes[l] = ASPlane(layer=l, d_feat=z[f"dfeat__l{l}"],
+                                 d_pc0=z[f"dpc0__l{l}"])
+        return cls(model_id=man["model_id"], benchmark=man["benchmark"],
+                   angle_deg=man["angle_deg"], layers_monitored=man["layers_monitored"],
+                   planes=planes)
+
+    def save(self, path_npz: str, path_manifest: str | None = None):
+        arrays = {}
+        for l, p in self.planes.items():
+            arrays[f"dfeat__l{l}"] = p.d_feat.astype(np.float32)
+            arrays[f"dpc0__l{l}"] = p.d_pc0.astype(np.float32)
+        np.savez(path_npz, **arrays)
+        import json
+        if path_manifest is None:
+            path_manifest = path_npz + ".manifest.json"
+        json.dump({"model_id": self.model_id, "benchmark": self.benchmark,
+                   "angle_deg": self.angle_deg,
+                   "layers_monitored": self.layers_monitored},
+                  open(path_manifest, "w"), indent=2)
+
+
+def fit_as_bank(all_head_acts: dict, *, model_id: str, benchmark: str,
+                angle_deg: float, layers_monitored: list) -> ASBank:
+    """Build a per-layer (d_feat, d_PC0) plane from the contrastive activation set.
+
+    d_feat = unit(mean_incorrect - mean_correct) over all pooled per-head activations
+    of the layer (across all heads, all traces, all token steps). d_PC0 = top-1 right
+    singular vector of the pooled centered activations. Both are contrastive/dataset
+    directions, computed at fit time and persisted (the ManifoldBank does not store
+    them)."""
+    # gather per-layer pooled activations grouped by class
+    layer_correct = {l: [] for l in layers_monitored}
+    layer_incorrect = {l: [] for l in layers_monitored}
+    for (l, h), ha in all_head_acts.items():
+        if l not in layer_correct:
+            continue
+        for pid in ha.problems():
+            for t in ha.correct[pid]:
+                layer_correct[l].append(t)        # [T,d_h] -> pooled below
+            for t in ha.incorrect[pid]:
+                layer_incorrect[l].append(t)
+    planes = {}
+    for l in layers_monitored:
+        c = layer_correct[l]; i = layer_incorrect[l]
+        if not c or not i:
+            continue
+        c_all = np.concatenate(c, axis=0)        # [M_c, d_h]
+        i_all = np.concatenate(i, axis=0)        # [M_i, d_h]
+        d_feat = (i_all.mean(axis=0) - c_all.mean(axis=0))    # difference-in-means
+        # d_PC0 from pooled centered activations (correct+incorrect combined)
+        pooled = np.concatenate([c_all, i_all], axis=0)
+        pooled_c = pooled - pooled.mean(axis=0)
+        # top-1 right singular vector
+        try:
+            _, _, Vh = np.linalg.svd(pooled_c, full_matrices=False)
+            d_pc0 = Vh[0]
+        except Exception:
+            d_pc0 = np.zeros_like(d_feat); d_pc0[0] = 1.0
+        nf = np.linalg.norm(d_feat)
+        if nf < 1e-12:
+            d_feat = np.zeros_like(d_pc0); d_feat[0] = 1.0
+        else:
+            d_feat = d_feat / nf
+        np_ = np.linalg.norm(d_pc0)
+        d_pc0 = d_pc0 / np_ if np_ > 1e-12 else np.eye(d_feat.shape[0])[0]
+        # orthogonalize d_feat against d_pc0 so the plane basis is orthonormal
+        d_feat = d_feat - (d_feat @ d_pc0) * d_pc0
+        nf2 = np.linalg.norm(d_feat)
+        d_feat = d_feat / nf2 if nf2 > 1e-12 else np.zeros_like(d_feat)
+        planes[l] = ASPlane(layer=l, d_feat=d_feat.astype(np.float32),
+                             d_pc0=d_pc0.astype(np.float32))
+    return ASBank(model_id=model_id, benchmark=benchmark, angle_deg=angle_deg,
+                  layers_monitored=layers_monitored, planes=planes)
+
+
+class AngularSteeringController:
+    """Target-angle Angular Steering (SPEC §4.16). Rotates each head's attention
+    output in the layer's (d_feat, d_PC0) plane so its angle becomes the target
+    angle. Applied at every monitored layer, every decode step."""
+    def __init__(self, as_bank: ASBank, angle_deg: float | None = None):
+        self.target = float(np.deg2rad(angle_deg if angle_deg is not None
+                                       else as_bank.angle_deg))
+        self.planes = as_bank.planes    # layer -> ASPlane
 
     def __call__(self, layer, x_heads):
         bsz, seq, H, dh = x_heads.shape
         if seq != 1:
             return None
         plane = self.planes.get(layer)
-        if plane is None or plane[0] is None:
+        if plane is None:
             return None
-        d_feat, d_pc0 = plane
+        d_feat, d_pc0 = plane.d_feat, plane.d_pc0
         x = x_heads.detach().to(torch.float32).cpu().numpy()
         out = x.copy()
-        # rotate every head's output in the (d_feat, d_pc0) plane by self.angle
-        cos, sin = np.cos(self.angle), np.sin(self.angle)
-        a = out[0, 0]   # [H, dh]
-        comp_feat = a @ d_feat      # [H]
-        comp_pc0 = a @ d_pc0        # [H]
+        a = out[0, 0]                      # [H, dh]
+        comp_feat = a @ d_feat             # [H]
+        comp_pc0 = a @ d_pc0               # [H]
+        # current angle of each head in the plane
+        cur = np.arctan2(comp_pc0, comp_feat)            # [H]
+        delta = self.target - cur                          # rotate to target
+        cos, sin = np.cos(delta), np.sin(delta)
         new_feat = cos * comp_feat - sin * comp_pc0
         new_pc0 = sin * comp_feat + cos * comp_pc0
-        a_new = a + (new_feat - comp_feat)[:, None] * d_feat + (new_pc0 - comp_pc0)[:, None] * d_pc0
+        a_new = a + (new_feat - comp_feat)[:, None] * d_feat \
+                  + (new_pc0 - comp_pc0)[:, None] * d_pc0
         out[0, 0] = a_new
         return torch.from_numpy(out).to(x_heads.device).to(x_heads.dtype).view(bsz, seq, H, dh)
 
 
 # ---------------------------------------------------------------------------
 # Contrastive Decoding (SPEC §4.17): expert vs amateur logits at each decode step.
-# Implemented as a HF logits processor (operates at the distribution level, no hooks).
+# Implemented as a logits processor (operates at the distribution level, no hooks).
 # CD (Li et al. 2023): score = log p_expert - beta * log p_amateur, with adaptive
-# plausibility alpha_p masking amateur-improbable tokens. Defaults: alpha_p=0.1, beta=0.5.
+# plausibility masking on the EXPERT's plausible set. Defaults: alpha_p=0.1, beta=0.5.
 # ---------------------------------------------------------------------------
 class ContrastiveDecoder:
     """Stateful expert/amateur contrastive decoder.
@@ -207,7 +355,9 @@ class ContrastiveDecoder:
         logp_e = F.log_softmax(expert_logits, dim=-1)
         logp_a = F.log_softmax(amateur_logits, dim=-1)
         score = logp_e - self.beta * logp_a
-        # adaptive plausibility: mask amateur-prob below alpha_p
-        p_a = logp_a.exp()
-        score = score.masked_fill(p_a < self.alpha_p, float("-inf"))
+        # adaptive plausibility (Li et al. 2023 CD): restrict to the EXPERT's plausible
+        # set (top-(1-alpha_p) of the expert distribution); discard expert-improbable
+        # tokens so the amateur cannot penalize tokens the expert is confident about.
+        p_e = logp_e.exp()
+        score = score.masked_fill(p_e < self.alpha_p, float("-inf"))
         return score

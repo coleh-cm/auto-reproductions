@@ -123,43 +123,38 @@ def load_mathinstruct(limit=None) -> list:
     return out
 
 
-def load_apps(limit=None) -> list:
+def load_apps(limit=None, subset="all") -> list:
     """APPS (HumanEval & MBPP contrastive-trace source, tex:L398). The canonical
-    `codeparrot/apps` is a dataset script no longer executed by datasets>=3; we try the
-    script, then the Hub auto-converted parquet branch."""
+    `codeparrot/apps` is a dataset script no longer executed by datasets>=3; the repo's
+    auto-converted parquet branch ``refs/convert/parquet`` has configs
+    ``all``/``competition``/``interview``/``introductory`` each with ``train``/``test``
+    shards. We load the TRAIN split of ``subset`` (default ``all`` = the full APPS
+    training set, matching the paper's 'corresponding training split', tex:L398).
+
+    Each APPS row carries ``input_output`` (JSON of test inputs/outputs) which the
+    APPS grader (mags.grading.grade_apps) executes to judge a generated trace
+    correct/incorrect — needed for the keep-if-both rule (tex:L399).
+    """
     from datasets import load_dataset
+    data_files = {"train": f"hf://datasets/codeparrot/apps@refs/convert/parquet/"
+                           f"{subset}/train/0000.parquet"}
     try:
-        d = load_dataset("codeparrot/apps", "back")
-        rows = list(d["train"])
-    except Exception:
-        try:
-            from huggingface_hub import HfApi
-            api = HfApi()
-            files = api.list_repo_files("codeparrot/apps", repo_type="dataset")
-            parquets = [f for f in files if f.endswith(".parquet")]
-            if not parquets:
-                raise DatasetUnavailable("APPS: no parquet mirror and script deprecated")
-            from datasets import load_dataset
-            d = load_dataset("parquet", data_files={
-                "train": f"hf://datasets/codeparrot/apps@refs/convert/parquet/{parquets[0]}"
-            })
-            rows = list(d["train"])
-        except DatasetUnavailable:
-            raise
-        except Exception as e:
-            raise DatasetUnavailable(
-                "APPS unavailable: codeparrot/apps script deprecated and parquet fallback "
-                f"failed ({e!r}). This blocks HumanEval/MBPP trace collection."
-            )
+        d = load_dataset("parquet", data_files=data_files)
+    except Exception as e:
+        raise DatasetUnavailable(
+            f"APPS parquet unavailable at refs/convert/parquet/{subset}/train: {e!r}. "
+            f"This blocks HumanEval/MBPP contrastive-trace collection.")
     out = []
-    for i, r in enumerate(rows):
+    for r in d["train"]:
         if limit and len(out) >= limit:
             break
         out.append(Problem(
-            id=f"apps-{i}", benchmark="APPS-train",
-            prompt_text=str(r.get("question", r.get("prompt", ""))),
+            id=f"apps-{r['problem_id']}", benchmark="APPS-train",
+            prompt_text=str(r.get("question", "")),
             gold=str(r.get("solutions", "")),
-            extra={"difficulty": r.get("difficulty"), "source": "apps"},
+            extra={"difficulty": r.get("difficulty"), "source": "apps",
+                   "input_output": r.get("input_output"),
+                   "starter_code": r.get("starter_code", "")},
         ))
     return out
 

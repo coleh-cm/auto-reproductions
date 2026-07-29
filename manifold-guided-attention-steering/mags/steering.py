@@ -23,22 +23,39 @@ class MAGSController:
     """
 
     def __init__(self, bank, alpha: float | None = None, score_only: bool = False,
-                 log_path: str | None = None):
+                 log_path: str | None = None, problem_id: str | None = None):
         # bank: ManifoldBank (only selected heads are active)
         self.alpha = bank.alpha if alpha is None else alpha
         self.score_only = score_only     # True for unsteered-with-scoring / diagnostics
         self.log_path = log_path
+        self.problem_id = problem_id
         self._heads = {tuple(h): bank.heads[tuple(h)] for h in bank.selected_heads}
         self._log = []
-        self._t = 0          # decode-step counter (incremented on each seq==1 call)
+        self._decode_step = 0          # per-decode-step counter (one increment per NEW step)
+        self._last_layer_seen = None  # detect step boundary across monitored layers
+
+    def begin_problem(self, problem_id: str):
+        """Reset per-problem state so the decode-step index and log are per-problem."""
+        self.problem_id = problem_id
+        self._decode_step = 0
+        self._last_layer_seen = None
 
     def __call__(self, layer: int, x_heads: torch.Tensor):
         bsz, seq, H, dh = x_heads.shape
         if seq != 1:
             # prefill (or any multi-position forward): pass-through (SPEC §4.9)
             return None
-        # decode step: only the single generated position
-        self._t += 1
+        # decode step: only the single generated position. Hooks fire once per
+        # monitored layer per decode step; increment the decode-step counter once per
+        # NEW step (detected when the layer index wraps back to the first monitored
+        # layer), so `t` is the decode-step index, not the cumulative hook-call index.
+        layers_order = sorted({l for l, _ in self._heads.keys()})
+        if not layers_order:
+            return None
+        if self._last_layer_seen is None or layer <= self._last_layer_seen:
+            self._decode_step += 1
+        self._last_layer_seen = layer
+        t = self._decode_step
         x = _to_np(x_heads)               # [bsz,1,H,dh] -> [bsz,1,H,dh]
         modified = np.array(x, copy=True)
         for (l, h), m in self._heads.items():
@@ -48,7 +65,8 @@ class MAGSController:
             d = float(m.proximity(a.reshape(1, -1))[0])     # Eq.(7)
             fired = d > m.threshold                          # Eq.(8)
             if self.log_path is not None:
-                self._log.append({"t": self._t, "head": [l, h], "d": d, "fired": bool(fired)})
+                self._log.append({"problem": self.problem_id, "t": t,
+                                  "head": [l, h], "d": d, "fired": bool(fired)})
             if fired and not self.score_only:
                 modified[0, 0, h, :] = m.correct(a.reshape(1, -1), self.alpha)[0]   # Eq.(9)
         # if nothing changed, return None to skip an unnecessary tensor copy

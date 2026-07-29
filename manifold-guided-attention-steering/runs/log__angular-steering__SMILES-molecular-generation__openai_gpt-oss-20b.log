@@ -1,0 +1,2 @@
+FINAL angular-steering__SMILES-molecular-generation__openai_gpt-oss-20b=BLOCKED
+BLOCKED[angular-steering__SMILES-molecular-generation__openai_gpt-oss-20b]: Molecular task (Table 3) target protein, prompt template, SMILES contrastive corpus, affinity cutoff and AutoDock-GPU params are all UNSTATED by the paper (SPEC §4.18); GPT-OSS-20B needs >=40GB VRAM. Treated as a stretch target, not implemented for real data.

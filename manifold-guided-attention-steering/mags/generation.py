@@ -75,13 +75,23 @@ def cd_generate(expert, amateur, tok, prompt_text, max_new_tokens=1024,
 
 
 @torch.no_grad()
-def perplexity_of(model, tok, completion_text):
-    """Perplexity of ``completion_text`` under ``model`` (token-level, mean over tokens).
+def perplexity_of(model, tok, completion_text=None, token_ids=None):
+    """Perplexity of a completion under ``model`` (token-level, mean over tokens).
 
     SPEC §4.14: PPL of the generated completion under the (unsteered) base model,
     averaged over problems. Secondary metric; not gated.
+
+    Prefer passing the actual generated ``token_ids`` (avoids re-tokenization, which
+    can shift boundaries / drop EOS and yield a PPL not equal to the PPL of the
+    generated tokens). Falls back to re-tokenizing ``completion_text`` only if ids
+    are unavailable.
     """
-    ids = tok(completion_text, return_tensors="pt").input_ids.to(model.device)
+    if token_ids is None:
+        ids = tok(completion_text, return_tensors="pt").input_ids
+    else:
+        import torch as _t
+        ids = _t.as_tensor(token_ids, dtype=_t.long).unsqueeze(0)
+    ids = ids.to(model.device)
     if ids.shape[1] < 2:
         return float("nan")
     out = model(ids, use_cache=False)

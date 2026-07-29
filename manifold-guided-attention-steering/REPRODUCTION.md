@@ -182,3 +182,68 @@ generated tokens only for means and mu_c (§4.7); greedy eval, 1 completion/prob
 max_new 1024 (math) / 512 (code) (§4.9); trace sampling T=1.0, top_p=0.95, n=8 (§4.10);
 70/15/15 problem-level split (§4.8); seed=42 everywhere (§4.19); ITI K=96 a=0.5,
 AS 30 deg, CD a_p=0.1 b=0.5 (§4.15-4.17).
+
+### 2026-07-29 — Review round 1 (orchestrated, 5-component adversarial review vs paper)
+
+Ran `orchestrate` with 5 reviewers (manifold-fit, steering+hook, baselines,
+eval/grading/gen, data), each adversarially checked against the LaTeX. Result:
+2/5 approved (manifold-fit, steering-hook — the MAGS method core and the headline
+gate), 3/5 rejected with real blockers. All blockers fixed this commit:
+
+**Baselines (ITI) — fixed.** The old ITIController used the MAGS SVD direction B[0]
+instead of a per-head logistic probe, ranked heads by MAGS AUROC, and applied a
+data-dependent shift. SPEC §4.15 mandates: per-head logistic probe on the
+trace-mean head output, top-K by held-out probe ACCURACY (K in {24,48,96}), STATIC
+intervention `a += alpha*sigma_h*v_h` every step (Li et al. 2023). Rewrote as a
+separate `ITIBank` (`fit_iti_bank`) that fits per-head probes for ALL monitored heads
+(so K=96 is reachable — the MAGS K=3 bank only persisted 3 heads), orients the
+direction toward the CORRECT class (probe predicts y=1 for incorrect, so
+direction = -coef), and stores sigma=held-out accuracy. `ITIController` applies the
+static shift. Added tests/test_baselines.py (probe fit, K-reachable, static
+intervention, orientation).
+
+**Baselines (Angular Steering) — fixed.** Old AS used the correct centroid as
+d_feat (not the difference-in-means), a fixed-offset rotation (not the target-angle
+form), and only rotated monitored layers with a single head's plane. SPEC §4.16 /
+tex:L394: 2D rotation in the mean-difference span across all layers, target-angle
+form (Vu & Nguyen). Rewrote as a separate `ASBank` (`fit_as_bank`) computing, per
+monitored layer, d_feat = unit(mean_incorrect - mean_correct) over pooled per-head
+activations (the contrastive direction) and d_PC0 = top-1 right singular vector of
+pooled centered activations, orthonormalized. `AngularSteeringController` uses the
+target-angle form: rotate each activation so its angle in the (d_feat,d_PC0) plane
+becomes the target. Documented adaptation: original AS rotates the residual stream;
+our hook is the per-head attention output (pre-W_O) — the closest available hook
+point, recorded here (the paper does not specify AS's hook location in its reasoning
+adaptation). Added tests (d_feat is the contrastive direction; output angle == target
+regardless of input angle; persistence roundtrip).
+
+**Data (APPS) — fixed.** The APPS loader (HumanEval/MBPP contrastive source,
+tex:L398) was broken: it requested a nonexistent `codeparrot/apps` 'back' config and
+its parquet fallback queried the wrong branch, so APPS was always unavailable. The
+auto-converted parquet branch `refs/convert/parquet/{all,competition,introductory,
+interview}/train/0000.parquet` DOES exist (verified via the HF API) with the
+`input_output` field needed to grade traces. Rewrote `load_apps` to load the TRAIN
+split of `all` from that branch, capturing `input_output` + `starter_code`.
+
+**Data (APPS grader) — fixed.** Even loaded, APPS traces could not be graded —
+`fit.py` dispatched the HumanEval/MBPP graders onto APPS Problem objects (which lack
+test/entry_point/test_list). Added `grade_apps` (executes the generated solution
+against `input_output` stdin/stdout cases) and an `APPS-train` benchmark branch in
+`grade()`; `fit.py` now grades against the SOURCE benchmark (`prob.benchmark`), not
+the eval benchmark. Added tests (correct solution passes, wrong fails).
+
+**CD plausibility mask — fixed.** The mask was applied to the AMATEUR distribution
+(inverting CD intent); standard CD (Li et al. 2023, SPEC §4.17) masks on the EXPERT's
+plausible set. Fixed to mask `p_expert < alpha_p`.
+
+**PPL wiring — fixed.** `run_arm` never received `ppl_model`, so all claimed_ppl
+fields would be NaN; `perplexity_of` re-tokenized decoded text. `run.py` now passes
+the unsteered base model as `ppl_model` (SPEC §4.14), and `perplexity_of` scores the
+actual generated token ids (no re-tokenization).
+
+**Minors fixed:** ManifoldBank persists ALL monitored heads + auroc_max (Figure-3
+diagnostic survives load); manifest key `split_seeds` (SPEC §5.2 plural schema);
+steering log records per-decode-step `t` (not per-hook-call) and includes `problem`;
+removed dead `full`/unused branches. 28/28 tests pass (22 prior + 6 new baseline/
+APPS). All blocker/major review findings resolved; the manifold-fit and
+steering-hook components were approved as-is.

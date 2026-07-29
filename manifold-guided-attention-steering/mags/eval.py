@@ -33,7 +33,7 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
     corrects = []
     ppls = []
     for i, prob in enumerate(problems):
-        completion, _ = generate(
+        completion, gen_ids = generate(
             model, tok, prob.prompt_text, controller,
             max_new_tokens=max_new_tokens, do_sample=False,
         )
@@ -43,7 +43,7 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
         ppl = float("nan")
         if ppl_model is not None:
             try:
-                ppl = perplexity_of(ppl_model, tok, completion)
+                ppl = perplexity_of(ppl_model, tok, token_ids=gen_ids)
             except Exception:
                 ppl = float("nan")
         corrects.append(int(ok))

@@ -55,6 +55,8 @@ def main(argv=None):
     ap.add_argument("--angle-deg", type=float, default=None)
     ap.add_argument("--iti-K", type=int, default=None)
     ap.add_argument("--iti-alpha", type=float, default=None)
+    ap.add_argument("--iti-manifold", default="", help="ITI bank .npz (default <manifold>.iti.npz)")
+    ap.add_argument("--as-manifold", default="", help="AS bank .npz (default <manifold>.as.npz)")
     ap.add_argument("--cd-amateur", default="")
     ap.add_argument("--smoke", action="store_true", help="use a synthetic fixture (smoke.sh only)")
     args = ap.parse_args(argv)
@@ -95,7 +97,6 @@ def main(argv=None):
 
     # ---- build the controller for this arm ----
     from .steering import MAGSController, NoOpController
-    from .baselines import ITIController, AngularSteeringController
     from .generation import generate, cd_generate
     from .grading import grade
     from .eval import run_arm, bootstrap_ci
@@ -114,22 +115,30 @@ def main(argv=None):
         alpha = args.alpha if args.alpha is not None else bank.alpha
         controller = MAGSController(bank, alpha=alpha)
     elif arm == "iti":
-        if not args.manifold or not os.path.exists(args.manifold):
-            _blocked(arm_id, "iti arm needs --manifold (probe directions derived from the "
-                          "contrastive activation set; fit blocked in this sandbox).")
-        from .manifold import ManifoldBank
-        bank = ManifoldBank.load(args.manifold)
-        K = args.iti_K or config.ITI_DEFAULT_K
-        alpha = args.iti_alpha if args.iti_alpha is not None else config.ITI_DEFAULT_ALPHA
-        controller = ITIController(bank, alpha=alpha, K=K)
+        iti_path = args.iti_manifold or args.manifold.replace(".npz", ".iti.npz")
+        if not iti_path or not os.path.exists(iti_path):
+            _blocked(arm_id, "iti arm needs an ITI bank (--iti-manifold, or <manifold>.iti.npz) "
+                          "with per-head logistic probes for ALL monitored heads; fit blocked "
+                          "in this sandbox (needs GPU traces).")
+        from .baselines import ITIBank, ITIController
+        iti_bank = ITIBank.load(iti_path)
+        alpha = args.iti_alpha if args.iti_alpha is not None else iti_bank.alpha
+        # honor --iti-K to override the bank's K (ablation grid {24,48,96})
+        if args.iti_K:
+            iti_bank.K = args.iti_K
+            iti_bank.selected_heads = [list(h) for h in sorted(
+                iti_bank.heads.items(), key=lambda kv: kv[1].accuracy, reverse=True)[:args.iti_K]]
+        controller = ITIController(iti_bank, alpha=alpha)
     elif arm == "angular-steering":
-        if not args.manifold or not os.path.exists(args.manifold):
-            _blocked(arm_id, "angular-steering needs --manifold (rotation plane from the "
-                          "contrastive activation set; fit blocked in this sandbox).")
-        from .manifold import ManifoldBank
-        bank = ManifoldBank.load(args.manifold)
-        ang = args.angle_deg if args.angle_deg is not None else config.AS_DEFAULT_ANGLE_DEG
-        controller = AngularSteeringController(bank, angle_deg=ang)
+        as_path = args.as_manifold or args.manifold.replace(".npz", ".as.npz")
+        if not as_path or not os.path.exists(as_path):
+            _blocked(arm_id, "angular-steering needs an AS bank (--as-manifold, or "
+                          "<manifold>.as.npz) with per-layer rotation planes; fit blocked "
+                          "in this sandbox (needs GPU traces).")
+        from .baselines import ASBank, AngularSteeringController
+        as_bank = ASBank.load(as_path)
+        ang = args.angle_deg if args.angle_deg is not None else as_bank.angle_deg
+        controller = AngularSteeringController(as_bank, angle_deg=ang)
     elif arm == "contrastive-decoding":
         amateur_id = args.cd_amateur or config.CD_AMATEUR.get(model_id, "")
         if not amateur_id:
@@ -157,13 +166,17 @@ def main(argv=None):
         _blocked(arm_id, f"unknown arm {arm!r}")
 
     # ---- run the arm ----
+    # PPL is measured under the UNSTEERED base model (SPEC §4.14): reuse the loaded
+    # model as the ppl_model. For CD the "base" is the expert; for steering arms the
+    # base is the same model run unsteered (the controller only changes generation,
+    # so scoring the completion under the raw model gives the unsteered-base PPL).
     result = run_arm(model, tok, model_id, controller, bench, problems,
-                     max_new_tokens=max_new, grading=grade)
+                     max_new_tokens=max_new, grading=grade, ppl_model=model)
     # commit results to disk (NOT gitignored)
     os.makedirs("runs", exist_ok=True)
     out_path = f"runs/{bench.replace('/','_')}__{model_id.replace('/','_')}__{arm}.json"
     with open(out_path, "w") as f:
-        json.dump({"arm": arm, "benchmark": bench, "model": model_id,
+        json.dump({"arm": arm_id, "benchmark": bench, "model": model_id,
                    "n": result["n"], "acc": result["acc"], "ci95": result["ci95"],
                    "ppl": result["ppl"], "per_problem": result["per_problem"]}, f, indent=2)
     emit(f"{result['acc']:.4f}")

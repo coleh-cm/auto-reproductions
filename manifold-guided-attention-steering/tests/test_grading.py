@@ -49,3 +49,19 @@ def test_mbpp_fail():
 def test_subprocess_timeout_safety():
     # infinite loop must be caught and return False, not hang
     assert not _run_subprocess_ok("while True:\n    pass\nprint('OK')", timeout=3)
+
+
+def test_apps_grader_correct_and_wrong():
+    """APPS trace grading (SPEC §5, tex:L399): execute generated code against
+    input_output test cases. A correct solution passes; a wrong one fails."""
+    import json as _json
+    from mags.data.loaders import Problem
+    io = _json.dumps({"inputs": ["2 3\n", "4 5\n"], "outputs": ["5\n", "9\n"]})
+    prob = Problem(id="apps-1", benchmark="APPS-train", prompt_text="", gold="",
+                   extra={"input_output": io, "starter_code": ""})
+    correct = "a,b=map(int,input().split());print(a+b)\n"
+    from mags.grading import grade_apps
+    assert grade_apps(correct, prob)
+    wrong = "print(0)\n"
+    assert not grade_apps(wrong, prob)
+    assert grade_apps("", prob) is False  # no code -> fails

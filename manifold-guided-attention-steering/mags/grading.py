@@ -82,7 +82,6 @@ def grade_humaneval(completion: str, problem) -> bool:
         from human_eval.execution import check_correctness
     except Exception as e:
         raise RuntimeError(f"human_eval import failed: {e!r}")
-    full = problem.prompt_text + completion
     test = problem.extra["test"]
     entry = problem.extra["entry_point"]
     res = check_correctness(problem.id, {"prompt": problem.prompt_text, "test": test,
@@ -98,6 +97,55 @@ def grade_mbpp(completion: str, problem) -> bool:
     code = completion
     test_code = "\n".join(imports) + "\n" + code + "\n" + "\n".join(test_list) + "\nprint('OK')"
     return _run_subprocess_ok(test_code, timeout=10)
+
+
+def grade_apps(completion: str, problem) -> bool:
+    """APPS trace grading (SPEC §5, tex:L399 keep-if-both): execute the generated
+    solution against the problem's ``input_output`` test cases (stdin/stdout match).
+
+    APPS rows store ``input_output`` as a JSON ``{"inputs":[...], "outputs":[...]}``.
+    We feed each input to the generated program on stdin and require an exact stdout
+    match (after rstrip). A trace is correct iff ALL provided cases pass within a
+    combined 20 s budget. This is the grader used during contrastive-trace collection
+    for HumanEval/MBPP manifolds (the contrastive source is APPS, tex:L398)."""
+    import json as _json
+    io = problem.extra.get("input_output")
+    if not io:
+        return False
+    try:
+        cases = _json.loads(io)
+    except Exception:
+        return False
+    inputs = cases.get("inputs", [])
+    outputs = cases.get("outputs", [])
+    if not inputs:
+        return False
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+        starter = problem.extra.get("starter_code") or ""
+        f.write(starter + "\n" + completion)
+        path = f.name
+    try:
+        import subprocess
+        for inp, exp in zip(inputs, outputs):
+            try:
+                proc = subprocess.run(
+                    ["python", path], input=inp, capture_output=True, text=True,
+                    timeout=20 / max(len(inputs), 1), env={**os.environ},
+                )
+            except Exception:
+                return False
+            if proc.returncode != 0:
+                return False
+            if (proc.stdout or "").rstrip() != str(exp).rstrip():
+                return False
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 
 def _run_subprocess_ok(code: str, timeout: int = 10) -> bool:
@@ -133,4 +181,6 @@ def grade(benchmark: str, completion: str, problem) -> bool:
         return grade_humaneval(completion, problem)
     if benchmark == "MBPP":
         return grade_mbpp(completion, problem)
+    if benchmark == "APPS-train":
+        return grade_apps(completion, problem)
     raise ValueError(f"unknown benchmark {benchmark!r}")

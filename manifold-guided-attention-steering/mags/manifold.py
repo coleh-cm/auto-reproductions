@@ -69,20 +69,25 @@ class ManifoldBank:
     # -- persistence --
     def save(self, path_npz: str, path_manifest: str | None = None):
         arrays = {}
+        # persist ALL monitored heads (not just selected) so a load->save roundtrip
+        # keeps every head's B/mu_c/threshold/auroc/auroc_max (Figure 3 heatmap, etc.)
         for (l, h), m in self.heads.items():
             arrays[f"B__l{l}_h{h}"] = m.B.astype(np.float32)
             arrays[f"muc__l{l}_h{h}"] = m.mu_c.astype(np.float32)
             arrays[f"thresh__l{l}_h{h}"] = np.float32(m.threshold)
             arrays[f"auroc__l{l}_h{h}"] = np.float32(m.auroc)
+            arrays[f"auroc_max__l{l}_h{h}"] = np.float32(m.auroc_max)
         np.savez(path_npz, **arrays)
         manifest = {
             "model_id": self.model_id, "benchmark": self.benchmark,
             "k": self.k, "q": self.q, "K": self.K, "alpha": self.alpha,
             "layers_monitored": self.layers_monitored,
             "selected_heads": self.selected_heads,
+            "all_heads": [list(k) for k in self.heads.keys()],
             "n_problems_fit": self.n_problems_fit,
             "n_problems_select": self.n_problems_select,
-            "split_seed": self.split_seed, "git_sha": self.git_sha,
+            "split_seeds": [self.split_seed],   # SPEC §5.2 schema (plural)
+            "git_sha": self.git_sha,
         }
         if path_manifest is None:
             path_manifest = path_npz + ".manifest.json"
@@ -90,14 +95,19 @@ class ManifoldBank:
             json.dump(manifest, f, indent=2)
 
     @classmethod
-    def load(cls, path_npz: str, path_manifest: str | None = None) -> "ManifoldBank":
+    def load(cls, path_npz: str, path_manifest: str | None = None,
+             load_all: bool = True) -> "ManifoldBank":
+        """``load_all=True`` materializes ALL monitored heads (needed by baselines and
+        the Figure-3 diagnostic); ``load_all=False`` loads only the selected heads."""
         if path_manifest is None:
             path_manifest = path_npz + ".manifest.json"
         with open(path_manifest) as f:
             man = json.load(f)
         z = np.load(path_npz)
         heads = {}
-        for h in man["selected_heads"]:
+        head_list = man.get("all_heads", man["selected_heads"]) if load_all \
+            else man["selected_heads"]
+        for h in head_list:
             l, hh = h
             key = (l, hh)
             heads[key] = HeadManifold(
@@ -106,14 +116,16 @@ class ManifoldBank:
                 mu_c=z[f"muc__l{l}_h{hh}"],
                 threshold=float(z[f"thresh__l{l}_h{hh}"]),
                 auroc=float(z[f"auroc__l{l}_h{hh}"]),
+                auroc_max=float(z[f"auroc_max__l{l}_h{hh}"]) if f"auroc_max__l{l}_h{hh}" in z else 0.0,
             )
+        split_seeds = man.get("split_seeds", [man.get("split_seed", 42)])
         return cls(
             model_id=man["model_id"], benchmark=man["benchmark"],
             k=man["k"], q=man["q"], K=man["K"], alpha=man["alpha"],
             layers_monitored=man["layers_monitored"],
             selected_heads=[list(h) for h in man["selected_heads"]],
             n_problems_fit=man["n_problems_fit"], n_problems_select=man["n_problems_select"],
-            split_seed=man["split_seed"], heads=heads, git_sha=man.get("git_sha", ""),
+            split_seed=split_seeds[0], heads=heads, git_sha=man.get("git_sha", ""),
         )
 
 

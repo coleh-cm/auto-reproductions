@@ -85,7 +85,7 @@ def main(argv=None):
                 top_p=config.DEFAULT_SAMPLING_TOP_P,
                 seed=config.DEFAULT_SEED + s,
             )
-            ok = grade(args.benchmark, text, prob)
+            ok = grade(prob.benchmark, text, prob)   # grade against the SOURCE benchmark
             traces.append((text, ids, acts, ok))
             if any(t[3] for t in traces) and any(not t[3] for t in traces):
                 pass  # keep sampling up to n to enrich
@@ -126,8 +126,30 @@ def main(argv=None):
         layers_monitored=monitored, split_seed=config.DEFAULT_SEED, git_sha=git_sha,
     )
     bank.save(args.out)
-    print(f"OK fit -> {args.out} ({len(bank.selected_heads)} heads selected, "
+    print(f"OK mags fit -> {args.out} ({len(bank.selected_heads)} heads selected, "
           f"{bank.n_problems_fit} fit / {bank.n_problems_select} select problems)")
+
+    # 6. fit the baseline banks from the SAME contrastive activation set:
+    #    ITI: per-head logistic probes for ALL monitored heads (K reachable in
+    #         {24,48,96}); AS: per-layer (d_feat, d_PC0) rotation planes.
+    from .baselines import fit_iti_bank, fit_as_bank
+    iti_bank = fit_iti_bank(
+        all_acts, fit_pids, sel_pids, model_id=args.model, benchmark=args.benchmark,
+        K=config.ITI_DEFAULT_K, alpha=config.ITI_DEFAULT_ALPHA,
+        layers_monitored=monitored,
+    )
+    iti_path = args.out.replace(".npz", ".iti.npz")
+    iti_bank.save(iti_path)
+    print(f"OK iti fit -> {iti_path} ({len(iti_bank.selected_heads)} heads, "
+          f"{len(iti_bank.heads)} monitored)")
+
+    as_bank = fit_as_bank(
+        all_acts, model_id=args.model, benchmark=args.benchmark,
+        angle_deg=config.AS_DEFAULT_ANGLE_DEG, layers_monitored=monitored,
+    )
+    as_path = args.out.replace(".npz", ".as.npz")
+    as_bank.save(as_path)
+    print(f"OK as fit -> {as_path} ({len(as_bank.planes)} layer planes)")
 
 
 def _git_sha():
