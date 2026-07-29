@@ -91,10 +91,12 @@ def get_opt_cached(problem, dataset: str, seed: int, solver: str = "CLARABEL"):
 
     The cache key MUST include ``seed``: ACS keeps m=51, n=10200 for every seed
     (200/region x 51), so a seed-blind cache (the prior bug) silently reused one
-    seed's OPT for every other seed -- e.g. seed-0 OPT=110.70 was used for the
-    seed-6 ACS run whose true OPT=109.49, shifting every relative gap.  We now
-    also keep the data-dependent signature (m, n, n_i hash) so a stale cache from
-    a different construction (different per_state / features) is rebuilt, not
+    seed's OPT for every other seed.  (The committed seed-6 OPT is 110.70266,
+    cross-solver verified CLARABEL+ECOS; a one-off flaky CLARABEL solve once
+    returned 109.49 with an "inaccurate" warning and was rejected as infeasible-low
+    -- see REPRODUCTION.md Round-3 -- so 109.49 is NOT a true OPT.)  We now also
+    keep the data-dependent signature (m, n, n_i hash) so a stale cache from a
+    different construction (different per_state / features) is rebuilt, not
     reused.
     """
     os.makedirs("results", exist_ok=True)

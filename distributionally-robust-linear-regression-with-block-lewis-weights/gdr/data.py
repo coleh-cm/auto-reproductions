@@ -22,9 +22,10 @@ from .problem import Problem  # noqa: F401  (re-export frozen Problem TypedDict)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = os.path.join(_REPO_ROOT, "data")
 _ACS_CACHE = os.path.join(_DATA_DIR, "acs_income_folded.npz")
-# Bumped on layout/semantics change so a stale (e.g. POBP-grouped) cache is
-# rebuilt rather than silently reused; load_acs_income also checks meta['group_by'].
-_ACS_CACHE_SCHEMA = 2
+# Bumped on layout/semantics change so a stale (e.g. POBP-grouped, or seed-blind)
+# cache is rebuilt rather than silently reused; load_acs_income also checks
+# meta['group_by'] and meta['seed'].  v3: added seed validation in _load_cache.
+_ACS_CACHE_SCHEMA = 3
 
 
 def fold_group(A_i: np.ndarray, b_i: np.ndarray, n_i: int):
@@ -273,15 +274,22 @@ def _save_cache(path, problem):
              name=np.array(problem["name"]), meta_json=np.array(meta_json))
 
 
-def _load_cache(path):
-    """Reload a folded Problem written by _save_cache; validates schema + ST grouping
-    (rejects a stale POBP-grouped cache, forcing a rebuild)."""
+def _load_cache(path, seed=None):
+    """Reload a folded Problem written by _save_cache; validates schema, ST grouping,
+    and (when ``seed`` is given) the requested seed.
+
+    The seed check is required: ACS keeps m=51, n=10200 for every seed (200/region x
+    51), so a seed-blind cache silently serves one seed's data for another -- the
+    same class of bug Round-3 fixed for the OPT-value cache.  A seed mismatch
+    forces a rebuild.  (Rejects a stale POBP-grouped cache likewise.)"""
     d = np.load(path, allow_pickle=False)
     meta = json.loads(str(d["meta_json"]))
     if int(meta.get("cache_schema", 0)) != _ACS_CACHE_SCHEMA:
         raise ValueError("cache schema mismatch; rebuild required")
     if not str(meta.get("group_by", "")).startswith("ST"):
         raise ValueError(f"cache grouped by {meta.get('group_by')!r}, not ST; rebuild required")
+    if seed is not None and int(meta.get("seed", -1)) != int(seed):
+        raise ValueError(f"cache seed {meta.get('seed')!r} != requested {seed}; rebuild required")
     return Problem(A=np.asarray(d["A"], dtype=np.float64),
                   b=np.asarray(d["b"], dtype=np.float64),
                   offsets=np.asarray(d["offsets"], dtype=np.int64),
@@ -304,14 +312,15 @@ def load_acs_income(seed=0, year=2018, horizon="1-Year", n_per_region=200):
        (numpy.default_rng(seed)); if fewer rows take all; drop any region with <10.
     4. Target log1p(PINCP) (U4). 5. Standardize 10 features globally (U4).
     6. Fold by 1/sqrt(n_i) (body.tex:27).  Cache to data/acs_income_folded.npz
-    (schema/grouping validated on reload).  Returns None (prints a message) if the
-    download/load fails, so ACS is a blocked result, not silent synthetic.  No
-    download at import time.
+    (schema/grouping/seed validated on reload -- a seed mismatch forces a
+    rebuild, never silently serving another seed's data).  Returns None (prints
+    a message) if the download/load fails, so ACS is a blocked result, not
+    silent synthetic.  No download at import time.
     """
     if os.path.exists(_ACS_CACHE):
         try:
-            return _load_cache(_ACS_CACHE)
-        except Exception as e:  # stale/incompatible cache -> rebuild
+            return _load_cache(_ACS_CACHE, seed=seed)
+        except Exception as e:  # stale/incompatible/seed-mismatched cache -> rebuild
             print(f"[gdr.data] cache rejected ({e}); rebuilding.")
 
     try:

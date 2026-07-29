@@ -126,7 +126,7 @@ budget. Full per-arm histories are written to `results/<dataset>_<arm>.json`
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 23 tests: degeneracy + equation invariants (SPEC T5)
+.venv/bin/python -m pytest -q     # 24 tests: degeneracy + equation invariants (SPEC T5)
 ```
 
 `tests/test_degeneracy.py` — the method at its no-op setting must reproduce the

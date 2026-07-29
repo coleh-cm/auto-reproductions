@@ -302,3 +302,40 @@ def test_first_order_arm_makes_progress(small_problem, small_problem_opt, arm, c
     # the arm must strictly decrease the worst-group suboptimality from the warm
     # start -- a no-op / broken arm would leave gN == g0.
     assert gN < g0 - 1e-6, (arm, "no progress: init", g0, "final", gN)
+
+
+# ---------------------------------------------------------------------------
+# ACS data-cache seed validation (gdr/data.py): a seed-blind cache would silently
+# serve one seed's folded data for another (Round-3 fixed this for the OPT cache;
+# this pins the analogous fix for the data cache).  Silent wrong-data
+# substitution is the highest-stakes latent failure mode here.
+# ---------------------------------------------------------------------------
+def test_acs_cache_rejects_seed_mismatch(tmp_path):
+    from gdr.data import _save_cache, _load_cache, _ACS_CACHE_SCHEMA
+    from gdr.problem import Problem
+
+    A = np.random.default_rng(0).standard_normal((20, 3))
+    b = np.random.default_rng(1).standard_normal(20)
+    offsets = np.array([0, 7, 14, 20])
+    n_i = np.array([7, 7, 6])
+    meta = {"cache_schema": _ACS_CACHE_SCHEMA, "group_by": "ST (region)", "seed": 0}
+    p = Problem(A=A, b=b, offsets=offsets, name="acs_income", m=3, d=3, n_i=n_i, meta=meta)
+    cache = tmp_path / "acs_income_folded.npz"
+    _save_cache(str(cache), p)
+
+    # matching seed -> accepted
+    r = _load_cache(str(cache), seed=0)
+    assert int(r["meta"]["seed"]) == 0
+    # mismatched seed -> rejected (forces a rebuild, never silent substitution)
+    with pytest.raises(ValueError, match="seed"):
+        _load_cache(str(cache), seed=6)
+    # stale schema -> rejected (so a cache from before the seed check is rebuilt)
+    bad = Problem(A=A, b=b, offsets=offsets, name="acs_income", m=3, d=3, n_i=n_i,
+                  meta={"cache_schema": 2, "group_by": "ST (region)", "seed": 0})
+    _save_cache(str(cache), bad)
+    with pytest.raises(ValueError, match="schema"):
+        _load_cache(str(cache), seed=0)
+    # seed=None (caller does not care) -> accepted (backward compat)
+    _save_cache(str(cache), p)
+    _load_cache(str(cache), seed=None)
+

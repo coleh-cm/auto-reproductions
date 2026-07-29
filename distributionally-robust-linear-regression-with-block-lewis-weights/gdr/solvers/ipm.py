@@ -16,9 +16,11 @@ so we adopt the equivalent convergent standard form where mu weights the
 barrier, not the objective; this is the textbook decreasing-mu central path
 and matches the paper's empirical result that the IPM converges rapidly,
 experiments.tex:107.)  Centering is by damped Newton; **one outer iteration =
-one barrier Newton step on (x, t)** (experiments.tex:100), after which mu is
-reduced by theta.  We start strictly feasible at t0 = max_loss(x0) + 1 so every
-gap_i = t0 - l_i(x0) >= 1 > 0.
+one barrier-parameter reduction mu <- theta*mu, preceded by full damped-Newton
+CENTERING on Phi_mu** (inner Newton steps until the Newton decrement <= inner_tol
+or the inner cap, per _run_single; experiments.tex:100 calls one iteration "one
+outer Newton step of the barrier procedure").  We start strictly feasible at
+t0 = max_loss(x0) + 1 so every gap_i = t0 - l_i(x0) >= 1 > 0.
 
 Gradient/Hessian of Phi_mu w.r.t. z = (x [d], t [1]).  Let l_i = ||r_i||^2,
 g_i = 2 A_{S_i}^T r_i  [d] (gradient of l_i), H_i = 2 A_{S_i}^T A_{S_i}  [d,d]

@@ -353,6 +353,69 @@ implemented (no §8 number exercises them; U3).
   (23) still passes; the test-suite check is kept as defense-in-depth (it uses
   wider grids / 60 iters, so it is the stronger per-arm evidence).
 
+### Round-9: parallel adversarial review of all 5 components (orchestration)
+
+Ran a 9-agent orchestration (5 components reviewed in parallel against the
+paper LaTeX, each finding refutation-verified by an independent agent). Result:
+4 confirmed bugs, all minor/nit, ALL in NON-production paths — no committed
+number or gate value changed. The two non-production paths flagged
+(`gdr/data.py` ACS cache, `gdr/runner.py:main` CLI) are reachable only via
+undocumented entrypoints; production (`run_arm.py` → `gdr/data_acs.py:make_acs_income`
+reads CSVs directly, no cache; `run_arm.py` applies the true OPT=1 normalization)
+is unaffected and re-verified to reproduce `results/run_all.log` exactly.
+
+Four fixes (all from the review's confirmed findings):
+
+- **`gdr/data.py` ACS data cache was seed-blind (latent bug, the highest-stakes
+  finding).** `_load_cache` validated only `cache_schema` and `group_by`, never
+  the requested `seed`, and `load_acs_income` returned the cache unconditionally
+  when it existed. The committed cache holds `meta seed=0`, so
+  `gdr/data.py:load_acs_income(seed=6)` would silently return seed-0 data —
+  exactly the "silent wrong-data substitution" failure the task warns against,
+  and the identical bug class Round-3 fixed for `run_arm.get_opt_cached`'s OPT
+  cache (REPRODUCTION.md:118-130). It does NOT affect committed numbers:
+  production `run_arm.py` uses `gdr/data_acs.py:make_acs_income` (reads census
+  CSVs directly, no cache), and even the buggy cache path still yields
+  California-worst; the buggy path is reachable only via the undocumented
+  `gdr/runner.py:main → load_problem → load_acs_income`. Fix: `_load_cache` now
+  takes `seed` and rejects a seed mismatch (forcing a rebuild); cache schema
+  bumped 2→3 so the existing seed-0 cache is rejected on next load rather than
+  silently reused; docstrings updated. Added `test_acs_cache_rejects_seed_mismatch`
+  pinning the fix (match accepted, mismatch rejected, stale-schema rejected,
+  seed=None backward-compat). Test count 23 → 24.
+
+- **`gdr/solvers/ipm.py` top docstring mis-described an outer iteration (nit).**
+  It said "one outer iteration = one barrier Newton step on (x,t)", but the code
+  runs up to INNER_CAP=50 damped-Newton centering steps per outer iteration
+  BEFORE the μ reduction. The `_run_single` docstring was already accurate.
+  Fix: top docstring now states "one barrier-parameter reduction μ←θ·μ, preceded
+  by full damped-Newton CENTERING", matching the code and `experiments.tex:100`'s
+  "one outer Newton step of the barrier procedure". No code change.
+
+- **`run_arm.py:get_opt_cached` docstring stated the opposite of the verified
+  truth (minor).** It claimed seed-6's "true OPT=109.49" and gave a fictional
+  "seed-0 OPT=110.70" example; but the committed cache holds 110.70266
+  (cross-solver verified CLARABEL+ECOS), and 109.49 was the one-off flaky
+  CLARABEL solve REPRODUCTION.md Round-3 explicitly rejected as infeasible-low.
+  The docstring actively contradicted the repo's own disclosure. Fix: docstring
+  now states 110.70266 is the true (committed) OPT and 109.49 the rejected flaky
+  value, with a pointer to Round-3. No cache value or code change.
+
+- **`gdr/runner.py:main` CLI docstring claimed U15 OPT=1 rescaling but the code
+  rescales by L0=F(ERM) (nit).** The production entrypoint `run_arm.py` applies
+  the true 1/√OPT OPT=1 normalization (body.tex:511-513); this unused CLI uses
+  L0=1 (initial-loss=1). Same defect class already fixed in `ipm.py` (Round-6,
+  REPRODUCTION.md:213-223), missed here. Fix: both docstrings now state it is
+  L0=1 (start-loss) rescaling, NOT the paper's OPT=1, and that `run_arm.py` is
+  the gate entrypoint. (F−OPT)/OPT is invariant to the choice, so even via this
+  CLI the FINAL lines would match. No code change.
+
+Verified post-fix: 24/24 tests pass; smoke gate (7 arms, machine-checked
+progress) passes identically; production path reproduces
+`results/run_all.log` (no re-run needed — only docstrings/cache-validation in
+non-production paths changed). No committed result changed.
+
+
 ### Round-9: adversarial paper-review of all 5 components (orchestrate)
 
 - Ran an orchestration that, for each of the 5 components (data_pipeline,

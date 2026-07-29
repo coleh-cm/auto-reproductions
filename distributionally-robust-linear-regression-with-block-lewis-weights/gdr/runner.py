@@ -86,8 +86,12 @@ def best_gap(history: dict) -> float:
 # ---------------------------------------------------------------------------
 
 # Per-arm default configs (disclosed tuning grids; SPEC sec5; U2: grids unstated).
-# The CLI rescales every problem to O(1) losses (U15: WLOG OPT=1) before running,
-# so these grids are on the O(1) scale and work uniformly across datasets.
+# This CLI rescales every problem to O(1) losses by the ERM START loss L0=F(x0)
+# (NOT the paper's WLOG OPT=1 rescaling of body.tex:511-513; the production
+# entrypoint run_arm.py applies the true 1/sqrt(OPT) OPT=1 normalization -- this
+# runner.main() path is not exercised by the gate).  (F-OPT)/OPT is invariant to
+# the choice, so the FINAL lines would match either way; the grids are on the
+# O(1) scale and work uniformly across datasets.
 ARM_CFGS = {
     "subgradient": {"lr_grid": [1e-2, 1e-3, 1e-4], "schedule": ["const", "1/sqrt_t"]},
     "smoothed_gd": {"lr_grid": [1e-2, 1e-3, 1e-4],
@@ -168,9 +172,11 @@ def main(argv=None) -> int:
             except Exception:
                 pass
 
-    # Rescale to O(1) losses (U15: WLOG OPT=1 rescaling; argmin x* unchanged,
-    # relative gaps unchanged).  Lets the standard O(1) tuning grids work on every
-    # dataset (ACS ~1e2, synthetic ~1e6) without per-arm scale fiddling.
+    # Rescale to O(1) losses by the ERM START loss L0=F(x0) (NOT the paper's WLOG
+    # OPT=1 rescaling of body.tex:511-513; run_arm.py applies the true OPT=1
+    # normalization.  argmin x* unchanged, relative gaps unchanged.)  Lets the
+    # standard O(1) tuning grids work on every dataset (ACS ~1e2, synthetic ~1e6)
+    # without per-arm scale fiddling.
     from gdr.problem import rescale_problem, max_loss as _max_loss
     x0_raw = _erm_warmstart(problem)
     L0 = float(_max_loss(problem, x0_raw))
