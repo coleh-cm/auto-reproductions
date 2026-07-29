@@ -303,6 +303,30 @@ Evaluation protocol:
      Tested by `test_adversarial_train_surrogate_matches_eval_attacker`. With dropout OFF (the
      runner default for the degeneracy gate) the mode switch is a no-op, so eps=0 degeneracy is
      unaffected.
+24. **M2 FGSM attack direction**: the paper's DISPLAYED E6 (tex:411) uses the uniform direction
+     η = −ε·sign(w) (the y=+1 worst case), but the FGSM *attack* the paper reports (99% error,
+     tex:456) uses sign(∇ₓJ) = −y·sign(w) per example (tex:407) — the true per-example worst case.
+     **Choice: `attacks.fgsm_logreg` implements the per-example worst case η = −ε·y·sign(w)**
+     (the actual adversary; this is what makes the attack "exact" for the linear model and what
+     the paper's 99% measures). The E6 *training loss* uniform-direction imprecision (item 21)
+     is a separate object (`adversarial_logreg_cost`) and is not used in the M2 attack.
+25. **M9 sigmoid-top arm**: the paper says only "Changing the top layer to independent sigmoids"
+     (tex:908-909) on the maxout net. It does not state whether the sigmoid-top net is retrained
+     or evaluated on the same learned trunk. **Choice: `SigmoidTopMLP` reuses the trained
+     maxout trunk + readout weights (copied), so the ONLY difference from the maxout+softmax net
+     is the top activation (sigmoid per class vs softmax).** The sigmoid-top net is NOT retrained
+     — this isolates the architecture change (the paper's controlled comparison). Documented in
+     `experiments/m9_rubbish.py`. Error = any per-class sigmoid > 0.5 (`eval_rubbish_sigmoid`).
+26. **M5 protocol choices**: the paper states the M5 protocol (adversarial-valid early stop →
+     retrain on 60k → 5-seed mean, tex:501-512) but not the patience for the adversarial-valid
+     criterion, the ε for the adversarial validation set, or the retrain optimizer. **Choices:
+     adversarial-valid patience = the same `--patience` knob (default 10 for CPU feasibility;
+     paper scale 100); adversarial-validation ε = 0.25 (the training ε); retrain uses the same
+     SGD + external maxout recipe as the selection phase.** The baseline arm selects on
+     clean-valid error (the original maxout recipe, tex:501-503); the adversarial arm selects on
+     adversarial-valid error (tex:503-505). Full 1600-unit/patience-100/5-seed scale is
+     infeasible on this CPU; `experiments/m5_large_advtrain.py` defaults to a documented
+     sub-scale and exposes the full-scale knobs.
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):
