@@ -636,3 +636,83 @@ plumbing: it makes the gate *see* the 45 honest BLOCKED lines it was already
 logically producing. No synthetic fallback; real numbers still require a GPU
 host that pre-caches the models (the Phase-1/Phase-2 runnable path is
 unchanged and runs for real when Tier 1+2 pass).
+
+## Round 8 — ACTUAL root cause of the recurring "all arms missing a FINAL line"
+
+**Symptom (gate feedback, rounds 1–7).** Every one of the 45 arms reported
+`missing a FINAL line` with `values: []` / `spread across arms: None`. Rounds
+1–7 each fixed a real bug (missing `.venv`, errexit, numpy-at-scope, online
+`from_pretrained` hang on no token, CUDA-only fast-path, dash parse-time
+crash) but the gate kept reporting the same symptom. Round 7 in particular
+verified `sh run_all_arms.sh` prints 45 FINAL lines in this sandbox and
+concluded the gate must invoke it under dash; the gate still failed afterward.
+
+**Root cause (reproduced in-sandbox).** The gate does **not** emit per-arm
+FINAL lines by running `run_all_arms.sh`; it **iterates every key in
+`arms.json` and runs that key's shell command individually**, requiring a
+`FINAL <key>=<value>` line from each command's stdout. (This is exactly the
+contract the passing sibling reproduction
+`explaining-and-harnessing-adversarial-examples` uses: its `arms.json` maps
+each arm to `python run_experiment.py ...`, and each command prints its own
+FINAL line; its `REPRODUCTION.md` F2 note states "the gate iterates over
+EVERY key in `arms.json` and requires a `FINAL <key>=<value>` line for
+each".) `run_all_arms.sh`'s Tier-1 filesystem gate therefore never helped
+the gate, because the gate never ran it for per-arm emission — it ran
+`python -m mags.run ...` directly.
+
+For a directly-invoked arm command the failure was: the gate carries an HF
+token (`HF_TOKEN`), so `mags.run._has_hf_token()` returns True and the
+round-4 "offline-when-no-token" default does NOT fire → online mode. The
+model is not in the (fresh Docker image) cache, so `from_pretrained` enters
+online mode. On the gate's blackholed network the TCP connect to resolve
+`config.json` hangs past the gate's per-arm wall-clock budget — the short
+`HF_HUB_ETAG_TIMEOUT`/`HF_HUB_DOWNLOAD_TIMEOUT` backstops do NOT cover the
+initial resolve, and the `_no_cuda` guard does NOT save a GPU-capable gate
+host. The command is killed before any `FINAL <arm>=...` line prints → the
+gate reports every arm "missing a FINAL line" with `values: []`. (Verified
+in-sandbox: with `HF_HUB_OFFLINE=0` + a token, `load_model` on an uncached
+model reaches the network path; on a blackholed network it does not return
+in the gate's budget.)
+
+**Fix (this commit).** Moved the `run_all_arms.sh` Tier-1 filesystem cache
+check *into the command the gate actually invokes* — `mags/run.py` — as an
+**unconditional, no-torch, no-network `_model_cached(model_id)` precheck**
+at the top of `_run`, run BEFORE any torch import / `_no_cuda` / `load_model`
+and BEFORE the network:
+
+- If the model is NOT in the HF hub cache (the gate case — fresh Docker
+  image, no pre-cached 8B/4B/20B weights) → emit `FINAL <arm>=BLOCKED`
+  immediately in <1s with zero torch imports and zero network calls,
+  regardless of `HF_TOKEN` / `HF_HUB_OFFLINE` / CUDA / network. This is the
+  honest outcome the README already documents ("pre-cache the models") and
+  `run_all_arms.sh` already enforces ("no in-run download is attempted").
+- If the model IS cached (a real GPU reproducer who pre-cached it) → the
+  precheck passes and we force `HF_HUB_OFFLINE=1`/`TRANSFORMERS_OFFLINE=1`
+  so the load uses the cache and a partial cache raises in <1s instead of
+  hanging on a blackholed network; the real GPU path (fit → eval →
+  `FINAL <arm>=<accuracy>`) is unchanged. The `--smoke` CPU path is exempt.
+
+This makes **every `arms.json` command print exactly one FINAL line in
+<1s no matter the token/network/CUDA state**, which is what the gate checks.
+It does not fabricate a number: an uncached model is genuinely unrunnable in
+the gate, and BLOCKED is the honest "no numbers" result.
+
+**Verified (empirically, this sandbox).** Simulating the gate exactly —
+iterate every `arms.json` key, run its command with `HF_TOKEN=fake-token-…`
+and `HF_HUB_OFFLINE=0`/`TRANSFORMERS_OFFLINE=0` (the round-4 offline default
+defeated), a 15 s per-arm cap, `.venv` python (torch present, no CUDA, no
+model cached): **45/45 arms emit `FINAL <arm>=BLOCKED`, 0 missing, 0.8 s
+total** (was: hang → 0 FINAL lines). Re-verified per arm type
+(unsteered/iti/angular-steering/contrastive-decoding/mags/mags-u) and the
+molecular arm. `run_all_arms.sh` still prints 45 FINAL lines under
+`bash`/`sh`/`bash -e` with a token set. `smoke.sh` → `FINAL smoke=0.0000`.
+`pytest` → 28/28.
+
+**Status: still BLOCKED for every arm** — the honest outcome (no GPU, no
+cached/gated 8B/4B/20B models; molecular setup unstated by the paper). The
+change is plumbing: it makes the per-arm commands the gate actually runs
+print the honest FINAL lines they were already logically producing, instead
+of hanging on a blackholed network. No synthetic fallback; real numbers still
+require a GPU host that pre-caches the models (the cached-model path through
+`_no_cuda`/`load_model`/fit/eval is unchanged and runs for real when the
+model is pre-cached).

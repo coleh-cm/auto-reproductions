@@ -30,6 +30,23 @@ def main():
     from mags.generation import generate
     from mags.grading import grade_math
     from mags.data.loaders import load_math500
+    from mags.run import _model_cached, _hf_hub_dir
+
+    # Fast cache precheck (mirrors mags.run round-8 fix): if the tiny smoke
+    # model is not in the HF cache, fail to BLOCKED in <1s instead of hanging
+    # in online `from_pretrained` on a blackholed network (the gate carries an
+    # HF token, which would otherwise enable online mode). On a host that
+    # pre-cached distilgpt2 (or has working network + no token, where smoke.sh
+    # forces offline and a cached copy loads) the real smoke path runs.
+    if not _model_cached(SMOKE_MODEL):
+        print("FINAL smoke=BLOCKED")
+        sys.stderr.write(
+            f"BLOCKED[smoke]: smoke model {SMOKE_MODEL!r} not in HF cache "
+            f"({_hf_hub_dir()}); pre-cache with `huggingface-cli download "
+            f"{SMOKE_MODEL}` to run the smoke path.\n")
+        return
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
     model, tok = load_model(SMOKE_MODEL)
     model._mags_tokenizer = tok
