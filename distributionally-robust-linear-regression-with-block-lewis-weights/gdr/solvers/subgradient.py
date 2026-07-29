@@ -68,7 +68,13 @@ def run(problem, cfg, x0, max_outer, time_budget):
     opt = get_opt(problem, cfg)
     x0 = np.asarray(x0, dtype=np.float64)          # [d]
     lr_grid = as_list(cfg.get("lr_grid"), DEFAULTS["lr_grid"])
-    sched_grid = as_list(cfg.get("schedule_grid"), DEFAULTS["schedule_grid"])
+    # The runner (gdr/runner.py:92) passes the schedule grid under key 'schedule';
+    # the in-solver default and tests use 'schedule_grid'.  Read both so a
+    # non-default grid passed via the runner is not silently dropped (the prior
+    # code read only 'schedule_grid' and fell back to the default, masking the
+    # runner value).
+    sched_grid = as_list(cfg.get("schedule") or cfg.get("schedule_grid"),
+                         DEFAULTS["schedule_grid"])
 
     t_start = time.perf_counter()
     deadline = t_start + float(time_budget)

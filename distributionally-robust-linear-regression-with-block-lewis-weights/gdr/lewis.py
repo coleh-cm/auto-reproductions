@@ -84,6 +84,8 @@ def block_lewis_weights(problem: Problem, p: float, rounds: int | None = None,
         # SPEC E8: T = ceil(2 ln m / ln(3/2)); iterate t=1..T-1  => T-1 update steps
         rounds = int(np.ceil(2.0 * np.log(max(m, 2)) / np.log(1.5)))
     T = max(rounds, 1)
+    # SPEC E8 / MO25 alg:blw run t=1..T-1 (T-1 update steps), averaging v^(1)..v^(T-1).
+    n_steps = max(T - 1, 1)
 
     v = np.full(m, n_cols / m, dtype=np.float64)  # init
     v_history = []
@@ -92,7 +94,7 @@ def block_lewis_weights(problem: Problem, p: float, rounds: int | None = None,
     for i in range(m):
         row_block[off[i]:off[i + 1]] = i
 
-    for t in range(T):
+    for t in range(n_steps):
         # V^{e_p} A_hat: rows scaled by v_{block}^{e_p}
         scale = np.power(v[row_block], e_p)
         M = scale[:, None] * A_hat

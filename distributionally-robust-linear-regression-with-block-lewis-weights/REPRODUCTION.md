@@ -352,3 +352,42 @@ implemented (no §8 number exercises them; U3).
   No production code or committed result changed; only `smoke.sh`. Test suite
   (23) still passes; the test-suite check is kept as defense-in-depth (it uses
   wider grids / 60 iters, so it is the stronger per-arm evidence).
+
+### Round-9: adversarial paper-review of all 5 components (orchestrate)
+
+- Ran an orchestration that, for each of the 5 components (data_pipeline,
+  method_core, training_loop, evaluation_metric, baseline_arm), spawned an
+  adversarial reviewer to find correctness failures against the cited LaTeX
+  source, then a *separate* verifier to refute each finding. The script is the
+  evaluator: a finding is kept only if the refuter independently confirmed it.
+  11 agents, 6 raw findings, 3 confirmed after refutation.
+- Confirmed (nit, data_pipeline): the synthetic adversarial construction rotates
+  the rank-1 curvature spike off the shared basis U (`gdr/data_synthetic.py:74`,
+  `gdr/data.py:135`), a literal departure from `experiments.tex:19` ("shares
+  eigenvectors with the others"). Already disclosed in SPEC §8A / code
+  `deviation_note` — the spike pinned to a single shared U column makes ERM fit
+  every adversarial group on its own axis and the ERM-worst group becomes a
+  normal group, eliminating the `experiments.tex:38` ERM-vs-robust gap the
+  reproduction targets. No code change (transparency report, not a bug).
+- Confirmed (nit, method_core): `block_lewis_weights` ran T leverage-solve
+  iterations and averaged T iterates, but SPEC E8 / MO25 alg:blw specify
+  `t=1..T-1` (T-1 update steps, averaging v^(1)..v^(T-1)) — the loop
+  `for t in range(T)` contradicted the code's own comment at `lewis.py:84`.
+  Fixed: loop now runs `max(T-1, 1)` steps. Correctness unaffected (each v_new
+  sums to rank(A_hat) ≤ d+1 regardless of iterate count, so ‖w‖₁ ≤ 1.5(d+1)
+  holds for both T and T-1); re-verified E6 overestimate (max ratio < 1) and
+  ‖w‖₁ ≤ 2(d+1)=22 → 16.5 numerically after the fix. Reset branch (Σwᵢ≥m) still
+  does not fire for synthetic (Σwᵢ=16.5 < m=100), so the degeneracy test
+  (Lewis arm == Euclidean arm bit-identical) is unaffected.
+- Confirmed (minor, training_loop): `subgradient.py:71` read the schedule grid
+  from cfg key `schedule_grid`, but `runner.py:92` passes it under key
+  `schedule`, so the runner's schedule value was silently dropped and the solver
+  fell back to `DEFAULTS['schedule_grid']` — correct only by accident of the
+  default equalling the runner intent. Fixed: the solver now reads
+  `cfg.get('schedule') or cfg.get('schedule_grid')`, so a non-default schedule
+  grid passed via the runner is no longer silently dropped. tests pass (23) and
+  smoke (all 7 arms progress) unchanged; production output unchanged because
+  the default grid already matched the runner intent.
+- No production code path or committed result changed beyond these two fixes;
+  the data_pipeline nit is already disclosed. Test suite (23) and smoke gate
+  both pass after the fixes.
