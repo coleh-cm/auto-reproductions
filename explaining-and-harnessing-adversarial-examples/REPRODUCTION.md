@@ -162,3 +162,50 @@
   the DIRECTION is the paper's central regularization claim and it now holds. M2 reproduces the
   paper closely: clean 2.01% (paper 1.6%), FGSM adv error 99.1% (paper 99%). M1 FGSM error 100%
   (paper 99.9%). 29/29 tests pass.
+- 2026-07-29: **Gate deliverables + M5 over-training blocker (adversarial review, fixed).**
+  Added the gate-contract deliverables the reproduction step requires:
+  (a) `arms.json` restructured to the flat gate map `{"baseline": "...", "adversarial": "..."}`
+  (each value the shell command that produces the arm); the rich 12-arm per-milestone metadata
+  is preserved in `arms_metadata.json`.
+  (b) `run_all_arms.sh` runs both arms at the paper's M4 config (maxout 240, eps=0.25, alpha=0.5,
+  5000 steps, dropout off for degeneracy validity); each prints exactly one line
+  `FINAL <arm>=<clean test accuracy>`; exports `OMP_NUM_THREADS=4`/`MKL_NUM_THREADS=4`
+  (PyTorch's default pool over-spawns on multi-core — a ~7x slowdown at 1500 steps; 4 threads
+  is the sweet spot; full 2-arm run ~1m55s).
+  (c) `smoke.sh` — same code path at 200 steps/units 64 (~3s), one FINAL line; path-prover only.
+  (d) `run_experiment.py` output changed `FINAL accuracy=` -> `FINAL <arm>=` (arm =
+  baseline|adversarial) so the gate can pair each line to its arm by name; degeneracy test updated
+  to compare the accuracy VALUE across the two arm names (names differ by construction).
+  (e) **Blocker found by the adversarial review of train.py (verifier-confirmed):** the paper
+  protocol (tex:505-506) selects the BEST epoch then retrains on 60k for EXACTLY that many
+  epochs, but `train.py` exposed only `epochs_run` (= best_epoch + patience), so
+  `experiments/m5_large_advtrain.py` over-trained by ~patience epochs and biased the headline
+  M5 number (tex:506-512, mean 0.782%). **Fix:** `TrainResult.best_epoch` (0-based index of the
+  best validation epoch); the M5 retrain arm now uses `best_epoch + 1`. Regression test
+  `test_best_epoch_is_selected_not_stopping` locks the property. SPEC §9 records the gate
+  contract and this finding. 30/30 tests pass.
+  **Gate result (5000 steps, 240 units, dropout off):** `FINAL baseline=0.9788`,
+  `FINAL adversarial=0.9829` — adversarial arm HIGHER clean accuracy (lower clean error:
+  2.12% -> 1.71%), reproducing the paper's M4 direction (0.94% -> 0.84%, tex:492-494). Exact
+  magnitudes need dropout-on + convergence (see results/m4_adversarial.json).
+  **Review summary:** 5-component adversarial review (data, method_core, train, eval,
+  baseline_arm), each reviewed by 3 lenses (correctness, completeness, faithfulness_to_paper)
+  with file:line evidence + a verification pass that tried to refute each blocker. 4/5
+  components passed; 1 major blocker (the train.py best_epoch gap above) survived
+  verification and was fixed. Remaining issues are all minor/nit (tautological self-check
+  asserts in data.py; stale docstring claiming a seed field; latent binary-K=1 hazards in
+  eval_fgsm/eval_transfer that no defined arm trips) — none bias a reported paper number.
+  Documented, not fixed (out of scope of the paper's headline comparison).
+- 2026-07-29: **F2 fix — gate-arm map (SPEC §9 / gate contract).** The gate iterates over
+  EVERY key in `arms.json` and requires a `FINAL <key>=<value>` line for each. `arms.json`
+  previously carried six `_`-prefixed informational keys (`_comment`, `_paper`,
+  `_paper_target`, `_value_definition`, `_degeneracy`, `_environment_note`) that are not arms
+  and emit no `FINAL` line, so the gate reported them as "arms missing a FINAL line".
+  Fix: `arms.json` now holds ONLY the two runnable arms the paper compares
+  (`baseline`, `adversarial`); the displaced explanatory notes were folded verbatim into a
+  new `gate_contract` block in `arms_metadata.json` (which already held the richer per-arm
+  metadata), so no information is lost. Also corrected the stale
+  `graded_harness.output_contract` (it claimed `FINAL accuracy=...`; the CLI emits the
+  arm-named `FINAL <arm>=...`). Re-verified: `run_all_arms.sh` prints exactly the two arm-named
+  `FINAL` lines on stdout; a gate simulation (`declared` vs. produced `FINAL` names) shows zero
+  missing and zero extra arms; 29/29 tests pass.

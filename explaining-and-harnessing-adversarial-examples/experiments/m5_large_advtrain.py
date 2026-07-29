@@ -101,7 +101,17 @@ def _select_and_retrain(adv_train: bool, seed: int, args) -> dict:
         patience=args.patience,
     )
     res_sel = train(model, select_cfg, data)
-    epochs_chosen = res_sel.epochs_run
+    # Paper protocol tex:505-506: the early-stopping criterion selects the BEST
+    # epoch, then the model is retrained on all 60,000 for EXACTLY that many
+    # epochs. epochs_run is the STOPPING epoch (best_epoch + patience), NOT the
+    # selected count; using it would over-train by ~patience epochs. best_epoch
+    # is 0-based, so the epoch COUNT is best_epoch + 1.
+    if res_sel.best_epoch is None:
+        # No validation improvement ever (e.g. max_epochs too small): fall back
+        # to epochs_run so the retrain still runs a sensible count.
+        epochs_chosen = res_sel.epochs_run
+    else:
+        epochs_chosen = res_sel.best_epoch + 1
 
     # --- Phase B: retrain on all 60,000 examples for epochs_chosen ---
     # (tex:506 "retrained on all 60,000 examples"). The full-train loader
@@ -128,6 +138,9 @@ def _select_and_retrain(adv_train: bool, seed: int, args) -> dict:
     return {
         "seed": seed,
         "epochs_chosen": epochs_chosen,
+        "best_epoch_index": (None if res_sel.best_epoch is None
+                             else int(res_sel.best_epoch)),
+        "selection_epochs_run": res_sel.epochs_run,
         "test_accuracy": test_acc,
         "test_error": 1.0 - test_acc,
     }

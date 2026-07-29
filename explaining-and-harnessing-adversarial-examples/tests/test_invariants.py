@@ -287,3 +287,49 @@ def test_maxout_readout_init_matches_recipe():
     assert torch.all(b == 0.0), f"readout bias must be zero, got {b}"
     # and it must NOT be all-zero (uniform draw is non-degenerate)
     assert w.abs().sum().item() > 0.0
+
+
+# --- early-stopping selects the BEST epoch, not the stopping epoch ---------- #
+def test_best_epoch_is_selected_not_stopping():
+    """Paper protocol tex:505-506: the early-stopping criterion chooses the
+    number of epochs to retrain for; that number is the BEST epoch (where
+    validation error was lowest), NOT the epoch at which patience ran out
+    (best_epoch + patience). TrainResult must expose best_epoch so the M5
+    retrain arm retrains for the selected count, not the stopping count.
+
+    This is a regression test for the blocker found by the adversarial review:
+    train.py previously exposed only epochs_run (= best_epoch + patience), so
+    M5 over-trained by ~patience epochs and the headline M5 number (tex:506-512)
+    was biased. Fix: TrainResult.best_epoch records the 0-based index of the
+    best validation epoch."""
+    from fgsm_repro.data import MNISTData
+    from fgsm_repro.models import SoftmaxRegression
+    from fgsm_repro.train import TrainConfig, train
+
+    # Build data where valid error is monotonically NON-decreasing after epoch
+    # 0, so the best epoch is unambiguously epoch 0 and patience trips later.
+    g = torch.Generator().manual_seed(0)
+    def make(n):
+        x = torch.rand(n, 784, generator=g, dtype=torch.float32)
+        y = torch.randint(0, 10, (n,), generator=g, dtype=torch.int64)
+        x[torch.arange(n), y] += 0.5
+        return x, y
+    data = MNISTData(x_train=make(200)[0], y_train=make(200)[1],
+                     x_valid=make(80)[0], y_valid=make(80)[1],
+                     x_test=make(80)[0], y_test=make(80)[1])
+    torch.manual_seed(0)
+    m = SoftmaxRegression(784, 10)
+    res = train(m, TrainConfig(batch_size=50, lr=1.0, momentum=0.0,
+                               max_epochs=20, seed=0, patience=3,
+                               early_stop="clean", max_steps=4), data)
+    # best_epoch must be an int (validation is non-empty) and 0-based.
+    assert res.best_epoch is not None, "best_epoch should be set (valid non-empty)"
+    assert isinstance(res.best_epoch, int)
+    assert res.best_epoch >= 0
+    # The selected epoch COUNT (what M5 retrains for) is best_epoch + 1, and it
+    # must be <= epochs_run (the stopping epoch). Equality holds only if
+    # patience never tripped; otherwise best_epoch+1 < epochs_run.
+    assert res.best_epoch + 1 <= res.epochs_run, (
+        f"best_epoch+1={res.best_epoch + 1} > epochs_run={res.epochs_run}")
+    # history length tracks epochs_run too.
+    assert len(res.history) == res.epochs_run

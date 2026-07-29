@@ -13,9 +13,11 @@ file asserts that at two levels:
   2. Training level: ``train(adv_train=True, eps=0)`` and ``train(adv_train=False)``
      produce bit-identical ``best_state_dict`` under the same seed (dropout OFF
      so no mask divergence).
-  3. CLI level: ``run_experiment.py --lambda 0`` (the method at its no-op) and
-     ``run_experiment.py --baseline`` (clean reference) print the SAME
-     ``FINAL accuracy=...`` line.
+  3. CLI level: ``run_experiment.py --lambda 0`` (the method at its no-op,
+     arm ``adversarial``) and ``run_experiment.py --baseline`` (clean
+     reference, arm ``baseline``) print lines whose accuracy VALUE is
+     identical (``FINAL adversarial=<v>`` == in value to ``FINAL baseline=<v>``;
+     the arm name differs by construction, the value must match bit-for-bit).
 
 If any of these fails the implementation is wrong — and we know in seconds,
 without a full paper-scale run.  (research-code skill: "the most valuable
@@ -116,8 +118,10 @@ def test_train_degeneracy_drops_with_dropout_on():
 
 
 def test_run_experiment_cli_degeneracy():
-    """CLI: `run_experiment.py --lambda 0` (method at no-op) must print the
-    SAME `FINAL accuracy=...` line as `--baseline` (clean reference)."""
+    """CLI: `run_experiment.py --lambda 0` (method at no-op, arm `adversarial`)
+    must print the SAME accuracy VALUE as `--baseline` (arm `baseline`).
+    The arm names differ by construction; the float value must match
+    bit-for-bit (eps=0 => x_tilde==x => J~==J => identical training)."""
     runner = REPRO_ROOT / "run_experiment.py"
     env = {"PYTHONPATH": str(REPRO_ROOT / "src")}
     common = ["--steps", "5", "--units", "16", "--seed", "0"]
@@ -128,9 +132,11 @@ def test_run_experiment_cli_degeneracy():
     assert r1.returncode == 0 and r2.returncode == 0, (r1.stderr, r2.stderr)
     line1 = r1.stdout.strip().splitlines()[-1]
     line2 = r2.stdout.strip().splitlines()[-1]
-    assert line1.startswith("FINAL accuracy="), line1
-    assert line2.startswith("FINAL accuracy="), line2
-    assert line1 == line2, f"CLI degeneracy: method eps=0='{line1}' != baseline='{line2}'"
+    assert line1.startswith("FINAL adversarial="), line1
+    assert line2.startswith("FINAL baseline="), line2
+    v1 = line1.split("=", 1)[1]
+    v2 = line2.split("=", 1)[1]
+    assert v1 == v2, f"CLI degeneracy: method eps=0 value='{v1}' != baseline value='{v2}'"
 
 
 def test_run_experiment_cli_determinism():

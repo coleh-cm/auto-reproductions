@@ -26,6 +26,21 @@ running log and target numbers.
 
 - `src/fgsm_repro/` — the implementation (models, attacks, objectives,
   train, eval). *(Added by the implementation step.)*
+- `run_experiment.py` — the graded-harness runner. `--baseline` (clean maxout
+  training) or `--lambda EPS` (FGSM adversarial training, Algorithm B); prints
+  exactly one line `FINAL <arm>=<clean test accuracy>`. `--lambda 0` (the method
+  at its no-op) prints the same accuracy VALUE as `--baseline` (the degeneracy
+  contract, tested by `tests/test_degeneracy.py`).
+- `arms.json` — the gate contract: a flat map `{"baseline": "<cmd>",
+  "adversarial": "<cmd>"}` from each arm the gate runs to the shell command
+  that produces it. The two arms are the paper's headline M4 comparison
+  (tex:492-494). The rich 12-arm per-milestone metadata is in
+  `arms_metadata.json`.
+- `run_all_arms.sh` — runs both arms at the paper's M4 config (maxout 240,
+  eps=0.25, alpha=0.5, 5000 steps); each prints exactly one
+  `FINAL <arm>=<value>` line (~1–2 min).
+- `smoke.sh` — the same code path at 200 steps (~3s); a path-prover only,
+  never evidence about the paper.
 - `experiments/` — one script per milestone: `m1_softmax.py`, `m2_logreg.py`,
   `m3_maxout_fgsm.py`, `m4_adversarial.py`, `m5_large_advtrain.py`,
   `m6_robustness_transfer.py`, `m7_noise_controls.py`, `m8_rbf.py`,
@@ -63,6 +78,12 @@ uv pip install --python .venv -r requirements.txt
 
 # run the tests (once the implementation step has added tests/)
 .venv/bin/python -m pytest -q
+
+# run the gate (both arms of the paper's headline M4 comparison; ~1-2 min)
+./run_all_arms.sh          # prints: FINAL baseline=<acc>  and  FINAL adversarial=<acc>
+
+# smoke-prove the code path runs (~3s; NOT a paper result)
+./smoke.sh
 
 # run a milestone experiment, e.g. the softmax-regression FGSM arm (M1)
 .venv/bin/python experiments/m1_softmax.py

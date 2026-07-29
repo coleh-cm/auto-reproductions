@@ -31,13 +31,21 @@ figure. We reproduce the **MNIST core**; the rest is graded below.
 Compute: CPU-only, 16 cores, Python 3.13, PyTorch. M5 (5 seeds × 2 arms) and E1 (12 nets) are
 the expensive items; seeds/ensemble members run as parallel processes.
 
-### 1.A. The comparison arms (machine-readable mirror: `arms.json`)
+### 1.A. The comparison arms (machine-readable mirror: `arms_metadata.json`; gate map: `arms.json`)
 
-The paper's own comparisons, named and fixed here — this table (mirrored in `arms.json`) is
-what the numbers gate walks. Training arms train a model; eval arms only consume trained
-models. Two extra evaluation-only rows (M6, M9) reuse the models of arms 3/6 and 1/3/8.
-Full per-arm configs (model, training, evaluation, target, citation, script, results file,
-metric paths) are in `arms.json` at the repo root.
+The paper's own comparisons, named and fixed here. `arms_metadata.json` is the
+rich machine-readable mirror (12 milestone arms with model/training/eval
+configs, paper targets, citations, results paths). `arms.json` is the GATE
+contract: a flat map from each arm the gate runs to the shell command that
+produces it (`{"baseline": "...", "adversarial": "..."}`), where each command
+prints exactly one line `FINAL <arm name>=<clean test accuracy>` and
+`run_all_arms.sh` runs both. The gate arms are the paper's headline M4
+comparison (tex:492-494): clean maxout training (`baseline`) vs FGSM
+adversarial training (`adversarial`, Algorithm B, eps=0.25, alpha=0.5).
+Training arms train a model; eval arms only consume trained models. Two
+extra evaluation-only rows (M6, M9) reuse the models of arms 3/6 and 1/3/8.
+Full per-arm configs (model, training, evaluation, target, citation, script,
+results file, metric paths) are in `arms_metadata.json` at the repo root.
 
 | Arm name | Kind | Model & training config | Attack/eval config | Paper target(s) |
 |----------|------|------------------------|--------------------|-----------------|
@@ -54,10 +62,17 @@ metric paths) are in `arms.json` at the repo root.
 | `m6_robustness_transfer_eval` | eval-only over arms 3 & 6 | — | own-FGSM; cross-transfer both directions, ε=0.25 | 17.9% / 19.6% / 40.9%, conf 81.4% (tex:514-523) |
 | `m9_rubbish_evals` | eval-only over arms 1, 3 (×sigmoid-top), 8 | — | 10,000 samples ∼ N(0,I₇₈₄); error := max p > 0.5 (tex:905-906) | maxout+softmax 98.35% (92.8%); sigmoid-top 68% (87.9%); softmax-reg 59.8% (70.8%); RBF 0% (tex:906-909, 919-924) |
 
-**Graded-harness arms** (subset for `run_experiment.py`): **method** = `--lambda EPS`
-(Algorithm B by default, α=0.5, dropout off for the degeneracy gate, §6 item 22);
-**baseline** = `--baseline` (clean training, same model/steps/seed). Degeneracy contract:
-`--lambda 0` ≡ `--baseline` bit-for-bit (tests/test_degeneracy.py).
+**Graded-harness arms** (gate, in `arms.json` + `run_all_arms.sh`): **baseline** =
+`python run_experiment.py --baseline --steps 5000 ...` (clean maxout training);
+**adversarial** = `python run_experiment.py --lambda 0.25 --steps 5000 ...`
+(Algorithm B by default, α=0.5, dropout off for the degeneracy gate, §6 item 22).
+Each prints exactly one line `FINAL <arm name>=<clean test accuracy>` (arm name =
+`baseline` / `adversarial`). Degeneracy contract: `--lambda 0` (arm `adversarial`
+at its no-op) prints the SAME accuracy VALUE as `--baseline` (arm `baseline`);
+the arm name differs by construction, the float value matches bit-for-bit
+(`tests/test_degeneracy.py`). Thread tuning: `run_all_arms.sh` / `smoke.sh` export
+`OMP_NUM_THREADS=4` / `MKL_NUM_THREADS=4` (PyTorch's default pool over-spawns on
+multi-core CPUs, a ~7x slowdown observed).
 
 **Excluded arms** (recorded, not run): GoogLeNet/ImageNet Fig. 1 (tex:378-383; 2014 DistBelief
 weights unavailable); MP-DBM ε=0.25 → 97.5% (tex:793-800; a separate paper's model);
@@ -418,3 +433,46 @@ this **only for y=+1**; for y=−1 E6 subtracts ε‖w‖₁ from the activation
 loss (E6 < clean), not the worst case. We implement E6 verbatim (matches the paper's printed
 equation) and the invariant test asserts E6 == empirical-FGSM for y=+1 (where the paper's "exact"
 claim holds) and records the y=−1 divergence as the paper's imprecision, not ours.
+
+---
+
+## 9. Gate contract (added at reproduction time)
+
+The reproduction's deliverable gate is a flat arm→command map plus runner scripts:
+
+- **`arms.json`** — a flat map `{"baseline": "<cmd>", "adversarial": "<cmd>"}` from each arm the
+  gate runs to the shell command that produces it. The two arms are the paper's headline M4
+  comparison (tex:492-494: clean maxout training vs FGSM adversarial training). The rich 12-arm
+  per-milestone metadata (model/training/eval configs, paper targets, citations, results paths)
+  is preserved in **`arms_metadata.json`**; `arms.json` is intentionally minimal so the gate can
+  pair each `FINAL <arm>=<value>` line to its arm by name mechanically.
+- **`run_all_arms.sh`** — runs both arms at the paper's M4 configuration (maxout 240×2, pieces 5,
+  eps=0.25, alpha=0.5, 5000 SGD steps, dropout OFF for degeneracy validity). Each command prints
+  exactly one line `FINAL <arm name>=<clean test accuracy>` to stdout (progress to stderr), so
+  stdout is exactly the two gate lines. Exports `OMP_NUM_THREADS=4` / `MKL_NUM_THREADS=4`
+  (PyTorch's default thread pool over-spawns on multi-core CPUs — a ~7x slowdown observed at
+  1500 steps; 4 threads is the sweet spot here).
+- **`smoke.sh`** — the same code path (method arm, 200 steps, units 64) finishing in seconds;
+  prints one `FINAL adversarial=<float>` line. A path-prover only, never evidence about the paper.
+- **`run_experiment.py` output contract** — exactly one line `FINAL <arm>=<clean test accuracy>`
+  where `<arm>` is `baseline` (for `--baseline`) or `adversarial` (for `--lambda`). The arm name
+  matches the `arms.json` keys. The degeneracy contract: `--lambda 0` (arm `adversarial` at its
+  no-op) prints the SAME accuracy VALUE as `--baseline` (arm `baseline`); the names differ by
+  construction, the float value matches bit-for-bit (`tests/test_degeneracy.py`).
+
+The gate reproduces the DIRECTION of the M4 result (adversarial ≥ baseline; the paper's 0.94%→0.84%
+clean test error drop). The exact magnitudes require dropout ON + early stopping to convergence;
+that higher-fidelity arm lives in `experiments/m4_adversarial.py` with committed
+`results/m4_adversarial.json`.
+
+### Finding: M5 retrain over-training (adversarial review, fixed)
+The paper protocol (tex:505-506): the early-stopping criterion selects the BEST epoch, then the
+model is retrained on all 60,000 for EXACTLY that many epochs. `train.py` originally exposed only
+`epochs_run` (= the STOPPING epoch = best_epoch + patience), so `experiments/m5_large_advtrain.py`
+retrained for best_epoch + patience epochs — over-training by ~patience epochs and biasing the
+headline M5 number (tex:506-512, mean 0.782%). **Fix:** `TrainResult` now exposes `best_epoch`
+(0-based index of the epoch with the best validation metric); the M5 retrain arm uses
+`best_epoch + 1` (the selected epoch count). Regression test
+`tests/test_invariants.py::test_best_epoch_is_selected_not_stopping` asserts the property so the
+bug cannot silently return. (Found by an adversarial review of `train.py`; the verifier confirmed
+it by reading the code.)

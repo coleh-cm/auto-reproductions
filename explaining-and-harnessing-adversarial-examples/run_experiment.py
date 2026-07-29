@@ -26,15 +26,18 @@ pylearn2 mnist_pi.yaml, documented as external in SPEC.md section 6):
 --units, --pieces, --batch-size, --lr, --alpha, --dropout-input,
 --dropout-hidden, --data-root.
 
-Output: EXACTLY one line  `FINAL accuracy=<float>`  = clean test accuracy
-(matching /^FINAL accuracy=[0-9.]+$/).  All other output goes to stderr.
+Output: EXACTLY one line  `FINAL <arm>=<float>`  where <arm> is
+``baseline`` (for ``--baseline``) or ``adversarial`` (for the method arm,
+``--lambda``), and <float> is the clean test accuracy.  The arm name matches
+the keys in ``arms.json`` so the gate (``run_all_arms.sh``) can pair each
+line with its arm.  All other output goes to stderr.
 
 Determinism: MaxoutMLP weight init draws from the GLOBAL torch RNG
 (``nn.init.uniform_`` / ``nn.Linear`` init use no generator), so we call
 ``torch.manual_seed(seed)`` BEFORE constructing the model.  Two runs with
 the same --seed then produce bit-identical weights, dropout masks (the
 per-module dropout generator is reseeded from ``seed`` inside ``train``),
-and batch order, hence the same FINAL accuracy line.
+and batch order, hence the same FINAL line.
 
 Degeneracy: ``adv_train = not --baseline`` — the method (Algorithm B) runs
 by default, including at ``--lambda 0`` (its no-op setting, where
@@ -44,8 +47,15 @@ default (include-prob 1.0) so the method at ``--lambda 0`` reproduces the
 ``--baseline`` arm BIT-FOR-BIT: with dropout off, ``adversarial_train_cost``
 at eps=0 performs no extra RNG draw and its second forward equals the first,
 so the parameter update is identical to clean training.  The degeneracy test
-(tests/test_degeneracy.py) asserts ``--lambda 0`` and ``--baseline`` produce
-identical ``FINAL accuracy`` lines.
+(tests/test_degeneracy.py) asserts that ``--lambda 0`` (arm ``adversarial``)
+and ``--baseline`` (arm ``baseline``) print the SAME accuracy VALUE (the arm
+name differs by construction; the value must match bit-for-bit).
+
+Thread tuning: on multi-core CPUs PyTorch's default thread pool over-spawns
+and contends (observed ~7x slowdown at 1500 steps).  ``run_all_arms.sh`` and
+``smoke.sh`` export ``OMP_NUM_THREADS=4`` / ``MKL_NUM_THREADS=4``; the CLI
+itself leaves threading to the environment so the degeneracy/determinism
+tests (tiny step counts) are unaffected.
 """
 from __future__ import annotations
 
@@ -149,7 +159,8 @@ def main(argv: list[str] | None = None) -> int:
     model.eval()
 
     acc = eval_clean(model, data.x_test, data.y_test)
-    print(f"FINAL accuracy={acc}")
+    arm = "baseline" if args.baseline else "adversarial"
+    print(f"FINAL {arm}={acc}")
     return 0
 
 

@@ -1,0 +1,411 @@
+{
+  "paper": {
+    "title": "Explaining and Harnessing Adversarial Examples",
+    "authors": [
+      "Ian J. Goodfellow",
+      "Jonathon Shlens",
+      "Christian Szegedy"
+    ],
+    "venue": "ICLR 2015",
+    "arxiv_id": "1412.6572",
+    "authoritative_source": "paper/source/iclr2015.tex (arXiv v3 LaTeX; byte-identical to fresh e-print fetch)"
+  },
+  "metric_definitions": {
+    "error_rate": "fraction of ALL evaluated examples misclassified = mean(argmax logits != y); over all examples, not only originally-correct ones (SPEC.md \u00a76 item 13)",
+    "mean_confidence_on_errors": "softmax probability of the PREDICTED class, averaged over the misclassified subset only (SPEC.md \u00a76 item 14; tex:333-341, 521-523, 600-604)",
+    "rubbish_error_rate": "fraction of N(0,I_F) samples with max_k p(y=k|x) > 0.5 (tex:905-906); sigmoid-top variant: any per-class sigmoid > 0.5",
+    "no_clipping": "FGSM-perturbed inputs are never clipped back to [0,1] (SPEC.md \u00a76 item 12; tex:235,309)"
+  },
+  "graded_harness": {
+    "cli": "run_experiment.py --lambda EPS --steps N [--seed S] [--baseline]",
+    "output_contract": "exactly one stdout line matching /^FINAL (baseline|adversarial)=[0-9.]+$/ where the arm name matches the keys in arms.json; <value> is the clean test accuracy. All other output goes to stderr.",
+    "method_arm": "--lambda EPS (default eps=0.25): FGSM adversarial training (Algorithm B, J~ = alpha*J + (1-alpha)*J(x+eps*sign(grad_x J)), alpha=0.5 per tex:488); runs by default including at eps=0",
+    "baseline_arm": "--baseline: identical maxout MLP trained on the clean cost only",
+    "degeneracy_requirement": "--lambda 0 and --baseline must print bit-identical FINAL lines (eps=0 => x_tilde==x => J~==J; dropout off by default in the harness); tested by tests/test_degeneracy.py"
+  },
+  "external_recipe": {
+    "note": "The paper states NO optimizer, depth/pieces, init, dropout rate, or epoch count. These defaults come from the still-live lisa-lab/pylearn2 mnist_pi.yaml (2013 maxout paper) and are EXTERNAL, not paper-stated (SPEC.md \u00a76, External block).",
+    "values": {
+      "init": "uniform irange .005 on all 3 layers incl. softmax readout, zero bias",
+      "constraint": "max_col_norm 1.9365 on all 3 layers (per-output-unit norm)",
+      "optimizer": "SGD batch 100, LR .1 with exponential decay 1.000004/update (min 1e-6), momentum .5 -> .7 by epoch 250",
+      "dropout": "input of h0 only, include-prob .8, non-inverted scale 1.0 (we use inverted dropout, documented deviation); NO hidden/readout-input dropout",
+      "split": "train[0:50000] / valid[50000:60000]; full-data retrain uses all 60000 (tex:506)"
+    }
+  },
+  "arms": [
+    {
+      "name": "m1_softmax_regression",
+      "milestone": "M1",
+      "model": {
+        "class": "SoftmaxRegression",
+        "in_dim": 784,
+        "n_classes": 10
+      },
+      "training": {
+        "loss": "cross_entropy",
+        "adv_train": false,
+        "optimizer": "SGD (external; paper states none)"
+      },
+      "evaluation": {
+        "attack": "fgsm",
+        "eps": 0.25,
+        "set": "mnist_test"
+      },
+      "paper_target": {
+        "adv_error_rate": 0.999,
+        "mean_confidence_on_errors": 0.793,
+        "citation": "paper/source/iclr2015.tex:333",
+        "quote": "an error rate of 99.9% with an average confidence of 79.3%"
+      },
+      "script": "experiments/m1_softmax.py",
+      "results": "results/m1_softmax.json",
+      "result_metric_paths": {
+        "adv_error_rate": "fgsm_eval.error_rate",
+        "mean_confidence_on_errors": "fgsm_eval.mean_confidence_on_errors"
+      }
+    },
+    {
+      "name": "m2_logistic_3v7",
+      "milestone": "M2",
+      "model": {
+        "class": "LogisticRegression",
+        "in_dim": 784,
+        "labels": "{-1,+1}",
+        "data": "MNIST classes 3 vs 7"
+      },
+      "training": {
+        "loss": "softplus_logreg_cost (E5; tex:401-404)",
+        "adv_train": false
+      },
+      "evaluation": {
+        "attack": "fgsm_logreg (exact per-example worst case eta = -eps*y*sign(w), tex:407)",
+        "eps": 0.25,
+        "set": "mnist_test_3v7"
+      },
+      "paper_target": {
+        "clean_error": 0.016,
+        "adv_error_rate": 0.99,
+        "citation": "paper/source/iclr2015.tex:454-456",
+        "quote": "a 1.6% error rate on the 3 versus 7 discrimination task ... an error rate of 99%"
+      },
+      "script": "experiments/m2_logreg.py",
+      "results": "results/m2_logreg.json",
+      "result_metric_paths": {
+        "clean_error": "clean_error",
+        "adv_error_rate": "fgsm_eval.error_rate"
+      }
+    },
+    {
+      "name": "m3_maxout240_clean",
+      "milestone": "M3",
+      "model": {
+        "class": "MaxoutMLP",
+        "units": 240,
+        "pieces": 5,
+        "hidden_layers": 2,
+        "in_dim": 784,
+        "n_classes": 10,
+        "dropout_input_include": 0.8,
+        "dropout_hidden_include": 1.0
+      },
+      "training": {
+        "loss": "cross_entropy",
+        "adv_train": false,
+        "recipe": "external_recipe"
+      },
+      "evaluation": {
+        "attack": "fgsm",
+        "eps": 0.25,
+        "set": "mnist_test"
+      },
+      "paper_target": {
+        "adv_error_rate": 0.894,
+        "mean_confidence_on_errors": 0.976,
+        "citation": "paper/source/iclr2015.tex:338-339",
+        "quote": "a maxout network misclassifies 89.4% of our adversarial examples with an average confidence of 97.6%"
+      },
+      "script": "experiments/m3_maxout_fgsm.py",
+      "results": "results/m3_maxout_fgsm.json",
+      "result_metric_paths": {
+        "adv_error_rate": "fgsm_eval.error_rate",
+        "mean_confidence_on_errors": "fgsm_eval.mean_confidence_on_errors"
+      },
+      "also_baseline_of": "M4 (its clean test error is the paper's 0.94%, tex:492-494)"
+    },
+    {
+      "name": "m4_maxout240_advtrain",
+      "milestone": "M4",
+      "model": "identical to m3_maxout240_clean (240x2, pieces 5, input dropout .8)",
+      "training": {
+        "loss": "adversarial_train_cost (E7, tex:486-487)",
+        "adv_train": true,
+        "eps": 0.25,
+        "alpha": 0.5,
+        "stop_grad_in_sign": true
+      },
+      "paper_target": {
+        "clean_test_error_baseline": 0.0094,
+        "clean_test_error_advtrain": 0.0084,
+        "comparison": "advtrain < baseline (direction is the headline regularization claim)",
+        "citation": "paper/source/iclr2015.tex:492-494",
+        "quote": "reduce the error rate from 0.94% without adversarial training to 0.84% with adversarial training"
+      },
+      "script": "experiments/m4_adversarial.py",
+      "results": "results/m4_adversarial.json",
+      "result_metric_paths": {
+        "clean_test_error_baseline": "arms.baseline.clean_error",
+        "clean_test_error_advtrain": "arms.adversarial.clean_error"
+      }
+    },
+    {
+      "name": "m5_maxout1600_clean",
+      "milestone": "M5",
+      "model": {
+        "class": "MaxoutMLP",
+        "units": 1600,
+        "pieces": 5,
+        "hidden_layers": 2,
+        "dropout_input_include": 0.8,
+        "dropout_hidden_include": 1.0
+      },
+      "training": {
+        "adv_train": false,
+        "early_stop": "clean valid error, patience 100 (tex:501-503)",
+        "retrain": "on all 60000 for the chosen epoch count"
+      },
+      "paper_target": {
+        "clean_test_error": 0.0114,
+        "citation": "paper/source/iclr2015.tex:497-499",
+        "quote": "Without adversarial training ... an error rate of 1.14% on the test set"
+      },
+      "script": "experiments/m5_large_advtrain.py",
+      "results": "results/m5_large_advtrain.json",
+      "result_metric_paths": {
+        "clean_test_error": "arms.baseline.mean_test_error"
+      }
+    },
+    {
+      "name": "m5_maxout1600_advtrain",
+      "milestone": "M5",
+      "model": "identical to m5_maxout1600_clean (1600x2)",
+      "training": {
+        "adv_train": true,
+        "eps": 0.25,
+        "alpha": 0.5,
+        "early_stop": "ADVERSARIAL valid-set error (FGSM vs current model, tex:503-505)",
+        "retrain": "on all 60000 (tex:506)",
+        "seeds": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "paper_target": {
+        "mean_test_error": 0.00782,
+        "per_seed": [
+          0.0077,
+          0.0077,
+          0.0077,
+          0.0077,
+          0.0083
+        ],
+        "citation": "paper/source/iclr2015.tex:506-512",
+        "quote": "four trials that each had an error rate of 0.77% ... one ... 0.83%. The average of 0.782%"
+      },
+      "script": "experiments/m5_large_advtrain.py",
+      "results": "results/m5_large_advtrain.json",
+      "result_metric_paths": {
+        "mean_test_error": "arms.adversarial.mean_test_error"
+      }
+    },
+    {
+      "name": "m6_robustness_transfer_eval",
+      "milestone": "M6",
+      "kind": "evaluation-only over arms m3_maxout240_clean and m5_maxout1600_advtrain (no new training arm)",
+      "evaluations": {
+        "own_fgsm_on_adv_model": {
+          "attack": "fgsm eps=0.25 vs m5 adv-trained model",
+          "target_error": 0.179,
+          "target_confidence_on_errors": 0.814
+        },
+        "transfer_orig_to_adv": {
+          "attack x from m3 model, score on m5 adv model": 0.196
+        },
+        "transfer_adv_to_orig": {
+          "attack x from m5 adv model, score on m3 model": 0.409
+        }
+      },
+      "paper_target": {
+        "citation": "paper/source/iclr2015.tex:514-523",
+        "quote": "the error rate fell to 17.9% ... 19.6% ... 40.9% ... average confidence ... 81.4%"
+      },
+      "script": "experiments/m6_robustness_transfer.py",
+      "results": "results/m6_robustness_transfer.json"
+    },
+    {
+      "name": "m7_maxout_noise_sign",
+      "milestone": "M7",
+      "model": "identical to m3_maxout240_clean",
+      "training": {
+        "loss": "noise_train_cost: x + eps*b, b iid Bernoulli{-1,+1} per pixel (E10; tex:555-556)",
+        "adv_train": false,
+        "eps": 0.25
+      },
+      "evaluation": {
+        "attack": "fgsm",
+        "eps": 0.25
+      },
+      "paper_target": {
+        "adv_error_rate": 0.862,
+        "mean_confidence_on_errors": 0.973,
+        "citation": "paper/source/iclr2015.tex:555-557"
+      },
+      "script": "experiments/m7_noise_controls.py",
+      "results": "results/m7_noise_controls.json",
+      "result_metric_paths": {
+        "adv_error_rate": "arms.bernoulli.fgsm_eval.error_rate",
+        "mean_confidence_on_errors": "arms.bernoulli.fgsm_eval.mean_confidence_on_errors"
+      }
+    },
+    {
+      "name": "m7_maxout_noise_uniform",
+      "milestone": "M7",
+      "model": "identical to m3_maxout240_clean",
+      "training": {
+        "loss": "noise_train_cost: x + u, u iid U(-eps, eps) per pixel (E10; tex:555-556)",
+        "adv_train": false,
+        "eps": 0.25
+      },
+      "evaluation": {
+        "attack": "fgsm",
+        "eps": 0.25
+      },
+      "paper_target": {
+        "adv_error_rate": 0.904,
+        "mean_confidence_on_errors": 0.978,
+        "citation": "paper/source/iclr2015.tex:555-557"
+      },
+      "script": "experiments/m7_noise_controls.py",
+      "results": "results/m7_noise_controls.json",
+      "result_metric_paths": {
+        "adv_error_rate": "arms.uniform.fgsm_eval.error_rate",
+        "mean_confidence_on_errors": "arms.uniform.fgsm_eval.mean_confidence_on_errors"
+      }
+    },
+    {
+      "name": "m8_rbf_shallow",
+      "milestone": "M8",
+      "model": {
+        "class": "RBFNet",
+        "n_classes": 10,
+        "in_dim": 784,
+        "params": "mu [K,784], beta [K,784,784]; binary form p(y=1|x)=exp((x-mu)^T beta (x-mu)) tex:595; multiclass normalization unstated (SPEC.md \u00a76 item 9)"
+      },
+      "training": {
+        "loss": "cross_entropy over softmax of quadratic forms"
+      },
+      "evaluation": {
+        "attack": "fgsm",
+        "eps": 0.25
+      },
+      "paper_target": {
+        "adv_error_rate": 0.554,
+        "confidence_on_mistakes": 0.012,
+        "clean_confidence": 0.606,
+        "citation": "paper/source/iclr2015.tex:600-604"
+      },
+      "secondary_targets": {
+        "class_agreement_section8": {
+          "rbf_predicts_maxout": 0.16,
+          "softmax_predicts_maxout": 0.546,
+          "softmax_given_both_err": 0.846,
+          "rbf_given_both_err": 0.543,
+          "rbf_predicts_softmax": 0.536,
+          "citation": "paper/source/iclr2015.tex:679-688"
+        }
+      },
+      "script": "experiments/m8_rbf.py",
+      "results": "results/m8_rbf.json"
+    },
+    {
+      "name": "m9_rubbish_evals",
+      "milestone": "M9",
+      "kind": "evaluation-only over trained arms (no new training): 10000 samples ~ N(0, I_784) (tex:905)",
+      "evaluations": {
+        "maxout_softmax (arm m3 model)": {
+          "rubbish_error": 0.9835,
+          "confidence_on_mistakes": 0.928,
+          "citation": "paper/source/iclr2015.tex:906-908"
+        },
+        "maxout_sigmoid_top (m3 trunk+readout copied, sigmoid per class, not retrained; SPEC.md \u00a76 item 25)": {
+          "rubbish_error": 0.68,
+          "confidence_on_mistakes": 0.879,
+          "citation": "paper/source/iclr2015.tex:908-909"
+        },
+        "softmax_regression (arm m1 model)": {
+          "rubbish_error": 0.598,
+          "confidence_on_mistakes": 0.708,
+          "citation": "paper/source/iclr2015.tex:919-924"
+        },
+        "rbf (arm m8 model)": {
+          "rubbish_error": 0.0,
+          "confidence_on_mistakes": "undefined (tex:923-924)"
+        }
+      },
+      "script": "experiments/m9_rubbish.py",
+      "results": "results/m9_rubbish.json"
+    },
+    {
+      "name": "e1_ensemble12_maxout",
+      "milestone": "E1 (extended)",
+      "model": "12 x m3_maxout240_clean config, distinct seeds (init/dropout/minibatch RNG; tex:820-822)",
+      "training": {
+        "adv_train": false,
+        "recipe": "external_recipe"
+      },
+      "evaluation": {
+        "attack_ensemble": "fgsm eps=0.25 on the mean of members' losses (combination rule unstated, SPEC.md \u00a76 item 11)",
+        "attack_single": "fgsm eps=0.25 vs one member"
+      },
+      "paper_target": {
+        "ensemble_targeted_error": 0.911,
+        "single_member_targeted_error": 0.879,
+        "citation": "paper/source/iclr2015.tex:822-825"
+      },
+      "script": "experiments/e1_ensemble.py",
+      "results": "results/e1_ensemble.json"
+    }
+  ],
+  "excluded_arms": [
+    {
+      "name": "googlenet_imagenet_fig1",
+      "paper_claim": "qualitative FGSM demo, eps=0.007 (tex:378-383)",
+      "reason": "2014-era DistBelief GoogLeNet weights unavailable; no reproducible artifact exists"
+    },
+    {
+      "name": "mpdbm_fgsm",
+      "paper_claim": "adv error 97.5% at eps=0.25 (tex:793-800)",
+      "reason": "requires implementing the MP-DBM (Goodfellow et al. 2013a), a separate paper's model; out of budget"
+    },
+    {
+      "name": "cifar10_conv_maxout (E2)",
+      "paper_claim": "adv 87.15% (conf 96.6%) at eps=0.1, tex:340-341; rubbish 93.4% (84.4%), tex:910-912; targeted fooling 75.3%/step avg, tex:936-941",
+      "reason": "extended scope beyond the MNIST core; architecture/preprocessing exist only externally (cifar10.yaml)"
+    }
+  ],
+  "gate_contract": {
+    "comment": "Gate contract: a flat map from each arm THIS paper compares to the shell command that produces it. The paper's headline comparison (Goodfellow et al. 2015, tex:492-494) is clean maxout training ('baseline') vs FGSM adversarial training ('adversarial', Algorithm B, eps=0.25, alpha=0.5). Each command prints EXACTLY one line `FINAL <arm name>=<clean test accuracy>`; run_all_arms.sh runs both and the gate pairs each line to its arm by name. arms.json holds ONLY the runnable arms; this section holds the explanatory notes that previously lived as '_'-prefixed keys in arms.json (removed because the gate requires a FINAL line for every key).",
+    "paper": "Explaining and Harnessing Adversarial Examples (Goodfellow, Shlens, Szegedy; ICLR 2015; arXiv:1412.6572v3)",
+    "paper_target": {
+      "citation": "paper/source/iclr2015.tex:492-494",
+      "quote": "from 0.94% without adversarial training to 0.84%",
+      "note": "adversarial training should reduce clean test error vs baseline (i.e. raise clean test accuracy). At the degeneracy-valid harness scale (dropout off, fixed SGD steps) we reproduce the DIRECTION: adversarial >= baseline. The paper's exact 0.94%->0.84% magnitudes require full convergence with dropout + early stopping (see experiments/m4_adversarial.py, results/m4_adversarial.json)."
+    },
+    "value_definition": "clean test accuracy = mean(argmax logits == y) over the 10k MNIST test set (printed as FINAL <arm>=<value>)",
+    "degeneracy": "run_experiment.py --lambda 0 (arm 'adversarial' at its no-op) must print the SAME accuracy VALUE as --baseline (arm 'baseline'); tested by tests/test_degeneracy.py",
+    "environment_note": "Commands rely on run_all_arms.sh / smoke.sh exporting OMP_NUM_THREADS=4 and MKL_NUM_THREADS=4 (PyTorch's default thread pool over-spawns on multi-core CPUs, a ~7x slowdown). The CLI itself leaves threading to the environment."
+  }
+}

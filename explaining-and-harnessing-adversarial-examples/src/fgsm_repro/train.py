@@ -77,6 +77,15 @@ class TrainResult:
     epochs_run: int
     best_metric: float
     steps_run: int
+    # Epoch index (0-based) at which the best validation metric was attained.
+    # Used by the M5 protocol (tex:505-506): the early-stopping criterion picks
+    # the BEST epoch, then the model is retrained on all 60,000 for EXACTLY that
+    # many epochs. ``epochs_run`` is the STOPPING epoch (best_epoch + patience),
+    # so callers that need the selected epoch count (not the stopping epoch)
+    # MUST read ``best_epoch`` (+1 to convert the 0-based index to a count).
+    # None when validation is empty (retrain arm keeps the final state) or
+    # when no epoch ever improved on +inf (max_steps == 0).
+    best_epoch: Optional[int] = None
 
 
 class _Trainable(Protocol):
@@ -189,6 +198,7 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
     cur_lr = float(cfg.lr)
     best_metric = float("inf")
     best_state_dict: Optional[dict] = None
+    best_epoch: Optional[int] = None
     patience_counter = 0
     steps = 0
     history: list = []
@@ -299,6 +309,7 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
             if metric < best_metric:
                 best_metric = metric
                 best_state_dict = copy.deepcopy(model.state_dict())
+                best_epoch = epoch
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -319,6 +330,7 @@ def train(model: Any, cfg: TrainConfig, data: "MNISTData") -> TrainResult:
         epochs_run=epochs_run,
         best_metric=best_metric,
         steps_run=steps,
+        best_epoch=best_epoch,
     )
 
 
