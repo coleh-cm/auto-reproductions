@@ -74,6 +74,9 @@ def main(argv=None):
     ap.add_argument("--q", type=float, default=config.DEFAULT_Q_PERCENTILE)
     ap.add_argument("--K", type=int, default=config.DEFAULT_K_HEADS)
     ap.add_argument("--alpha", type=float, default=config.DEFAULT_ALPHA)
+    ap.add_argument("--max-new-tokens", type=int, default=0,
+                    help="override per-domain max_new_tokens (0 = config default; "
+                         "use a small value for fast CPU verification of the fit path)")
     args = ap.parse_args(argv)
 
     # load model (expected to fail in sandbox)
@@ -105,8 +108,9 @@ def main(argv=None):
         _blocked(f"training source unavailable for {args.benchmark}: {e!r}")
 
     # 2. sample <=n traces per problem, keep problems with >=1 correct & >=1 incorrect
-    max_new = config.DEFAULT_MAX_NEW_TOKENS.get(
-        "code" if args.benchmark in ("HumanEval", "MBPP") else "math", 512)
+    max_new = (args.max_new_tokens if args.max_new_tokens and args.max_new_tokens > 0
+               else config.DEFAULT_MAX_NEW_TOKENS.get(
+                   "code" if args.benchmark in ("HumanEval", "MBPP") else "math", 512))
     paired = []
     for prob in train_problems:
         traces = []

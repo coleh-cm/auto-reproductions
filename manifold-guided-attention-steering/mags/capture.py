@@ -51,6 +51,8 @@ def capture_trace(model, tok, model_id, hook_registry, prompt_text, max_new_toke
     """
     torch.manual_seed(seed)
     ids = tok(prompt_text, return_tensors="pt").input_ids.to(model.device)
+    from .generation import _truncate_prompt
+    ids = _truncate_prompt(model, ids, max_new_tokens)
     n_prompt = ids.shape[1]
     capture = _CaptureHook(hook_registry.layout.monitored_layers,
                            hook_registry.layout.n_heads, hook_registry.layout.head_dim)

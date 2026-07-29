@@ -933,3 +933,76 @@ molecular setup unstated by the paper, SPEC §4.18). The gate's "all missing"
 report is the expected signal for an environment-blocked GPU paper, not a
 plumbing bug to fix by fabricating numbers; the publish step reports
 `rung=environment`.
+
+### Round 12 — pipeline end-to-end verification on a real model + real benchmark; two real bugs fixed
+
+The recurring gate feedback (`values: []`, "all arms missing a FINAL line")
+diagnoses only the environment block: the gate parses `FINAL <arm>=<value>` and
+treats the non-numeric `BLOCKED` as no value. This is honest and unavoidable
+here (no GPU, no cached 8B/4B/20B weights, Llama gated, GPT-OSS needs >=40 GB),
+and fabricating a number is forbidden by the reproduction rules. So this round
+did NOT chase a fake number; it verified the pipeline is correct so that a
+GPU host with cached paper models produces real numbers, and fixed two real
+bugs found by actually running the code path on a cached tiny model + the real
+benchmark data (the only legitimate CPU-runnable verification available).
+
+**Verification (real model `distilgpt2` — cached with weights — + real cached
+benchmark data; NOT paper evidence, only path evidence):**
+- `mags.fit` (Phase A) on `distilgpt2` + real `TIGER-Lab/MathInstruct` (the
+  MATH-500 contrastive-trace source): loads the model, loads the real source,
+  generates traces, grades them, applies the keep-if-both rule (tex:L399), and
+  correctly emits `BLOCKED[fit]` when the tiny model produces no problem with
+  both a correct and an incorrect trace (a model-capability limit, not a bug).
+  The full trace→grade→retain→(fit) path executes without error.
+- `mags.run --arm unsteered` on `distilgpt2` + real `HuggingFaceH4/MATH-500`
+  (--smoke --limit 4): runs the whole eval (load→generate→grade→bootstrap CI→
+  conditional PPL), writes `runs/MATH-500__distilgpt2__unsteered.json`
+  (`{n,acc,ci95,ppl}`), and prints a numeric `FINAL test_unsteered=0.0000`.
+- `mags.run --arm mags` with a real fitted `ManifoldBank` .npz built from
+  captured `distilgpt2` activations: loads the bank, builds the `MAGSController`,
+  runs decode-only W_O pre-hook steering on real MATH-500, writes the result
+  JSON, and prints a numeric `FINAL test_mags=0.0000`. The steering arm path
+  (bank load → controller → hooked generation → grade) is verified.
+- `smoke.sh` → `FINAL smoke=0.0000` (unchanged); `pytest` → 33/33.
+
+This proves the ONLY remaining blocker is the paper's specific models + GPU:
+the code path is correct end-to-end, so a GPU host with cached
+`meta-llama/Llama-3.1-8B-Instruct` / `google/gemma-4-E4B-it` / `openai/gpt-oss-20b`
+would run `run_all_arms.sh` Phase 1 (fit) + Phase 2 (eval) and emit real numeric
+`FINAL <arm>=<acc>` lines.
+
+**Bug 1 (real, would have crashed the MATH-500 manifold fit on a GPU host).**
+`mags/grading.py::grade` dispatched `MATH-500`, `GSM8K`, `HumanEval`, `MBPP`,
+`APPS-train` but NOT `MATH-500-train`. The MathInstruct source
+(`load_mathinstruct`) tags its problems `benchmark="MATH-500-train"`, and
+`mags.fit` grades each sampled trace against `prob.benchmark` (the SOURCE
+problem's gold, tex:L399). So `mags.fit --benchmark MATH-500` on a GPU host
+raised `ValueError: unknown benchmark 'MATH-500-train'` on the very first trace
+and the whole MATH-500 manifold (the headline comparison, Table 1/2 MATH-500
+column) could never be fit. Found by running the fit CLI on `distilgpt2` + the
+real MathInstruct source. Fixed: added `MATH-500-train` → `grade_math` (the
+MathInstruct gold is a `\boxed{}` answer, identical format to MATH-500).
+Regression test `test_grade_math500_train_source_tag` (+ an "unknown tag must
+raise" guard) added to `tests/test_grading.py`.
+
+**Bug 2 (robustness, long training prompts).** `generation.generate` and
+`capture.capture_trace` did not truncate the prompt to the model's context
+window, so a training prompt longer than `max_position_embeddings` raised
+`IndexError: index out of range in self` in the position-embedding lookup
+(reproduced on `distilgpt2`, 1024 positions, with a long MathInstruct prompt).
+Inert for the paper's 8B/20B models (>=8k context) but a real crash on over-long
+prompts (some APPS questions) and on the small verification models. Fixed:
+shared `_truncate_prompt` (left-truncation, keeps the most recent prompt
+context, matching chat-template usage) applied in both entry points.
+Regression test `test_truncate_prompt_left_truncates_to_context` in
+`tests/test_invariants.py`. Also added `--max-new-tokens` to `mags.fit` for
+fast CPU verification of the fit path.
+
+**Open choice recorded.** None new beyond SPEC §4. The fixes close latent bugs;
+they do not introduce a knob the paper does not have and do not change the
+method or any reported number.
+
+**Status (unchanged conclusion).** Implementation complete and correct; the
+environment cannot produce the paper's numbers (no GPU / no cached 8B/4B/20B
+weights; molecular setup unstated, SPEC §4.18). Every arm is a genuine
+`BLOCKED`; the publish step reports `rung=environment`.

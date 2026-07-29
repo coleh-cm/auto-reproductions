@@ -192,3 +192,28 @@ def test_auroc_detects_signal_above_chance():
     auc_max = head_auroc(ha, B, mu_c, "max")
     assert auc_mean > 0.6, f"mean AUROC {auc_mean} should exceed 0.6 with a real error dir"
     assert auc_max > 0.6
+
+
+# --- prompt truncation never crashes a forward pass on a long prompt ---
+def test_truncate_prompt_left_truncates_to_context():
+    """Regression: generate()/capture_trace() left-truncate the prompt to the
+    model's context window so a long training prompt (e.g. an APPS question) does
+    not raise IndexError in the position-embedding lookup. The paper's 8B/20B
+    models have >=8k context so this is inert there; it matters for verification
+    on small models and for any over-long prompt on any model."""
+    import numpy as np
+    from mags.generation import _max_positions, _truncate_prompt
+
+    class _Cfg:
+        max_position_embeddings = 64
+    class _M:
+        config = _Cfg()
+    import torch
+    ids = torch.arange(1, 201).unsqueeze(0)  # 200 tokens, exceeds 64
+    out = _truncate_prompt(_M(), ids, max_new_tokens=10)
+    assert out.shape[1] == 54, out.shape  # 64 - 10 = 54
+    # keeps the MOST RECENT tokens (left-truncation)
+    assert out[0, -1].item() == 200
+    # under the cap: unchanged
+    short = torch.arange(1, 11).unsqueeze(0)
+    assert _truncate_prompt(_M(), short, max_new_tokens=10).shape[1] == 10

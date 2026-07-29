@@ -189,4 +189,14 @@ def grade(benchmark: str, completion: str, problem) -> bool:
         return grade_mbpp(completion, problem)
     if benchmark == "APPS-train":
         return grade_apps(completion, problem)
+    # MATH-500-train: the MathInstruct contrastive-trace source (SPEC §4.13,
+    # load_mathinstruct) tags its problems `MATH-500-train`; its gold is a
+    # \\boxed{} answer extracted from the MathInstruct `output`, identical in
+    # format to MATH-500, so it grades with the same math grader. This case is
+    # reached by mags.fit when labelling contrastive traces for the MATH-500
+    # manifold (fit grades against the SOURCE problem's gold, tex:L399); without
+    # it the fit CLI raises `unknown benchmark 'MATH-500-train'` and the whole
+    # MATH-500 manifold fit crashes on a GPU host.
+    if benchmark == "MATH-500-train":
+        return grade_math(completion, problem.gold)
     raise ValueError(f"unknown benchmark {benchmark!r}")

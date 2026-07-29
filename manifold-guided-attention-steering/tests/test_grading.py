@@ -90,3 +90,27 @@ def test_humaneval_pass_and_fail():
     from mags.grading import grade_humaneval
     assert grade_humaneval("    return a + b\n", prob)
     assert not grade_humaneval("    return a * b\n", prob)
+
+
+def test_grade_math500_train_source_tag():
+    """Regression: mags.fit grades contrastive traces against the SOURCE problem's
+    gold. The MathInstruct source (load_mathinstruct, MATH-500 contrastive-trace
+    source per tex:L399) tags problems `benchmark='MATH-500-train'`; grade() must
+    dispatch that tag to the math grader. Without it mags.fit raises
+    `unknown benchmark 'MATH-500-train'` and the whole MATH-500 manifold fit
+    crashes on a GPU host (the bug was found by running the fit CLI on a tiny
+    cached model + the real MathInstruct source)."""
+    prob = Problem(id="mathinstruct-0", benchmark="MATH-500-train",
+                   prompt_text="", gold="42",
+                   extra={"solution": r"...$\boxed{42}$"})
+    assert grade("MATH-500-train", r"The answer is $\boxed{42}$", prob)
+    assert not grade("MATH-500-train", r"The answer is $\boxed{7}$", prob)
+
+
+def test_grade_unknown_tag_raises():
+    """An unrecognised benchmark tag must raise, not silently pass/fail — that is
+    how the MATH-500-train bug was originally caught."""
+    import pytest
+    prob = Problem(id="x", benchmark="no-such-bench", prompt_text="", gold="")
+    with pytest.raises(ValueError):
+        grade("no-such-bench", "anything", prob)

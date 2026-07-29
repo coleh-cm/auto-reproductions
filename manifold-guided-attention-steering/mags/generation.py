@@ -9,6 +9,33 @@ import torch
 import torch.nn.functional as F
 
 
+def _max_positions(model):
+    """Best-effort model context length. Falls back to a large value when the
+    attribute is absent (modern models set it on config)."""
+    cfg = getattr(model, "config", None)
+    for attr in ("max_position_embeddings", "n_positions", "max_seq_len",
+                 "model_max_length"):
+        v = getattr(cfg, attr, None)
+        if isinstance(v, int) and v > 0:
+            return v
+    return 1 << 30
+
+
+def _truncate_prompt(model, ids, max_new_tokens):
+    """Left-truncate prompt token ids so prompt + max_new_tokens fits the model's
+    context window. Long training prompts (e.g. APPS questions) can exceed a
+    model's max_position_embeddings on small models and would otherwise raise an
+    IndexError in the position-embedding lookup; the paper's 8B/20B models have
+    >=8k context so this is inert for the real runs (it only prevents a crash on
+    very long prompts). Left-truncation preserves the most recent prompt context,
+    matching the paper's instruction-tuned chat-template usage."""
+    cap = _max_positions(model)
+    room = max(1, cap - int(max_new_tokens))
+    if ids.shape[1] > room:
+        ids = ids[:, -room:]
+    return ids
+
+
 @torch.no_grad()
 def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
              do_sample=False, temperature=1.0, top_p=0.95, seed=42):
@@ -24,6 +51,7 @@ def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
     """
     torch.manual_seed(seed)
     ids = tok(prompt_text, return_tensors="pt").input_ids.to(model.device)
+    ids = _truncate_prompt(model, ids, max_new_tokens)
     n_prompt = ids.shape[1]
     prompt_ids = ids[0].cpu().numpy()
     # Install the controller through the model's HookRegistry when available.
