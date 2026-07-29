@@ -937,3 +937,43 @@ substantive numbers are unchanged.
 
 No implementation, SPEC, blocker (B1), or `run_all.log` changed. 32/32 tests
 pass; `smoke.sh` → `FINAL smoke=ok`. Branch `repro/block-lewis-gdr` pushed.
+
+### Round-20: 5-component adversarial paper-fidelity review (orchestration) — 0 findings; full gate + smoke reproduced byte-identical
+
+- Ran an `orchestrate` review (`block-lewis-gdr-round20-paper-fidelity-review`,
+  5 reviewer subagents — one per decomposable component: data_pipeline,
+  method_core, training_loop, evaluation_metric, baseline_arm_tests — each
+  reading the ACTUAL code files AND the authoritative paper `.tex` source at
+  `paper/arxiv-2607.00252-src/`, hunting for UNDISCLOSED correctness/fidelity
+  departures; each raw finding would go to a *separate* refutation-verifier that
+  re-read the cited `code:line` and `paper:tex:line` itself and kept the finding
+  only if real, material, and NOT a disclosed SPEC U-item / 8A / Blocker). The
+  script is the evaluator: nothing is trusted unverified.
+- Result: **0 confirmed findings** — every one of the 5 reviewers returned an
+  empty candidate list, so the verify phase never triggered. This matches the
+  Round-11/13/15/18 pattern (0 actionable) for this already-hardened codebase.
+  A unanimous-clean result is exactly what a lenient panel produces, so it was
+  not accepted at face value: an independent full-gate + smoke re-run was done
+  in the same pass.
+- Independent verification (this pass): `run_all_arms.sh 300 120` on both
+  datasets re-run end to end — all 16 `FINAL <dataset>_<arm>=<value>` lines are
+  byte-identical to `results/run_all.log` (acs_income: subgradient=3,
+  smoothed_gd=45, smoothed_hb=10, smoothed_nesterov=10, ipm=10,
+  ball_oracle_euclidean=1, ball_oracle_lewis=1, opt_reference=0; synthetic:
+  4 first-order=NR, ipm=5, ball_oracle_euclidean=9, ball_oracle_lewis=5,
+  opt_reference=0). T1 still holds (BO arms =1 ≤ 2 ✓, iters(BO)=1 <
+  iters(IPM)=10 ≤ iters(HB)=10 ✓). The re-run's only delta was the inherently
+  non-deterministic wall-clock timing fields (`time_to_rel_gap`, `elapsed`,
+  `history.time` — T2, report-only) in the 16 result JSONs; verified
+  programmatically that every substantive field (`iters_to_rel_gap`, `gap`,
+  `gap_best`, `x`, `iter`, `opt`, `scale`, `F0_norm`) is byte-identical to
+  HEAD. The timing-only churn was discarded (`git checkout -- results/`) so the
+  committed evidence stays clean (same approach as Rounds 10/12/17/18/19).
+- `smoke.sh` → `FINAL smoke=ok` reproducing the round feedback exactly
+  (subgradient 0.223→0.188, smoothed_gd 0.223→0.159, smoothed_hb 0.223→0.160,
+  smoothed_nesterov 0.223→0.152, ipm 0.223→0.013 @iter 11,
+  ball_oracle_euclidean/lewis 0.223→0.050 @iter 1; all 7 arms make strict
+  finite progress). 32/32 tests pass.
+- No implementation, SPEC, blocker (B1), result JSON, or `run_all.log` changed.
+  Working tree clean; branch `repro/block-lewis-gdr` pushed (HEAD = this
+  round's commit).
