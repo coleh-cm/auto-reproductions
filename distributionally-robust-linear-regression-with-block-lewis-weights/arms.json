@@ -1,0 +1,15 @@
+{
+  "subgradient":              "python run_arm.py --arm subgradient --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "smoothed_gd":               "python run_arm.py --arm smoothed_gd --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "smoothed_hb":               "python run_arm.py --arm smoothed_hb --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "smoothed_nesterov":         "python run_arm.py --arm smoothed_nesterov --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "ipm":                       "python run_arm.py --arm ipm --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "ball_oracle_euclidean":     "python run_arm.py --arm ball_oracle --geometry euclidean --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "ball_oracle_lewis":         "python run_arm.py --arm ball_oracle --geometry lewis --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "opt_reference":             "python run_arm.py --arm opt_reference --dataset DATASET --max-outer MAXOUTER --time-budget TIME",
+  "_dataset_overrides": {
+    "synthetic": "d=10, m=100, n_adv=5, n_per_group=50, seed=0, E_LO=0.01, E_HI=1.0, E_ADV=1e6, DIST=5.0 (conflicting adversarial sharp directions in a 2D subspace); measured cond(A^T A)=1.40e5, ERM/robust-opt worst-group ratio=1.47 (clear gap, D1; experiments.tex:38). All concrete numbers unstated (U1) -> these disclosed choices.",
+    "acs_income": "folktables ACSIncome 2018 1-Year, log1p(PINCP) target, d=10 standardized features (AGEP,COW,SCHL,MAR,OCCP,POBP,RELP,WKHP,SEX,RAC1P), adult_filter (employed adults), m=51 regions (50 states + PR), 200 per region (n=10200), seed=0, subsample without replacement. Year/subsample/transform unstated (U4) -> these disclosed choices. ERM mean MSE ~108.4 (paper T3: 108.2)."
+  },
+  "_gate": "T1 (experiments.tex:171-186, tab:acs_runtime): on acs_income, iterations of each arm's own outer iterations to reach 1% relative worst-group suboptimality (F(x)-OPT)/OPT <= 0.01. Expected ordering: ball_oracle_{euclidean,lewis} <= 2 < ipm ~8 < smoothed_hb ~47; subgradient does NOT reach 1% within budget. Pass = BO arms <= 2 AND iters(BO) < iters(IPM) <= iters(HB) AND subgradient=NR. Wall-time (T2) and ACS statistics (T3) are report-only."
+}
