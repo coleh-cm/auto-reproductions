@@ -181,8 +181,9 @@ def main(argv=None):
     )
     as_path = args.out.replace(".npz", ".as.npz")
     as_bank.save(as_path)
-    print(f"OK as fit -> {as_path} (global plane over {len(as_bank.layers_monitored)} "
-          f"monitored layers, applied at all layers)")
+    print(f"OK as fit -> {as_path} ({len(as_bank.planes)} plane(s) over "
+          f"{len(as_bank.layers_monitored)} monitored layers; one plane per distinct "
+          f"head_dim {[p.dh for p in as_bank.planes]}, applied at all layers)")
 
 
 def _git_sha():

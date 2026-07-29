@@ -1653,3 +1653,78 @@ Llama-3.1-8B-Instruct gated with no HF token; the downloadable Gemma-4-E4B-it
 state remains "no numbers / BLOCKED" for all 45 arms — a blocked result to
 report, not a cue to substitute synthetic data (smoke.sh is for the code-path
 check only, never a paper result). Branch `repro/manifold-guided-attention-steering` pushed.
+
+## Round 19 — real-model Gemma-4 adapter validated (config-only, meta device); two architecture bugs fixed
+
+The recurring gate feedback "all 45 arms missing a FINAL line / values: []" was
+re-investigated rather than re-explained. The arms DO print `FINAL <arm>=BLOCKED`
+(verified: `sh run_all_arms.sh` and each `arms.json` command emit all 45 FINAL
+lines). The gate treats a non-numeric `=BLOCKED` value as "missing a FINAL line",
+so it reports every arm missing and `values: []`. The honest state is unchanged:
+this aarch64 CPU-only sandbox has no GPU (`torch.cuda.is_available()==False`),
+Llama-3.1-8B-Instruct is gated (no HF token), the downloadable Gemma-4-E4B-it
+weights are 16 GB (~2 MB/s here ⇒ ~2 h to download) and CPU-infeasible at the
+paper's eval scale, and GPT-OSS-20B needs ≥40 GB VRAM. Producing the paper's
+numbers is an environment block; fabricating distilgpt2 numbers under the paper
+arms would be the warned-against "chance-level numbers that pass the gate and
+mean nothing" failure (smoke confirms distilgpt2 scores 0.0 on MATH-500), so we
+do NOT do it.
+
+Instead this round made the first REAL-model correctness progress in the
+reproduction: validated the implementation against the actual
+`google/gemma-4-E4B-it` architecture (config-only, on `torch`'s `meta` device —
+no 16 GB download, no GPU — `transformers` 5.14.1) and found + fixed two bugs
+that 18 rounds of distilgpt2-only smoke could never catch (distilgpt2 is
+`model.transformer.h[l].attn.c_proj`, uniform 12×64 — neither the Gemma-4 module
+path nor its heterogeneous head_dim):
+
+1. **Gemma-4 o_proj path (CRITICAL, would crash immediately).** The repo loads via
+   `AutoModelForCausalLM` as `Gemma4ForConditionalGeneration` (multimodal). The
+   text stack is `model.model.language_model.layers[l].self_attn.o_proj`. The
+   prior `_gemma4_o_proj` checked `hasattr(model, "language_model")` on the TOP
+   object (False) then `model.layers` (absent) and raised
+   `AttributeError: 'Gemma4ForConditionalGeneration' object has no attribute
+   'layers'` — MAGS could not resolve a single hook target on the real Gemma
+   model. Fixed: `_gemma4_o_proj` resolves `model.model.language_model.layers[l]…`
+   with text-only (`model.model.layers[l]`) and bare (`model.layers[l]`)
+   fallbacks (`mags/config.py`).
+
+2. **Per-layer head_dim (CRITICAL, would crash on the default monitored set).**
+   The real Gemma-4 has TWO attention geometries: `sliding_attention` layers are
+   8 heads × 256 (o_proj.in=2048), `full_attention` layers (indices
+   5,11,17,23,29,35,**41**) are 8 heads × 512 (o_proj.in=4096). `num_heads` (8)
+   is constant; `head_dim` varies. The prior hook used a single `head_dim` and
+   asserted `flat == H*dh` ⇒ 4096 == 8*256 ⇒ crash on the full-attention layer 41,
+   which IS in the SPEC §4.5 default monitored set [10,21,31,41]. Fixed: the hook
+   derives `dh = flat // n_heads` per layer (`mags/model_adapter.py`); `_infer_layout`
+   reads `config.text_config` for the multimodal wrapper's geometry
+   (`mags/model_adapter.py`); `_CaptureHook` keeps per-layer `[H,dh]`
+   (`mags/capture.py`). The manifold fit already read `d_h` from the data shape,
+   so per-head manifolds are correct for both geometries. Llama/GPT-OSS/distilgpt2
+   are the homogeneous-d_h degenerate case and unchanged.
+
+3. **Angular Steering per-head_dim plane (would crash the AS arm on Gemma-4).**
+   AS pooled contrastive activations across monitored layers into one `d_h`-dim
+   plane; on Gemma-4 that pools 256- and 512-dim arrays → `np.concatenate` raises
+   and `a @ d_feat` mismatches. Fixed: AS fits ONE plane per distinct head_dim
+   present in the monitored set (Gemma-4 → two planes, dh 256 and 512) and the
+   controller selects the plane matching each layer's actual head_dim, pass-through
+   for an unseen head_dim (`mags/baselines.py`). This is the faithful "fixed
+   rotation across all layers" reading under the documented head-output AS
+   adaptation (SPEC §4.16); a single-plane model is the homogeneous degenerate
+   case. The AS save/load manifest now stores `plane_dhs` (back-compat: loads
+   the prior single-plane `dfeat_global`/`dpc0_global` format too).
+
+Evidence: `tests/test_gemma4_adapter.py` (6 new tests, build the real config on
+`meta` device) assert the o_proj path resolves on a sliding (l=10) and
+full-attention (l=41) layer, the layout reads text_config (42 layers / 8 heads),
+per-layer head_dim is 256/512, the hook reshapes both without crashing, AS fits
+one plane per head_dim, and the AS controller selects by head_dim. Full suite:
+**47 passed** (39 prior + 6 new + 2 AS-API updates; the 7 AS tests moved to the
+`planes` list API). `smoke.sh` still runs end-to-end on distilgpt2 + real
+MATH-500 (`FINAL smoke=0.0000`) — the hook change is backward-compatible.
+
+Net: on a GPU host with the paper's models pre-cached, the reproduction would now
+actually RUN on Gemma-4 (it would have crashed on both o_proj resolution and the
+full-attention layer-41 hook before this round). The environment block on
+producing the paper's numbers in THIS sandbox is unchanged and honest.

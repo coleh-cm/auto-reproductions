@@ -18,27 +18,40 @@ class _CaptureHook:
     generated token's logits); for decode (seq==1) we keep the single position.
     Concatenated in call order this yields exactly L_tau activations, one per
     generated token (SPEC §4.7: generated tokens only).
+
+    ``n_heads`` is constant across layers for every supported family (Gemma-4: 8
+    everywhere). ``head_dim`` can vary per layer (Gemma-4: 256 sliding, 512 full),
+    so each captured array keeps its own ``[H, dh]`` and the per-layer shape is
+    learned from the first capture (the ``head_dim`` arg is only the empty-buffer
+    fallback, never the reshape authority — the hook derives dh per layer).
     """
     def __init__(self, monitored_layers, n_heads, head_dim):
         self.monitored = set(monitored_layers)
         self.buffer = {l: [] for l in monitored_layers}
         self.H = n_heads
         self.dh = head_dim
+        self._layer_shape = {}   # layer -> (H, dh) learned from first capture
 
     def __call__(self, layer, x_heads):
         bsz, seq, H, dh = x_heads.shape
         if layer not in self.monitored:
             return None
+        self._layer_shape[layer] = (H, dh)
         # last position only
         last = x_heads[:, -1:, :, :].detach().to(torch.float32).cpu().numpy()
         self.buffer[layer].append(last[0, 0])   # [H, dh]
         return None
 
     def stacked(self):
-        # per layer [T, H, dh]
-        return {l: np.stack(self.buffer[l], axis=0) if self.buffer[l]
-                else np.zeros((0, self.H, self.dh), dtype=np.float32)
-                for l in self.monitored}
+        # per layer [T, H, dh]; dh is per-layer (Gemma-4 full-attention dh=512).
+        out = {}
+        for l in self.monitored:
+            if self.buffer[l]:
+                out[l] = np.stack(self.buffer[l], axis=0)
+            else:
+                H, dh = self._layer_shape.get(l, (self.H, self.dh))
+                out[l] = np.zeros((0, H, dh), dtype=np.float32)
+        return out
 
 
 @torch.no_grad()

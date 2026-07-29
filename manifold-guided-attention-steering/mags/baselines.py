@@ -212,32 +212,41 @@ class ITIController:
 # ---------------------------------------------------------------------------
 @dataclass
 class ASPlane:
-    layer: int                   # -1 = global (one plane applied at every layer)
-    d_feat: np.ndarray           # [d_h] unit, contrastive direction
-    d_pc0: np.ndarray            # [d_h] unit, pooled PC1
+    layer: int                   # -1 = global (one plane applied at every layer of this dh)
+    dh: int                      # head_dim this plane applies to (Gemma-4: 256 or 512)
+    d_feat: np.ndarray           # [dh] unit, contrastive direction
+    d_pc0: np.ndarray            # [dh] unit, pooled PC1
 
 
 @dataclass
 class ASBank:
-    """Angular Steering bank: a SINGLE global (d_feat, d_PC0) plane computed from
-    the contrastive activation set and applied as one fixed 2D rotation at EVERY
-    layer.
+    """Angular Steering bank: ONE fixed 2D rotation plane PER distinct head_dim,
+    computed from the contrastive activation set and applied as that fixed rotation
+    at EVERY layer whose attention output has that head_dim.
 
     Paper (tex:L394): Angular Steering "applies a fixed 2D rotation in the
     mean-difference span across all layers"; SPEC §4.16 "rotate all layers";
     SPEC §5.5 "plane from candidate directions at ALL layers, applied at every
-    layer". A single fixed rotation applied uniformly is the faithful reading of
-    "fixed ... across all layers" (one rotation, all layers), and it does not
-    require per-layer activations for non-monitored layers: the plane is pooled
-    across the monitored layers/heads (the contrastive set) and reused at every
-    layer. ``layers_monitored`` is kept for provenance (which layers fed the
-    plane); the controller requests hooks on ALL layers via ``hook_layers='all'``.
+    layer". The paper rotates the residual stream (d_model, constant), so a single
+    plane suffices. Our hook infrastructure is the per-head attention output
+    (pre-W_O), and on the REAL google/gemma-4-E4B-it head_dim is NOT constant
+    across layers (round-19: sliding_attention 8x256, full_attention 8x512), so a
+    single d_h-dim plane cannot apply to both geometries — pooling 256- and
+    512-dim activations would raise and `a @ d_feat` would mismatch. We fit one
+    plane per distinct head_dim present in the monitored set; the controller
+    selects the plane matching each layer's actual head_dim and pass-throughs any
+    layer whose head_dim was not seen at fit time. This is the faithful
+    "fixed rotation across all layers" reading under the documented head-output
+    adaptation (SPEC §4.16); a single-plane model is the degenerate homogeneous
+    case (Llama / GPT-OSS / distilgpt2 all have one head_dim). ``layers_monitored``
+    is kept for provenance (which layers fed the planes); the controller requests
+    hooks on ALL layers via ``hook_layers='all'``.
     """
     model_id: str
     benchmark: str
     angle_deg: float
-    layers_monitored: list        # layers whose activations computed the plane
-    plane: ASPlane               # the single global plane (layer=-1)
+    layers_monitored: list        # layers whose activations computed the planes
+    planes: list                 # list[ASPlane], one per distinct head_dim
 
     @classmethod
     def load(cls, path_npz: str, path_manifest: str | None = None) -> "ASBank":
@@ -247,83 +256,50 @@ class ASBank:
         with open(path_manifest) as f:
             man = json.load(f)
         z = np.load(path_npz)
-        plane = ASPlane(layer=-1, d_feat=z["dfeat_global"], d_pc0=z["dpc0_global"])
+        dhs = man.get("plane_dhs", [])
+        planes = []
+        if dhs:
+            for dh in dhs:
+                planes.append(ASPlane(layer=-1, dh=int(dh),
+                                       d_feat=z[f"dfeat__dh{int(dh)}"],
+                                       d_pc0=z[f"dpc0__dh{int(dh)}"]))
+        else:
+            # back-compat with the prior single-plane format
+            planes = [ASPlane(layer=-1, dh=int(z["dpc0_global"].shape[0]),
+                              d_feat=z["dfeat_global"], d_pc0=z["dpc0_global"])]
         return cls(model_id=man["model_id"], benchmark=man["benchmark"],
                    angle_deg=man["angle_deg"], layers_monitored=man["layers_monitored"],
-                   plane=plane)
+                   planes=planes)
 
     def save(self, path_npz: str, path_manifest: str | None = None):
-        np.savez(path_npz,
-                 dfeat_global=self.plane.d_feat.astype(np.float32),
-                 dpc0_global=self.plane.d_pc0.astype(np.float32))
+        arrays = {}
+        for p in self.planes:
+            arrays[f"dfeat__dh{p.dh}"] = p.d_feat.astype(np.float32)
+            arrays[f"dpc0__dh{p.dh}"] = p.d_pc0.astype(np.float32)
+        np.savez(path_npz, **arrays)
         import json
         if path_manifest is None:
             path_manifest = path_npz + ".manifest.json"
         json.dump({"model_id": self.model_id, "benchmark": self.benchmark,
                    "angle_deg": self.angle_deg,
-                   "layers_monitored": self.layers_monitored},
+                   "layers_monitored": self.layers_monitored,
+                   "plane_dhs": [p.dh for p in self.planes]},
                   open(path_manifest, "w"), indent=2)
 
 
-def fit_as_bank(all_head_acts: dict, train_pids: list, *, model_id: str,
-                benchmark: str, angle_deg: float, layers_monitored: list) -> ASBank:
-    """Build a SINGLE global (d_feat, d_PC0) plane from the contrastive activation
-    set, pooled across all monitored layers/heads, RESTRICTED to the train split
-    (SPEC §4.8 split discipline; fit_iti_bank and fit_manifold_bank already
-    restrict to train_pids/select_pids). The prior impl iterated ALL problems,
-    leaking the held-out select/report splits and giving AS ~30% more contrastive
-    data than MAGS/ITI.
-
-    d_feat = unit(mean_incorrect - mean_correct) over the pooled TRAIN contrastive
-             activations — the contrastive direction (tex:L394; SPEC §4.16).
-    d_PC0 = first principal component of the per-(l,h) candidate difference-in-
-             means directions (Vu & Nguyen §4.5: "PCA on the candidate directions
-             d_feat^i and select the first principal component, d_PC0"). Each
-             candidate delta^(l,h) = mean_incorrect^(l,h) - mean_correct^(l,h)
-             over the train traces. The prior impl took PC1 of pooled RAW
-             activations, which captures dominant token/magnitude variance rather
-             than cross-layer feature-direction variance and changes the plane.
-    Both are [d_h] directions; head_dim is constant across layers for every
-    supported model, so one global plane applies at every layer's per-head output.
-    The plane is reused at all layers at inference — the "fixed rotation across
-    all layers" the paper describes.
-    """
-    train_set = set(train_pids)
-    c_all = []   # pooled correct activations [M_c, d_h]
-    i_all = []   # pooled incorrect activations [M_i, d_h]
-    candidates = []   # per-(l,h) difference-in-means directions [n_cand, d_h]
-    for (l, h), ha in all_head_acts.items():
-        if l not in layers_monitored:
-            continue
-        c_h, i_h = [], []
-        for pid in ha.problems():
-            if pid not in train_set:
-                continue
-            for t in ha.correct[pid]:
-                c_h.append(t); c_all.append(t)
-            for t in ha.incorrect[pid]:
-                i_h.append(t); i_all.append(t)
-        if c_h and i_h:
-            delta = (np.concatenate(i_h, axis=0).mean(axis=0)
-                     - np.concatenate(c_h, axis=0).mean(axis=0))
-            candidates.append(delta)
-    if not c_all or not i_all or not candidates:
-        # degenerate: fall back to an axis-aligned plane so the controller still
-        # has a valid orthonormal basis (a real fit never reaches here)
-        d_h = next(iter(all_head_acts.values())).correct[
-            next(iter(next(iter(all_head_acts.values())).correct))].shape[-1] \
-            if all_head_acts else 8
-        plane = ASPlane(layer=-1,
-                        d_feat=np.eye(d_h)[0].astype(np.float32),
-                        d_pc0=np.eye(d_h)[1].astype(np.float32))
-        return ASBank(model_id=model_id, benchmark=benchmark, angle_deg=angle_deg,
-                      layers_monitored=layers_monitored, plane=plane)
-    c_all = np.concatenate(c_all, axis=0)        # [M_c, d_h]
-    i_all = np.concatenate(i_all, axis=0)        # [M_i, d_h]
+def _fit_one_plane(c_acts, i_acts, candidates, dh):
+    """Fit a single (d_feat, d_PC0) orthonormal plane for one head_dim."""
+    if not c_acts or not i_acts or not candidates:
+        plane = ASPlane(layer=-1, dh=dh,
+                        d_feat=np.eye(dh)[0].astype(np.float32),
+                        d_pc0=np.eye(dh)[1].astype(np.float32))
+        return plane
+    c_all = np.concatenate(c_acts, axis=0)        # [M_c, dh]
+    i_all = np.concatenate(i_acts, axis=0)        # [M_i, dh]
     d_feat = (i_all.mean(axis=0) - c_all.mean(axis=0))    # difference-in-means
     # d_PC0 = PC1 of the per-(l,h) candidate difference-in-means directions
     # (Vu & Nguyen §4.5), NOT PC1 of pooled raw activations.
-    C = np.stack(candidates, axis=0)             # [n_candidates, d_h]
+    C = np.stack(candidates, axis=0)             # [n_candidates, dh]
     Cc = C - C.mean(axis=0, keepdims=True)
     try:
         _, _, Vh = np.linalg.svd(Cc, full_matrices=False)
@@ -341,37 +317,93 @@ def fit_as_bank(all_head_acts: dict, train_pids: list, *, model_id: str,
     d_feat = d_feat - (d_feat @ d_pc0) * d_pc0
     nf2 = np.linalg.norm(d_feat)
     d_feat = d_feat / nf2 if nf2 > 1e-12 else np.zeros_like(d_feat)
-    plane = ASPlane(layer=-1, d_feat=d_feat.astype(np.float32),
-                    d_pc0=d_pc0.astype(np.float32))
+    return ASPlane(layer=-1, dh=dh, d_feat=d_feat.astype(np.float32),
+                   d_pc0=d_pc0.astype(np.float32))
+
+
+def fit_as_bank(all_head_acts: dict, train_pids: list, *, model_id: str,
+                benchmark: str, angle_deg: float, layers_monitored: list) -> ASBank:
+    """Build ONE fixed rotation plane PER distinct head_dim from the contrastive
+    activation set, pooled across the monitored layers/heads of that head_dim,
+    RESTRICTED to the train split (SPEC §4.8 split discipline). A single-plane model
+    (Llama/GPT-OSS/distilgpt2: one head_dim) yields one plane; Gemma-4 (two
+    head_dims) yields two.
+
+    d_feat = unit(mean_incorrect - mean_correct) over the pooled TRAIN contrastive
+             activations of that head_dim — the contrastive direction (tex:L394).
+    d_PC0 = first principal component of the per-(l,h) candidate difference-in-
+             means directions (Vu & Nguyen §4.5), NOT PC1 of pooled raw activations.
+    """
+    train_set = set(train_pids)
+    # group monitored layers/heads by their head_dim (the activation last-dim).
+    by_dh = {}   # dh -> {"c": [...], "i": [...], "cands": [...]}
+    for (l, h), ha in all_head_acts.items():
+        if l not in layers_monitored:
+            continue
+        c_h, i_h = [], []
+        for pid in ha.problems():
+            if pid not in train_set:
+                continue
+            for t in ha.correct[pid]:
+                c_h.append(t)
+            for t in ha.incorrect[pid]:
+                i_h.append(t)
+        if not c_h and not i_h:
+            continue
+        dh = (c_h[0].shape[-1] if c_h else i_h[0].shape[-1])
+        bucket = by_dh.setdefault(dh, {"c": [], "i": [], "cands": []})
+        if c_h:
+            bucket["c"].extend(c_h)
+        if i_h:
+            bucket["i"].extend(i_h)
+        if c_h and i_h:
+            delta = (np.concatenate(i_h, axis=0).mean(axis=0)
+                     - np.concatenate(c_h, axis=0).mean(axis=0))
+            bucket["cands"].append(delta)
+    if not by_dh:
+        # degenerate: no train activations at all; emit an axis plane for the
+        # registry head_dim so the controller still has a valid basis.
+        d_h = 8
+        plane = ASPlane(layer=-1, dh=d_h,
+                        d_feat=np.eye(d_h)[0].astype(np.float32),
+                        d_pc0=np.eye(d_h)[1].astype(np.float32))
+        return ASBank(model_id=model_id, benchmark=benchmark, angle_deg=angle_deg,
+                      layers_monitored=layers_monitored, planes=[plane])
+    planes = [_fit_one_plane(b["c"], b["i"], b["cands"], dh)
+              for dh, b in sorted(by_dh.items())]
     return ASBank(model_id=model_id, benchmark=benchmark, angle_deg=angle_deg,
-                  layers_monitored=layers_monitored, plane=plane)
+                  layers_monitored=layers_monitored, planes=planes)
 
 
 class AngularSteeringController:
     """Fixed-offset Angular Steering (SPEC §4.16; Vu & Nguyen Eq. 1). Rotates each
-    head's attention output in the global (d_feat, d_PC0) plane by the SAME constant
-    angle theta (a fixed offset). theta=0 is the IDENTITY (matches the ablation
-    Table 4 0deg~unsteered signature, tex:L654). The SAME fixed plane is applied at
-    EVERY layer (paper tex:L394 "a fixed 2D rotation ... across all layers"; SPEC
-    §4.16 "rotate all layers"; SPEC §5.5 "applied at every layer").
+    head's attention output in the (d_feat, d_PC0) plane of its head_dim by the SAME
+    constant angle theta (a fixed offset). theta=0 is the IDENTITY (matches the
+    ablation Table 4 0deg~unsteered signature, tex:L654). The SAME fixed angle is
+    applied at EVERY layer (paper tex:L394 "a fixed 2D rotation ... across all
+    layers"; SPEC §4.16 "rotate all layers"; SPEC §5.5 "applied at every layer"),
+    selecting the plane matching each layer's head_dim (Gemma-4 has two).
     ``hook_layers='all'`` asks the HookRegistry to install W_O pre-hooks on every
-    layer so the rotation reaches non-monitored layers too (the prior
-    implementation only rotated the monitored subset, which made AS behave like a
-    targeted method rather than the uniform-across-all-layers baseline the paper
-    compares against)."""
+    layer so the rotation reaches non-monitored layers too. Layers whose head_dim
+    was not seen at fit time are passed through (no plane to rotate in)."""
     # request hooks on ALL layers (registry resolves 'all' to range(n_layers))
     hook_layers = "all"
 
     def __init__(self, as_bank: ASBank, angle_deg: float | None = None):
         self.theta = float(np.deg2rad(angle_deg if angle_deg is not None
                                       else as_bank.angle_deg))
-        self.plane = as_bank.plane      # the single global ASPlane
+        self._planes = {p.dh: p for p in as_bank.planes}
 
     def __call__(self, layer, x_heads):
         bsz, seq, H, dh = x_heads.shape
         if seq != 1:
             return None
-        d_feat, d_pc0 = self.plane.d_feat, self.plane.d_pc0
+        plane = self._planes.get(dh)
+        if plane is None:
+            # no fitted plane for this head_dim: pass-through (identity at theta=0
+            # semantics for an un-fitted geometry).
+            return None
+        d_feat, d_pc0 = plane.d_feat, plane.d_pc0
         x = x_heads.detach().to(torch.float32).cpu().numpy()
         out = x.copy()
         a = out[0, 0]                      # [H, dh]

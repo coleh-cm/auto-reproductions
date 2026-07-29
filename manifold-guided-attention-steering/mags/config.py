@@ -100,16 +100,40 @@ MODEL_REGISTRY = {
 
 
 def _gemma4_o_proj(model, layer):
-    """Resolve the attention output projection for Gemma-4 text models.
+    """Resolve the attention output projection for the Gemma-4 text stack.
 
-    Gemma-4 multi-modal repos expose a ``language_model`` text stack; pure-text Gemma-4
-    repos expose ``model.layers`` directly. SPEC §5.3 notes the exact attribute is
-    verified at implementation time against the installed transformers version. We
-    cannot run a Gemma-4 model in this sandbox (no GPU), so we resolve defensively.
+    Verified round-19 against the REAL ``google/gemma-4-E4B-it`` repo (config-only,
+    no weights, ``transformers`` 5.14.1 ``AutoModelForCausalLM`` →
+    ``Gemma4ForConditionalGeneration``). The text stack lives at
+    ``model.model.language_model.layers[l].self_attn.o_proj`` (the multimodal wrapper
+    ``Gemma4ForConditionalGeneration`` has a ``Gemma4Model`` at ``.model`` whose
+    ``.language_model`` is the ``Gemma4TextModel``). A text-only ``Gemma4ForCausalLM``
+    load exposes ``model.model.layers[l]``; a bare ``Gemma4TextModel`` exposes
+    ``model.layers[l]``. The prior version checked ``hasattr(model, "language_model")``
+    on the TOP object — which is False for the multimodal wrapper — and then
+    ``model.layers[l]`` — which does not exist either — so it raised
+    ``AttributeError: 'Gemma4ForConditionalGeneration' object has no attribute 'layers'``
+    and MAGS could not resolve a single hook target on the real Gemma model. The paths
+    below are tried most-specific-first and validated by tests/test_gemma4_adapter.py
+    (builds the real config on ``meta`` device, no 16 GB download).
     """
+    # multimodal Gemma4ForConditionalGeneration: model.model.language_model.layers[l]
+    if hasattr(model, "model") and hasattr(model.model, "language_model"):
+        return model.model.language_model.layers[layer].self_attn.o_proj
+    # text-only Gemma4ForCausalLM: model.model.layers[l]
+    if hasattr(model, "model") and hasattr(model.model, "layers"):
+        return model.model.layers[layer].self_attn.o_proj
+    # bare Gemma4TextModel: model.layers[l]
+    if hasattr(model, "layers"):
+        return model.layers[layer].self_attn.o_proj
+    # legacy: a wrapper that already exposes language_model at top level
     if hasattr(model, "language_model"):
         return model.language_model.layers[layer].self_attn.o_proj
-    return model.layers[layer].self_attn.o_proj
+    raise AttributeError(
+        f"could not resolve Gemma-4 o_proj on {type(model).__name__}: expected "
+        f"model.model.language_model.layers[l].self_attn.o_proj "
+        f"(multimodal) or model.model.layers[l].self_attn.o_proj (text-only)"
+    )
 
 
 def get_model_spec(model_id: str) -> dict:

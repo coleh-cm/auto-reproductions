@@ -113,7 +113,8 @@ def test_as_bank_uses_difference_in_means_d_feat():
     all_acts, pids = _make_all_acts(rng, n_heads_per_layer=2, layers=(0,), d_h=6)
     asb = fit_as_bank(all_acts, pids, model_id="m", benchmark="b", angle_deg=30,
                       layers_monitored=[0])
-    p = asb.plane                       # single global plane (layer=-1)
+    assert len(asb.planes) == 1          # homogeneous d_h -> one plane (round-19 API)
+    p = asb.planes[0]                   # the (d_feat, d_PC0) plane for this head_dim
     assert p.layer == -1
     # recompute the true difference-in-means direction (pooled over the layer's heads)
     cs = [t for (l, h), ha in all_acts.items() if l == 0
@@ -155,11 +156,11 @@ def test_as_bank_restricts_to_train_split():
           for pid in train for t in ha.incorrect[pid]]
     train_dfeat = (np.concatenate(iss, axis=0).mean(axis=0)
                    - np.concatenate(cs, axis=0).mean(axis=0))
-    cos_train = float(asb.plane.d_feat @ train_dfeat
+    cos_train = float(asb.planes[0].d_feat @ train_dfeat
                       / (np.linalg.norm(train_dfeat) + 1e-12))
     assert cos_train > 0.95, "d_feat must follow the TRAIN contrastive direction"
     # and must NOT align with the held-out problem's spurious direction w2
-    cos_held = float(abs(asb.plane.d_feat @ w2))
+    cos_held = float(abs(asb.planes[0].d_feat @ w2))
     assert cos_held < 0.9, "held-out problem must not leak into the plane"
 
 
@@ -191,11 +192,11 @@ def test_as_d_pc0_from_candidate_directions_not_raw():
                       layers_monitored=[0])
     # d_pc0 must lie in the candidate span {span0, span1} (within tolerance), NOT
     # along the raw-dominant e0 axis.
-    proj_span = ((asb.plane.d_pc0 @ span0) * span0
-                 + (asb.plane.d_pc0 @ span1) * span1)
-    assert np.linalg.norm(asb.plane.d_pc0 - proj_span) < 0.15, \
+    proj_span = ((asb.planes[0].d_pc0 @ span0) * span0
+                 + (asb.planes[0].d_pc0 @ span1) * span1)
+    assert np.linalg.norm(asb.planes[0].d_pc0 - proj_span) < 0.15, \
         "d_pc0 must lie in the candidate-difference span, not the raw-activation axis"
-    assert abs(asb.plane.d_pc0[0]) < 0.5, \
+    assert abs(asb.planes[0].d_pc0[0]) < 0.5, \
         "d_pc0 must not align with the raw-dominant e0 axis"
 
 
@@ -210,7 +211,7 @@ def test_as_rotation_is_fixed_offset_identity_at_zero():
                       layers_monitored=[0])
     ctrl0 = AngularSteeringController(asb0, angle_deg=0.0)
     import torch
-    p = asb0.plane
+    p = asb0.planes[0]
     # theta=0 must be the identity for arbitrary activations
     for start_deg in (0, 30, 90, 200):
         a = np.cos(np.deg2rad(start_deg)) * p.d_feat + np.sin(np.deg2rad(start_deg)) * p.d_pc0
@@ -229,7 +230,7 @@ def test_as_rotation_offset_adds_constant_angle():
                       layers_monitored=[0])
     ctrl = AngularSteeringController(asb, angle_deg=45.0)
     import torch
-    p = asb.plane
+    p = asb.planes[0]
     for start_deg in (0, 30, 90, 200):
         a = np.cos(np.deg2rad(start_deg)) * p.d_feat + np.sin(np.deg2rad(start_deg)) * p.d_pc0
         x = torch.from_numpy(a[None, None, None, :]).float()
@@ -253,7 +254,7 @@ def test_as_applies_the_same_global_plane_at_every_layer():
     ctrl = AngularSteeringController(asb, angle_deg=30.0)
     assert ctrl.hook_layers == "all", "AS must request hooks on ALL layers"
     import torch
-    p = asb.plane
+    p = asb.planes[0]
     # the SAME fixed-offset rotation is applied at every layer index, including
     # ones NOT monitored: output angle = input + 30.
     for layer in (0, 1, 5, 17, 31):
@@ -311,6 +312,8 @@ def test_as_persists_and_reloads(tmp_path):
     asb.save(npz)
     asb2 = ASBank.load(npz)
     assert asb2.layers_monitored == asb.layers_monitored
-    assert asb2.plane.layer == -1
-    assert np.allclose(asb2.plane.d_feat, asb.plane.d_feat)
-    assert np.allclose(asb2.plane.d_pc0, asb.plane.d_pc0)
+    assert len(asb2.planes) == len(asb.planes)
+    assert asb2.planes[0].layer == -1
+    assert asb2.planes[0].dh == asb.planes[0].dh
+    assert np.allclose(asb2.planes[0].d_feat, asb.planes[0].d_feat)
+    assert np.allclose(asb2.planes[0].d_pc0, asb.planes[0].d_pc0)

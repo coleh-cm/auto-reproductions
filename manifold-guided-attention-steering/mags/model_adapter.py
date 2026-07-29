@@ -106,8 +106,20 @@ class HookRegistry:
                 return None
             x = x  # [bsz, seq, H*d_h]
             bsz, seq, flat = x.shape
-            H, dh = registry.layout.n_heads, registry.layout.head_dim
-            assert flat == H * dh, f"layer {layer}: W_O input flat={flat} != H*d_h={H*dh}"
+            H = registry.layout.n_heads
+            # SPEC §7 (round-19): head_dim is NOT constant across all layers on every
+            # model. The REAL google/gemma-4-E4B-it has TWO attention geometries:
+            # sliding_attention layers use 8 heads x 256 (o_proj.in=2048), full_attention
+            # layers use 8 heads x 512 (o_proj.in=4096). num_heads (8) is constant;
+            # head_dim varies. Deriving dh = flat // H per layer (from the actual W_O
+            # input) is correct for every supported family (Llama 32x128, GPT-OSS
+            # 64x64, distilgpt2 12x64, Gemma4 8x{256,512}) and removes the prior
+            # single-head_dim assumption that crashed the assert on Gemma4 full-attention
+            # layers (4096 != 8*256). Verified by tests/test_gemma4_adapter.py.
+            assert flat % H == 0, (
+                f"layer {layer}: W_O input flat={flat} not divisible by n_heads={H}"
+            )
+            dh = flat // H
             x_heads = x.view(bsz, seq, H, dh)
             if registry.callback is None:
                 return None
@@ -125,18 +137,35 @@ class HookRegistry:
 
 
 def _infer_layout(model: nn.Module, model_id: str, spec: dict) -> LayerHeadLayout:
-    """Prefer config.json values read from the loaded model; fall back to registry."""
+    """Prefer config.json values read from the loaded model; fall back to registry.
+
+    For multi-modal families (Gemma-4 loads as ``Gemma4ForConditionalGeneration``),
+    the top-level ``model.config`` has null geometry; the real numbers live in
+    ``config.text_config`` (round-19: verified against the real
+    ``google/gemma-4-E4B-it`` repo — text_config gives 42 layers / 8 heads /
+    head_dim 256 for the sliding layers). ``head_dim`` here is the SLIDING-layer
+    default; the hook derives the actual per-layer head_dim from the W_O input
+    (Gemma-4 full-attention layers use head_dim 512), so this value is only a
+    fallback / empty-buffer shape, never the reshape authority.
+    """
     cfg = getattr(model, "config", None)
-    n_layers = _first(cfg, ["num_hidden_layers", "n_layer"]) or spec["layers"]
-    n_heads = _first(cfg, ["num_attention_heads", "num_heads", "n_head"]) or spec["heads"]
+    text_cfg = getattr(cfg, "text_config", None)
+    n_layers = (_first(text_cfg, ["num_hidden_layers", "n_layer"])
+               or _first(cfg, ["num_hidden_layers", "n_layer"]) or spec["layers"])
+    n_heads = (_first(text_cfg, ["num_attention_heads", "num_heads", "n_head"])
+               or _first(cfg, ["num_attention_heads", "num_heads", "n_head"])
+               or spec["heads"])
     # SPEC §7: read head_dim from config, do NOT derive as hidden/H (Gemma-4: 8*256 != 2560).
     head_dim = (
-        getattr(cfg, "head_dim", None)
+        getattr(text_cfg, "head_dim", None)
+        or getattr(cfg, "head_dim", None)
         or getattr(cfg, "d_head", None)
         or (spec["head_dim"] if spec.get("head_dim") else None)
     )
     if head_dim is None:
-        hidden = _first(cfg, ["hidden_size", "n_embd", "d_model"]) or (n_heads * spec["head_dim"])
+        hidden = (_first(text_cfg, ["hidden_size", "d_model"])
+                  or _first(cfg, ["hidden_size", "n_embd", "d_model"])
+                  or (n_heads * spec["head_dim"]))
         head_dim = hidden // n_heads
     monitored = list(spec["monitored_layers"])
     # clamp monitored layers to the model's actual depth (smoke models etc.)
