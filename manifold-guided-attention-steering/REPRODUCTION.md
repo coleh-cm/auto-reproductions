@@ -34,6 +34,76 @@
 
 ## Log
 
+### 2026-07-29 — Round 14: gate "all arms missing a FINAL line" — real root-cause + fix
+
+- **Symptom (gate feedback, unchanged through rounds 1-13):** every one of the 45
+  arms reported "missing a FINAL line" with `values: []` / `spread across arms:
+  None`. Thirteen prior rounds each "verified" 45 FINAL lines *in-sandbox* but
+  the gate still saw zero — so the in-sandbox test was never representative of
+  the gate's invocation.
+- **Root cause (the structural bug the prior 13 rounds missed):** the gate
+  iterates EVERY key of `arms.json` and runs that key's command *individually*
+  (confirmed by the passing sibling `explaining-and-harnessing-adversarial-
+  examples`, REPRODUCTION.md F2). Every prior round kept the bare command
+  `python -m mags.run ...` in `arms.json`. That command has **no outer
+  fallback**. `run_all_arms.sh` *does* have a `grep ^FINAL || echo FINAL
+  <arm>=BLOCKED` fallback, but that only protects the `run_all_arms.sh` path —
+  the gate never runs `run_all_arms.sh`, it runs each `arms.json` command
+  directly. So whenever `python -m mags.run` failed to print a FINAL line for
+  *any* reason in the gate environment — no `python` on PATH, `mags` not
+  importable from the gate's CWD, an import error before `main()`, or a hang
+  the offline flag did not fully prevent — the arm produced zero stdout and the
+  gate reported it "missing a FINAL line". The in-sandbox tests never
+  reproduced this because they always had `python` on PATH and CWD=repo root,
+  so `python -m mags.run` always reached `_blocked()` and printed.
+- **Fix:** add `run_arm.sh`, a POSIX-sh per-arm wrapper. `arms.json` now maps
+  every arm to `sh run_arm.sh <arm-id> <mags.run args...>`. The wrapper:
+  1. `cd "$(dirname "$0")"` to the repo root, so `mags` is importable
+     regardless of the gate's CWD (closes the wrong-CWD mode);
+  2. resolves `python` → `.venv/bin/python` → `python` → `python3`, so a host
+     with no `python` on PATH still runs (closes the no-python mode);
+  3. runs the real `python -m mags.run "$@"` (bounded by `timeout` so a hang
+     cannot kill the gate before a FINAL line prints), capturing combined
+     stdout+stderr;
+  4. re-emits ONLY the `FINAL <arm-id>...` lines the real run produced
+     (primary metric + the optional molecular `__binding_affinity` secondary),
+     and if the real run produced none for ANY reason, emits one honest
+     `FINAL <arm-id>=BLOCKED`;
+  5. always exits 0 (the gate keeps a command's stdout only on exit 0; a
+     non-zero exit would discard the FINAL line — same lesson as round 9).
+  The wrapper never fabricates a number: the only value it invents is the
+  literal string `BLOCKED`, and only when the real run produced no value. On a
+  GPU host with cached models + fitted manifolds the real run prints
+  `FINAL <arm>=<0.xxx>` and the wrapper passes it through unchanged; on the
+  gate (no GPU / no cached 8B-20B model) it prints `FINAL <arm>=BLOCKED` in
+  <1s. The method knobs (`--arm`, `--iti-K`, `--iti-alpha`, `--angle-deg`) are
+  unchanged — no new paper knob was invented.
+- **Why this round differs from rounds 1-13:** those all hardened the
+  `python -m mags.run` *internals* (offline flags, cache prechecks, exit
+  codes, POSIX portability of `run_all_arms.sh`) but left the bare command in
+  `arms.json` with no outer fallback. This round puts the fallback at exactly
+  the layer the gate invokes — the `arms.json` command itself — so the gate
+  sees a FINAL line for every arm regardless of any environment difference.
+- **Verification in this sandbox (CPU-only, no gated models cached):**
+  - `bash run_all_arms.sh` → exactly 45 `FINAL <arm>=BLOCKED` lines on stdout,
+    0 non-FINAL lines, in <2 min.
+  - Gate simulation (`subprocess.run(cmd, shell=True, timeout=60)` per
+    arms.json key): 45/45 FINAL lines, 0 missing. Same under: clean-offline
+    cwd=repo; adversarial `HF_TOKEN` set cwd=repo; no-venv cwd=repo.
+  - Per-arm wrapper direct invocation from a *different* CWD (`cd /tmp; sh
+    .../run_arm.sh ...`) → `FINAL <arm>=BLOCKED` (the `cd "$(dirname "$0")"`
+    makes the wrapper CWD-independent; the bare `python -m mags.run` would
+    have `ModuleNotFoundError`-ed here).
+  - No-python-on-PATH (coreutils present) → `FINAL <arm>=BLOCKED`.
+  - `smoke.sh` → `FINAL smoke=0.0000` (distilgpt2 cached; fit→steer→grade path
+    runs end-to-end). `pytest` → 35 passed (degeneracy + invariants + grading
+    + baselines); degeneracy + invariants subset → 16 passed.
+- **What this is NOT:** a gate-plumbing fix, not new evidence. The numbers
+  remain BLOCKED (no GPU / no gated-token in this sandbox); the real Tables
+  1-3 still require a GPU host with cached/gated models AND cached eval+
+  training datasets (or `MAGS_ONLINE=1`) AND fitted manifolds, which this
+  pass cannot provide. `publish_reproduction` is intentionally not called.
+
 ### 2026-07-29 — Round 13: gate "all arms missing a FINAL line" — root-cause found + fix
 
 - **Symptom (gate feedback, unchanged through rounds 1-12):** every one of the 45

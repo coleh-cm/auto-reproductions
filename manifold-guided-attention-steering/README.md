@@ -30,6 +30,7 @@ manifold-guided-attention-steering/
 ├── SPEC.md               # method spec, equations, shapes, gaps/defaults
 ├── arms.json             # 45-arm COMMAND MAP: {arm_id: shell command} (the gate contract)
 ├── arms_contract.json    # 45-arm claimed values + bootstrap CIs (numbers-gate data)
+├── run_arm.sh            # per-arm wrapper the gate invokes (cd+run+FINAL fallback)
 ├── run_all_arms.sh       # phase 1 fit manifolds, phase 2 run every arm -> FINAL lines
 ├── smoke.sh / smoke.py   # the MAGS code path at smoke size (NOT paper evidence)
 ├── mags/                 # the implementation (model adapter, manifold fit, steering,
@@ -52,6 +53,13 @@ not a fabricated one. `run_all_arms.sh` runs every arm at the paper's full
 configuration; each prints `FINAL <arm_id>=BLOCKED` and writes a
 `runs/BLOCKED__<arm>.json` reason. This is the honest "real data or no numbers"
 outcome the reproduction requires.
+
+The numbers gate runs each `arms.json` command *individually* (not
+`run_all_arms.sh`), so every arm command is wrapped in `run_arm.sh`: it `cd`s
+to the repo root, runs the real `python -m mags.run`, and **guarantees** one
+`FINAL <arm_id>=<value>` line on stdout — passing through the real number on a
+GPU host, or `BLOCKED` on any failure (no python, no model, no GPU, import
+error, hang). `BLOCKED` is a literal string, never a fabricated number.
 
 What DOES run and is committed:
 
