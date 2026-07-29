@@ -251,7 +251,8 @@ def _run(args, arm_id, bench, model_id, arm, emit):
         _blocked(arm_id, "Molecular task (Table 3) target protein, prompt template, SMILES "
                           "contrastive corpus, affinity cutoff and AutoDock-GPU params are all "
                           "UNSTATED by the paper (SPEC §4.18); GPT-OSS-20B needs >=40GB VRAM. "
-                          "Treated as a stretch target, not implemented for real data.")
+                          "Treated as a stretch target, not implemented for real data.",
+                 secondary=True)
 
     # ---- EARLY resource checks (round-13 gate fix) -----------------------------
     # A steering arm needs a FITTED bank produced by `mags.fit` (GPU contrastive
@@ -373,6 +374,13 @@ def _run(args, arm_id, bench, model_id, arm, emit):
     if arm == "unsteered":
         controller = NoOpController()
     elif arm in ("mags", "mags-u"):
+        # NOTE: mags-u (molecular multi-objective union, tex:L378-379) should load
+        # TWO banks (validity + affinity) and steer the UNION of their selected head
+        # sets, each head corrected through its own objective's manifold (SPEC
+        # §1/§4.12). The molecular task is a documented stretch target (SPEC
+        # §4.18) and always BLOCKs before this path, so mags-u is currently dead
+        # code that behaves like mags. When molecular is implemented, give mags-u
+        # a distinct multi-bank union path here.
         from .manifold import ManifoldBank
         bank = ManifoldBank.load(args.manifold)
         alpha = args.alpha if args.alpha is not None else bank.alpha
@@ -419,13 +427,33 @@ def _run(args, arm_id, bench, model_id, arm, emit):
     # so scoring the completion under the raw model gives the unsteered-base PPL).
     result = run_arm(model, tok, model_id, controller, bench, problems,
                      max_new_tokens=max_new, grading=grade, ppl_model=model)
+    # Per-arm config manifest (SPEC §5.8): record the open hyperparameters the
+    # paper left unstated (k/q/K/alpha/monitored_layers) and the decoding config
+    # so each run is self-describing. Steering-arm params come from the loaded
+    # bank; baselines record their own. git SHA via env (set by run_arm.sh).
+    run_cfg = {"arm": arm, "benchmark": bench, "model": model_id,
+               "decoding": {"do_sample": False, "max_new_tokens": max_new,
+                            "n_completions": 1},
+               "eval_seed": 42, "bootstrap_B": 10000,
+               "git_sha": os.environ.get("MAGS_GIT_SHA", "")}
+    if arm in ("mags", "mags-u") and 'bank' in dir():
+        run_cfg.update({"k": bank.k, "q": bank.q, "K": bank.K, "alpha": alpha,
+                        "monitored_layers": bank.layers_monitored})
+    elif arm == "iti" and 'iti_bank' in dir():
+        run_cfg.update({"K": iti_bank.K, "alpha": alpha})
+    elif arm == "angular-steering" and 'as_bank' in dir():
+        run_cfg.update({"angle_deg": ang, "monitored_layers": as_bank.layers_monitored})
+    elif arm == "contrastive-decoding":
+        run_cfg.update({"alpha_plausibility": config.CD_DEFAULT_ALPHA_PLAUS,
+                        "beta": config.CD_DEFAULT_BETA, "amateur_model": amateur_id})
     # commit results to disk (NOT gitignored)
     os.makedirs("runs", exist_ok=True)
     out_path = f"runs/{bench.replace('/','_')}__{model_id.replace('/','_')}__{arm}.json"
     with open(out_path, "w") as f:
         json.dump({"arm": arm_id, "benchmark": bench, "model": model_id,
                    "n": result["n"], "acc": result["acc"], "ci95": result["ci95"],
-                   "ppl": result["ppl"], "per_problem": result["per_problem"]}, f, indent=2)
+                   "ppl": result["ppl"], "config": run_cfg,
+                   "per_problem": result["per_problem"]}, f, indent=2)
     emit(f"{result['acc']:.4f}")
 
 

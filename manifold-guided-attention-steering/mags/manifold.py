@@ -315,23 +315,31 @@ def fit_manifold_bank(
         if m is None:
             continue
         m.layer, m.head = l, h
-        # held-out mean-AUROC for selection (tex:L305)
-        if select_acts.get((l, h)) is not None and len(select_acts[(l, h)].problems()) > 0:
-            m.auroc = head_auroc(select_acts[(l, h)], m.B, m.mu_c, "mean")
+        # held-out mean-AUROC for selection (tex:L305). The head-selection AUROC
+        # MUST be computed on a held-out problem split, never on the fit split
+        # (selection-biased). If the held-out split is empty (degenerate small-N),
+        # assign chance-level 0.5 rather than scoring on the train split, so a
+        # degenerate fit cannot produce inflated held-out AUROCs that would skew
+        # top-K selection. Such heads sink to the bottom of the ranking.
+        sel_ha = select_acts.get((l, h))
+        if sel_ha is not None and len(sel_ha.problems()) > 0:
+            m.auroc = head_auroc(sel_ha, m.B, m.mu_c, "mean")
         else:
-            m.auroc = head_auroc(ha, m.B, m.mu_c, "mean")
+            m.auroc = 0.5
         # max-AUROC for the Figure-3 drift-validation diagnostic (tex:L298) on the
         # report-only split when available (SPEC §4.8), else on the select split.
-        diag_acts = (report_acts.get((l, h))
-                     if report_acts is not None and report_acts.get((l, h)) is not None
-                     and len(report_acts[(l, h)].problems()) > 0
-                     else (select_acts.get((l, h))
-                           if select_acts.get((l, h)) is not None
-                           and len(select_acts[(l, h)].problems()) > 0 else None))
+        # Same anti-bias rule: never score the diagnostic on the fit split.
+        diag_acts = None
+        if report_acts is not None:
+            rha = report_acts.get((l, h))
+            if rha is not None and len(rha.problems()) > 0:
+                diag_acts = rha
+        if diag_acts is None and sel_ha is not None and len(sel_ha.problems()) > 0:
+            diag_acts = sel_ha
         if diag_acts is not None:
             m.auroc_max = head_auroc(diag_acts, m.B, m.mu_c, "max")
         else:
-            m.auroc_max = head_auroc(ha, m.B, m.mu_c, "max")
+            m.auroc_max = 0.5
         heads[(l, h)] = m
         aurocs.append((m.auroc, l, h))
     # top-K by held-out mean-AUROC (SPEC §4.6: mean for production selection)

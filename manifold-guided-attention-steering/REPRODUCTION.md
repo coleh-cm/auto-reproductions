@@ -1409,3 +1409,77 @@ documented design choices, not bugs). `pytest` → 36/36; `smoke.sh` →
 8B/4B/20B weights, molecular setup unstated — genuine environment block). The
 publish step reports `rung=environment`: the code path runs and is correct,
 but no paper number is reproducible in this CPU-only, model-uncached sandbox.
+
+## Round 17 — paper-faithful review (orchestrated, 5-dimension adversarial)
+
+A second orchestrated review (`orchestrate` run `mags-paper-review`, 5 reviewers
+in parallel, each a distinct lens) re-audited all components against the paper
+LaTeX after the round-16 CD fix. **5/5 dimensions approved; 0 blocker, 0 major
+discrepancy.** Six minor findings; the four substantive ones fixed in this
+commit, the two cosmetic ones documented.
+
+**Fixed — `begin_problem` never called (minor; mags/eval.py).** Reviewer found
+`MAGSController.begin_problem` (steering.py:37-41) exists to reset the per-problem
+decode-step index `t` and `problem_id` for the steering log, but no caller
+invoked it — the controller was built once in run.py and reused across all
+problems, so `_decode_step` accumulated monotonically (problem 2 started at
+t=N+1) and every log record carried `problem=None`. The steering MATHS and
+generated tokens were unaffected (correction is independent of `t`); only the
+diagnostic `steering_log.jsonl` was mislabelled. Fixed: `eval.run_arm` now calls
+`controller.begin_problem(prob.id)` (guarded by `hasattr`) before each
+`generate`, so the log matches the SPEC §5.4 schema. NoOpController ignores it.
+
+**Fixed — molecular BLOCKED dropped the secondary line (minor; mags/run.py).**
+The molecular stretch-target branch called `_blocked(arm_id, reason)` with no
+`secondary` arg, so molecular arms printed only `FINAL <arm>=BLOCKED` and never
+the documented `FINAL <arm>__binding_affinity=BLOCKED` (Table 3 reports both
+Validity and Binding Affinity; run.py docstring + `_blocked`/`emit` both support
+a secondary line). The gate keys on arms.json keys only (the `__binding_affinity`
+suffix is not a key), so this never failed the gate, but the two-line contract
+wasn't honored. Fixed: pass `secondary=True`; verified
+`mags-u__SMILES...__binding_affinity=BLOCKED` now prints.
+
+**Fixed — held-out-AUROC fallback was selection-biased (minor; mags/manifold.py).**
+When the held-out select split was empty (degenerate small-N), `fit_manifold_bank`
+fell back to computing `auroc`/`auroc_max` on `ha` — the train-fit split — which
+is selection-biased (tex:L305/L298 require held-out). Real corpora (n in the
+thousands) never hit this, but a degenerate smoke fit could inflate held-out
+AUROCs and skew top-K. Fixed: assign chance-level 0.5 instead of scoring on the
+train split; such heads sink to the bottom of the ranking. Same anti-bias rule
+applied to the `auroc_max` diagnostic fallback.
+
+**Fixed — `B^T B` projector property not directly tested (minor; tests).**
+`test_difference_matrix_rows_are_problems` asserted `B @ B.T == I` (orthonormal
+rows), which is SUFFICIENT for `P = B^T B` to be a projector but not direct
+evidence. Proposition 1 (tex:L319-330) relies on `P_perp = I - B^T B` being a
+projector. Added direct assertions `P@P == P` and `P_perp@P_perp == P_perp` so a
+future refactor cannot break idempotency silently. pytest → 36/36.
+
+**Documented (cosmetic) — eval manifest omits open hyperparameters (minor;
+mags/run.py).** The per-arm `runs/<bench>__<model>__<arm>.json` recorded only
+acc/ci/ppl/per_problem, omitting the open hyperparameters (k/q/K/alpha/monitored
+layers) and decoding config that SPEC §5.8 requires per run. The ManifoldBank
+manifest already records k/q/K/alpha/layers_monitored/split_seeds/git_sha, so the
+values were recoverable, but not co-located with the eval result and the
+decoding config was on disk nowhere. Fixed: the per-arm JSON now carries a
+`config` block (decoding, eval_seed, bootstrap_B, git_sha, and the arm's
+hyperparameters pulled from the loaded bank).
+
+**Documented (cosmetic) — mags-u is currently dead code (minor; mags/run.py).**
+`mags-u` (molecular multi-objective union, tex:L378-379) should load TWO banks
+(validity + affinity) and steer the union of their selected head sets, each head
+corrected through its own objective's manifold (SPEC §1/§4.12). The molecular
+task always BLOCKs before this path, so mags-u currently behaves exactly like
+mags. Added an explicit comment documenting the dead-code status and the
+intended multi-bank union path for when molecular is implemented.
+
+**State after round 17.** Implementation complete and paper-faithful; both
+orchestrated reviews (rounds 16 + 17) found no blocker/major discrepancy. The
+environment block is confirmed real: no `nvidia-smi`, `torch.cuda.is_available()
+== False`, paper's 8B/20B models uncached (only distilgpt2/tiny-gpt2 cached), all
+6 datasets cached. `pytest` → 36/36; `smoke.sh` → `FINAL smoke=0.0000`; gate-style
+invocation of an arm → `FINAL <arm>=BLOCKED`, exit 0 (the gate's "missing a
+FINAL line" is numeric rejection of the non-numeric `BLOCKED`, matching the
+round-16 diagnosis). All 45 arms emit their FINAL line(s); molecular arms now
+emit both primary and secondary. Branch `repro/manifold-guided-attention-steering`
+pushed.

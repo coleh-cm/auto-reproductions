@@ -52,6 +52,13 @@ def test_difference_matrix_rows_are_problems():
     # rows orthonormal
     G = B @ B.T
     assert np.allclose(G, np.eye(4), atol=1e-4), "B rows not orthonormal"
+    # Eq.(10) / Proposition 1 rely on P = B^T B being a projector (idempotent).
+    # Orthonormal rows are SUFFICIENT but not DIRECT evidence; assert the
+    # projector property itself so a future refactor cannot break it silently.
+    P = B.T @ B
+    assert np.allclose(P @ P, P, atol=1e-5), "B^T B is not idempotent (not a projector)"
+    P_perp = np.eye(10) - P
+    assert np.allclose(P_perp @ P_perp, P_perp, atol=1e-5), "I-B^T B is not idempotent"
 
 
 # --- Eq.(5): fit_basis == top-k rows of V^T from SVD of D (not D^T) ---

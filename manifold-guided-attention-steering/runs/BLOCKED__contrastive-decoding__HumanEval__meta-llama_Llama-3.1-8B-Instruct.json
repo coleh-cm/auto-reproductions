@@ -1,1 +1,4 @@
-{"arm": "contrastive-decoding__HumanEval__meta-llama_Llama-3.1-8B-Instruct", "blocked_reason": "model meta-llama/Llama-3.1-8B-Instruct is not present in the HuggingFace cache (/root/.cache/huggingface/hub); the paper's 8B/20B models require a GPU host with the model pre-downloaded (SPEC §C.1). No in-run download is attempted (would hang an offline gate)."}
+{
+  "arm": "contrastive-decoding__HumanEval__meta-llama_Llama-3.1-8B-Instruct",
+  "blocked_reason": "contrastive-decoding amateur model 'meta-llama/Llama-3.2-1B-Instruct' is not present in the HuggingFace cache (/root/.cache/huggingface/hub); pre-cache it on a GPU host (SPEC \u00a7C.1). No in-run download is attempted."
+}

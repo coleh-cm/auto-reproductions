@@ -33,6 +33,14 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
     corrects = []
     ppls = []
     for i, prob in enumerate(problems):
+        # Reset per-problem controller state (decode-step index, problem id) so
+        # the steering_log records the per-problem decode index `t` and the
+        # problem id (Algorithm 1, SPEC §5.4). Without this, a controller reused
+        # across problems accumulates `_decode_step` monotonically and logs every
+        # record under problem=None. No-op controllers ignore the call.
+        begin = getattr(controller, "begin_problem", None)
+        if begin is not None:
+            begin(prob.id)
         completion, gen_ids, prompt_ids = generate(
             model, tok, prob.prompt_text, controller,
             max_new_tokens=max_new_tokens, do_sample=False,
