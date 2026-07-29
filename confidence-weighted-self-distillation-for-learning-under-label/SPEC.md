@@ -11,8 +11,9 @@ each citation also gives a grep string that resolves there.
 
 - Dataset: `sklearn.datasets.load_digits()` → `1797` grey-scale `8×8` images, `K = 10` classes,
   raw pixels in `[0, 16]` (paper.md:288, grep `load_digits`; paper.md:292, grep `1797`).
-- Hyperparameters: `λ ∈ {0, 1}` (paper.md:361–364, grep `confidence threshold` context),
-  `τ = 0.9`, `T = 2` (paper.md:366–375, grep `distillation temperature`),
+- Hyperparameters: `λ ∈ {0, 1}` (`λ = 1` stated at paper.md:361–365),
+  `τ = 0.9`, `T = 2` (paper.md:366–376, grep `confidence threshold` → 366,
+  grep `distillation temperature` → 373),
   learning rate `0.1`, minibatch size `64`, steps `4000` (paper.md:344–356,
   grep `learning rate` / `minibatch size` / `4000`), seed `0`
   (paper.md:385, grep `single runs at seed`).
@@ -201,13 +202,18 @@ init → per-step batching; label noise uses a `Generator` derived from
 Searched; none found.
 
 - **In the paper**: no URLs, DOIs, footnotes, or code-availability statements anywhere
-  in `paper/paper.md` — §5 "Reproducing" (paper.md:449–470) gives commands only.
-- **GitHub repository search** (`api.github.com/search/repositories`, 2026-07-29):
-  `confidence-weighted self-distillation`, `"Confidence-Weighted Self-Distillation"`,
-  `cwsd self-distillation`, `CWSD label noise Bergstrom` → all `total_count: 0`.
-- **GitHub code search** (authenticated, `api.github.com/search/code`):
+  in `paper/paper.md` (verified by `grep -niE "http|www\.|github|arxiv|doi|available at"`,
+  zero matches) — §5 "Reproducing" (paper.md:449–470) gives commands only.
+- **GitHub repository search** (`api.github.com/search/repositories`, re-run 2026-07-29):
+  `confidence-weighted self-distillation` → `total_count: 0`; `cwsd label noise` → 0;
+  `self-distillation label noise` → 0 (no CWSD among generic results);
+  `Bergstrom cwsd` → 0; `"Institute for Applied Learning Systems"` → 0.
+- **GitHub user search** (by authors, `api.github.com/search/users`, 2026-07-29):
+  `Bergstrom Oyelaran Vasquez` → `total_count: 0`.
+- **GitHub code search** (authenticated, `api.github.com/search/code`, re-run 2026-07-29):
   `"Confidence-Weighted Self-Distillation"` → 0; `"FINAL accuracy=" load_digits` → 0.
-- **DuckDuckGo web search**: blocked by bot challenge; no results obtained.
+- **DuckDuckGo web search**: blocked by bot challenge both attempts (2026-07-29);
+  no results obtained.
 
 Conclusion: **no usable upstream implementation exists; implement from scratch** per §1/§5.
 
