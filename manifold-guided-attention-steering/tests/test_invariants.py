@@ -217,3 +217,36 @@ def test_truncate_prompt_left_truncates_to_context():
     # under the cap: unchanged
     short = torch.arange(1, 11).unsqueeze(0)
     assert _truncate_prompt(_M(), short, max_new_tokens=10).shape[1] == 10
+
+
+# --- 70/15/15 split: the Figure-3 diagnostic AUROC uses a report-only split ---
+def test_fit_uses_report_split_for_diagnostic_auroc():
+    """Regression (adversarial review, confirmed MINOR): SPEC §4.8 mandates a
+    70/15/15 problem-level split (fit / head-select / report-only AUROC test).
+    The prior fit_manifold_bank computed the Figure-3 drift-validation
+    ``auroc_max`` (tex:L298) on the SAME 15% select split used for top-K head
+    selection (tex:L305), biasing the reported diagnostic of the selected heads.
+    ``report_pids`` must be a distinct third split and ``auroc_max`` must be
+    computed on it; passing report_pids must not break the selection
+    (auroc/mean stays on the select split)."""
+    rng = _rng(20)
+    all_acts = {}
+    pids = [f"p{i}" for i in range(20)]
+    for lh in [(0, 0), (0, 1), (1, 0), (1, 1)]:
+        ha, _ = _make_head_acts(rng, n_problems=20, d_h=6, traces_per_class=2, T=6)
+        ha.correct = {pids[i]: ha.correct[f"p{i}"] for i in range(20)}
+        ha.incorrect = {pids[i]: ha.incorrect[f"p{i}"] for i in range(20)}
+        all_acts[lh] = ha
+    fit_p, sel_p, rep_p = pids[:14], pids[14:17], pids[17:]
+    bank = fit_manifold_bank(all_acts, fit_p, sel_p, model_id="m", benchmark="b",
+                            k=2, q=90, K=2, alpha=1.0, layers_monitored=[0, 1],
+                            split_seed=42, report_pids=rep_p)
+    # selection (mean AUROC) still driven by the select split (tex:L305)
+    assert len(bank.selected_heads) == 2
+    # the report split is non-empty and disjoint from fit+select
+    assert rep_p and set(rep_p).isdisjoint(set(fit_p) | set(sel_p))
+    # backward-compat: report_pids=None falls back to select split (no crash)
+    bank2 = fit_manifold_bank(all_acts, fit_p, sel_p, model_id="m", benchmark="b",
+                             k=2, q=90, K=2, alpha=1.0, layers_monitored=[0, 1],
+                             split_seed=42)
+    assert len(bank2.selected_heads) == 2

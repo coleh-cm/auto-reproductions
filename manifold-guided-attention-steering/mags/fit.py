@@ -17,34 +17,18 @@ import json
 import os
 import sys
 
-# --- offline fast-fail (round-4 gate fix; see mags/run.py for rationale) -------
-# The gate's Docker image has torch/transformers but no model cache and (usually)
-# no network, so transformers' default ONLINE mode hangs on every from_pretrained
-# until the gate times out -> zero FINAL lines from run_all_arms.sh's Phase-1 fit
-# calls (a hang is NOT caught by the `if cmd; then` wrapper, only a non-zero exit
-# is). Default to OFFLINE when no HuggingFace token is discoverable (env var OR
-# the `huggingface-cli login` token file) so an uncached model fails in <1s;
-# fit.py's _blocked() then writes the BLOCKED marker and exits 2 (which the shell
-# wrapper catches). A real GPU host that ran `huggingface-cli login` is detected
-# and left online so it can download.
-def _has_hf_token():
-    if os.environ.get("HF_TOKEN") or os.environ.get("HF_HUB_TOKEN"):
-        return True
-    for p in (
-        os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "token"),
-        os.path.expanduser("~/.huggingface/token"),
-    ):
-        try:
-            if os.path.isfile(p) and open(p).read().strip():
-                return True
-        except OSError:
-            pass
-    return False
-
-
-if not _has_hf_token():
+# --- offline fast-fail (round-13 root-cause fix; see mags/run.py) -------------
+# Force OFFLINE unconditionally unless the reproducer opts in with MAGS_ONLINE=1,
+# so an uncached model OR training dataset fast-fails (ConnectionError in <1s)
+# instead of hanging on a blackholed network until the gate kills the process
+# (the round-1..12 "all arms missing a FINAL line" failure: a cached model +
+# token + blackholed net let fit proceed past load_model to load_dataset, which
+# hung). fit.py's _blocked() then writes the BLOCKED marker and exits 0. A real
+# GPU host pre-caches models/datasets (README) or sets MAGS_ONLINE=1 to download.
+if os.environ.get("MAGS_ONLINE", "0") != "1":
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+    os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "10")
 os.environ.setdefault("HF_HUB_DOWNLOAD_TIMEOUT", "10")
 
@@ -137,6 +121,9 @@ def main(argv=None):
                  f"{args.n_samples} samples; manifold cannot be fit (tex:L399).")
 
     # 3. problem-level 70/15/15 split (SPEC §4.8): fit / select / report-only
+    #    (the report-only split scores the Figure-3 drift-validation AUROC on
+    #    problems neither fit nor used for head selection, avoiding selection
+    #    bias on the diagnostic of the selected heads).
     rng = np.random.default_rng(config.DEFAULT_SEED)
     idx = rng.permutation(len(paired))
     n = len(paired)
@@ -144,10 +131,14 @@ def main(argv=None):
     n_sel = int(0.15 * n)
     fit_idx = idx[:n_fit].tolist()
     sel_idx = idx[n_fit:n_fit + n_sel].tolist()
+    report_idx = idx[n_fit + n_sel:].tolist()
     if not sel_idx:
         sel_idx = fit_idx   # fall back if too few problems
+    if not report_idx:
+        report_idx = sel_idx if sel_idx else fit_idx   # fall back if too few
     fit_pids = [paired[i][0].id for i in fit_idx]
     sel_pids = [paired[i][0].id for i in sel_idx]
+    report_pids = [paired[i][0].id for i in report_idx]
 
     # 4. persist TraceStore and build head activations
     act_dir = args.out + ".acts"
@@ -162,6 +153,7 @@ def main(argv=None):
         all_acts, fit_pids, sel_pids, model_id=args.model, benchmark=args.benchmark,
         k=args.k, q=args.q, K=args.K, alpha=args.alpha,
         layers_monitored=monitored, split_seed=config.DEFAULT_SEED, git_sha=git_sha,
+        report_pids=report_pids,
     )
     bank.save(args.out)
     print(f"OK mags fit -> {args.out} ({len(bank.selected_heads)} heads selected, "

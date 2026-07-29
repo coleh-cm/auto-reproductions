@@ -114,3 +114,21 @@ def test_grade_unknown_tag_raises():
     prob = Problem(id="x", benchmark="no-such-bench", prompt_text="", gold="")
     with pytest.raises(ValueError):
         grade("no-such-bench", "anything", prob)
+
+
+def test_grade_math_multi_boxed_scores_last_answer():
+    """Regression (adversarial review, confirmed MAJOR): a model's chain-of-thought
+    on MATH-500 routinely emits intermediate \\boxed{} results before the final
+    answer. The prior grade_math parsed the WHOLE raw prediction; math_verify then
+    collapsed every boxed value into a FiniteSet and the single gold failed the
+    set-size check, marking a CORRECT final answer WRONG. This depressed headline
+    MATH-500 accuracy (Table 1/2) and corrupted fit-time contrastive-trace labels
+    for the MATH-500 manifold. The grader must score ONLY the last boxed answer.
+    """
+    pred = r"Step 1: $\boxed{3}$. Step 2: $\boxed{5}$. Final: $\boxed{8}$."
+    assert grade_math(pred, "8"), "last boxed is 8 == gold; must pass"
+    assert not grade_math(pred, "3"), "first boxed is not the final answer"
+    # dfrac preserved through the last-boxed path
+    pred2 = r"intermediate $\boxed{3}$ then $\boxed{\dfrac{1}{2}}$"
+    assert grade_math(pred2, r"\dfrac{1}{2}"), "last boxed dfrac must pass"
+    assert not grade_math(pred2, "3"), "intermediate boxed must not be scored"

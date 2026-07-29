@@ -291,12 +291,23 @@ def fit_manifold_bank(
     select_pids: list,                # held-out problems for head selection AUROC
     *, model_id: str, benchmark: str, k: int, q: float, K: int, alpha: float,
     layers_monitored: list, split_seed: int, git_sha: str = "",
+    report_pids: list | None = None,
 ) -> ManifoldBank:
     """Phase A end-to-end: fit per-head manifolds on train_pids, rank heads by held-out
-    (select_pids) mean-AUROC, keep top-K. Returns a ManifoldBank."""
+    (select_pids) mean-AUROC, keep top-K. Returns a ManifoldBank.
+
+    ``report_pids`` is the report-only third split (SPEC §4.8: 70/15/15) used to
+    compute the Figure-3 drift-validation diagnostic ``auroc_max`` (tex:L298) on
+    problems that were neither used to fit the manifold nor to select heads. This
+    avoids the selection bias of computing the diagnostic AUROC of the selected
+    heads on the same split that selected them. If None, falls back to select_pids
+    (the prior behaviour) so a caller without a report split still works.
+    """
     # restrict activations to train split for fitting
     train_acts = _split_heads(all_head_acts, train_pids)
     select_acts = _split_heads(all_head_acts, select_pids)
+    report_acts = (_split_heads(all_head_acts, report_pids)
+                   if report_pids is not None else None)
     heads = {}
     aurocs = []
     for (l, h), ha in train_acts.items():
@@ -304,12 +315,22 @@ def fit_manifold_bank(
         if m is None:
             continue
         m.layer, m.head = l, h
-        # held-out mean-AUROC for selection (tex:L305) and max-AUROC for the diagnostic (tex:L298)
+        # held-out mean-AUROC for selection (tex:L305)
         if select_acts.get((l, h)) is not None and len(select_acts[(l, h)].problems()) > 0:
             m.auroc = head_auroc(select_acts[(l, h)], m.B, m.mu_c, "mean")
-            m.auroc_max = head_auroc(select_acts[(l, h)], m.B, m.mu_c, "max")
         else:
             m.auroc = head_auroc(ha, m.B, m.mu_c, "mean")
+        # max-AUROC for the Figure-3 drift-validation diagnostic (tex:L298) on the
+        # report-only split when available (SPEC §4.8), else on the select split.
+        diag_acts = (report_acts.get((l, h))
+                     if report_acts is not None and report_acts.get((l, h)) is not None
+                     and len(report_acts[(l, h)].problems()) > 0
+                     else (select_acts.get((l, h))
+                           if select_acts.get((l, h)) is not None
+                           and len(select_acts[(l, h)].problems()) > 0 else None))
+        if diag_acts is not None:
+            m.auroc_max = head_auroc(diag_acts, m.B, m.mu_c, "max")
+        else:
             m.auroc_max = head_auroc(ha, m.B, m.mu_c, "max")
         heads[(l, h)] = m
         aurocs.append((m.auroc, l, h))

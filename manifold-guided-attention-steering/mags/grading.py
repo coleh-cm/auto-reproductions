@@ -18,19 +18,28 @@ import tempfile
 def grade_math(prediction: str, gold: str) -> bool:
     """MATH-500 / GSM8K: math_verify boxed/numeric extraction + equivalence.
 
-    math_verify's ``parse`` needs the LaTeX wrapper (``\\boxed{...}``) to recognise
-    constructs like ``\\dfrac``; we therefore parse the *original* prediction text
-    (which contains the boxed answer) rather than the bare extracted content, and
-    parse the gold wrapped in ``\\boxed{}``. Falls back to normalised numeric
-    string-equality if math_verify cannot parse either side.
+    Standard MATH grading convention: score the LAST boxed answer in the
+    prediction (a model's CoT often emits intermediate ``\\boxed{}`` results
+    before the final answer). ``_extract_answer`` isolates that last boxed
+    content; we wrap it back in ``\\boxed{}`` (so math_verify recognises
+    constructs like ``\\dfrac``) and parse it. If the prediction has no boxed
+    marker, fall back to parsing the raw prediction. Falls back to normalised
+    numeric string-equality if math_verify cannot parse either side.
+
+    NOTE: parsing the WHOLE raw prediction when multiple ``\\boxed{}`` markers
+    are present is a bug -- math_verify collapses every boxed value into a set
+    and the single gold then fails the set-size check, marking a correct final
+    answer wrong (depressing headline accuracy and corrupting fit-time trace
+    labels for the MATH-500 manifold). Always parse only the last boxed answer.
     """
     pred_ans = _extract_answer(prediction)
     try:
         from math_verify import parse, verify
         g = parse(f"\\boxed{{{gold}}}")
-        # prefer the raw prediction (keeps \boxed wrapper for \dfrac etc.)
-        p = parse(prediction) if "\\boxed" in prediction else parse(
-            f"\\boxed{{{pred_ans}}}" if pred_ans is not None else prediction)
+        if pred_ans is not None:
+            p = parse(f"\\boxed{{{pred_ans}}}")
+        else:
+            p = parse(prediction)
         if g is None or p is None or not g or not p:
             return _norm(pred_ans) == _norm(gold)
         return bool(verify(g, p))
