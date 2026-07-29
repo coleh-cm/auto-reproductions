@@ -72,7 +72,7 @@ Each run prints exactly one line on completion: `FINAL accuracy=<float>`.
 ### With plain pip + a system Python 3.13
 
 ```bash
-python3.13 -m venv .venv
+python3.13 -m venv --clear .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python run_experiment.py --lambda 0.0   # baseline
 .venv/bin/python run_experiment.py --lambda 1.0   # CWSD

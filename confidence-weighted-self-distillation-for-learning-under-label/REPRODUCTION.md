@@ -23,6 +23,15 @@ implementation.
   `paper/paper.md`, unstated-items list §4, frozen component interfaces §5, upstream-code
   search record §6). Installed numpy 2.5.1 + scikit-learn 1.9.0; verified split arithmetic
   empirically (1797 → 1257 train / 540 test).
+- 2026-07-29: Verified the reproducible environment end to end. Recreated the venv from
+  scratch with `uv venv --python 3.13 .venv` (removed a stale `.venv` first so the bare
+  command succeeds idempotently) and `uv pip install --python .venv -r requirements.txt`;
+  all 11 pinned packages installed. `import run_experiment` resolves; `pytest -q` → 5
+  passed. Both arms run and print the `FINAL accuracy=<float>` contract line:
+  baseline (λ=0) `0.9315`, CWSD (λ=1) `0.9519` — the ~2-point CWSD-over-baseline
+  improvement is reproduced (Table 1's absolute numbers are not bitwise-reproducible
+  because the paper omits the RNG stream layout, weight init, and gate sharpness `s`;
+  see SPEC §4).
 
 ## Target numbers
 
