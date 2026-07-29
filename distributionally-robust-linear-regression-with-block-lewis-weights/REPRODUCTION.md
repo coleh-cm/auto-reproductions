@@ -325,3 +325,30 @@ implemented (no §8 number exercises them; U3).
   IPM=5) and ACS (BO_lewis=1, subgradient=3) reproduce the committed
   `results/run_all.log` FINAL lines exactly from the current code. No
   production arm or committed result changed; only the test suite.
+
+### Round-8: move the no-op check from the test suite to the smoke GATE
+
+- Feedback (this pass): the smoke output is unchanged from Round-7 — the four
+  first-order arms still report `iters_to_5%=None` (genuine plateau) and the
+  gate still prints `FINAL smoke=ok`. Round-7 fixed the *test suite*
+  (`test_first_order_arm_makes_progress`) but left the *gate* cosmetic: the
+  smoke printed `gap=<init>-><final>` to stderr as a human-readable diagnostic
+  and emitted `FINAL smoke=ok` unconditionally (modulo a crash). A no-op arm
+  returning the warm start x0 — the exact regression the check exists to catch
+  — would still pass the gate, because the gate never reads the gaps it prints.
+  The recurring identical feedback signals the gate itself must be meaningful.
+- Fix: `smoke.sh` now MACHINE-CHECKS, for every one of the 7 arms, that (a)
+  every recorded gap is finite and (b) the final gap is STRICTLY below the
+  initial gap (`gN < g0 - 1e-6`). It prints `FINAL smoke=ok` only if all 7 pass;
+  otherwise `FINAL smoke=FAIL (<arm>: <init>-><final>)` and exits non-zero.
+  A no-op arm (final == init) now fails the gate, not just the test suite; a
+  divergent arm (non-finite / increasing) fails it too. The `iters_to_5%=None`
+  for the first-order arms is unchanged (genuine plateau) — the new check
+  confirms the plateau is progress, not a stuck arm, at the gate level.
+  Adversarially verified: a simulated no-op result `[0.223]*4` and a divergent
+  result `[0.223, 1.5, inf]` are both rejected; a genuine-progress result
+  passes. Smoke output is still NOT paper evidence (tiny problem, tiny grids,
+  12 iters) — the assertion is about the code path, not the paper's numbers.
+  No production code or committed result changed; only `smoke.sh`. Test suite
+  (23) still passes; the test-suite check is kept as defense-in-depth (it uses
+  wider grids / 60 iters, so it is the stronger per-arm evidence).

@@ -38,9 +38,22 @@ from run_arm import normalize_problem, erm_warm_start
 # monotone progress (gap init->final shrinks) but PLATEAU well above 5%, so
 # their iters_to_5% is None.  This is exactly the paper's §8 T4 finding --
 # "first-order methods' plateau" on the heterogeneous instance, while the
-# second-order arms (IPM, ball-oracle) converge fast.  Printing init->final
-# (not just final) makes the progress visible so a "None" cannot be misread
-# as a broken arm: a broken arm would show init == final.
+# second-order arms (IPM, ball-oracle) converge fast.
+#
+# MACHINE-CHECKED progress (closes the round-7 gap).  Printing `gap=init->final`
+# alone is only a human-readable diagnostic: a NO-OP arm that returns the warm
+# start x0 (final == init) would still pass a gate that only checks
+# `FINAL smoke=ok`, reading identically to a genuine plateau.  So the gate now
+# ASSERTS, for every arm, that (a) every recorded gap is finite and (b) the
+# final gap is STRICTLY below the initial gap.  A no-op/broken arm fails
+# (final == init); a divergent arm fails (non-finite / increasing).  Only if
+# all 7 arms pass does the script print `FINAL smoke=ok`; otherwise it prints
+# `FINAL smoke=FAIL` with the offending arm and exits non-zero.  This is the
+# same distinction `tests/test_invariants.py::test_first_order_arm_makes_progress`
+# enforces, but at the GATE level -- so the smoke is real evidence every arm
+# optimizes, not just that it did not crash.  (Still NOT paper evidence: tiny
+# problem, tiny grids, 12 iters; the assertion is about the code path, not the
+# paper's numbers.)
 prob = make_synthetic(d=5, m=10, n_adv=2, n_per_group=15, seed=1, E_ADV=1e3, DIST=3.0)
 xopt, OPT = solve_opt(prob)
 prob, scale = normalize_problem(prob, OPT)   # OPT == 1 after this (U15)
@@ -56,6 +69,7 @@ cfgs = {
   "ball_oracle_lewis": {"geometry":"lewis","r0_grid":[10.0],"shrink_grid":[0.5],"beta_grid":[1e-1],"delta_grid":[1e-1]},
 }
 last = None
+results = []   # (arm, g_init, g_final, iters_to_5%, ok)
 for arm, cfg in cfgs.items():
     cfg = dict(cfg); cfg["opt"] = opt_norm
     geom = cfg.pop("geometry", None)
@@ -63,8 +77,26 @@ for arm, cfg in cfgs.items():
     h = run_arm(a, cfg, prob, x0, opt_norm, max_outer=12, time_budget=30.0)
     it, _ = time_to_gap(h, rel_gap=0.05)
     g = h["gap"]
-    last = f"{arm}: gap={g[0]:.3f}->{g[-1]:.3f} iters_to_5%={it}"
-    print(f"  smoke {last}", file=sys.stderr)
+    g0, gN = float(g[0]), float(g[-1])
+    # machine-check the arm actually optimizes (not a no-op / broken arm):
+    # every gap finite, and the final gap strictly below the initial gap.
+    finite = all(np.isfinite(v) for v in g)
+    progressed = finite and (gN < g0 - 1e-6)
+    ok = bool(finite and progressed)
+    results.append((arm, g0, gN, it, ok))
+    last = f"{arm}: gap={g0:.3f}->{gN:.3f} iters_to_5%={it}"
+    print(f"  smoke {last} progress={'YES' if ok else 'NO'}", file=sys.stderr)
+
+# Gate: ALL arms must make strict, finite progress.  A no-op arm (final ==
+# init) or a divergent arm (non-finite / increasing) fails the smoke -- this
+# is the machine-checked invariant that `FINAL smoke=ok` now means something,
+# not just "did not crash".  (Tests/test_invariants.py enforces the same per
+# first-order arm with wider grids/iters; here it is checked at the gate.)
+bad = [(arm, g0, gN) for (arm, g0, gN, _it, ok) in results if not ok]
+if bad:
+    detail = "; ".join(f"{a}: {gi:.4g}->{gf:.4g}" for a, gi, gf in bad)
+    print(f"FINAL smoke=FAIL (no progress / non-finite: {detail})")
+    sys.exit(1)
 # one FINAL line for the gate to find
 print(f"FINAL smoke=ok")
 PYEOF
