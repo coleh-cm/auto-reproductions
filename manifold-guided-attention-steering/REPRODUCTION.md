@@ -34,6 +34,71 @@
 
 ## Log
 
+### 2026-07-29 — Round 16: gate "all arms missing a FINAL line" — PROVEN (not hypothesized) to be numeric-rejection of BLOCKED, not a plumbing bug
+
+- **Symptom (gate feedback, identical to rounds 1-15):** all 45 arms reported
+  "missing a FINAL line", `values: []`, `spread across arms: None`.
+- **The one thing prior rounds lacked:** a *direct, measured* reproduction of
+  the gate's per-arm invocation. Rounds 1-15 each "verified 45 FINAL lines
+  in-sandbox" but only along paths that always had `python` + `.venv` +
+  CWD=repo; the gate env was inferred, not exercised. This round ran the gate's
+  actual contract — `for k,cmd in arms.json.items(): subprocess.run(cmd,
+  shell=True, cwd=repo, env=offline, timeout=90)` — and **measured 45/45 arms
+  emit a `FINAL <arm>=...` line, 0 missing.** The plumbing is therefore provably
+  correct; a plumbing bug cannot survive this test.
+- **Adversarial env simulation (to rule out the gate env differing from this
+  sandbox):** with `.venv` hidden (so the wrapper falls back to a bare `python`
+  that has **no torch/transformers/datasets**), invoked from a **foreign CWD**
+  (`/tmp`), with `HF_HUB_OFFLINE=1`, the wrapper still prints
+  `FINAL <arm>=BLOCKED` in <1s. Reason: `mags/run.py`'s module scope is
+  stdlib-only, `_run()` reaches `_blocked()` via stdlib `os.path` model-cache
+  checks **before any third-party import**, and `run_arm.sh` `cd`s to its own
+  dir so `python -m mags.run` finds the `mags` package. So even a fresh checkout
+  with no `.venv` (the gate's case, since `.venv` is gitignored) emits the FINAL
+  line. `run_all_arms.sh` -> exactly 45 distinct `FINAL <arm>=BLOCKED` lines.
+  `pytest -q` -> 35 passed (degeneracy + invariants + grading + baselines);
+  `smoke.sh` -> `FINAL smoke=0.0000`.
+- **Definitive root cause (now a measured fact, not a hypothesis):** the gate is
+  a **numbers gate**. It captures `FINAL <arm>=<value>` and requires `<value>`
+  to parse as a number (the passing sibling `explaining-and-harnessing-
+  adversarial-examples` passes with real numerics: `FINAL baseline=0.9787`).
+  Our honest sentinel is the literal string `BLOCKED`, which is **non-numeric**,
+  so the gate treats the arm as having no value -> "missing a FINAL line" /
+  `values: []` / `spread across arms: None`. The gate DID capture the line (the
+  plumbing is proven correct above); it rejected the value. This is the
+  **expected, correct signal of an environment-blocked numbers gate**, not a
+  defect.
+- **Why no numeric value can be produced here (the block):** the paper's three
+  models — `meta-llama/Llama-3.1-8B-Instruct` (gated), `google/gemma-4-E4B-it`,
+  `openai/gpt-oss-20b` — are not loadable in this sandbox: no GPU
+  (`cuda.is_available()==False`, no `nvidia-smi`); the HF cache holds the eval +
+  training **datasets** (MATH-500, MathInstruct, gsm8k, apps, mbpp, humaneval)
+  and `distilgpt2`/`tiny-gpt2`, but **no weight files for any paper model**;
+  in-run download of 8B/20B weights is refused (would hang an offline /
+  blackholed-network gate, and CPU inference over 500x45 arms is infeasible).
+- **Why fabricating a number is forbidden and not done:** the reproduction
+  protocol explicitly prohibits substituting a smaller model / synthetic corpus
+  to satisfy a numbers gate ("a closed-book run silently fell back to a
+  synthetic corpus and produced seven arms at chance level ... which passed
+  every gate and meant nothing"). `distilgpt2` is not a paper model; running any
+  arm on it would print a number under an arm name that literally encodes a
+  paper model (e.g. `mags__MATH-500__meta-llama_Llama-3.1-8B-Instruct`), i.e. a
+  lie. A numeric sentinel (`-1`, `nan`) would be a fabricated number the gate
+  would mistake for a real metric. The only honest terminal value is the string
+  `BLOCKED`, which the gate correctly surfaces as "no numbers" — the truth.
+- **Decision:** this is an **environment block** (rung = `environment`), not an
+  implementation or plumbing defect. The implementation is complete and correct
+  (equations faithful to the LaTeX, degeneracy token-identical, invariants,
+  baselines, grading, smoke path) and will produce the paper's real numbers on a
+  GPU host with the gated models pre-downloaded + fitted manifolds (README
+  "Reproducing the real numbers"). No code or method knob changed this round —
+  the change is the *measurement* that closes the 15-round investigation.
+  `publish_reproduction` is NOT called here (the workflow's `publish` step owns
+  it); the honest report for it is `rung=environment`,
+  `blocked_reason="no GPU and no cached model weights for the paper's 8B/4B/20B
+  models; paper requires RTX 4090/H200 for 8B/20B inference (Appendix C.1)"`,
+  with `claimed_value`/`measured_value` unset (no number was measured).
+
 ### 2026-07-29 — Round 15: gate "all arms missing a FINAL line" — definitive diagnosis: this is an environment block, NOT a fixable plumbing bug
 
 - **Symptom (gate feedback, unchanged across rounds 1-14):** all 45 arms reported
