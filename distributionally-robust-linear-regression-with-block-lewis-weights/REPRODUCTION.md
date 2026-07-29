@@ -728,3 +728,38 @@ unchanged and still disclosed.
   3 parametrized p-Hessian + 1 softmax). Committed result JSONs unchanged
   (no implementation code changed; the gate is unaffected). Branch
   `repro/block-lewis-gdr` pushed.
+
+### Round-15: 5-component adversarial paper-fidelity review (orchestration) — 0 findings
+
+- Ran an `orchestrate` review (`gdr-round15-paper-fidelity-review`, 10 agents:
+  one adversarial reviewer + one independent refutation-verifier per-component
+  pipeline over the 5 decomposable components — data_pipeline, method_core,
+  training_loop, evaluation_metric, baseline_arm). Each reviewer read the
+  ACTUAL code files AND the authoritative paper `.tex` source at
+  `paper/arxiv-2607.00252-src/`, hunting for undisclosed
+  correctness/fidelity departures (wrong formula/sign/exponent, missing term,
+  wrong update rule, silently-dropped config key, wrong objective/gap
+  definition); each raw finding then went to a *separate* verifier stage that
+  re-read the cited `code:line` and `paper:line` itself and kept the finding
+  only if the deviation was real, material, and NOT disclosed in SPEC.md
+  U-items / 8A / Blockers or this log. The script is the evaluator: nothing
+  was trusted unverified.
+- Result: **0 confirmed findings across all 5 components** (0 raw findings
+  raised by every reviewer — the verify stage never triggered). The core
+  implementation is faithful to the paper: the maths match the cited equations
+  (E3/E4/E5/E6/E7/E8/E9/E11/E20), the loops match the paper algorithm
+  descriptions (E19 ball-oracle damped-Newton / E21 IPM log-barrier / E22
+  first-order baselines), the evaluation matches the paper (gap=(F−OPT)/OPT,
+  gap_best=cummin, time_to_rel_gap at the crossing), and every deviation from
+  a paper fact is disclosed in SPEC U-items / 8A / Blocker B1.
+- This is the third consecutive adversarial review pass (Rounds 11, 13, 15)
+  to return zero actionable findings on the implementation; Round-14's
+  confirmed findings were all test-coverage gaps (now pinned), not impl bugs.
+- No code or committed result changed this round — the review confirmed the
+  substance. Tests 32/32 pass; smoke gate `FINAL smoke=ok` (all 7 arms make
+  strict finite progress, matching the round feedback: subgradient
+  0.223→0.188, smoothed_gd 0.223→0.159, smoothed_hb 0.223→0.160,
+  smoothed_nesterov 0.223→0.152, ipm 0.223→0.013 @iter 11,
+  ball_oracle_euclidean/lewis 0.223→0.050 @iter 1). Blocker B1 (ACS
+  heterogeneity magnitude, subgradient-NR / IPM-HB counts) unchanged and
+  still disclosed. Branch `repro/block-lewis-gdr` pushed.
