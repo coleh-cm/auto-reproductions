@@ -16,7 +16,37 @@ import argparse
 import json
 import os
 import sys
-import numpy as np
+
+# --- offline fast-fail (round-4 gate fix; see mags/run.py for rationale) -------
+# The gate's Docker image has torch/transformers but no model cache and (usually)
+# no network, so transformers' default ONLINE mode hangs on every from_pretrained
+# until the gate times out -> zero FINAL lines from run_all_arms.sh's Phase-1 fit
+# calls (a hang is NOT caught by the `if cmd; then` wrapper, only a non-zero exit
+# is). Default to OFFLINE when no HuggingFace token is discoverable (env var OR
+# the `huggingface-cli login` token file) so an uncached model fails in <1s;
+# fit.py's _blocked() then writes the BLOCKED marker and exits 2 (which the shell
+# wrapper catches). A real GPU host that ran `huggingface-cli login` is detected
+# and left online so it can download.
+def _has_hf_token():
+    if os.environ.get("HF_TOKEN") or os.environ.get("HF_HUB_TOKEN"):
+        return True
+    for p in (
+        os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "token"),
+        os.path.expanduser("~/.huggingface/token"),
+    ):
+        try:
+            if os.path.isfile(p) and open(p).read().strip():
+                return True
+        except OSError:
+            pass
+    return False
+
+
+if not _has_hf_token():
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "10")
+os.environ.setdefault("HF_HUB_DOWNLOAD_TIMEOUT", "10")
 
 from . import config
 
@@ -59,6 +89,7 @@ def main(argv=None):
     from .capture import capture_trace
     from .grading import grade
     import torch
+    import numpy as np
 
     monitored = config.monitored_layers_for(args.model)
     # 1. load training problems for the benchmark

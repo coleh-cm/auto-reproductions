@@ -24,6 +24,44 @@ import json
 import os
 import sys
 
+# --- offline fast-fail (round-4 gate fix) -------------------------------------
+# The gate runs in a Docker image that HAS torch/transformers but has NO model
+# cache and (typically) NO network. transformers' default ONLINE mode then hangs
+# on every `from_pretrained` call until the gate's overall timeout -> the script
+# is killed before a single `FINAL <arm>=...` line prints -> the gate reports
+# every arm "missing a FINAL line" with `values: []`. We default to OFFLINE
+# (HF_HUB_OFFLINE=1 / TRANSFORMERS_OFFLINE=1) when NO HuggingFace token is
+# discoverable, so an uncached model raises an OSError in well under a second
+# instead of hanging; run.py's try/except turns that into one honest
+# `FINAL <arm>=BLOCKED` line. A real GPU host that ran `huggingface-cli login`
+# (token stored at $HF_HOME/token) OR exported HF_TOKEN is detected here and
+# left in online mode so the models can download; pre-cached models load under
+# offline=1 too. This runs at module scope using only stdlib, BEFORE any
+# transformers import, so it also protects arms invoked directly (not just via
+# run_all_arms.sh).
+def _has_hf_token():
+    if os.environ.get("HF_TOKEN") or os.environ.get("HF_HUB_TOKEN"):
+        return True
+    for p in (
+        os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "token"),
+        os.path.expanduser("~/.huggingface/token"),
+    ):
+        try:
+            if os.path.isfile(p) and open(p).read().strip():
+                return True
+        except OSError:
+            pass
+    return False
+
+
+if not _has_hf_token():
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+# Short HF timeouts as a backstop so even explicit online mode cannot hang the
+# gate on a blackholed network (fails in ~10s instead of the ~75s TCP default).
+os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "10")
+os.environ.setdefault("HF_HUB_DOWNLOAD_TIMEOUT", "10")
+
 # IMPORTANT: this module's TOP LEVEL imports ONLY the standard library.
 # `python -m mags.run` is the command every arm in arms.json invokes, and the
 # gate runs those commands in a fresh checkout where the local .venv (which
@@ -35,6 +73,32 @@ import sys
 # deferred into _run() and wrapped so a missing dep still produces one honest
 # `FINAL <arm>=BLOCKED` line. config.py is itself pure-stdlib, but we import
 # it lazily too so the module can never fail to load on a missing dependency.
+
+
+def _offline_uncached(model_id):
+    """Cheap, no-torch check used to fast-path the BLOCKED line. Returns True ONLY
+    when (a) we are in offline mode (HF_HUB_OFFLINE=1, the round-4 default for a
+    no-token sandbox) AND (b) the standard HF hub cache has NO snapshot for
+    `model_id`. In that case the model provably cannot load, so we emit
+    `FINAL <arm>=BLOCKED` without paying the ~1s torch/transformers import per
+    arm — this keeps run_all_arms.sh to ~tens of seconds in the gate instead of
+    minutes, leaving margin under a tight gate wall-clock budget. It is
+    conservative: any uncertainty (offline unset, cache dir overridden to a path
+    we can't stat, a snapshot present) returns False and falls through to the
+    real `load_model` below, which is the source of truth. It never BLOCKS a
+    model that is cached."""
+    if os.environ.get("HF_HUB_OFFLINE", "0") != "1":
+        return False
+    hub_cache = os.environ.get("HF_HUB_CACHE") or os.path.join(
+        os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+    snap = os.path.join(hub_cache, "models--" + model_id.replace("/", "--"),
+                        "snapshots")
+    try:
+        if not os.path.isdir(snap):
+            return True            # no snapshots dir => definitely not cached
+        return not any(os.scandir(snap))   # empty snapshots dir => not cached
+    except OSError:
+        return False               # uncertain => let the real load decide
 
 
 def _blocked(arm, reason, secondary=None):
@@ -105,6 +169,14 @@ def _run(args, arm_id, bench, model_id, arm, emit):
                           "Treated as a stretch target, not implemented for real data.")
 
     # ---- load the model (expected to fail in a no-GPU/no-token sandbox) ----
+    # Fast-path the honest BLOCKED for uncached models in offline mode WITHOUT
+    # importing torch/transformers (keeps the gate fast); see _offline_uncached.
+    if _offline_uncached(model_id):
+        _blocked(arm_id, f"offline mode (HF_HUB_OFFLINE=1) and {model_id!r} has no "
+                          "snapshot in the HF cache; cannot load without network "
+                          "(no GPU / no gated-token sandbox). On a GPU host set "
+                          "HF_HUB_OFFLINE=0 and provide HF_TOKEN, or pre-cache the "
+                          "model.")
     try:
         from .models import load_model
         model, tok = load_model(model_id)

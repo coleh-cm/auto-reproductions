@@ -1,2 +1,2 @@
 FINAL iti__HumanEval__meta-llama_Llama-3.1-8B-Instruct=BLOCKED
-BLOCKED[iti__HumanEval__meta-llama_Llama-3.1-8B-Instruct]: model load failed: ModuleNotFoundError("No module named 'torch'")
+BLOCKED[iti__HumanEval__meta-llama_Llama-3.1-8B-Instruct]: offline mode (HF_HUB_OFFLINE=1) and 'meta-llama/Llama-3.1-8B-Instruct' has no snapshot in the HF cache; cannot load without network (no GPU / no gated-token sandbox). On a GPU host set HF_HUB_OFFLINE=0 and provide HF_TOKEN, or pre-cache the model.

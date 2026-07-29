@@ -1,6 +1,1 @@
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/root/auto-reproductions/manifold-guided-attention-steering/mags/fit.py", line 19, in <module>
-    import numpy as np
-ModuleNotFoundError: No module named 'numpy'
+BLOCKED[mags.fit]: model load failed (RuntimeError('Could not load model \'meta-llama/Llama-3.1-8B-Instruct\': OSError("We couldn\'t connect to \'https://huggingface.co\' to load the files, and couldn\'t find them in the cached files.\\nCheck your internet connection or see how to run the library in offline mode at \'https://huggingface.co/docs/transformers/installation#offline-mode\'."). This is the expected BLOCKER in a no-GPU / no-gated-token sandbox; the paper\'s models are Llama-3.1-8B-Instruct (gated), Gemma-4-E4B-it, GPT-OSS-20B (need >=40GB VRAM).')); cannot collect contrastive traces from meta-llama/Llama-3.1-8B-Instruct. Manifold fit needs the base model to sample <=8 traces per problem (tex:L399); blocked without GPU / gated-token access.

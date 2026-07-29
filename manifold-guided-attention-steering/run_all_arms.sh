@@ -33,9 +33,51 @@ set -uo pipefail
 set +e
 
 cd "$(dirname "$0")"
-export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-0}"
 export PYTHONUNBUFFERED=1
 mkdir -p runs manifolds
+
+# --- offline fast-fail (round-4 gate fix) -------------------------------------
+# The gate runs in a Docker image that HAS torch/transformers but has NO model
+# cache and (typically) NO network. transformers' default ONLINE mode then hangs
+# on every `from_pretrained` until the gate's overall timeout -> the script is
+# killed before any `FINAL <arm>=...` line prints -> the gate reports all 45
+# arms "missing a FINAL line" with `values: []` (this was the failure for the
+# first THREE gate rounds; the prior fixes addressed missing-deps and errexit,
+# which were real but not the actual gate failure mode). Default to OFFLINE
+# when no HuggingFace token is discoverable (env var OR the `huggingface-cli
+# login` token file) so an uncached model raises in <1s -> FINAL <arm>=BLOCKED.
+# (mags/run.py and mags/fit.py set the same default at import, so this also
+# protects arms invoked directly; setting it here covers the Phase-1 fit calls
+# and makes the behaviour visible.) A real GPU host that ran `huggingface-cli
+# login` is detected and left online so it can download; pre-cached models
+# load under offline=1 too.
+_hf_token_set() {
+    [ -n "${HF_TOKEN:-}${HF_HUB_TOKEN:-}" ] && return 0
+    local f="${HF_HOME:-$HOME/.cache/huggingface}/token"
+    [ -s "$f" ] && return 0
+    [ -s "$HOME/.huggingface/token" ] && return 0
+    return 1
+}
+if ! _hf_token_set; then
+    : "${HF_HUB_OFFLINE:=1}"; : "${TRANSFORMERS_OFFLINE:=1}"
+fi
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-0}"
+export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-0}"
+# Short HF timeouts as a backstop so even explicit online mode cannot hang the
+# gate on a blackholed network (fail in ~10s instead of the ~75s TCP default).
+export HF_HUB_ETAG_TIMEOUT="${HF_HUB_ETAG_TIMEOUT:-10}"
+export HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-10}"
+# Per-command wall-clock backstops (only a safety net; in the gate every command
+# fast-fails in <1s under offline mode, so these never trigger). On a real GPU
+# host a single fit/eval can legitimately exceed these — override
+# MAGS_FIT_TIMEOUT / MAGS_ARM_TIMEOUT to raise them.
+FIT_TIMEOUT="${MAGS_FIT_TIMEOUT:-1800}"
+ARM_TIMEOUT="${MAGS_ARM_TIMEOUT:-3600}"
+if ! command -v timeout >/dev/null 2>&1; then
+    # no coreutils `timeout`: define a no-op shim so the `timeout N cmd` calls below
+    # just run the command unbounded (offline fast-fail still protects the gate).
+    timeout() { shift; "$@"; }
+fi
 
 if [ ! -f arms.json ]; then echo "arms.json missing" >&2; exit 1; fi
 
@@ -89,7 +131,7 @@ PY
         out="manifolds/$(echo "$model" | tr '/' '_')__$(echo "$bench" | tr ' ' '_').npz"
         if [ -f "$out" ]; then echo "[fit] exists $out"; continue; fi
         echo "[fit] $model / $bench -> $out"
-        if "$PYTHON" -m mags.fit --model "$model" --benchmark "$bench" --out "$out" \
+        if timeout "$FIT_TIMEOUT" "$PYTHON" -m mags.fit --model "$model" --benchmark "$bench" --out "$out" \
                 > "runs/log__fit__${slug}.log" 2>&1; then
             :
         else
@@ -105,7 +147,7 @@ while IFS='	' read -r arm cmd; do
     # `if` so a non-zero exit can never trigger errexit — the FINAL-line
     # fallback below always runs.
     if [ "$HAVE_PYTHON" = 1 ] && [ -n "$cmd" ]; then
-        if eval "$cmd" > "runs/log__${arm}.log" 2>&1; then
+        if eval "timeout \"$ARM_TIMEOUT\" $cmd" > "runs/log__${arm}.log" 2>&1; then
             :
         fi
     fi

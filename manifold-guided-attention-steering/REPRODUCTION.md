@@ -388,3 +388,72 @@ gated HF token mean none of the paper's 8B/4B/20B models load, and the
 molecular task's setup is unstated by the paper. No synthetic fallback for
 results; `smoke.sh` is the only synthetic path and is never reported as a
 result.
+
+### Round-4 gate fix (this commit): the real cause was a network HANG, not missing deps
+
+The three prior rounds hardened `run_all_arms.sh`/`smoke.sh`/`mags.run` for the
+no-deps and errexit cases. Those were real bugs, but the gate STILL reported
+all 45 arms "missing a FINAL line" with `values: []` after each. The actual
+failure mode was different and is fixed here.
+
+**Root cause.** The gate runs in the `Dockerfile` image, which bakes
+`requirements.txt` (torch / transformers / datasets / numpy / sklearn / …) into
+`python:3.13-slim` (Dockerfile L44-54). So the base interpreter HAS the heavy
+deps — round-3's "no numpy/torch" diagnosis does not apply to the Docker gate.
+With deps present, every `python -m mags.run`/`mags.fit` reached
+`AutoModelForCausalLM.from_pretrained`. The paper's models are NOT in a fresh
+image's cache, and `run_all_arms.sh` defaulted `HF_HUB_OFFLINE=0` (online). In
+a no-network (or blackholed-network) sandbox, online `from_pretrained` then
+HANGS on the TCP connect until the gate's overall wall-clock budget — the
+script is killed before a single `FINAL <arm>=...` line prints → "arms missing
+a FINAL line", `values: []`. (Verified empirically: with `HF_HUB_OFFLINE=1` an
+uncached model raises an OSError in ~2 s; with online mode and no network it
+hangs indefinitely.) A hang is NOT caught by the `if cmd; then` errexit-exempt
+wrapper (only a non-zero exit is), so Phase 1 (fit) and Phase 2 (arms) both
+stalled.
+
+**Fix ( defence in depth, all in this commit ).**
+
+1. `mags/run.py` and `mags/fit.py` now default to **offline mode**
+   (`HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`) at module scope **when no
+   HuggingFace token is discoverable** — checked via env (`HF_TOKEN` /
+   `HF_HUB_TOKEN`) AND the `huggingface-cli login` token file
+   (`$HF_HOME/token`, `~/.huggingface/token`) — BEFORE any transformers import.
+   An uncached model then raises in <1 s instead of hanging. This runs at
+   import using only stdlib, so it protects arms invoked directly (not just
+   via `run_all_arms.sh`). A real GPU host that ran `huggingface-cli login` is
+   detected (token file) and left online so the models can download; the
+   default is inert when a token is present. Short
+   `HF_HUB_ETAG_TIMEOUT`/`HF_HUB_DOWNLOAD_TIMEOUT` (10 s) are set as a
+   backstop so even explicit online mode cannot hang the gate on a
+   blackholed network.
+2. `mags/run.py` adds `_offline_uncached(model_id)` — a conservative, **no-torch**
+   cache precheck (stdlib `os.scandir` of the HF hub `snapshots` dir). In offline
+   mode with no cached snapshot it emits `FINAL <arm>=BLOCKED` immediately,
+   skipping the ~1 s torch/transformers import per arm. It is conservative: any
+   uncertainty (offline unset, unstatable cache dir, a snapshot present) returns
+   False and falls through to the real `load_model`, which remains the source of
+   truth; it never BLOCKS a cached model.
+3. `run_all_arms.sh` sets the same offline default for its Phase-1 fit calls
+   and exports the short HF timeouts, and wraps every fit/arm command in
+   `timeout` (`MAGS_FIT_TIMEOUT`/`MAGS_ARM_TIMEOUT`, overridable; defaults
+   generous for the real GPU path; a `timeout` shim covers images without
+   coreutils `timeout`). `smoke.sh` hardened the same way (offline default +
+   `MAGS_SMOKE_TIMEOUT`).
+
+**Verified.** Simulating the Docker gate (`.venv` on PATH = deps present,
+fresh empty `HF_HOME` = nothing cached, no token): `bash run_all_arms.sh`
+prints exactly 45 `FINAL <arm>=BLOCKED` lines, `exit 0`, in **~18 s** (was:
+hang → zero FINAL lines). Each `arms.json` command run directly also prints
+its `FINAL <arm>=BLOCKED` line in ~0.01 s (the precheck fast-path). With a
+token present, `HF_HUB_OFFLINE` is NOT forced and the precheck returns False,
+so the real GPU path (download + eval) is unchanged. `smoke.sh` prints
+`FINAL smoke=0.0000` where `distilgpt2` is cached (the path runs) and
+`FINAL smoke=BLOCKED` where it is not — one FINAL line either way. 28/28
+tests still pass.
+
+This is still BLOCKED for every arm — the honest outcome: no GPU and no
+gated HF token mean none of the paper's 8B/4B/20B models load, and the
+molecular task's setup is unstated by the paper. No synthetic fallback for
+results; `smoke.sh` is the only synthetic path and is never reported as a
+result.
