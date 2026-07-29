@@ -13,8 +13,10 @@
 - [x] arXiv LaTeX source fetched and unpacked to `paper/source/` (verified byte-identical to a fresh download of `https://arxiv.org/e-print/1412.6572`)
 - [x] Paper read properly; `SPEC.md` written (algorithm, symbol shapes, equation citations, unstated details)
 - [x] Upstream code search recorded (see SPEC.md §7: no author code; paper's only link is the 2013 maxout-paper pylearn2 configs)
-- [x] Implementation runs smallest end-to-end case
-- [x] Adversarial review rounds clean
+- [x] Implementation runs smallest end-to-end case (`run_experiment.py --lambda 0.25 --steps 20`)
+- [x] Degeneracy test ships and passes (method at ε=0 reproduces baseline bit-for-bit)
+- [x] Equation-invariant + shape tests ship and pass (28 tests, `tests/`)
+- [ ] Adversarial review rounds clean (orchestration ran 2 review lenses per component; real bugs fixed; see Log)
 - [ ] Readiness gates walked and recorded
 - [ ] Numbers compared to paper and published
 
@@ -65,12 +67,32 @@
   per-example worst case. Both recorded.
 - 2026-07-29: **run_experiment.py determinism.** `MaxoutMLP` weight init draws from the
   GLOBAL torch RNG (`nn.init.uniform_`, no generator), so `run_experiment.py` calls
-  `torch.manual_seed(seed)` before constructing the model. Dropout is DISABLED
-  (include prob 1.0) in `run_experiment.py` specifically so the ε=0 degeneracy holds
-  bit-for-bit: dropout masks would diverge the RNG between the adv arm (extra forward for the
-  input gradient) and the baseline arm. The full milestone experiments may re-enable dropout;
-  this runner does not. The monitor-best checkpoint (`result.best_state_dict`) is loaded
-  before evaluation, matching the paper's protocol.
+  `torch.manual_seed(seed)` before constructing the model. Dropout defaults to OFF
+  (include-prob 1.0/1.0) in `run_experiment.py` so the ε=0 degeneracy holds bit-for-bit:
+  the method (Algorithm B) runs by default (including at `--lambda 0`); at eps=0,
+  `x + 0*sign(grad) == x` so `J~ == J` exactly and `adversarial_train_cost` performs no
+  extra RNG draw, so the parameter update is identical to clean training. `--baseline`
+  forces the clean arm as the reference. (Earlier text incorrectly stated the degeneracy
+  held by branch-switching and that dropout was "disabled" globally — corrected: the
+  adversarial code path IS exercised at eps=0; dropout is off only in the graded runner,
+  and is re-enabled (0.8/0.5) in the full-scale milestone scripts.) The monitor-best
+  checkpoint (`result.best_state_dict`) is loaded before evaluation, matching the paper's
+  protocol.
+- 2026-07-29: **F1 fix — surrogate dropout state (SPEC §6 item 23).** Adversarial review
+  found that `adversarial_train_cost` computed the FGSM input-gradient probe while the
+  model was in train() mode, so with dropout enabled the probe, `loss_clean`, and
+  `loss_adv` each drew a *different* dropout mask — the surrogate targeted a randomly
+  masked subnetwork and diverged from the deterministic eval-time attacker
+  (`eval.py` uses `model.eval()`). The paper does not state the dropout state during
+  surrogate generation (tex:490-491 only says "resist the current version of the model").
+  Choice recorded in SPEC §6 item 23: the probe is now computed with the model
+  temporarily in `eval()` mode (dropout off, deterministic — matching the eval-time
+  attacker), then the caller's mode is restored for the two loss terms so regular
+  training-time dropout still applies to the losses. New tests
+  `test_adversarial_train_surrogate_matches_eval_attacker` and
+  `test_adversarial_train_backward_finite_with_dropout` assert the surrogate direction
+  matches the eval-mode attacker and that backward stays clean with dropout on. The
+  eps=0 degeneracy is unaffected (the mode switch is a no-op with dropout off).
 - 2026-07-29: **Bug #2 found by adversarial review and fixed in `train._apply_max_col_norm`.**
   The clamp used `p.norm(dim=0)` for ALL 2-D weights. That is correct for `_MaxoutLayer.W`
   (shape `[in, out]` -> per-output-unit norm over the input axis), but WRONG for the readout

@@ -70,14 +70,14 @@ _VALID_FRACTION_DENOM = 6  # valid = n // 6, train = n - n // 6  (5:1 ratio)
 
 @dataclass
 class MNISTData:
-    """Container for the six split tensors plus the recorded seed.
+    """Container for the six split tensors (frozen 6-field interface, SPEC.md
+    section 4).
 
     x_* : float32 [N, 784] in [0,1]; y_* : int64 [N] (values 0..9, or {-1,+1}
-    for the 3-vs-7 binary variant). ``seed`` records the seed passed to the
-    loader for bookkeeping only; the load itself performs NO shuffle, so the
-    split is deterministic and identical regardless of seed. ``seed`` is an
-    optional, documented dataclass field (default None) so callers never need
-    an undocumented side channel to recover it.
+    for the 3-vs-7 binary variant).  The load itself performs NO shuffle, so
+    the split is deterministic and identical regardless of seed; the seed is
+    therefore NOT stored on the dataclass (the frozen interface has exactly
+    six fields).
     """
 
     x_train: Tensor
@@ -86,7 +86,6 @@ class MNISTData:
     y_valid: Tensor
     x_test: Tensor
     y_test: Tensor
-    seed: Optional[int] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -260,7 +259,6 @@ def load_mnist(root: Path, seed: int) -> MNISTData:
         y_valid=y_valid,
         x_test=x_test,
         y_test=y_test,
-        seed=int(seed),
     )
 
 
@@ -291,7 +289,6 @@ def load_mnist_full_train(root: Path, seed: int = 0) -> MNISTData:
         y_valid=empty_y,
         x_test=x_test,
         y_test=y_test,
-        seed=int(seed),
     )
 
 
@@ -308,7 +305,8 @@ def load_mnist_3v7(root: Path) -> MNISTData:
       early-stopping. Applying the literal [0:50000]/[50000:] indices to 12396
       examples would produce an empty validation set, which is not a faithful
       reading of "same split convention".
-    - The test split is the full filtered test set (~1962 examples).
+    - The test split is the full filtered test set (2038 examples: 1010 threes
+      + 1028 sevens).
     """
     train_images, train_labels, test_images, test_labels = _load_raw_arrays(root)
 
@@ -336,7 +334,6 @@ def load_mnist_3v7(root: Path) -> MNISTData:
         y_valid=y_valid,
         x_test=x_test,
         y_test=y_test,
-        seed=None,  # load_mnist_3v7 takes no seed; load is deterministic
     )
 
 
@@ -357,7 +354,6 @@ def subsample_mnist(
         y_valid=data.y_valid.clone(),
         x_test=data.x_test[:n_test].clone(),
         y_test=data.y_test[:n_test].clone(),
-        seed=int(seed),
     )
 
 
@@ -438,8 +434,7 @@ def _self_check() -> str:
                 f"x_train.dtype={data.x_train.dtype} "
                 f"y_train.dtype={data.y_train.dtype} "
                 f"x_train.min={data.x_train.min().item():.4f} "
-                f"x_train.max={data.x_train.max().item():.4f} "
-                f"seed={data.seed}"
+                f"x_train.max={data.x_train.max().item():.4f}"
             )
             assert data.x_train.shape == (50000, 784)
             assert data.x_valid.shape == (10000, 784)
@@ -447,7 +442,6 @@ def _self_check() -> str:
             assert data.y_train.dtype == torch.int64
             assert data.x_train.dtype == torch.float32
             assert 0.0 <= data.x_train.min().item() <= data.x_train.max().item() <= 1.0
-            assert data.seed == 0
 
             # 3-vs-7: validation must be NON-empty (the prior review bug).
             d37 = load_mnist_3v7(local_data_dir)
@@ -481,22 +475,18 @@ def _self_check() -> str:
                 "full_train loaded: "
                 f"x_train={tuple(dft.x_train.shape)} "
                 f"x_valid={tuple(dft.x_valid.shape)} "
-                f"y_valid={tuple(dft.y_valid.shape)} "
-                f"seed={dft.seed}"
+                f"y_valid={tuple(dft.y_valid.shape)}"
             )
             assert dft.x_train.shape == (60000, 784)
             assert dft.x_valid.shape == (0, 784)
             assert dft.y_valid.shape == (0,)
-            assert dft.seed == 7
 
             # subsample determinism
             s = subsample_mnist(data, n_train=200, n_test=50, seed=42)
             assert s.x_train.shape == (200, 784) and s.x_test.shape == (50, 784)
-            assert s.seed == 42
             lines.append(
                 "subsample ok: "
-                f"x_train={tuple(s.x_train.shape)} x_test={tuple(s.x_test.shape)} "
-                f"seed={s.seed}"
+                f"x_train={tuple(s.x_train.shape)} x_test={tuple(s.x_test.shape)}"
             )
         except Exception as exc:  # noqa: BLE001
             lines.append(f"real MNIST load skipped (network/download issue): {exc}")

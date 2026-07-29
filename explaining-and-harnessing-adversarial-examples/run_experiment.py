@@ -36,11 +36,16 @@ the same --seed then produce bit-identical weights, dropout masks (the
 per-module dropout generator is reseeded from ``seed`` inside ``train``),
 and batch order, hence the same FINAL accuracy line.
 
-Degeneracy: with ``adv_train = (--lambda > 0)``, ``--lambda 0`` selects the
-baseline arm (adv_train=False) -- identical to ``--baseline``; ``--lambda > 0``
-selects the adversarial arm (Algorithm B).  This makes ``--lambda 0`` the
-degeneracy no-op that exactly reproduces the baseline arm (the adv branch
-performs no extra forward at eps=0, so the RNG stays in lock-step).
+Degeneracy: ``adv_train = not --baseline`` — the method (Algorithm B) runs
+by default, including at ``--lambda 0`` (its no-op setting, where
+``x + 0*sign(grad) == x`` so ``J~ == J`` exactly).  ``--baseline`` forces the
+clean arm (``adv_train=False``) as the reference.  Dropout is DISABLED by
+default (include-prob 1.0) so the method at ``--lambda 0`` reproduces the
+``--baseline`` arm BIT-FOR-BIT: with dropout off, ``adversarial_train_cost``
+at eps=0 performs no extra RNG draw and its second forward equals the first,
+so the parameter update is identical to clean training.  The degeneracy test
+(tests/test_degeneracy.py) asserts ``--lambda 0`` and ``--baseline`` produce
+identical ``FINAL accuracy`` lines.
 """
 from __future__ import annotations
 
@@ -86,9 +91,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--alpha", type=float, default=0.5,
                    help="adversarial-training mixing weight (tex:488 alpha=0.5)")
     p.add_argument("--dropout-input", dest="dropout_input", type=float,
-                   default=0.8, help="input dropout include-prob (external)")
+                   default=1.0, help="input dropout include-prob (1.0=off; "
+                   "paper M4 uses 0.8 but degeneracy requires it off here)")
     p.add_argument("--dropout-hidden", dest="dropout_hidden", type=float,
-                   default=0.5, help="hidden dropout include-prob (external)")
+                   default=1.0, help="hidden dropout include-prob (1.0=off; "
+                   "paper M4 uses 0.5 but degeneracy requires it off here)")
     p.add_argument("--baseline", action="store_true",
                    help="force the baseline (clean) arm; --lambda is ignored")
     return p
@@ -115,10 +122,12 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     eps = max(0.0, args.lam)
-    # --lambda 0  -> adv_train=False (baseline, the degeneracy no-op).
-    # --lambda>0 -> adv_train=True (Algorithm B adversarial training).
-    # --baseline -> adv_train=False regardless of --lambda.
-    adv_train = (args.lam > 0.0) and (not args.baseline)
+    # The method (Algorithm B) runs by default, including at --lambda 0 (its
+    # no-op setting). --baseline forces the clean arm (adv_train=False) as the
+    # degeneracy reference. With dropout off (defaults 1.0/1.0), the method at
+    # eps=0 is bit-for-bit identical to the clean arm (adversarial_train_cost
+    # at eps=0 == cross_entropy_cost; no extra RNG draw).
+    adv_train = not args.baseline
 
     cfg = TrainConfig(
         batch_size=args.batch_size,

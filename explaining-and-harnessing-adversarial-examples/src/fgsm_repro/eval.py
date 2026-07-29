@@ -34,6 +34,8 @@ class AttackEval:
 
 @dataclass
 class AgreementStats:
+    # count of examples m1 misclassifies on its own FGSM adversarials
+    n_m1_errors: int
     # count of examples BOTH models misclassify on m1's FGSM adversarials
     n_both_wrong: int
     # fraction (over m1's-error subset) where m2 assigns m1's (predicted) class.
@@ -72,10 +74,26 @@ def _eval_from_probs_pred(
 
 
 def eval_clean(model: Classifier, x: torch.Tensor, y: torch.Tensor) -> float:
-    """Clean ACCURACY = mean(argmax(logits) == y) in [0, 1]."""
+    """Clean ACCURACY = mean(prediction == y) in [0, 1].
+
+    Multiclass (K>1): prediction = argmax(logits).  Binary (K==1, e.g. M2
+    logistic regression with y in {-1,+1}): prediction = +1 if score>0
+    else -1, i.e. the logistic decision rule sign(score).  The argmax-over-one
+    column would always yield 0 and never match {-1,+1} labels, so the binary
+    case is special-cased here.
+    """
     model.eval()
     with torch.no_grad():
-        pred = model.logits(x).argmax(dim=1)
+        logits = model.logits(x)
+        if logits.shape[-1] == 1:
+            # binary: predict +1 where score>0, else -1 (matches y in {-1,+1})
+            pred = torch.where(
+                logits.squeeze(-1) > 0,
+                torch.ones_like(y, dtype=y.dtype),
+                -torch.ones_like(y, dtype=y.dtype),
+            )
+        else:
+            pred = logits.argmax(dim=1)
     return (pred == y).float().mean().item()
 
 
@@ -135,6 +153,7 @@ def class_agreement(
         p2 = m2.logits(x_adv).argmax(dim=1)
     m1_err = p1 != y
     both_wrong = m1_err & (p2 != y)
+    n_m1_errors = int(m1_err.sum().item())
     n_both_wrong = int(both_wrong.sum().item())
 
     if m1_err.sum() > 0:
@@ -152,6 +171,7 @@ def class_agreement(
         p_pred_match_over_both_wrong = 0.0
 
     return AgreementStats(
+        n_m1_errors=n_m1_errors,
         n_both_wrong=n_both_wrong,
         p_pred_match_over_m1_errors=p_pred_match_over_m1_errors,
         p_pred_match_over_both_wrong=p_pred_match_over_both_wrong,
@@ -172,7 +192,6 @@ def eval_rubbish(
     with torch.no_grad():
         probs = _probs(model, x)
         max_prob = probs.max(dim=1).values
-        pred = probs.argmax(dim=1)
     wrong = max_prob > 0.5
     error_rate = wrong.float().mean().item()
     if wrong.sum() > 0:

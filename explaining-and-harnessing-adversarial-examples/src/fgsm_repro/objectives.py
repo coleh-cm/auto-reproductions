@@ -84,6 +84,21 @@ def adversarial_train_cost(
     x_tilde is detached, so the adversary's reaction is not anticipated
     (derivative of sign is zero or undefined everywhere).
 
+    SURROGATE-MODE CHOICE (SPEC.md section 6 item 23; addresses the
+    dropout-state-during-surrogate-generation gap): the paper says only that
+    the adversarial examples should "resist the current version of the model"
+    (tex:490-491) and never states the dropout state used while generating
+    them. The evaluation-time attacker (eval.py: eval_fgsm / fgsm) runs with
+    the model in ``eval()`` mode (dropout OFF, deterministic). To make the
+    training-time adversary MATCH the deterministic evaluation attacker, we
+    compute the input-gradient probe with the model temporarily in ``eval()``
+    mode (no dropout mask drawn, deterministic), then restore the caller's
+    mode and compute the two loss terms in the original (typically ``train()``)
+    mode so the regular training-time dropout still regularises the loss.
+    This keeps the surrogate's direction identical to the eval-time attacker's
+    and avoids consuming dropout RNG inside the probe (which previously caused
+    the probe, loss_clean, and loss_adv to each use a *different* random mask).
+
     Implementation note: the forward used to compute the input gradient is a
     SEPARATE graph from the outer loss. ``autograd.grad(Jc, x)`` (default
     ``retain_graph=False``) frees Jc's graph, so we do NOT reuse ``Jc`` in the
@@ -94,14 +109,24 @@ def adversarial_train_cost(
     Degeneracy: when eps == 0, x_tilde == x EXACTLY (x + 0*sign(g) == x), so
     loss_clean == loss_adv and the returned value equals the clean cost exactly
     (with alpha=0.5, 0.5*Jc + 0.5*Jc == Jc in IEEE-754). No clipping, no eps fudge.
+    With dropout OFF (the runner's default for the degeneracy gate), eval() and
+    train() mode are identical, so the mode switch is a no-op there.
     """
     x = x.detach().clone()
     x.requires_grad_(True)
+    # Compute the FGSM surrogate in eval() mode so it matches the deterministic
+    # evaluation-time attacker (eval.py uses model.eval()). Restore the caller's
+    # mode afterwards so the loss terms keep the original dropout behaviour.
+    was_training = model.training
+    model.eval()
     Jc = cross_entropy_cost(model, x, y)
     g = torch.autograd.grad(Jc, x)[0].detach()          # frees Jc's graph
+    if was_training:
+        model.train()
     x_tilde = (x.detach() + eps * torch.sign(g)).detach()
     x.requires_grad_(False)
-    # fresh graphs for the outer backward (not shared with the grad probe)
+    # fresh graphs for the outer backward (not shared with the grad probe),
+    # computed in the caller's original mode.
     loss_clean = cross_entropy_cost(model, x, y)
     loss_adv = cross_entropy_cost(model, x_tilde, y)
     return alpha * loss_clean + (1.0 - alpha) * loss_adv

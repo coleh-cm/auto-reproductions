@@ -275,13 +275,29 @@ Evaluation protocol:
      `--baseline` exactly (the degeneracy test). `--steps` is the SGD step count (the paper
      states no epoch/step count). Chose: maxout 240 units (paper's M3 size), 5 pieces, 2
      layers, init irange .005, SGD batch 100, LR .1, momentum .5→.7, α=0.5 (paper-stated),
-     ε=0.25 default (paper-stated for MNIST). **Dropout is DISABLED** (include prob 1.0) in
-     `run_experiment.py` specifically so the ε=0 degeneracy holds bit-for-bit: dropout masks
-     would diverge the RNG between the adv arm (extra forward for the input gradient) and the
-     baseline arm. Determinism: `MaxoutMLP` init draws from the GLOBAL torch RNG, so
-     `run_experiment.py` calls `torch.manual_seed(seed)` before constructing the model; the
-     batch-shuffle generator is seeded from `cfg.seed` inside `train()`. The monitor-best
-     checkpoint is loaded before evaluation (paper protocol).
+     ε=0.25 default (paper-stated for MNIST). Dropout defaults to **OFF** (include prob 1.0)
+     in `run_experiment.py` so the ε=0 degeneracy holds bit-for-bit: the method (Algorithm B)
+     runs by default (including at `--lambda 0`); `--baseline` forces the clean arm. With
+     dropout off, `adversarial_train_cost` at eps=0 performs no extra RNG draw and its second
+     forward equals the first, so the parameter update is identical to clean training. (The
+     degeneracy now holds by eps=0 ⇒ x̃==x ⇒ J̃==J, NOT by branch-switching; the adversarial
+     code path IS exercised at eps=0.) Determinism: `MaxoutMLP` init draws from the GLOBAL
+     torch RNG, so `run_experiment.py` calls `torch.manual_seed(seed)` before constructing the
+     model; the batch-shuffle generator is seeded from `cfg.seed` inside `train()`. The
+     monitor-best checkpoint is loaded before evaluation (paper protocol). Full-scale
+     milestone experiments (m4_adversarial.py etc.) re-enable dropout (0.8/0.5) — see item 3.
+23. **Dropout state during surrogate generation (F1)**: the paper says only that adversarial
+     examples should "resist the current version of the model" (tex:490-491) and never states
+     whether dropout is on or off while generating the FGSM surrogate. The evaluation-time
+     attacker (`eval.py`) runs with `model.eval()` (dropout OFF, deterministic). **Choice: the
+     input-gradient probe inside `adversarial_train_cost` is computed with the model temporarily
+     in `eval()` mode (dropout off), then the caller's mode is restored so the two loss terms
+     keep the regular training-time dropout.** This makes the training-time adversary match the
+     deterministic evaluation attacker and stops the probe from consuming dropout RNG (which
+     previously made the probe, loss_clean and loss_adv each use a different random mask).
+     Tested by `test_adversarial_train_surrogate_matches_eval_attacker`. With dropout OFF (the
+     runner default for the degeneracy gate) the mode switch is a no-op, so eps=0 degeneracy is
+     unaffected.
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):
@@ -322,3 +338,13 @@ raw IDX download (torchvision if its mirror works, else direct from a mirror).
   same direction and order of magnitude (e.g., M1 adv error "≈100%" vs 99.9%); the M4/M5 deltas
   (0.94→0.84, 1.14→0.782-mean) are the paper's headline claims and get the strictest comparison.
 - Every result JSON records the exact grep-able paper line it is compared against.
+
+### Finding: E6 sign subtlety (tex:407-412)
+The paper states "the sign of the gradient is just −sign(w)" (tex:407) and derives the closed-form
+adversarial logistic loss E6 = E ζ(y(ε‖w‖₁ − wᵀx − b)) (tex:410-412). The true FGSM input gradient of
+ζ(−y(wᵀx+b)) is −y·w·σ(·), whose sign is −y·sign(w), so the worst-case η = −ε·y·sign(w). Substituting
+gives the *true* worst-case loss ζ(ε‖w‖₁ − y(wᵀx+b)). The paper's E6 = ζ(y·ε‖w‖₁ − y(wᵀx+b)) matches
+this **only for y=+1**; for y=−1 E6 subtracts ε‖w‖₁ from the activation, yielding the *best*-case
+loss (E6 < clean), not the worst case. We implement E6 verbatim (matches the paper's printed
+equation) and the invariant test asserts E6 == empirical-FGSM for y=+1 (where the paper's "exact"
+claim holds) and records the y=−1 divergence as the paper's imprecision, not ours.
