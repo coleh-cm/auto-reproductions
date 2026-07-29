@@ -312,6 +312,54 @@ def test_maxout_readout_init_matches_recipe():
     assert w.abs().sum().item() > 0.0
 
 
+# --- §8 agreement: attack source == the paper's fixed maxout set (tex:679-680) - #
+def test_class_agreement_equals_agreement_on_adv_same_attacker_ref():
+    """§8 (tex:679-688): class_agreement(m1, m2) is the special case
+    agreement_on_adv(m1, m1, m2) -- the attack source and the reference whose
+    class is predicted are the same model. The two must be bit-identical so the
+    first four §8 numbers (16.0/54.6/84.6/54.3%, all with ref==attacker==maxout)
+    are unaffected by the refactor that separated the attacker from the ref."""
+    from fgsm_repro.eval import class_agreement, agreement_on_adv
+    torch.manual_seed(5)
+    m1 = SoftmaxRegression(784, 10)
+    m2 = SoftmaxRegression(784, 10)
+    x = torch.rand(64, 784)
+    y = torch.randint(0, 10, (64,))
+    a = class_agreement(m1, m2, x, y, 0.25)
+    b = agreement_on_adv(m1, m1, m2, x, y, 0.25)
+    assert a.n_m1_errors == b.n_m1_errors
+    assert a.n_both_wrong == b.n_both_wrong
+    assert abs(a.p_pred_match_over_m1_errors - b.p_pred_match_over_m1_errors) < 1e-9
+    assert abs(a.p_pred_match_over_both_wrong - b.p_pred_match_over_both_wrong) < 1e-9
+
+
+def test_agreement_on_adv_separates_attacker_from_ref():
+    """§8 (tex:679-688): the 53.6% number (rbf predicts softmax's class) must use
+    the MAXOUT-generated adversarial examples (the paragraph's fixed set,
+    tex:679-680), with the softmax as the reference whose class is predicted --
+    NOT new adversarials generated from the softmax model. We verify the attack
+    source is genuinely the `attacker` argument by checking the n_m1_errors
+    count (errors of the REFERENCE model on the ATTACKER's adversarials) changes
+    when the attacker changes while ref/pred stay fixed. A reading that built
+    adversarials from softmax would tie n_m1_errors to softmax's own-attack
+    errors instead of to the maxout-attack examples."""
+    from fgsm_repro.eval import agreement_on_adv
+    torch.manual_seed(6)
+    attacker_a = SoftmaxRegression(784, 10)  # maxout stand-in (any model works)
+    attacker_b = SoftmaxRegression(784, 10)
+    ref = SoftmaxRegression(784, 10)          # softmax stand-in
+    pred = SoftmaxRegression(784, 10)         # rbf stand-in
+    x = torch.rand(128, 784)
+    y = torch.randint(0, 10, (128,))
+    # Same ref+pred, different attacker -> the adversarial set differs, so the
+    # reference's error count on those adversarials must (almost surely) differ.
+    ra = agreement_on_adv(attacker_a, ref, pred, x, y, 0.25)
+    rb = agreement_on_adv(attacker_b, ref, pred, x, y, 0.25)
+    assert ra.n_m1_errors != rb.n_m1_errors, (
+        "attacker change did not change the adversarial set -- attacker is not "
+        "the attack source")
+
+
 # --- early-stopping selects the BEST epoch, not the stopping epoch ---------- #
 def test_best_epoch_is_selected_not_stopping():
     """Paper protocol tex:505-506: the early-stopping criterion chooses the

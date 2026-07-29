@@ -166,6 +166,28 @@ def main(argv: list[str] | None = None) -> int:
     adv_mean = _mean(adversarial_results)
     sub_scale = (args.patience < 100) or (len(seeds) < 5) or (args.units < 1600)
 
+    # Honest-reporting flags (same schema as e1_ensemble.json / m6). The paper's
+    # headline §6 direction (tex:497-512) is adversarial training REDUCING clean
+    # test error vs baseline (1.14% -> 0.782% mean). `direction_matches_paper` is
+    # true iff the adversarial arm actually trained (mean test error well below
+    # the 88.65% MNIST majority-class constant-predictor error) AND adv error <=
+    # baseline error. A collapsed adv arm (mean_test_error ~ 0.8865) gives a
+    # vacuous number that contradicts the paper's direction and must be flagged,
+    # not silently committed as a "sub-scale" result.
+    MAJORITY_CLASS_ERROR = 0.8865  # 1 - 0.1135 = MNIST test majority-class error
+    adv_arm_trained = adv_mean < 0.5 and abs(adv_mean - MAJORITY_CLASS_ERROR) > 0.05
+    direction_holds = adv_mean <= baseline_mean
+    direction_matches = adv_arm_trained and direction_holds
+    training_note = (
+        "adversarial arm trained healthily (mean_test_error=%.4f, well below the "
+        "88.65%% majority-class constant-predictor error); measurement is real, "
+        "not a collapsed-arm artifact." % adv_mean
+    ) if adv_arm_trained else (
+        "adversarial arm COLLAPSED (mean_test_error=%.4f ~ the 88.65%% "
+        "majority-class rate): the headline M5 number is vacuous and contradicts "
+        "the paper's direction; re-run at more epochs/units." % adv_mean
+    )
+
     record = {
         "milestone": "M5",
         "description": "Large maxout 1600x2: adv-valid early stop + 60k retrain "
@@ -185,10 +207,14 @@ def main(argv: list[str] | None = None) -> int:
             "baseline": {"per_seed": baseline_results, "mean_test_error": baseline_mean},
             "adversarial": {"per_seed": adversarial_results, "mean_test_error": adv_mean},
         },
+        "direction_matches_paper": direction_matches,
+        "adv_arm_trained": adv_arm_trained,
+        "direction_holds_adv_le_baseline": direction_holds,
         "paper_target": PAPER_TARGET,
         "note": ("Sub-scale run (units=%d, patience=%d, seeds=%d). The paper's "
-                 "0.782 pct mean uses 1600 units, patience-100, 5 seeds."
-                 % (args.units, args.patience, len(seeds))) if sub_scale else None,
+                 "0.782 pct mean uses 1600 units, patience-100, 5 seeds. %s"
+                 % (args.units, args.patience, len(seeds), training_note))
+                 if sub_scale else training_note,
     }
 
     out_path = Path(args.out)

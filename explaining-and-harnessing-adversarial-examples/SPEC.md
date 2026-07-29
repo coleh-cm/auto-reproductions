@@ -87,6 +87,17 @@ protocol and reproduces only a null result (no regularization benefit). Both exc
 recorded here rather than silently omitted; the L1 weight-decay control (Section 5, the one
 named *quantified* control the paper reports with numbers) IS now implemented (item 28).
 
+**Unimplemented but recorded (no exclusion arm, fits existing machinery):**
+- **MNIST rubbish class-skew statistic** (tex:929-930): "On MNIST, 45.3% of a naively trained
+  maxout network's false positives were classified as 5s, and none were classified as 8s." This
+  is a stated MNIST-core number implementable from the M9 maxout+softmax arm (collect the
+  predicted class on the erroring N(0,I) subset). It is NOT implemented (M9 reports only error
+  rate + confidence, not the per-class false-positive distribution) and is recorded here as a
+  known gap rather than silently omitted.
+- **Fig. 3 weight-localization** (tex:523-528): "the weights of the adversarially trained model
+  being significantly more localized and interpretable." A qualitative claim with no numeric
+  target; not checked and not reproducible as a number. Recorded as excluded.
+
 ---
 
 ## 2. The method as explicit algorithms
@@ -436,6 +447,56 @@ Evaluation protocol:
       here; 0.000025 trains but confers no clean-test/FGSM benefit.) The L1 penalty is ADDED
       to the cost (standard weight decay); the paper notes this is more pessimistic than
       adversarial training, which SUBTRACTS the penalty from the activation (tex:418-424).
+ 29. **M8 §8 "53.6%" attack source (adversarial review, fixed):** the paper fixes ONE
+      adversarial-example set per paragraph — "we generated adversarial examples on a deep
+      maxout network and classified these examples using a shallow softmax network and a
+      shallow RBF network" (tex:679-680) — so all five §8 agreement numbers use the
+      MAXOUT-generated examples. The first four (16.0/54.6/84.6/54.3%) compare a model's
+      prediction to the MAXOUT's class (attacker == reference == maxout). The fifth — "the
+      RBF network can predict softmax regression's class 53.6% of the time" (tex:687) —
+      compares the RBF's prediction to the SOFTMAX's class; the paper is genuinely ambiguous
+      whether this keeps the maxout-generated set with softmax as the reference, or builds new
+      adversarials from softmax. **Choice: the headline 53.6% uses the maxout-generated set
+      with softmax as the reference** (`eval.agreement_on_adv(attacker=maxout, ref=softmax,
+      pred=rbf)`) — the faithful reading of the paragraph's fixed set. The prior
+      implementation's reading (build NEW adversarials from softmax, `class_agreement(softmax,
+      rbf)`) is RETAINED as a secondary diagnostic (`softmax_vs_rbf_on_softmax_adv_secondary`
+      in results/m8_rbf.json) so the divergence between the two readings is visible.
+      `class_agreement(m1, m2)` is now the special case `agreement_on_adv(m1, m1, m2)`.
+      Tested by `test_class_agreement_equals_agreement_on_adv_same_attacker_ref` and
+      `test_agreement_on_adv_separates_attacker_from_ref`.
+ 30. **ε floor in the graded harness (adversarial review, recorded):** `run_experiment.py`
+      maps `--lambda` to ε via `eps = max(0.0, args.lam)` (run_experiment.py:138). A negative
+      `--lambda` is silently floored to the no-op (eps=0), which would report as the
+      "adversarial" arm while running the baseline trajectory. The paper never mentions a
+      negative ε (it is meaningless for a max-norm bound); the floor is a defensive clamp, not
+      a papered value. Recorded here for completeness; no reported number depends on it (no
+      arm is ever run with ε<0).
+ 31. **RBF exp clamp `q.clamp(max=80.0)` (adversarial review, recorded):** `eval._rbf_unnorm_probs`
+      / `eval_fgsm_rbf` clamp the RBF quad form to ≤ 80 before `torch.exp`
+      (eval.py:77,165) to avoid float32 overflow if a trained β drifts positive. This is a
+      STRICT NO-OP for any faithful RBF: q_k = −Σ_f softplus(raw_{k,f})(x_f−μ_{k,f})² ≤ 0
+      always (β neg-def by construction, models.py:298-323), so q ≤ 0 ≪ 80 and the clamp
+      never fires. It only guards pathological β drift, which would itself contradict the RBF
+      property. Recorded as an unpapered clamp that affects no reported number.
+ 32. **External lr schedule applied before the first step (adversarial review, recorded):** the
+      external maxout recipe's exponential lr adjust (`lr *= 1.000004` per update) is applied
+      BEFORE `optimizer.step()` (train.py:290-293), so the FIRST step uses lr·1.000004 = 0.1000004,
+      not the stated lr 0.1. The per-update adjust itself is documented external (§6 External
+      block); the pre-first-step application ordering is recorded here. Effect: a 4e-6 relative
+      lr shift on step 1 only, negligible against the lr·momentum dynamics; biases no reported
+      number meaningfully. (The degeneracy gate's eps=0==baseline holds bit-for-bit because both
+      arms share this identical schedule.)
+ 33. **M5 baseline arm retrain protocol (adversarial review, recorded):** the paper ties the
+      "retrain on all 60,000" step to the ADVERSARIAL-validation early-stop criterion
+      (tex:505-506) and is silent on whether the 1.14% BASELINE (tex:497-499) was also retrained
+      on the full 60k or simply early-stopped. **Choice: the M5 baseline arm runs the SAME
+      select-epochs-then-retrain-on-60k protocol as the adversarial arm** (select on clean-valid
+      error, retrain on 60k for best_epoch+1; m5_large_advtrain.py:157). A symmetric protocol is
+      the cleaner comparison (same training budget per arm) and biases the baseline, if anything,
+      UPWARD (more training), making the adversarial<baseline direction HARDER to show — so a
+      positive result is not inflated by this choice. Recorded; the paper's 1.14% baseline
+      number is compared against this symmetric-protocol baseline.
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):

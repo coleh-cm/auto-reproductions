@@ -40,6 +40,7 @@ from fgsm_repro.models import MaxoutMLP, SoftmaxRegression, RBFNet  # noqa: E402
 from fgsm_repro.train import TrainConfig, train  # noqa: E402
 from fgsm_repro.eval import (  # noqa: E402
     eval_clean, eval_fgsm_rbf, eval_clean_confidence_rbf, class_agreement,
+    agreement_on_adv,
 )
 
 # Paper target (tex:600-604, 679-688).
@@ -119,13 +120,26 @@ def main(argv: list[str] | None = None) -> int:
     # RBF clean confidence = mean over ALL test of max_k exp(q_k) (60.6%).
     rbf_clean_conf = eval_clean_confidence_rbf(rbf, x_test)
 
-    # Section 8 cross-model class agreement (tex:679-688).
+    # Section 8 cross-model class agreement (tex:679-688). The paper fixes ONE
+    # adversarial-example set per paragraph: "we generated adversarial examples
+    # on a deep maxout network and classified these examples using a shallow
+    # softmax network and a shallow RBF network" (tex:679-680). All five §8
+    # numbers therefore use the MAXOUT-generated examples (attacker = m_max).
     # maxout vs rbf: rbf predicts maxout's class 16.0% over m1 errors, 54.3% both-wrong.
     ag_mr = class_agreement(m_max, rbf, x_test, y_test, EPS)
     # maxout vs softmax: softmax predicts maxout's class 54.6% over m1 errors, 84.6% both-wrong.
     ag_ms = class_agreement(m_max, m_soft, x_test, y_test, EPS)
-    # softmax vs rbf: rbf predicts softmax's class 53.6% over m1 errors.
-    ag_sr = class_agreement(m_soft, rbf, x_test, y_test, EPS)
+    # 53.6% (tex:687 "the RBF network can predict softmax regression's class
+    # 53.6% of the time"): rbf predicts SOFTMAX's class, still on the
+    # MAXOUT-generated examples (the paragraph's fixed set). The reference
+    # whose class is predicted is softmax (ref=m_soft), the predictor is rbf,
+    # the attack source stays maxout (the paper's fixed set). SPEC §6 item 29.
+    ag_sr_on_maxout = agreement_on_adv(m_max, m_soft, rbf, x_test, y_test, EPS)
+    # SECONDARY diagnostic: the prior implementation built NEW adversarials from
+    # the softmax model (attacker=m_soft) -- a different example set than the
+    # paper's paragraph fixes. Retained so the divergence between the two
+    # readings is visible; the headline 53.6% uses the maxout-generated set above.
+    ag_sr_on_softmax = class_agreement(m_soft, rbf, x_test, y_test, EPS)
 
     # Sub-scale if ANY model is under-trained: the paper converges each net to
     # patience-100; we flag any epoch/patience knob below the paper scale.
@@ -155,8 +169,16 @@ def main(argv: list[str] | None = None) -> int:
         "agreement": {
             "maxout_vs_rbf": asdict(ag_mr),
             "maxout_vs_softmax": asdict(ag_ms),
-            "softmax_vs_rbf": asdict(ag_sr),
+            "softmax_vs_rbf_on_maxout_adv": asdict(ag_sr_on_maxout),
+            "softmax_vs_rbf_on_softmax_adv_secondary": asdict(ag_sr_on_softmax),
         },
+        "agreement_attack_source_note": (
+            "All five §8 numbers use the MAXOUT-generated adversarial examples "
+            "(tex:679-680). The headline 53.6% (rbf predicts softmax's class) is "
+            "'softmax_vs_rbf_on_maxout_adv' (attacker=maxout, ref=softmax, "
+            "pred=rbf). 'softmax_vs_rbf_on_softmax_adv_secondary' is the prior "
+            "implementation's reading (attacker=softmax) retained as a "
+            "divergence diagnostic; SPEC §6 item 29 records the choice."),
         "paper_target": PAPER_TARGET,
         "note": ("Sub-scale run (rbf_epochs=%d, maxout_epochs=%d, soft_epochs=%d, "
                  "patience=%d). The paper notes quadratic models are hard to train "
@@ -176,7 +198,9 @@ def main(argv: list[str] | None = None) -> int:
           f"clean_conf={rbf_clean_conf:.4f} ; "
           f"agreements maxout-rbf={ag_mr.p_pred_match_over_m1_errors:.3f}/{ag_mr.p_pred_match_over_both_wrong:.3f} "
           f"maxout-soft={ag_ms.p_pred_match_over_m1_errors:.3f}/{ag_ms.p_pred_match_over_both_wrong:.3f} "
-          f"soft-rbf={ag_sr.p_pred_match_over_m1_errors:.3f} "
+          f"soft-rbf(on maxout adv)={ag_sr_on_maxout.p_pred_match_over_m1_errors:.3f}/"
+          f"{ag_sr_on_maxout.p_pred_match_over_both_wrong:.3f} "
+          f"[secondary on softmax adv={ag_sr_on_softmax.p_pred_match_over_m1_errors:.3f}] "
           f"(paper 55.4/1.2/60.6; 16.0/54.6/84.6/54.3/53.6%)")
     print(f"[M8] wrote {out_path}")
     return 0

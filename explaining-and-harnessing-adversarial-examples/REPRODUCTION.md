@@ -240,9 +240,13 @@
      (objectives.sigmoid_top_cost, train cost='sigmoid_top'), sharing the
      maxout trunk architecture/init/SGD/external recipe (so the comparison
      trains identically to the maxout+softmax net); only the top activation +
-     cost differ. SPEC §6 item 25 corrected. Re-run: trained sigmoid-top
-     rubbish error 0.0011 (paper 0.68) — same DIRECTION (sigmoid-top far more
-     robust than the softmax-top net's 0.82); magnitude sub-scale (5 epochs).
+      cost differ. SPEC §6 item 25 corrected. Re-run: trained sigmoid-top
+      rubbish error 0.7921 (paper 0.68) vs maxout+softmax 0.8212 (paper
+      98.35%) — same DIRECTION (sigmoid-top MORE robust than maxout+softmax,
+      as the paper reports); magnitude sub-scale (5 epochs). (An earlier draft
+      quoted 0.0011 here — that was the pre-fix `sigmoid_top_cost` that averaged
+      over classes AND batch (B·K-mean); a6c99e0 corrected it to
+      sum-over-classes/mean-over-batch, giving 0.7921.)
   3. **E1 ensemble metric was unpapered and direction-reversed.** Reported the
      MEAN of per-member error rates; no ensemble prediction was formed, and the
      single-member arm always attacked member 0. FIX: the headline metric is
@@ -272,8 +276,93 @@
      (tex:346-347, 562-584) and trained-to-zero-on-rubbish (tex:963-965) arms
      are now RECORDED as documented exclusions (SPEC §1, arms_metadata.json),
      not silently omitted.
-  6. **Doc hygiene.** run_experiment.py help text no longer attributes dropout
-     rates (0.8/0.5) to "paper M4" (the paper states no rates); gate_result.json
-     stops calling the dropout-off gate "the paper's configuration" (the
-     paper's M4 net was dropout-on, tex:492); m9 now defaults n=10000 (the
-     paper's stated count, tex:905) — the prior committed run used n=2000.
+   6. **Doc hygiene.** run_experiment.py help text no longer attributes dropout
+      rates (0.8/0.5) to "paper M4" (the paper states no rates); gate_result.json
+      stops calling the dropout-off gate "the paper's configuration" (the
+      paper's M4 net was dropout-on, tex:492); m9 now defaults n=10000 (the
+      paper's stated count, tex:905) — the prior committed run used n=2000.
+
+- 2026-07-29: **Round-3 review fixes (3 adversarial reviewers: faithful, metric,
+  divergence).** All findings addressed; 47/47 tests pass (+2 new agreement-
+  source invariant tests); M5/M6/M8 re-run with healthy, real measurements.
+  1. **BLOCKING — committed M5/M6 were collapsed constant predictors
+     (reviews 1+2+3).** results/m5_large_advtrain.json had the adversarial arm at
+     mean_test_error=0.8865 (= 1−0.1135, the MNIST test majority-class rate) vs
+     baseline 0.0657 — the OPPOSITE of the paper's 1.14%→0.782% (tex:497-512);
+     results/m6_robustness_transfer.json had the adversarial arm at
+     clean_accuracy=0.1135, so own-FGSM 0.8865 / both transfers 0.8865/0.7465
+     were vacuous properties of a constant predictor, carrying no signal about
+     tex:514-523. Both JSON `note` fields said only "Sub-scale run" with NO
+     collapse flag, although the repo already had an honesty mechanism for
+     exactly this (`direction_matches_paper` in e1_ensemble.json). The collapse
+     was NOT a compute wall — it came from tiny committed settings (M5:
+     units=64, select_max_epochs=2; M6: --epochs 1). FIX: re-ran both at
+     settings where the arm demonstrably trains (M4's proven-healthy 240-unit/
+     12-epoch config): M5 → 240 units, 12 select epochs, patience 10, seed 0
+     (select-then-60k-retrain, both arms); M6 → 12 epochs. Both scripts now
+     emit `direction_matches_paper` + `adv_arm_trained` + the asymmetry/
+     direction sub-flags, with a `training_note` that says "trained healthily"
+     or "COLLAPSED" explicitly (same schema as e1_ensemble.json). Committed
+     results: M5 baseline 1.82% vs adversarial 1.44% (direction_matches_paper:
+     true — adversarial LOWER, matching the paper's 1.14%→0.782% direction;
+     adv_arm_trained: true); M6 adv clean 0.9836 (= M4's adv arm, same config),
+     own-FGSM 10.4% (paper 17.9%), transfer asymmetry orig→adv 0.340 < adv→orig
+     0.673 (paper 19.6% < 40.9%, correct asymmetry; direction_matches_paper:
+     true, adv_arm_trained: true). Sub-scale magnitudes (paper used 1600-unit/
+     patience-100/5-seed models) but REAL, healthy measurements — no longer a
+     vacuous artifact contradicting the paper.
+  2. **MODERATE — §8 "53.6%" measured on the wrong example set (reviews 1+2).**
+     The paper fixes ONE adversarial-example set per paragraph: "we generated
+     adversarial examples on a deep maxout network and classified these
+     examples using a shallow softmax network and a shallow RBF network"
+     (tex:679-680). The prior code's 53.6% arm called
+     `class_agreement(softmax, rbf)` — crafting NEW FGSM from the softmax model
+     and conditioning on softmax's errors — a different example set than the
+     paragraph fixes. FIX: added `eval.agreement_on_adv(attacker, ref, pred)`
+     which separates the attack source from the reference whose class is
+     predicted; `class_agreement(m1, m2)` is now the special case
+     `agreement_on_adv(m1, m1, m2)`. The headline 53.6% now uses the
+     MAXOUT-generated set with softmax as the reference
+     (`agreement_on_adv(maxout, softmax, rbf)`); the prior softmax-generated
+     reading is retained as `softmax_vs_rbf_on_softmax_adv_secondary` so the
+     divergence is visible (committed: 0.387/0.588 over softmax-errors/both-wrong
+     on maxout adv vs 0.573/0.710 on softmax adv). SPEC §6 item 29 records the
+     choice; 2 new invariant tests lock it
+     (`test_class_agreement_equals_agreement_on_adv_same_attacker_ref`,
+     `test_agreement_on_adv_separates_attacker_from_ref`).
+  3. **MINOR — stale docs (review 3).** (a) REPRODUCTION.md quoted sigmoid-top
+     rubbish error 0.0011 (the pre-fix B·K-mean `sigmoid_top_cost`); a6c99e0
+     corrected the cost to sum-over-classes/mean-over-batch, and the committed
+     m9 sigmoid_top is 0.7921. Fixed the line to 0.7921 and corrected the
+     comparison (sigmoid-top 0.7921 vs maxout+softmax 0.8212 — same DIRECTION,
+     sigmoid-top more robust; paper 68% vs 98.35%). (b) arms_metadata.json
+     described the m9 sigmoid-top arm as "m3 trunk+readout copied, ... not
+     retrained" though SigmoidTopMLP is TRAINED (per-class BCE); fixed to
+     "TRAINED maxout net with independent per-class sigmoid outputs, per-class
+     BCE cost". (c) M6 metadata `kind` said "evaluation-only over arms m3/m5
+     (no new training arm)" though m6_robustness_transfer.py trains its own
+     m_orig/m_adv; fixed to describe the actual protocol.
+  4. **MINOR — unrecorded exclusions (review 3).** Two stated-MNIST-core items
+     were neither implemented nor listed as exclusions: the rubbish class-skew
+     statistic (tex:929-930 "45.3% of false positives classified as 5s, none
+     as 8s" — implementable from the M9 maxout+softmax arm but M9 reports only
+     error/confidence) and the Fig. 3 weight-localization claim (tex:523-528,
+     qualitative, no numeric target). Both now recorded as known gaps in SPEC §1
+     ("Unimplemented but recorded") and arms_metadata.json `excluded_arms`
+     (`mnist_rubbish_class_skew_stat`, `fig3_weight_localization`).
+  5. **MINOR — trivial unpapered choices recorded (review 3), SPEC §6 items
+     30-33:** (a) the ε floor `max(0.0, args.lam)` in run_experiment.py:138
+     (a defensive clamp; no arm runs with ε<0); (b) the RBF `q.clamp(max=80.0)`
+     in eval.py:77,165 — a STRICT NO-OP (q=−Σ softplus(raw)(x−μ)² ≤ 0 by the
+     neg-def-by-construction β, so q ≪ 80 always; guards only pathological β
+     drift); (c) the external lr schedule applied BEFORE the first optimizer
+     step (train.py:290-293, so step 1 uses 0.1000004 not 0.1) — a 4e-6
+     relative shift, negligible and shared by both gate arms (degeneracy
+     unaffected); (d) the M5 baseline arm running the same select-then-60k-
+     retrain protocol as the adversarial arm (the paper ties the 60k retrain
+     only to the adversarial-valid criterion, tex:505-506) — a symmetric-
+     protocol choice that biases the baseline, if anything, upward.
+  Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
+  `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
+  error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
+  47/47 tests pass.

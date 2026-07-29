@@ -106,6 +106,30 @@ def main(argv: list[str] | None = None) -> int:
     orig_clean = float(eval_clean(m_orig, x_test, y_test))
     adv_clean = float(eval_clean(m_adv, x_test, y_test))
 
+    # Honest-reporting flags (same schema as e1_ensemble.json). The paper's §6
+    # robustness claim (tex:514-523) is the ASYMMETRY orig->adv (19.6%) <
+    # adv->orig (40.9%) -- adv-trained examples transfer HARDER to the naive
+    # model than naive examples do to the adv model -- plus the adv model's own
+    # FGSM error (17.9%) being far below the untrained ~89.4% (tex:514, 338-339).
+    # `direction_matches_paper` is true iff that asymmetry holds AND the adv arm
+    # actually trained (clean accuracy well above the 11.35% MNIST majority-class
+    # constant predictor -- a collapsed arm gives a vacuous 1-majority-class
+    # number that carries no signal about tex:514-523).
+    MAJORITY_CLASS_RATE = 0.1135  # MNIST test P(label=1)=1135/10000
+    adv_arm_trained = adv_clean > 0.5 and abs(adv_clean - MAJORITY_CLASS_RATE) > 0.05
+    asymmetry_holds = orig_to_adv.error_rate < adv_to_orig.error_rate
+    direction_matches = adv_arm_trained and asymmetry_holds
+    training_note = (
+        "adversarial arm trained healthily (clean_accuracy=%.4f, well above the "
+        "11.35%% MNIST majority-class constant predictor); measurements are real, "
+        "not a collapsed-arm artifact." % adv_clean
+    ) if adv_arm_trained else (
+        "adversarial arm COLLAPSED (clean_accuracy=%.4f ~ the 11.35%% majority-class "
+        "rate): the own-FGSM / transfer numbers are properties of a constant "
+        "predictor and carry NO signal about tex:514-523; re-run at more epochs."
+        % adv_clean
+    )
+
     sub_scale = args.patience < 100 or args.epochs < 100 or args.units < 1600
     record = {
         "milestone": "M6",
@@ -125,10 +149,15 @@ def main(argv: list[str] | None = None) -> int:
         "own_fgsm_on_adv_model": asdict(own),
         "transfer_orig_to_adv": asdict(orig_to_adv),
         "transfer_adv_to_orig": asdict(adv_to_orig),
+        "direction_matches_paper": direction_matches,
+        "adv_arm_trained": adv_arm_trained,
+        "transfer_asymmetry_holds": asymmetry_holds,
         "paper_target": PAPER_TARGET,
         "note": ("Sub-scale run (units=%d, epochs=%d, patience=%d). The paper's "
-                 "17.9/19.6/40.9/81.4 pct are from a 1600-unit adv-trained model."
-                 % (args.units, args.epochs, args.patience)) if sub_scale else None,
+                 "17.9/19.6/40.9/81.4 pct are from a 1600-unit adv-trained model. "
+                 "%s"
+                 % (args.units, args.epochs, args.patience, training_note))
+                 if sub_scale else training_note,
     }
 
     out_path = Path(args.out)

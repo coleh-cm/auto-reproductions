@@ -12,13 +12,20 @@
       "p_pred_match_over_both_wrong": 0.6448200941085815,
       "p_pred_match_over_m1_errors": 0.6277003884315491
     },
-    "softmax_vs_rbf": {
+    "softmax_vs_rbf_on_maxout_adv": {
+      "n_both_wrong": 6349,
+      "n_m1_errors": 9650,
+      "p_pred_match_over_both_wrong": 0.5881240963935852,
+      "p_pred_match_over_m1_errors": 0.3869430124759674
+    },
+    "softmax_vs_rbf_on_softmax_adv_secondary": {
       "n_both_wrong": 8066,
       "n_m1_errors": 10000,
       "p_pred_match_over_both_wrong": 0.7102653384208679,
       "p_pred_match_over_m1_errors": 0.5728999972343445
     }
   },
+  "agreement_attack_source_note": "All five \u00a78 numbers use the MAXOUT-generated adversarial examples (tex:679-680). The headline 53.6% (rbf predicts softmax's class) is 'softmax_vs_rbf_on_maxout_adv' (attacker=maxout, ref=softmax, pred=rbf). 'softmax_vs_rbf_on_softmax_adv_secondary' is the prior implementation's reading (attacker=softmax) retained as a divergence diagnostic; SPEC \u00a76 item 29 records the choice.",
   "description": "Shallow RBF on MNIST; FGSM eps=0.25; cross-model class agreement (section 8). RBF confidence uses the UNNORMALIZED per-class exp(q) reading (SPEC \u00a76 item 9).",
   "hyperparams": {
     "batch_size": 100,

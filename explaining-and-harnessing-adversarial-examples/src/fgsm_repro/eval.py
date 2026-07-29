@@ -201,28 +201,78 @@ def class_agreement(
       * p_pred_match_over_both_wrong: over the subset where BOTH misclassify,
         how often m2 picks m1's (wrong) class. (paper's 84.6% / 54.3%)
     Both fractions are 0.0 when their denominator is empty.
+
+    This is the special case ``agreement_on_adv(m1, m1, m2, ...)`` (the attack
+    source and the reference whose class is predicted are the SAME model m1),
+    which is the paper's construction for the first four §8 numbers: all five
+    numbers use adversarial examples generated on the deep MAXOUT network
+    (tex:679-680 "we generated adversarial examples on a deep maxout network
+    and classified these examples using a shallow softmax network and a shallow
+    RBF network"). See ``agreement_on_adv`` for the 53.6% case where the attack
+    source (maxout) differs from the reference whose class is predicted
+    (softmax).
     """
-    m1.eval()
-    m2.eval()
-    x_adv = fgsm(m1, x, y, eps)
+    return agreement_on_adv(m1, m1, m2, x, y, eps)
+
+
+def agreement_on_adv(
+    attacker: Classifier,
+    ref: Classifier,
+    pred: Classifier,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    eps: float,
+) -> AgreementStats:
+    """§8 cross-model class agreement with the attack source separated from the
+    reference model (tex:679-688).
+
+    The paper fixes ONE adversarial-example set per paragraph: "we generated
+    adversarial examples on a deep maxout network and classified these examples
+    using a shallow softmax network and a shallow RBF network" (tex:679-680).
+    All five §8 agreement numbers therefore use the MAXOUT-generated examples
+    (``attacker``). For the first four the predicted class is the MAXOUT's class
+    (``ref == attacker == maxout``); for "the RBF network can predict softmax
+    regression's class 53.6% of the time" (tex:687) the predicted class is the
+    SOFTMAX's class, so ``ref == softmax`` while ``attacker`` stays maxout.
+
+    Build FGSM adversarials from ``attacker``; let ``p_ref`` be the reference
+    model's prediction (the class being predicted) and ``p_pred`` the predictor
+    model's prediction. Report:
+      * p_pred_match_over_m1_errors: over the subset where ``ref`` misclassifies
+        the attacker's adversarial, how often ``pred`` picks ``ref``'s class.
+        (paper's 16.0% / 54.6% / 53.6% over the attacker/reference's errors)
+      * p_pred_match_over_both_wrong: over the subset where BOTH ``ref`` and
+        ``pred`` misclassify, how often ``pred`` picks ``ref``'s (wrong) class.
+        (paper's 84.6% / 54.3%)
+    Both fractions are 0.0 when their denominator is empty.
+
+    The prior implementation called ``class_agreement(m_soft, rbf)`` for the
+    53.6% number, which built NEW adversarials from the softmax model rather
+    than the paragraph's fixed maxout-generated set; that reading is retained
+    as a SECONDARY diagnostic in m8_rbf.py. SPEC §6 records the ambiguity.
+    """
+    attacker.eval()
+    ref.eval()
+    pred.eval()
+    x_adv = fgsm(attacker, x, y, eps)
     with torch.no_grad():
-        p1 = m1.logits(x_adv).argmax(dim=1)
-        p2 = m2.logits(x_adv).argmax(dim=1)
-    m1_err = p1 != y
-    both_wrong = m1_err & (p2 != y)
-    n_m1_errors = int(m1_err.sum().item())
+        p_ref = ref.logits(x_adv).argmax(dim=1)
+        p_pred = pred.logits(x_adv).argmax(dim=1)
+    ref_err = p_ref != y
+    both_wrong = ref_err & (p_pred != y)
+    n_m1_errors = int(ref_err.sum().item())
     n_both_wrong = int(both_wrong.sum().item())
 
-    if m1_err.sum() > 0:
+    if ref_err.sum() > 0:
         p_pred_match_over_m1_errors = (
-            (p2[m1_err] == p1[m1_err]).float().mean().item()
+            (p_pred[ref_err] == p_ref[ref_err]).float().mean().item()
         )
     else:
         p_pred_match_over_m1_errors = 0.0
 
     if both_wrong.sum() > 0:
         p_pred_match_over_both_wrong = (
-            (p2[both_wrong] == p1[both_wrong]).float().mean().item()
+            (p_pred[both_wrong] == p_ref[both_wrong]).float().mean().item()
         )
     else:
         p_pred_match_over_both_wrong = 0.0

@@ -1,31 +1,33 @@
 {
+  "adv_arm_trained": true,
   "arms": {
     "adversarial": {
-      "clean_accuracy": 0.11349999904632568
+      "clean_accuracy": 0.9836000204086304
     },
     "original": {
-      "clean_accuracy": 0.8578000068664551
+      "clean_accuracy": 0.9801999926567078
     }
   },
   "description": "Robustness & cross-transfer of an adv-trained maxout (own-FGSM, orig->adv, adv->orig, confidence).",
+  "direction_matches_paper": true,
   "hyperparams": {
     "alpha": 0.5,
     "batch_size": 100,
     "dropout_input": 0.8,
     "eps": 0.25,
     "lr": 0.1,
-    "max_epochs": 1,
+    "max_epochs": 12,
     "model": "MaxoutMLP",
     "momentum": 0.5,
-    "patience": 100,
+    "patience": 10,
     "pieces": 5,
     "units": 240
   },
   "milestone": "M6",
-  "note": "Sub-scale run (units=240, epochs=1, patience=100). The paper's 17.9/19.6/40.9/81.4 pct are from a 1600-unit adv-trained model.",
+  "note": "Sub-scale run (units=240, epochs=12, patience=10). The paper's 17.9/19.6/40.9/81.4 pct are from a 1600-unit adv-trained model. adversarial arm trained healthily (clean_accuracy=0.9836, well above the 11.35% MNIST majority-class constant predictor); measurements are real, not a collapsed-arm artifact.",
   "own_fgsm_on_adv_model": {
-    "error_rate": 0.8865000009536743,
-    "mean_confidence_on_errors": 0.11693352460861206,
+    "error_rate": 0.1039000004529953,
+    "mean_confidence_on_errors": 0.6508220434188843,
     "n": 10000
   },
   "paper_target": {
@@ -38,13 +40,14 @@
   },
   "seed": 0,
   "transfer_adv_to_orig": {
-    "error_rate": 0.7465000152587891,
-    "mean_confidence_on_errors": 0.5036455988883972,
+    "error_rate": 0.6729999780654907,
+    "mean_confidence_on_errors": 0.835659921169281,
     "n": 10000
   },
+  "transfer_asymmetry_holds": true,
   "transfer_orig_to_adv": {
-    "error_rate": 0.8865000009536743,
-    "mean_confidence_on_errors": 0.11690864711999893,
+    "error_rate": 0.33980000019073486,
+    "mean_confidence_on_errors": 0.706581711769104,
     "n": 10000
   }
 }

@@ -201,7 +201,7 @@
           "attack x from m3 model, score on m5 adv model": 0.196
         }
       },
-      "kind": "evaluation-only over arms m3_maxout240_clean and m5_maxout1600_advtrain (no new training arm)",
+      "kind": "trains its own m_orig (clean maxout) and m_adv (adv-trained maxout) at the same config, then evaluates own-FGSM + cross-transfer both directions (the paper's M6 protocol on the M5-family models; m6_robustness_transfer.py trains both arms itself rather than consuming m3/m5 checkpoints, so the two models share an identical training budget)",
       "milestone": "M6",
       "name": "m6_robustness_transfer_eval",
       "paper_target": {
@@ -284,6 +284,7 @@
       "script": "experiments/m8_rbf.py",
       "secondary_targets": {
         "class_agreement_section8": {
+          "attack_source": "all five numbers use the MAXOUT-generated adversarial examples (tex:679-680); the 53.6% (rbf predicts softmax's class) uses attacker=maxout, ref=softmax, pred=rbf (SPEC.md \u00a76 item 29). The prior attacker=softmax reading is retained as 'softmax_vs_rbf_on_softmax_adv_secondary' in results/m8_rbf.json.",
           "citation": "paper/source/iclr2015.tex:679-688",
           "rbf_given_both_err": 0.543,
           "rbf_predicts_maxout": 0.16,
@@ -298,7 +299,7 @@
     },
     {
       "evaluations": {
-        "maxout_sigmoid_top (m3 trunk+readout copied, sigmoid per class, not retrained; SPEC.md \u00a76 item 25)": {
+        "maxout_sigmoid_top (TRAINED maxout net with independent per-class sigmoid outputs, per-class BCE cost; SPEC.md \u00a76 item 25)": {
           "citation": "paper/source/iclr2015.tex:908-909",
           "confidence_on_mistakes": 0.879,
           "rubbish_error": 0.68
@@ -403,6 +404,16 @@
       "name": "rubbish_training_arm",
       "paper_claim": "maxout trained to 0% error on Gaussian rubbish, no clean-accuracy cost (tex:963-965)",
       "reason": "the paper reports it confers NO clean-test reduction (unlike adversarial training); reproduces only a null result (no regularization benefit) and needs a per-class rubbish training protocol"
+    },
+    {
+      "name": "mnist_rubbish_class_skew_stat",
+      "paper_claim": "On MNIST, 45.3% of a naively trained maxout net's false positives classified as 5s, none as 8s (tex:929-930)",
+      "reason": "stated MNIST-core number implementable from the M9 maxout+softmax arm (predicted class on the erroring N(0,I) subset) but NOT implemented; M9 reports only error rate + confidence, not the per-class false-positive distribution. Recorded as a known gap."
+    },
+    {
+      "name": "fig3_weight_localization",
+      "paper_claim": "weights of the adversarially trained model are significantly more localized and interpretable (tex:523-528)",
+      "reason": "qualitative claim with no numeric target; not checkable as a number. Recorded as excluded."
     }
   ],
   "external_recipe": {

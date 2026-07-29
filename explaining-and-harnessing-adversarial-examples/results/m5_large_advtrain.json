@@ -1,29 +1,36 @@
 {
+  "adv_arm_trained": true,
   "arms": {
     "adversarial": {
-      "mean_test_error": 0.8865000009536743,
+      "mean_test_error": 0.014400005340576172,
       "per_seed": [
         {
-          "epochs_chosen": 2,
+          "best_epoch_index": 11,
+          "epochs_chosen": 12,
           "seed": 0,
-          "test_accuracy": 0.11349999904632568,
-          "test_error": 0.8865000009536743
+          "selection_epochs_run": 12,
+          "test_accuracy": 0.9855999946594238,
+          "test_error": 0.014400005340576172
         }
       ]
     },
     "baseline": {
-      "mean_test_error": 0.0656999945640564,
+      "mean_test_error": 0.01819998025894165,
       "per_seed": [
         {
-          "epochs_chosen": 2,
+          "best_epoch_index": 9,
+          "epochs_chosen": 10,
           "seed": 0,
-          "test_accuracy": 0.9343000054359436,
-          "test_error": 0.0656999945640564
+          "selection_epochs_run": 12,
+          "test_accuracy": 0.9818000197410583,
+          "test_error": 0.01819998025894165
         }
       ]
     }
   },
   "description": "Large maxout 1600x2: adv-valid early stop + 60k retrain + multi-seed mean (baseline vs adversarial).",
+  "direction_holds_adv_le_baseline": true,
+  "direction_matches_paper": true,
   "hyperparams": {
     "alpha": 0.5,
     "batch_size": 100,
@@ -35,15 +42,15 @@
     "model": "MaxoutMLP",
     "momentum": 0.5,
     "n_classes": 10,
-    "patience": 100,
+    "patience": 10,
     "pieces": 5,
     "select_criterion_adv": "adversarial-valid",
     "select_criterion_base": "clean-valid",
-    "select_max_epochs": 2,
-    "units": 64
+    "select_max_epochs": 12,
+    "units": 240
   },
   "milestone": "M5",
-  "note": "Sub-scale run (units=64, patience=100, seeds=1). The paper's 0.782 pct mean uses 1600 units, patience-100, 5 seeds.",
+  "note": "Sub-scale run (units=240, patience=10, seeds=1). The paper's 0.782 pct mean uses 1600 units, patience-100, 5 seeds. adversarial arm trained healthily (mean_test_error=0.0144, well below the 88.65% majority-class constant-predictor error); measurement is real, not a collapsed-arm artifact.",
   "paper_target": {
     "adversarial_test_error_mean": 0.00782,
     "baseline_test_error": 0.0114,
