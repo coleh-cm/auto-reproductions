@@ -57,7 +57,8 @@ target equals the one-hot label exactly) holds.
 
 ```bash
 # from this reproduction folder
-uv venv --python 3.13 .venv
+# --clear lets the command work even if .venv already exists (idempotent)
+uv venv --python 3.13 --clear .venv
 uv pip install --python .venv -r requirements.txt
 
 # baseline cross-entropy (lambda = 0)
