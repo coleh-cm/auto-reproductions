@@ -90,6 +90,22 @@ calibrated against the paper's own reported CWSD number (see "Decisions" below).
   normalisation, target-in-simplex, confidence range, gate bound, non-negative loss,
   gate-open ⇒ t=p̃ ⇒ CE(p̃,p), finite-difference gradient check, stop-grad purity).
   `pytest -q` → 23 passed.
+- 2026-07-29: Adversarial review of all five components against the paper
+  (orchestrate, 5 reviewers: data-pipeline, method-core, training-loop,
+  evaluation-metric, baseline-arm). The method-core reviewer stalled on the
+  first pass and was re-run as a fresh adversarial review — it approved with
+  file:line evidence for every equation (Eq 1-4, gradient, no T-leak into the
+  loss prediction, correct mean-over-batch/sum-over-class reduction, ReLU mask
+  `h>0`, finite-difference gradient check extended to W1/b1). All five
+  components approved; no blocker/major. Nits fixed: dtype assertions added to
+  the data-split test, rate bound tightened so `uniform-all`/`uniform-other` are
+  distinguishable, CLI rejection test now asserts the diagnostic went to stderr,
+  the degeneracy `w==0` sub-check made non-circular (probes `make_target` with a
+  `p_tilde != Y` and relies on `array_equal(t, Y)` as the witness), the
+  finite-difference gradient check extended to all four params (W1/b1 are the
+  ReLU-backprop path, the most error-prone), and `--noise-rate` documented in
+  the SPEC §5 / README CLI synopsis. `pytest -q` → 23 passed; both arms still
+  reproduce (baseline 0.9370 exact, CWSD 0.9611).
 
 ## Target numbers
 

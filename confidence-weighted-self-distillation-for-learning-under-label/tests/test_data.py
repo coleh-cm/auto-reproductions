@@ -12,6 +12,9 @@ def test_data_split_shapes():
     assert Xte.shape == (540, 64)
     assert ytr.shape == (1257,)
     assert yte.shape == (540,)
+    # dtypes (SPEC §2 / §5): X float32, y int64 — assert so a silent upcast regression fails
+    assert Xtr.dtype == np.float32 and Xte.dtype == np.float32
+    assert ytr.dtype == np.int64 and yte.dtype == np.int64
     # scaling to [0,1]
     assert Xtr.max() <= 1.0 + 1e-6 and Xtr.min() >= 0.0 - 1e-6
     assert Xte.max() <= 1.0 + 1e-6 and Xte.min() >= 0.0 - 1e-6
@@ -36,12 +39,15 @@ def test_split_is_stratified_and_seeded():
 
 
 def test_corrupt_labels_rate_and_invariance():
-    """uniform-all noise touches ~20% (effective ~0.18) and keeps labels in [0,K)."""
+    """uniform-all noise: effective flip rate ~0.18 (literal reading, uniform over
+    all K so ~1/10 of corrupted examples keep their label) and labels stay in [0,K).
+    Upper bound < 0.21 so uniform-other (true ~0.20) would fail this test, making
+    the two modes distinguishable here rather than only via the exclusion test."""
     rng = np.random.default_rng(3)
     y = rng.integers(0, r.K, size=4000)
     yc = r.corrupt_labels(y, rng, rate=0.2, mode="uniform-all")
     changed = float(np.mean(yc != y))
-    assert 0.16 < changed < 0.24
+    assert 0.16 < changed < 0.21  # ~0.18 effective flip rate for uniform-all
     assert yc.min() >= 0 and yc.max() < r.K
 
 

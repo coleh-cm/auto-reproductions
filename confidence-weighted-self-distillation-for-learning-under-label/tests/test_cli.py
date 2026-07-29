@@ -35,6 +35,9 @@ def test_cli_rejects_lambda_out_of_range():
     cmd = [sys.executable, "run_experiment.py", "--lambda", "1.5", "--steps", "1"]
     out = subprocess.run(cmd, capture_output=True, text=True)
     assert out.returncode != 0
+    # SPEC §5: all diagnostics go to stderr, nothing to stdout
+    assert out.stdout.strip() == "", out.stdout
+    assert out.returncode == 2
 
 
 def test_cli_accepts_all_documented_flags():

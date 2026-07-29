@@ -100,7 +100,7 @@ python run_experiment.py --lambda FLOAT   # 0.0 = baseline CE, 1.0 = CWSD (requi
                          [--tau 0.9]        # confidence threshold
                          [--temperature 2.0]
                          [--seed 0] [--steps 4000] [--lr 0.1] [--batch-size 64]
-                         [--init he] [--noise-mode uniform-all]
+                         [--init he] [--noise-mode uniform-all] [--noise-rate 0.2]
                          [--batch-mode epoch-permutation]
                          [--rng-layout init-first]  # init-first|spawned|noise-first
 ```

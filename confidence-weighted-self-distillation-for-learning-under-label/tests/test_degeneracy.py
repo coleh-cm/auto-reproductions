@@ -62,14 +62,23 @@ def _rand_case(seed=0, B=8):
 
 
 def test_lambda_zero_target_equals_onehot():
-    """lam=0 => w=0 => t == y exactly (SPEC gate a)."""
+    """lam=0 => w=0 => t == y exactly (SPEC gate a).
+
+    Non-circular: we probe ``make_target`` with a ``p_tilde`` (built from z) that
+    differs from ``Y`` and confirm the returned target is STILL bitwise equal to
+    ``Y``. That can only hold if the mixing weight is exactly zero — any nonzero
+    ``w`` would mix in ``p_tilde`` and break equality. We do NOT recompute ``w``
+    with the same formula (that would be circular); we let ``array_equal(t, Y)``
+    be the witness that ``w == 0``.
+    """
     params, X, Y = _rand_case()
     out = r.forward(params, X)
+    # p_tilde differs from Y for this random case (sanity: not all rows equal)
+    p_tilde = r.softmax(out["z"] / 2.0)
+    assert not np.allclose(p_tilde, Y)
     t = r.make_target(out["z"], Y, lam=0.0, tau=0.9, s=0.15, T=2.0)
+    # t == Y bitwise => the only way is w == 0 exactly (p_tilde != Y above)
     assert np.array_equal(t, Y)
-    # and the gate weight itself is exactly zero, not merely tiny
-    w = 0.0 / (1.0 + np.exp(-(out["p"].max(-1) - 0.9) / 0.15))
-    assert np.all(w == 0.0)
 
 
 def test_lambda_zero_loss_and_grads_equal_ce_bitwise():

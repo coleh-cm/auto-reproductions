@@ -117,7 +117,9 @@ def test_gradient_matches_finite_differences():
     Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
     _, grads = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)
     eps = 1e-4
-    for name in ("W2", "b2"):
+    # check ALL four params, including W1/b1 (the ReLU backprop path — the most
+    # error-prone: a wrong ReLU mask or transposed W2 would only show up here).
+    for name in ("W1", "b1", "W2", "b2"):
         num = np.zeros_like(P[name])
         for idx in np.ndindex(P[name].shape):
             orig = P[name][idx]

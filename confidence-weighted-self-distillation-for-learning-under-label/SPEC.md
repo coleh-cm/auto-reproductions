@@ -183,7 +183,7 @@ CLI:
 python run_experiment.py --lambda FLOAT   # 0.0 = baseline, 1.0 = CWSD (paper §5)
                          [--s 0.15] [--tau 0.9] [--temperature 2.0]
                          [--seed 0] [--steps 4000] [--lr 0.1] [--batch-size 64]
-                         [--init he] [--noise-mode uniform-all]
+                         [--init he] [--noise-mode uniform-all] [--noise-rate 0.2]
                          [--batch-mode epoch-permutation]
                          [--rng-layout init-first]   # init-first|spawned|noise-first (§4 item 7)
 ```
