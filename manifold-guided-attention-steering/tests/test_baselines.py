@@ -143,6 +143,41 @@ def test_as_applies_the_same_global_plane_at_every_layer():
             f"layer {layer}: output angle {ang_out} != 30 (global plane not applied)"
 
 
+def test_cd_plausibility_mask_is_relative_to_expert_max():
+    """Li et al. 2023 adaptive plausibility (cited by the paper, tex:L396): the plausible
+    set is {x : p_expert(x) >= alpha_p * max_x' p_expert(x')} — a RELATIVE threshold
+    (alpha_p of the expert's own maximum), NOT an absolute cutoff p_e >= alpha_p. An
+    absolute cutoff collapses the plausible set to ~1-2 tokens over a large vocab and
+    makes the amateur penalty inert (CD degrades to the greedy expert). This test pins
+    the relative form by checking a token whose expert prob is well below alpha_p but
+    above alpha_p*max stays IN the plausible set, and one below alpha_p*max is OUT."""
+    import torch
+    import torch.nn.functional as F
+    from mags.baselines import ContrastiveDecoder
+    # a fake vocab of 5 tokens; expert strongly favors token 0
+    expert_logits = torch.tensor([[0.0, -1.0, -2.0, -8.0, -10.0]])
+    amateur_logits = torch.tensor([[-5.0, -5.0, -5.0, -5.0, -5.0]])
+    cd = ContrastiveDecoder(None, None, None, alpha_plausibility=0.1, beta=0.5)
+    score = cd.adapted_logits(expert_logits, amateur_logits)
+    p_e = F.softmax(expert_logits, dim=-1)
+    p_max = float(p_e.max())
+    # token 1: p_e ~0.21 > 0.1*0.71 ~0.071  => stays plausible (relative form keeps it);
+    #   under the OLD absolute form (p_e < 0.1) it would ALSO stay, so this alone is
+    #   not the discriminator — see the token-2 assertion below.
+    # token 2: p_e ~0.087. Absolute cutoff 0.1 would MASK it; relative threshold 0.071
+    #   keeps it. So under the relative form token 2 must be UNMASKED (finite score),
+    #   while under the absolute form it would be -inf. This is the discriminator.
+    assert torch.isfinite(score[0, 2]), \
+        "relative plausibility: token 2 (p_e~0.087 > 0.1*p_max~0.071) must stay plausible; " \
+        "the absolute form (p_e < 0.1) would wrongly mask it"
+    # token 3: p_e ~1.5e-4 << 0.1*p_max~0.071 => masked under BOTH forms (sanity)
+    assert torch.isinf(score[0, 3]) and score[0, 3] < 0, \
+        "token far below alpha_p*max must be masked"
+    # the relative threshold value itself is what we use, not alpha_p alone
+    assert float(p_e[0, 2]) < 0.1, "token 2 must be below the absolute 0.1 line (so the " \
+        "absolute form would mask it); the relative form is what keeps it"
+
+
 def test_as_persists_and_reloads(tmp_path):
     rng = np.random.default_rng(4)
     all_acts, pids = _make_all_acts(rng, layers=(0, 1))

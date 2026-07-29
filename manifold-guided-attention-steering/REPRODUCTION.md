@@ -1359,3 +1359,53 @@ ceasing to mark correct multi-boxed MATH-500 answers wrong at both eval and
 fit time. The environment blocker (no GPU / no cached 8B/4B/20B weights; Llama
 gated; molecular setup unstated) is unchanged; every arm remains a genuine
 `BLOCKED`, and the publish step reports `rung=environment`.
+
+## Round 16 — paper-faithful review of all 5 components (orchestrated)
+
+A parallel review (orchestrate run `mags-paper-review`) fanned one reviewer per
+component — data-pipeline, method-core, fit-loop, eval-metric, baselines — each
+reading the component file(s) IN FULL against the paper LaTeX
+(`paper/latex_src/neurips_2026.tex`, the authoritative source) and SPEC, then an
+adversarial verify stage where a separate agent tried to REFUTE each finding by
+re-reading the actual code. 3 findings, 1 confirmed, 2 refuted.
+
+**Confirmed — Contrastive Decoding plausibility mask was ABSOLUTE not RELATIVE
+(major; fixed).** `mags/baselines.py:385-386` applied an absolute cutoff
+`p_e < alpha_p` (`alpha_p=0.1`) on the raw expert probability. Li et al. 2023's
+adaptive plausibility set (cited by the paper at tex:L396, not redefined) is the
+RELATIVE form `V_plaus = {x : p_expert(x) >= alpha_p * max_x' p_expert(x')}`
+— `alpha_p` of the expert's OWN maximum probability, not an absolute 0.1. Over a
+~128k-token vocab the absolute form collapses the plausible set to ~1-2 tokens
+(the top-1 occasionally top-2 with p_e >= 0.1), so the amateur penalty
+`logp_e - beta*logp_a` is inert and CD degrades to the greedy expert (CD acc ≈
+unsteered, not the paper's e.g. MATH-500/Llama 0.492 vs 0.478). Fixed to
+`p_e < alpha_p * p_e.max(dim=-1, keepdim=True)` (relative). Added
+`tests/test_baselines.py::test_cd_plausibility_mask_is_relative_to_expert_max`
+pinning the relative form (token at p_e≈0.087, below the absolute 0.1 line but
+above 0.1·p_max≈0.071, must stay unmasked; the absolute form would wrongly mask
+it). pytest → 36/36. Affects the 8 CD arms (Llama×4 + Gemma×4); GPT-OSS CD
+exclusion (tex:L527) is already correct (config.CD_AMATEUR has no gpt-oss entry,
+run.py:291-294 BLOCKs).
+
+**Refuted (2).** (1) `fit.py:135-138` tiny-N split fallback aliases select/report
+onto fit when n≤6 — refuted: paper's construction-disjointness (tex:L296) is
+preserved (construction uses fit_pids only, manifold.py:307-314), the 70/15/15
+split is a SPEC §4.8 reproduction decision whose purpose is the Figure-3
+degeneracy diagnostic, and the fallback only triggers in a degenerate
+non-numbers-producing smoke regime (real corpora give n in the thousands); the
+claim also misattributed the CLI help text. (2) ITI candidate head pool is the 4
+MAGS-monitored layers (Gemma 4×8=32 < K=96, silent truncation) — refuted: this
+is the documented SPEC §5.5 / REPRODUCTION.md monitored-layers-baselines design
+(ITI reuses the MAGS contrastive capture), the ITIController iterates the actual
+selected_heads (32) not the K label (96) so runtime is correct, and the
+`K reachable in {24,48,96}` comment is accurate for Llama (128 monitored heads;
+the ablation and Table 1 ITI rows are Llama, tex:L425-428,L640-642).
+
+**State after round 16.** Implementation complete and paper-faithful across all
+5 components (the one real bug is fixed; the two refuted findings are
+documented design choices, not bugs). `pytest` → 36/36; `smoke.sh` →
+`FINAL smoke=0.0000` (real fit→steer→grade on distilgpt2 + cached MATH-500);
+`sh run_all_arms.sh` → 45/45 `FINAL <arm>=BLOCKED` (no GPU, no cached
+8B/4B/20B weights, molecular setup unstated — genuine environment block). The
+publish step reports `rung=environment`: the code path runs and is correct,
+but no paper number is reproducible in this CPU-only, model-uncached sandbox.

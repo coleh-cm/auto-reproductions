@@ -380,8 +380,14 @@ class ContrastiveDecoder:
         logp_a = F.log_softmax(amateur_logits, dim=-1)
         score = logp_e - self.beta * logp_a
         # adaptive plausibility (Li et al. 2023 CD): restrict to the EXPERT's plausible
-        # set (top-(1-alpha_p) of the expert distribution); discard expert-improbable
-        # tokens so the amateur cannot penalize tokens the expert is confident about.
+        # set V_plaus(x_{1:t}) = {x : p_expert(x|x_{1:t}) >= alpha_p * max_x' p_expert(x'|x_{1:t})}
+        # — a RELATIVE threshold (alpha_p of the expert's own max probability), NOT an
+        # absolute cutoff. An absolute cutoff (p_e < alpha_p) collapses the plausible set
+        # to ~1-2 tokens over a large vocab, making the amateur penalty inert and CD
+        # degrade to the greedy expert. The relative form keeps a meaningfully large set
+        # so the amateur actually reshapes the distribution (Li et al. 2023, Eq. 4-5).
         p_e = logp_e.exp()
-        score = score.masked_fill(p_e < self.alpha_p, float("-inf"))
+        p_max = p_e.max(dim=-1, keepdim=True).values
+        plaus_mask = p_e < (self.alpha_p * p_max)
+        score = score.masked_fill(plaus_mask, float("-inf"))
         return score
