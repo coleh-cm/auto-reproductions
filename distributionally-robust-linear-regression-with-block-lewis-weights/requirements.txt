@@ -1,0 +1,81 @@
+# Reproduction environment for
+# "Distributionally Robust Linear Regression With Block Lewis Weights"
+# (Manoj & Patel, arXiv:2607.00252, ICLR 2026).
+#
+# Direct method dependencies (what the paper's algorithms + §8 experiments use):
+#   numpy        — core array/linear-algebra primitives (E1–E22 throughout)
+#   scipy        — Cholesky / linear-system solves in AᵀBA (E8, E14, E19), optimize brute-force check
+#   cvxpy        — robust-optimum reference via the epigraph QCQP (E20, experiments.tex:40-50)
+#   clarabel     — CVXPY default convex solver (handles the quadratic constraints of E20)
+#   scs          — CVXPY fallback convex solver for E20
+#   pandas       — ACS/folktables data handling (D2, experiments.tex:145-152)
+#   matplotlib   — convergence/runtime plots fig:iteration_runtime, fig:acs_convergence
+#   folktables   — ACSIncome task + ACSDataSource (D2; pulls scikit-learn transitively)
+#   pytest       — test runner (required by the reproduction gate)
+#
+# ecos is intentionally NOT pinned: ecos 2.0.14 has no cp313/aarch64 wheel and its
+# source build needs Python.h (unavailable in the slim base). The paper only says
+# "a standard convex solver" via CVXPY (experiments.tex:50); clarabel + scs cover
+# the epigraph QCQP and are verified to solve it correctly (see smoke_imports.py).
+#
+# Transitive dependencies are pinned below for full reproducibility (every package
+# `uv pip freeze` reported from a clean Python 3.13 install).
+
+# --- direct method dependencies ---
+numpy==2.5.1
+scipy==1.18.0
+cvxpy==1.9.2
+clarabel==0.11.1
+scs==3.2.11
+pandas==3.0.5
+matplotlib==3.11.1
+folktables==0.0.12
+pytest==9.1.1
+
+# --- cvxpy solver backends / CVXPY internals ---
+osqp==1.1.3
+qdldl==0.1.9.post1
+highspy==1.15.1
+sparsediffpy==0.3.0
+
+# --- folktables -> scikit-learn + deps ---
+scikit-learn==1.9.0
+joblib==1.5.3
+threadpoolctl==3.6.0
+narwhals==2.24.0
+
+# --- matplotlib -> pillow / contourpy / fonttools / cycler / kiwisolver / pyparsing ---
+pillow==12.3.0
+contourpy==1.3.3
+fonttools==4.63.0
+cycler==0.12.1
+kiwisolver==1.5.0
+pyparsing==3.3.2
+
+# --- folktables / pandas -> requests -> urllib3/charset-normalizer/idna/certifi ---
+requests==2.34.2
+urllib3==2.7.0
+charset-normalizer==3.4.9
+idna==3.18
+certifi==2026.7.22
+
+# --- pandas -> python-dateutil -> six ---
+python-dateutil==2.9.0.post0
+six==1.17.0
+
+# --- build / runtime utilities ---
+setuptools==83.0.0
+packaging==26.2
+
+# --- clarabel / scs native bindings ---
+cffi==2.1.0
+pycparser==3.0
+
+# --- matplotlib / pytest templating ---
+jinja2==3.1.6
+markupsafe==3.0.3
+
+# --- pytest runtime ---
+iniconfig==2.3.0
+pluggy==1.6.0
+pygments==2.20.0
