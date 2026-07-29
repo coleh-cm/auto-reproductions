@@ -21,14 +21,17 @@ WORKDIR /repro
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the experiment and supporting docs.
-COPY run_experiment.py ./
+# Copy the experiment, tests, and supporting docs.
+COPY run_experiment.py conftest.py ./
+COPY tests ./tests
 COPY README.md SPEC.md REPRODUCTION.md ./
 COPY paper ./paper
 
-# Smoke-test that the implementation imports and the degeneracy gate holds
-# (lambda=0 path must reduce exactly to cross-entropy). Cheap; no training.
-RUN python -c "import run_experiment; print('import OK')"
+# Smoke-test that the implementation imports and the degeneracy gate holds:
+# the lambda=0 path must be bitwise identical to an independent cross-entropy
+# routine (per-step grads and a 300-step SGD loop), plus all equation
+# invariants. Cheap; no 4000-step training.
+RUN python -m pytest -q tests && python -c "import run_experiment; print('import OK')"
 
 # Default command: run the baseline arm. Override with `--lambda 1.0` for CWSD.
 ENTRYPOINT ["python", "run_experiment.py"]
