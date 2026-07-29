@@ -466,3 +466,33 @@ non-production paths changed). No committed result changed.
 - No production code path or committed result changed beyond these two fixes;
   the data_pipeline nit is already disclosed. Test suite (23) and smoke gate
   both pass after the fixes.
+
+## Round 10: independent re-run reproduces the committed gate exactly (verification only)
+
+- Re-ran the full `run_all_arms.sh` gate (300 outer, 120s budget) end to end on a
+  fresh sandbox state and diffed against `results/run_all.log`: every one of the
+  16 `FINAL <dataset>_<arm>=<value>` lines is byte-identical (ACS: subgradient=3,
+  smoothed_gd=45, smoothed_hb=10, smoothed_nesterov=10, ipm=10, BO_euc=1,
+  BO_lewis=1, opt=0; synthetic: 4 first-order=NR, ipm=5, BO_euc=9, BO_lewis=5,
+  opt=0). The gate ordering `iters(BO)=1 < iters(IPM)=10 <= iters(HB)=10` and
+  `BO=1` reproduce; blocker B1 (subgradient-NR / IPM-HB magnitudes on ACS) is
+  unchanged and still disclosed.
+- Stronger than the FINAL line: the per-arm result JSONs' gate value
+  (`iters_to_rel_gap`), OPT, and the **entire gap-history trajectory** are
+  bit-identical between the committed files and the independent re-run — the
+  *only* field that differs is `elapsed` (wall-clock timing). I.e. the whole
+  optimization path is deterministic across independent runs; only the
+  non-meaningful timing varies. The canonical committed JSONs were therefore
+  left in place (the re-run only added timing noise) — `git checkout`'d back.
+- Re-verified the core maths against the LaTeX source by hand: `smoothed` /
+  `smoothed_grad_hess` match eq (2.2) and the Lemma 6.2 calculus; `p_grad_hess`
+  matches (7.1)/(7.2); `block_lewis_weights` / `geometry_M` / `should_reset_W`
+  / `wls_init` match Definition 3.1/3.2, Theorem 2.3, and Algorithm 1 lines 1-4.
+- Test suite 24 passed; smoke gate `FINAL smoke=ok` (all 7 arms make strict
+  finite progress, matching the round-9 feedback). No code change was needed
+  this round — the feedback confirmed the path runs and the substance holds.
+- Open choices U1-U18 all defined in SPEC.md; every U-id referenced in
+  code/arms.json (U1,U2,U4,U7,U13,U14,U15,U16,U18) resolves. README documents
+  only what runs and states the B1 blocker honestly; accelerated MS-oracle arms
+  (E16-E18) remain deliberately unimplemented (only the unaccelerated ball-oracle
+  that §8 actually benchmarks is implemented, per U3).
