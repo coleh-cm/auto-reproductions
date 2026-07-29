@@ -12,7 +12,7 @@
 `run_experiment.py` implements CWSD per SPEC §1/§5 (hand-derived gradients, numpy +
 scikit-learn only; the stop-grad of Eq. (3) is structural). `tests/` holds the
 degeneracy gate (`tests/test_degeneracy.py`) and the equation-invariant tests
-(`tests/test_invariants.py`), plus data and CLI tests — 23 pass. Both arms have
+(`tests/test_invariants.py`), plus data and CLI tests — 24 pass. Both arms have
 been run; their measured numbers are recorded below beside the paper's claimed
 numbers. The baseline (λ=0) arm has no dependence on the unstated gate sharpness
 `s`; the CWSD (λ=1) arm does, and `s` was calibrated against the paper's own
@@ -53,7 +53,7 @@ exercised here; the from-scratch environment was instead verified via a fresh
 | 4 | Entrypoint is obvious | pass | One documented command, `python run_experiment.py --lambda FLOAT`, drives the whole experiment via flags; no source edits needed. `--lambda` is required; all hyperparameters are CLI flags with the paper's values as defaults. |
 | 5 | Fast path | pass | The full 4000-step run completes in ~0.8 s, so the full run *is* the fast path; the whole train+eval path is exercised end to end in well under a couple of minutes. |
 | 6 | Deterministic / noise quantified | pass | Same command, same seed (0) → same number on re-run: baseline `0.9370` and CWSD `0.9611` reproduced on a second invocation. |
-| 7 | Degeneracy test in repo | pass | `tests/test_degeneracy.py` asserts the λ=0 path is bitwise identical to an independently written cross-entropy routine (per-step loss + every grad, and a 300-step SGD loop with identical params + accuracy). `pytest -q` → 23 passed. |
+| 7 | Degeneracy test in repo | pass | `tests/test_degeneracy.py` asserts the λ=0 path is bitwise identical to an independently written cross-entropy routine (per-step loss + every grad, and a 300-step SGD loop with identical params + accuracy). The structural and per-step checks are swept over `s ∈ {0.01,0.15,1.0,10.0}` so the gate cannot be fit to the answer via the one unstated hyperparameter. A `test_training_step_count_is_exact` pins the loop's exact step-count guard. `pytest -q` → 24 passed. |
 | 8 | Data provenance stated | pass | Data is `sklearn.datasets.load_digits` (1797 × 8×8 digits, 10 classes), pinned via scikit-learn 1.9.0; split is stratified `train_test_split` at seed 0 (30% test); stated in README/SPEC. No manual download. |
 | 9 | Recorded number reproducible | pass | The exact commands recorded beside the numbers above, run again, produced the same numbers (baseline 0.9370, CWSD 0.9611). |
 | 10 | No hidden local state | pass | A fresh venv in a fresh location (`/tmp/freshvenv_test`) with only the repo files + pinned requirements installed runs the experiment and the tests with the recorded numbers; nothing depends on a hand-built env or home-directory state. |
@@ -180,3 +180,25 @@ exercised here; the from-scratch environment was instead verified via a fresh
 |---|---|---|
 | Cross-entropy (baseline) | 0 | 0.9370 |
 | CWSD (ours) | 1 | 0.9620 |
+
+## Running log (this pass)
+
+- 2026-07-29: Adversarial component review via orchestration (run
+  `cf87146a-5710-464f-97ed-f8d2eef77eb1`, 5 reviewers + 1 independent verify
+  agent). Each of data-pipeline, method-core, training-loop, evaluation-metric,
+  and baseline-arm was reviewed against `paper/paper.md` with file:line
+  evidence; all 5 approved, 0 failures. The independent verify agent ran the
+  actual program: `pytest -q` → 23 passed; `--lambda 0.0` → `FINAL
+  accuracy=0.9370` (exact); `--lambda 1.0` → `FINAL accuracy=0.9611` (within
+  ±0.004 of 0.9620).
+- 2026-07-29: Hardened the two `completeness` minors the review surfaced (neither
+  a blocker). (1) The degeneracy tests now sweep `s ∈ {0.01,0.15,1.0,10.0}`
+  (3 orders of magnitude) for both the structural `t==Y` check and the per-step
+  loss+grad bitwise-CE check, so the no-op=baseline gate provably cannot be fit
+  to the answer via the one unstated hyperparameter. (2) Added
+  `test_training_step_count_is_exact` pinning the loop's exact step-count guard
+  (`--steps` → exactly that many gradient updates) across the first-epoch
+  boundary (0,1,63,64,65,100). `pytest -q` → 24 passed; both arms still
+  reproduce (baseline 0.9370 exact, CWSD 0.9611). SPEC §7 updated: structural
+  gates (a)–(e), 24 tests.
+

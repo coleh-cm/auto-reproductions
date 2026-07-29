@@ -246,10 +246,13 @@ Conclusion: **no usable upstream implementation exists; implement from scratch**
 | Cross-entropy baseline | 0 | 0.9370 | within ±0.004 (±2 test examples) |
 | CWSD | 1 | 0.9620 | within ±0.004 |
 
-Plus structural gates: (a) `--lambda 0.0` path must be exact CE (assert `w ≡ 0`);
+Plus structural gates: (a) `--lambda 0.0` path must be exact CE (assert `w ≡ 0`),
+**swept over `s`** so the gate cannot be fit to the answer via the one unstated
+hyperparameter (gates a–b hold for `s ∈ {0.01,0.15,1.0,10.0}`, 3 orders of magnitude);
 (b) `t = y` when `w = 0`; (c) loss of Eq. (4) at `t = p̃` matches a direct
-`CE(p̃, p)` computation; (d) gradient check of `dL/dz = (p − t)/B` vs finite differences.
-All four gates are implemented as tests in `tests/` (degeneracy + invariants).
+`CE(p̃, p)` computation; (d) gradient check of `dL/dz = (p − t)/B` vs finite differences;
+(e) the training loop runs exactly `--steps` gradient updates (no more, no fewer).
+All five gates are implemented as tests in `tests/` (degeneracy + invariants).
 Sensitivity over the §4 choices (`s`, init, noise-mode, batch-mode, rng-layout) to be reported in
 REPRODUCTION.md since the paper cannot adjudicate them.
 

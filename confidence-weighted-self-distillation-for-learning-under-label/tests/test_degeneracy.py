@@ -18,6 +18,8 @@ labels. These tests enforce that at three levels:
                  unstated hyperparameter), so it cannot be fit to the answer.
 """
 
+import argparse
+
 import numpy as np
 
 import run_experiment as r
@@ -70,25 +72,35 @@ def test_lambda_zero_target_equals_onehot():
     ``w`` would mix in ``p_tilde`` and break equality. We do NOT recompute ``w``
     with the same formula (that would be circular); we let ``array_equal(t, Y)``
     be the witness that ``w == 0``.
+
+    Swept over ``s`` so the gate cannot be fit to the answer via the one
+    unstated hyperparameter: the degeneracy must hold for *every* ``s``, not just
+    the calibrated default 0.15.
     """
     params, X, Y = _rand_case()
     out = r.forward(params, X)
     # p_tilde differs from Y for this random case (sanity: not all rows equal)
     p_tilde = r.softmax(out["z"] / 2.0)
     assert not np.allclose(p_tilde, Y)
-    t = r.make_target(out["z"], Y, lam=0.0, tau=0.9, s=0.15, T=2.0)
-    # t == Y bitwise => the only way is w == 0 exactly (p_tilde != Y above)
-    assert np.array_equal(t, Y)
+    for s in (0.01, 0.05, 0.15, 0.5, 1.0, 10.0):
+        t = r.make_target(out["z"], Y, lam=0.0, tau=0.9, s=s, T=2.0)
+        # t == Y bitwise => the only way is w == 0 exactly (p_tilde != Y above)
+        assert np.array_equal(t, Y), f"s={s}"
 
 
 def test_lambda_zero_loss_and_grads_equal_ce_bitwise():
-    """Loss and ALL parameter grads at lam=0 are bitwise identical to plain CE."""
+    """Loss and ALL parameter grads at lam=0 are bitwise identical to plain CE.
+
+    Swept over ``s`` so the gate cannot be fit to the answer via the one
+    unstated hyperparameter: CE equality must hold for *every* ``s``.
+    """
     params, X, Y = _rand_case(seed=7)
-    loss_cw, grads_cw = r.loss_and_grads(params, X, Y, 0.0, 0.9, 0.15, 2.0)
     loss_ce, grads_ce = ce_loss_and_grads(params, X, Y)
-    assert loss_cw == loss_ce, (loss_cw, loss_ce)
-    for k in ("W1", "b1", "W2", "b2"):
-        assert np.array_equal(grads_cw[k], grads_ce[k]), k
+    for s in (0.01, 0.15, 1.0, 10.0):
+        loss_cw, grads_cw = r.loss_and_grads(params, X, Y, 0.0, 0.9, s, 2.0)
+        assert loss_cw == loss_ce, (s, loss_cw, loss_ce)
+        for k in ("W1", "b1", "W2", "b2"):
+            assert np.array_equal(grads_cw[k], grads_ce[k]), (s, k)
 
 
 def test_lambda_zero_training_matches_ce_training_bitwise():
@@ -130,3 +142,34 @@ def test_lambda_zero_training_matches_ce_training_bitwise():
     for k in ("W1", "b1", "W2", "b2"):
         assert np.array_equal(p_cw[k], p_ce[k]), k
     assert a_cw == a_ce
+
+
+def test_training_step_count_is_exact():
+    """The loop runs EXACTLY --steps gradient updates, no more, no fewer.
+
+    Guards against a future edit silently breaking the step-count guard
+    (run_experiment.py:284-298). Includes a short-final-batch boundary
+    (1257 train / 64 => 20 batches = 1280 step-capacities; probes 0,1,63,64,
+    65,100 around the first-epoch boundary).
+    """
+    for steps in (0, 1, 63, 64, 65, 100):
+        saved_fn = r.loss_and_grads
+        seen = {"n": 0}
+
+        def counting(params, X, Y_onehot, lam, tau, s, T):
+            loss, g = saved_fn(params, X, Y_onehot, lam, tau, s, T)
+            seen["n"] += 1
+            return loss, g
+        r.loss_and_grads = counting
+        try:
+            ns = argparse.Namespace(
+                lambda_=0.0, s=0.15, tau=0.9, temperature=2.0, seed=0,
+                steps=steps, lr=0.1, batch_size=64, init="he",
+                noise_mode="uniform-all", noise_rate=0.2,
+                batch_mode="epoch-permutation", rng_layout="init-first",
+            )
+            r.train(ns)
+        finally:
+            r.loss_and_grads = saved_fn
+        assert seen["n"] == steps, (steps, seen["n"])
+
