@@ -1,0 +1,141 @@
+\begin{thebibliography}{19}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Bastien et~al.(2012)Bastien, Lamblin, Pascanu, Bergstra, Goodfellow,
+  Bergeron, Bouchard, and Bengio]{Bastien-Theano-2012}
+Bastien, Fr{\'{e}}d{\'{e}}ric, Lamblin, Pascal, Pascanu, Razvan, Bergstra,
+  James, Goodfellow, Ian~J., Bergeron, Arnaud, Bouchard, Nicolas, and Bengio,
+  Yoshua.
+\newblock Theano: new features and speed improvements.
+\newblock Deep Learning and Unsupervised Feature Learning NIPS 2012 Workshop,
+  2012.
+
+\bibitem[Bergstra et~al.(2010)Bergstra, Breuleux, Bastien, Lamblin, Pascanu,
+  Desjardins, Turian, Warde-Farley, and Bengio]{bergstra+al:2010-scipy}
+Bergstra, James, Breuleux, Olivier, Bastien, Fr{\'{e}}d{\'{e}}ric, Lamblin,
+  Pascal, Pascanu, Razvan, Desjardins, Guillaume, Turian, Joseph, Warde-Farley,
+  David, and Bengio, Yoshua.
+\newblock Theano: a {CPU} and {GPU} math expression compiler.
+\newblock In \emph{Proceedings of the Python for Scientific Computing
+  Conference ({SciPy})}, June 2010.
+\newblock Oral Presentation.
+
+\bibitem[{Chalupka} et~al.(2014){Chalupka}, {Perona}, and {Eberhardt}]{causal}
+{Chalupka}, K., {Perona}, P., and {Eberhardt}, F.
+\newblock {Visual Causal Feature Learning}.
+\newblock \emph{ArXiv e-prints}, December 2014.
+
+\bibitem[Dean et~al.(2012)Dean, Corrado, Monga, Chen, Devin, Le, Mao, Ranzato,
+  Senior, Tucker, Yang, and Ng]{distbelief}
+Dean, Jeffrey, Corrado, Greg~S., Monga, Rajat, Chen, Kai, Devin, Matthieu, Le,
+  Quoc~V., Mao, Mark~Z., Ranzato, Marc’Aurelio, Senior, Andrew, Tucker, Paul,
+  Yang, Ke, and Ng, Andrew~Y.
+\newblock Large scale distributed deep networks.
+\newblock In \emph{NIPS}, 2012.
+
+\bibitem[Deng et~al.(2009)Deng, Dong, Socher, jia Li, Li, and
+  Fei-fei]{ImageNet}
+Deng, Jia, Dong, Wei, Socher, Richard, jia Li, Li, Li, Kai, and Fei-fei, Li.
+\newblock Imagenet: A large-scale hierarchical image database.
+\newblock In \emph{In CVPR}, 2009.
+
+\bibitem[Glorot et~al.(2011)Glorot, Bordes, and Bengio]{Glorot+al-AI-2011}
+Glorot, Xavier, Bordes, Antoine, and Bengio, Yoshua.
+\newblock Deep sparse rectifier neural networks.
+\newblock In \emph{JMLR W\&CP: Proceedings of the Fourteenth International
+  Conference on Artificial Intelligence and Statistics (AISTATS 2011)}, April
+  2011.
+
+\bibitem[Goodfellow et~al.(2013{\natexlab{a}})Goodfellow, Mirza, Courville, and
+  Bengio]{mpdbm}
+Goodfellow, Ian~J., Mirza, Mehdi, Courville, Aaron, and Bengio, Yoshua.
+\newblock Multi-prediction deep {Boltzmann} machines.
+\newblock In \emph{Neural Information Processing Systems}, December
+  2013{\natexlab{a}}.
+
+\bibitem[Goodfellow et~al.(2013{\natexlab{b}})Goodfellow, Warde-Farley,
+  Lamblin, Dumoulin, Mirza, Pascanu, Bergstra, Bastien, and
+  Bengio]{pylearn2_arxiv_2013}
+Goodfellow, Ian~J., Warde-Farley, David, Lamblin, Pascal, Dumoulin, Vincent,
+  Mirza, Mehdi, Pascanu, Razvan, Bergstra, James, Bastien,
+  Fr{\'{e}}d{\'{e}}ric, and Bengio, Yoshua.
+\newblock Pylearn2: a machine learning research library.
+\newblock \emph{arXiv preprint arXiv:1308.4214}, 2013{\natexlab{b}}.
+
+\bibitem[Goodfellow et~al.(2013{\natexlab{c}})Goodfellow, Warde-Farley, Mirza,
+  Courville, and Bengio]{Goodfellow-et-al-ICML2013}
+Goodfellow, Ian~J., Warde-Farley, David, Mirza, Mehdi, Courville, Aaron, and
+  Bengio, Yoshua.
+\newblock Maxout networks.
+\newblock In Dasgupta, Sanjoy and McAllester, David (eds.), \emph{International
+  Conference on Machine Learning}, pp.\  1319--1327, 2013{\natexlab{c}}.
+
+\bibitem[Gu \& Rigazio(2014)Gu and Rigazio]{Luca}
+Gu, Shixiang and Rigazio, Luca.
+\newblock Towards deep neural network architectures robust to adversarial
+  examples.
+\newblock In \emph{NIPS Workshop on Deep Learning and Representation Learning},
+  2014.
+
+\bibitem[Hochreiter \& Schmidhuber(1997)Hochreiter and Schmidhuber]{lstm}
+Hochreiter, S. and Schmidhuber, J.
+\newblock Long short-term memory.
+\newblock \emph{Neural Computation}, 9\penalty0 (8):\penalty0 1735--1780, 1997.
+
+\bibitem[Hornik et~al.(1989)Hornik, Stinchcombe, and White]{Hornik89}
+Hornik, Kurt, Stinchcombe, Maxwell, and White, Halbert.
+\newblock Multilayer feedforward networks are universal approximators.
+\newblock \emph{Neural Networks}, 2:\penalty0 359--366, 1989.
+
+\bibitem[Jarrett et~al.(2009)Jarrett, Kavukcuoglu, Ranzato, and
+  {LeCun}]{Jarrett-ICCV2009}
+Jarrett, Kevin, Kavukcuoglu, Koray, Ranzato, {Marc'Aurelio}, and {LeCun}, Yann.
+\newblock What is the best multi-stage architecture for object recognition?
+\newblock In \emph{Proc. International Conference on Computer Vision
+  (ICCV'09)}, pp.\  2146--2153. IEEE, 2009.
+
+\bibitem[Krizhevsky \& Hinton(2009)Krizhevsky and Hinton]{KrizhevskyHinton2009}
+Krizhevsky, Alex and Hinton, Geoffrey.
+\newblock Learning multiple layers of features from tiny images.
+\newblock Technical report, University of Toronto, 2009.
+
+\bibitem[{Nguyen} et~al.(2014){Nguyen}, {Yosinski}, and {Clune}]{fool}
+{Nguyen}, A., {Yosinski}, J., and {Clune}, J.
+\newblock {Deep Neural Networks are Easily Fooled: High Confidence Predictions
+  for Unrecognizable Images}.
+\newblock \emph{ArXiv e-prints}, December 2014.
+
+\bibitem[Rust et~al.(2005)Rust, Schwartz, Movshon, and Simoncelli]{Rust}
+Rust, Nicole, Schwartz, Odelia, Movshon, J.~Anthony, and Simoncelli, Eero.
+\newblock Spatiotemporal elements of macaque {V1} receptive fields.
+\newblock \emph{Neuron}, 46\penalty0 (6):\penalty0 945--956, 2005.
+
+\bibitem[Srivastava et~al.(2014)Srivastava, Hinton, Krizhevsky, Sutskever, and
+  Salakhutdinov]{dropout}
+Srivastava, Nitish, Hinton, Geoffrey, Krizhevsky, Alex, Sutskever, Ilya, and
+  Salakhutdinov, Ruslan.
+\newblock Dropout: A simple way to prevent neural networks from overfitting.
+\newblock \emph{The Journal of Machine Learning Research}, 15\penalty0
+  (1):\penalty0 1929--1958, 2014.
+
+\bibitem[Szegedy et~al.(2014{\natexlab{a}})Szegedy, Liu, Jia, Sermanet, Reed,
+  Anguelov, Erhan, Vanhoucke, and Rabinovich]{Szegedy-et-al-arxiv2014}
+Szegedy, Christian, Liu, Wei, Jia, Yangqing, Sermanet, Pierre, Reed, Scott,
+  Anguelov, Dragomir, Erhan, Dumitru, Vanhoucke, Vincent, and Rabinovich,
+  Andrew.
+\newblock Going deeper with convolutions.
+\newblock Technical report, arXiv preprint arXiv:1409.4842, 2014{\natexlab{a}}.
+
+\bibitem[Szegedy et~al.(2014{\natexlab{b}})Szegedy, Zaremba, Sutskever, Bruna,
+  Erhan, Goodfellow, and Fergus]{Szegedy-ICLR2014}
+Szegedy, Christian, Zaremba, Wojciech, Sutskever, Ilya, Bruna, Joan, Erhan,
+  Dumitru, Goodfellow, Ian~J., and Fergus, Rob.
+\newblock Intriguing properties of neural networks.
+\newblock \emph{ICLR}, abs/1312.6199, 2014{\natexlab{b}}.
+\newblock URL \url{http://arxiv.org/abs/1312.6199}.
+
+\end{thebibliography}
