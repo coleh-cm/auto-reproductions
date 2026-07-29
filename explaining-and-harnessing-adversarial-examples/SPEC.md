@@ -31,6 +31,39 @@ figure. We reproduce the **MNIST core**; the rest is graded below.
 Compute: CPU-only, 16 cores, Python 3.13, PyTorch. M5 (5 seeds × 2 arms) and E1 (12 nets) are
 the expensive items; seeds/ensemble members run as parallel processes.
 
+### 1.A. The comparison arms (machine-readable mirror: `arms.json`)
+
+The paper's own comparisons, named and fixed here — this table (mirrored in `arms.json`) is
+what the numbers gate walks. Training arms train a model; eval arms only consume trained
+models. Two extra evaluation-only rows (M6, M9) reuse the models of arms 3/6 and 1/3/8.
+Full per-arm configs (model, training, evaluation, target, citation, script, results file,
+metric paths) are in `arms.json` at the repo root.
+
+| Arm name | Kind | Model & training config | Attack/eval config | Paper target(s) |
+|----------|------|------------------------|--------------------|-----------------|
+| `m1_softmax_regression` | train | SoftmaxRegression 784→10, clean CE (SGD; paper states no optimizer) | FGSM ε=0.25, MNIST test | adv err 99.9%, conf 79.3% (tex:333) |
+| `m2_logistic_3v7` | train | LogisticRegression 784→1, y∈{−1,+1}, E5 softplus | exact FGSM η=−ε·y·sign(w), ε=0.25 | clean 1.6%, adv 99% (tex:454-456) |
+| `m3_maxout240_clean` | train | MaxoutMLP 240×2, pieces 5, input-dropout .8, external recipe | FGSM ε=0.25 | adv err 89.4%, conf 97.6% (tex:338-339); also M4's clean arm 0.94% (tex:492-494) |
+| `m4_maxout240_advtrain` | train | identical to `m3_maxout240_clean` + Algorithm B (α=0.5, ε=0.25, stop-grad) | clean test error | 0.84% vs baseline 0.94% — the headline comparison (tex:492-494) |
+| `m5_maxout1600_clean` | train | MaxoutMLP 1600×2, clean-early-stop (patience 100), retrain on 60k | clean test error | 1.14% (tex:497-499) |
+| `m5_maxout1600_advtrain` | train | identical + Algorithm B; early stop on ADVERSARIAL valid error; retrain on 60k; seeds 0–4 | clean test error | 4×0.77% + 1×0.83%, mean 0.782% (tex:506-512) |
+| `m7_maxout_noise_sign` | train (control) | `m3` model trained on x+ε·b, b∈{±1} iid (E10) | FGSM ε=0.25 | adv err 86.2%, conf 97.3% (tex:555-557) |
+| `m7_maxout_noise_uniform` | train (control) | `m3` model trained on x+u, u∼U(−ε,ε) iid (E10) | FGSM ε=0.25 | adv err 90.4%, conf 97.8% (tex:555-557) |
+| `m8_rbf_shallow` | train | RBFNet (10 quad. forms; multiclass norm unstated, §6 item 9) | FGSM ε=0.25 + §8 class-agreement evals | adv err 55.4%, conf-on-mistakes 1.2%, clean conf 60.6% (tex:600-604); agreement 16.0/54.6/84.6/54.3/53.6% (tex:679-688) |
+| `e1_ensemble12_maxout` | train (12×) | 12× `m3` config, distinct RNG seeds | FGSM ε=0.25 vs ensemble (mean-loss grad; rule unstated §6 item 11) and vs single member | 91.1% / 87.9% (tex:822-825) |
+| `m6_robustness_transfer_eval` | eval-only over arms 3 & 6 | — | own-FGSM; cross-transfer both directions, ε=0.25 | 17.9% / 19.6% / 40.9%, conf 81.4% (tex:514-523) |
+| `m9_rubbish_evals` | eval-only over arms 1, 3 (×sigmoid-top), 8 | — | 10,000 samples ∼ N(0,I₇₈₄); error := max p > 0.5 (tex:905-906) | maxout+softmax 98.35% (92.8%); sigmoid-top 68% (87.9%); softmax-reg 59.8% (70.8%); RBF 0% (tex:906-909, 919-924) |
+
+**Graded-harness arms** (subset for `run_experiment.py`): **method** = `--lambda EPS`
+(Algorithm B by default, α=0.5, dropout off for the degeneracy gate, §6 item 22);
+**baseline** = `--baseline` (clean training, same model/steps/seed). Degeneracy contract:
+`--lambda 0` ≡ `--baseline` bit-for-bit (tests/test_degeneracy.py).
+
+**Excluded arms** (recorded, not run): GoogLeNet/ImageNet Fig. 1 (tex:378-383; 2014 DistBelief
+weights unavailable); MP-DBM ε=0.25 → 97.5% (tex:793-800; a separate paper's model);
+CIFAR-10 conv maxout E2 (tex:340-341, 910-912, 936-941; beyond the MNIST core, architecture
+exists only externally).
+
 ---
 
 ## 2. The method as explicit algorithms
