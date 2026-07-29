@@ -669,3 +669,62 @@ unchanged and still disclosed.
   reorder/timestamp churn, which was discarded).
 - Tests 27/27 pass; smoke `FINAL smoke=ok` (all 7 arms strict finite
   progress). Branch `repro/block-lewis-gdr` pushed.
+
+### Round-14: 5-component adversarial paper-fidelity review (orchestration) — 3 confirmed test-coverage findings, fixed
+
+- Ran an `orchestrate` review (`gdr-paper-fidelity-review`, 11 agents total:
+  one review subagent + one refutation-verifier per-component pipeline over
+  the 5 decomposable components — data_pipeline, method_core, training_loop,
+  evaluation_metric, baseline_arm_tests — plus a verify stage that re-read the
+  cited code:line and paper:line for each raw finding and kept it only if
+  confirmed real and not a disclosed SPEC U-item). The script is the
+  evaluator: nothing was trusted unverified.
+- Result: **3 confirmed findings, all in the `baseline_arm_tests` component,
+  all test-coverage gaps (no implementation code bug).** The other four
+  components (data_pipeline, method_core, training_loop, evaluation_metric)
+  returned 0 confirmed findings — the core implementation is faithful to the
+  paper. Three reviewer claims were refuted by the verifier as non-issues:
+  (a) a "two non-equivalent ACS loaders" claim — refuted because the SPEC-8A
+  canonical loader (`gdr/data_acs.py`, the production path
+  `run_all_arms.sh → run_arm.py → data_acs.make_acs_income`) is faithful
+  (California-worst), and the parallel `gdr/data.py` path is non-production /
+  already documented in Round-9; (b) a "no determinism test" claim — refuted
+  because determinism is established by the bit-identical degeneracy test +
+  two independent full-gate re-runs (Rounds 10/12) with seed-cache guards, and
+  the solvers have no RNG; (c) a "Lemma strong_convexity_component untested"
+  claim — refuted because that lemma is pure maths (no code locus) and the
+  aggregated form IS tested with the paper's exact `4/2^p` constant.
+- The 3 confirmed findings, all in `tests/test_invariants.py` (no
+  implementation code touched — the reviewed code was verified correct):
+  1. **major — E9 Lewis warm-start QUALITY bound not tested** (SPEC T5 lists
+     it; `other_proofs.tex:51-61` Lemma `gp_regression_initialization`:
+     `‖A x₀−b‖_{G_p} ≤ (2 rank(A))^{1/2−1/p} ‖A x★−b‖_{G_p}`). The existing
+     `test_lewis_warm_start_D_exponent` checked only the D-exponent and
+     `x0 == wls_init(D)`, never the loss-vs-OPT consequence. **Fix:** added
+     `test_lewis_warm_start_init_quality`, which builds a dedicated problem
+     with `m=20 > 2(d+1)=10` so the E11 reset does **not** fire (Lewis weights
+     are the geometry actually used — the shared `small_problem` fixture has
+     `m=8` so `2(d+1)=10 ≥ m` and the reset fires, where only the naive
+     `√m` bound holds, not the Lewis one), then asserts
+     `f(x₀) ≤ √(2(d+1))·f(x★)` on the unsquared `‖·‖_{G_∞}` scale (the lemma's
+     scale), and also the tighter `√(2 rank(A))` bound. Verified numerically
+     first: `f0=37.18 ≤ √(2·rank(A))·f★=96.6` and `≤ √(2(d+1))·f★=108.0`.
+  2. **minor — E5 p-objective Hessian never finite-difference / symmetry /
+     PSD checked** (`test_p_grad_finite_diff` checked only the `[d]` gradient;
+     a Hessian-only bug — wrong sign on the `p(p−2)` outer product, missing
+     term, or `‖r‖^{p−4}` vs `‖r‖^{p−2}` exponent confusion — would pass).
+     **Fix:** added `test_p_hessian_finite_diff_symmetry_psd` (parametrized
+     `p ∈ {2,4,8}`), mirroring the E4 Hessian test: finite-differences the
+     `[d,d]` Hessian from the gradient, asserts symmetry, and asserts PSD
+     (`f = Σ‖r_i‖^p` is convex).
+  3. **nit — softmax weights `s ∈ Δ^m` (sum to 1, nonnegative) asserted
+     nowhere** (E4 / `body.tex:285-288`). **Fix:** added
+     `test_softmax_weights_in_simplex`, a direct unit test of `_softmax`
+     (including the max-shift edge case with extreme exponents).
+- These are exactly the "tests for the invariants the paper's equations
+  imply" the task requires: they pin facts the maths guarantees so a
+  regression in the (correct) implementation is caught.
+- Tests 27 → 32 passing (the new tests add 5 cases: 1 init-quality +
+  3 parametrized p-Hessian + 1 softmax). Committed result JSONs unchanged
+  (no implementation code changed; the gate is unaffected). Branch
+  `repro/block-lewis-gdr` pushed.

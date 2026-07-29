@@ -126,7 +126,7 @@ budget. Full per-arm histories are written to `results/<dataset>_<arm>.json`
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 27 tests: degeneracy + equation invariants (SPEC T5)
+.venv/bin/python -m pytest -q     # 32 tests: degeneracy + equation invariants (SPEC T5)
 ```
 
 `tests/test_degeneracy.py` — the method at its no-op setting must reproduce the
@@ -135,10 +135,15 @@ bit-identical to the Euclidean ball-oracle; (D2) the p=2 interpolating objective
 reduces to plain least squares (ERM). `tests/test_invariants.py` — Lemma 6.1
 (`|f̃−f| ≤ β log m + δ`), the E6 block-Lewis overestimate & `‖w‖₁ ≤ 2(d+1)`,
 the E7 residual sandwich, smoothed grad/Hessian finite-difference + PSD,
-p-objective gradient finite-difference, **Lemma 7.2 strong-convexity of ‖·‖ₚ²**,
-**lewis_warm_start D-exponent** (p=∞/2/4/8), subgradient validity, ball-oracle
-**per-iteration f̃-monotonicity** (via the recorded `x_traj`), **first-order arms
-make end-to-end progress** (the smoke `iters_to_5%=None` plateau is not a no-op).
+p-objective gradient finite-difference, **p-objective Hessian finite-difference
++ symmetry + PSD**, **Lemma 7.2 strong-convexity of ‖·‖ₚ²**,
+**E9 Lewis warm-start quality bound `f(x₀) ≤ √(2(d+1))·f(x★)`** (Lemma
+gp_regression_initialization, on a problem where the E11 reset does *not*
+fire so the Lewis geometry is the one actually bounded), **softmax weights lie
+in the simplex Δᵐ**, **lewis_warm_start D-exponent** (p=∞/2/4/8), subgradient
+validity, ball-oracle **per-iteration f̃-monotonicity** (via the recorded
+`x_traj`), **first-order arms make end-to-end progress** (the smoke
+`iters_to_5%=None` plateau is not a no-op).
 
 ## Results (this reproduction)
 

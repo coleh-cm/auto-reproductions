@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from gdr.lewis import block_lewis_weights, geometry_M, leverage_scores, should_reset_W, lewis_warm_start, wls_init
-from gdr.objectives import smoothed, smoothed_grad_hess, p_objective, p_grad_hess
+from gdr.objectives import smoothed, smoothed_grad_hess, p_objective, p_grad_hess, _softmax
 from gdr.problem import group_losses, group_norms, max_loss, max_loss_unsquared
 
 
@@ -413,4 +413,119 @@ def test_opt_cache_n_i_signature_checked(tmp_path, monkeypatch):
     # definitely not 1.234 -> the stale cache must be rejected and rebuilt.
     val = get_opt_cached(prob, "synthetic", 0)
     assert abs(val - 1.234) > 1e-6, "stale cache with mismatched n_i was reused"
+
+
+# ---------------------------------------------------------------------------
+# Round-14: three invariant tests added after an adversarial paper-fidelity
+# review (orchestration) confirmed them as missing coverage the paper's
+# equations imply.  None changes implementation code; all pin facts the maths
+# guarantees so a regression in the (correct) implementation is caught.
+# ---------------------------------------------------------------------------
+
+# (1) E9 Lewis warm-start QUALITY bound (major finding; SPEC T5 lists this
+# check explicitly, other_proofs.tex:51-61 Lemma gp_regression_initialization).
+#
+#   On the UNSQUARED group-p-norm scale the lemma states, for the Lewis-weighted
+#   least-squares init x0 = argmin ||W^{1/2-1/p}(Ax-b)||_2 (E9, p=inf => D=W):
+#       ||A x0 - b||_{G_p}  <=  (2 rank(A))^{1/2-1/p}  ||A x* - b||_{G_p}
+#   For p=inf this is  f(x0) <= sqrt(2 rank(A)) * f(x*)  where f = ||.||_{G_inf}.
+#   The SPEC T5 / Thm-2.3 sandwich uses the augmented rank (d+1), giving the
+#   looser (valid) bound  f(x0) <= sqrt(2(d+1)) * f(x*).  We assert the SPEC T5
+#   bound (looser, conservative); the lemma's tighter sqrt(2 rank(A)) bound
+#   also holds and is printed for transparency.
+#
+#   CRITICAL: this only proves something when the Lewis weights are ACTUALLY
+#   used, i.e. when the E11 reset (sum w_i >= m => W=I) does NOT fire.  The
+#   shared `small_problem` fixture has m=8, d=4 so 2(d+1)=10 >= m and the reset
+#   fires (Lewis collapses to Euclidean); there the bound that holds is the
+#   naive sqrt(m) one, not the Lewis one.  So this test builds a dedicated
+#   problem with m=20 > 2(d+1)=10 so the reset does NOT fire and the Lewis
+#   warm start is the one the lemma bounds.  (research-code skill: the
+#   degeneracy/no-op setting must be distinguished from the active setting.)
+def test_lewis_warm_start_init_quality():
+    """E9 Lewis warm-start quality: f(x0) <= sqrt(2(d+1)) * f(x*)  (Lemma
+    gp_regression_initialization, other_proofs.tex:51-61; SPEC T5).  Uses a
+    problem where the E11 reset does NOT fire so the Lewis weights (not W=I)
+    are the geometry actually used."""
+    from gdr.data_synthetic import make_synthetic
+    from gdr.reference import solve_opt
+    # m=20 > 2(d+1)=10  =>  sum w_i <= 2(d+1) < m  => reset does NOT fire
+    prob = make_synthetic(d=4, m=20, n_adv=3, n_per_group=8, seed=11,
+                          E_ADV=1e3, DIST=3.0, E_LO=0.1, E_HI=1.0)
+    d, m = prob["d"], prob["m"]
+    w = block_lewis_weights(prob, p=np.inf)
+    assert not should_reset_W(w, m), "test requires the E11 reset NOT to fire"
+    assert w.sum() <= 2 * (d + 1) + 1e-9, (w.sum(), 2 * (d + 1))  # E8 guarantee
+
+    x0, _w_rows, reset = lewis_warm_start(prob, p=np.inf)
+    assert not reset, "lewis_warm_start must not reset when sum w_i < m"
+    _xstar, opt_sq = solve_opt(prob)           # OPT = F(x*) on the SQUARED scale
+    assert opt_sq > 0, "need a non-trivial optimum (b not in col(A))"
+
+    # unsquared theory scale: f = ||A x - b||_{G_inf} = max_i ||r_i||_2
+    f0 = max_loss_unsquared(prob, x0)
+    fstar = float(np.sqrt(opt_sq))
+    rank_A = int(np.linalg.matrix_rank(prob["A"]))
+    # Lemma statement (tighter):  f0 <= sqrt(2 rank(A)) * fstar
+    bound_lemma = np.sqrt(2 * rank_A) * fstar
+    # SPEC T5 / Thm-2.3 sandwich (looser, augmented rank d+1): the asserted bound
+    bound_spec = np.sqrt(2 * (d + 1)) * fstar
+    assert f0 <= bound_spec + 1e-6 * fstar, (f0, bound_spec, fstar, w.sum())
+    # the tighter lemma bound must also hold (it does for a correct impl)
+    assert f0 <= bound_lemma + 1e-6 * fstar, (f0, bound_lemma, fstar)
+
+
+# (2) E5 p-objective Hessian: finite-difference check + symmetry + PSD (minor
+# finding; test_p_grad_finite_diff only checked the [d] gradient, never the
+# [d,d] Hessian, so a Hessian-only bug -- wrong sign on the p(p-2) outer
+# product, a missing term, or ||r||^{p-4} vs ||r||^{p-2} exponent confusion --
+# would pass).  Mirrors test_smoothed_grad_hess_finite_diff for E4.
+@pytest.mark.parametrize("p", [2.0, 4.0, 8.0])
+def test_p_hessian_finite_diff_symmetry_psd(small_problem, p):
+    """E5 Hessian (interpolation.tex:24-29) vs finite differences of the
+    gradient, plus symmetry and PSD (f = sum ||r_i||^p is convex => Hessian PSD)."""
+    prob = small_problem
+    rng = np.random.default_rng(9)
+    # pick x with all ||r_i|| > 0 to stay off the r=0 guard branch
+    x = rng.standard_normal(prob["d"]) + 5.0
+    _v, g, H = p_grad_hess(prob, x, p)
+    d = prob["d"]
+    # symmetry (exact, up to fp noise)
+    assert np.allclose(H, H.T, atol=1e-12), (p, np.max(np.abs(H - H.T)))
+    # PSD: f = sum ||r_i||^p is convex in x, so its Hessian is PSD
+    assert np.linalg.eigvalsh(0.5 * (H + H.T)).min() > -1e-6, (p, np.linalg.eigvalsh(H).min())
+    # finite-difference the Hessian column-by-column from the gradient
+    eps = 1e-5
+    Hfd = np.zeros((d, d))
+    for i in range(d):
+        xp = x.copy(); xp[i] += eps
+        xm = x.copy(); xm[i] -= eps
+        _, gp, _ = p_grad_hess(prob, xp, p)
+        _, gm, _ = p_grad_hess(prob, xm, p)
+        Hfd[:, i] = (gp - gm) / (2 * eps)
+    scale = np.maximum(np.abs(H), np.abs(Hfd)).max() + 1e-12
+    assert np.max(np.abs(H - Hfd)) / scale < 1e-3, (p, np.max(np.abs(H - Hfd)) / scale)
+
+
+# (3) softmax weights s lie in the probability simplex Delta^m (nit finding;
+# E4 / body.tex:285-288 define s_i = lambda_i / sum_j lambda_j; SPEC E4 says
+# s = softmax(a) in Delta^m).  No test pinned this; a regression that dropped
+# the normalization would corrupt grad/Hessian.  Direct unit test of _softmax.
+def test_softmax_weights_in_simplex():
+    """s = softmax(a) is nonnegative and sums to 1 (E4, body.tex:285-288),
+    including the max-shift edge case with large/extreme exponents."""
+    rng = np.random.default_rng(13)
+    for _ in range(50):
+        a = rng.standard_normal(rng.integers(1, 20))
+        s = _softmax(a)
+        assert s.shape == a.shape
+        assert np.all(s >= 0.0), s
+        assert abs(float(s.sum()) - 1.0) < 1e-12, s.sum()
+    # extreme / degenerate inputs (max-shift stability + simplex membership)
+    for a in [np.array([0.0]), np.array([1000.0, -1000.0, 0.0]),
+              np.array([1e6, 1e6, 1e6]), np.array([-1e6, -1e6])]:
+        s = _softmax(a)
+        assert np.all(np.isfinite(s)), a
+        assert np.all(s >= 0.0), a
+        assert abs(float(s.sum()) - 1.0) < 1e-12, (a, s.sum())
 
