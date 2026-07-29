@@ -47,23 +47,31 @@
 
 ### Numbers (committed in `results/`)
 
-Synthetic (D1, seed=0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative
-(`results/run_all.log`, MAXOUTER=20):
-subgradient=NR, smoothed_gd/_hb/_nesterov=NR (plateau), ipm=6,
-ball_oracle_euclidean=9, ball_oracle_lewis=3.
-Matches the paper: IPM reaches the lowest final loss; both BO arms strictly
-decrease the gap over outer iterations and beat the first-order plateau (all
-first-order = NR); **Lewis ≤ Euclidean finally** (3 ≤ 9, the paper's "very
-slight benefit from Lewis", experiments.tex:109). Both BO curves are monotone
-non-increasing in the smoothed objective (damped Newton, see Round-2 fixes).
+All numbers below are from `results/<dataset>_<arm>.json` produced by
+`run_all_arms.sh` at its default `MAXOUTER=300` (the per-arm `max_outer` is
+recorded in each JSON); `results/run_all.log` is the one-line-per-arm summary
+regenerated from those files. The exact iteration counts are timing- and
+grid-sensitive (U2) and the honest gate is the *ordering* (SPEC T1).
 
-ACS Income (D2, seed=6, California worst, ERM mean 107.3) — T1 gate
-(`results/run_all.log`, MAXOUTER=20):
-ball_oracle_euclidean=1, ball_oracle_lewis=1, ipm=8, smoothed_hb=10,
-smoothed_gd=NR, smoothed_nesterov=10, subgradient=3.
-- BO arms ≤ 2 ✓ (paper 1 — **exact match**).
-- iters(BO)=1 < iters(IPM)=8 ≤ iters(HB)=10 ✓ (ordering holds; paper 1 < 8 < 47;
-  **IPM=8 is an exact match to tab:acs_runtime**).
+Synthetic (D1, seed=0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative:
+subgradient=NR, smoothed_gd/_hb/_nesterov=NR (plateau ≈9.1%), ipm=6,
+ball_oracle_euclidean=9, ball_oracle_lewis=3.
+Matches the paper: IPM reaches the lowest final loss (≈0); both BO arms strictly
+decrease the gap over outer iterations and beat the first-order plateau (all
+first-order = NR); **Lewis ≤ Euclidean** — Lewis reaches the 0.34% smoothing
+floor in 3 outer iterations vs Euclidean's 9 (the paper's "very slight benefit
+from Lewis", experiments.tex:109). Both BO curves are monotone non-increasing in
+the smoothed objective (damped Newton, see Round-2 fixes).
+
+ACS Income (D2, seed=6, California worst, ERM mean 107.3) — T1 gate:
+ball_oracle_euclidean=1, ball_oracle_lewis=1, ipm=10, smoothed_hb=10,
+smoothed_gd=45, smoothed_nesterov=10, subgradient=3.
+- BO arms ≤ 2 ✓ (paper 1).
+- iters(BO)=1 < iters(IPM)=10 ≤ iters(HB)=10 ✓ (ordering holds; paper
+  tab:acs_runtime is 1 < 8 < 47 — our counts differ because the grids are
+  undisclosed (U2) and the reproduced ACS heterogeneity is smaller than the
+  paper's (B1), which compresses IPM/HB toward each other; the ordering, not the
+  exact counts, is the honest gate).
 - subgradient reaches 1% in 3 ✗ (paper: never reaches — see Blocker B1, U4).
 T3 (report-only): ERM mean 107.3 (paper 108.2 ±5 ✓), worst state California
 (paper ✓), robust Max/Mean 1.030 (paper 1.02 ✓); but ERM worst 112.7 (paper
