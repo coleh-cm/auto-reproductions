@@ -497,3 +497,68 @@ gated HF token mean none of the paper's 8B/4B/20B models load, and the
 molecular task's setup is unstated by the paper. No synthetic fallback for
 results; `smoke.sh` is the only synthetic path and is never reported as a
 result.
+
+## Round 6 — root-cause fix for the recurring "all arms missing a FINAL line" gate failure
+
+**Symptom (gate feedback, rounds 1–5).** Every one of the 45 arms reported
+`missing a FINAL line` with `values: []` — i.e. `run_all_arms.sh` printed ZERO
+`FINAL <arm>=...` lines before the gate's wall-clock budget killed it. The
+prior five rounds each addressed a different theory (missing deps, errexit,
+numpy-free FINAL emission, offline-default-on-no-token, single-GPU-probe
+fast-path); all real, none the actual failure mode at the gate.
+
+**Root cause.** `run_all_arms.sh` ran **Phase 1 (manifold fit) before any
+Phase 2 arm printed a FINAL line.** The committed gate fit logs show fit
+either (a) hung in online `from_pretrained` on a blackholed network (a
+HuggingFace token was present, so the offline default did NOT trigger), or
+(b) paid a ~5 s torch import per fit/arm. With ~8 fits + 45 arms the script
+could not finish inside the gate's tight wall-clock budget, so it was killed
+mid-Phase-1/early-Phase-2 → zero FINAL lines. The round-5 GPU-probe
+fast-path only fired when `torch.cuda.is_available()==False`; if the gate
+host reported CUDA (or the single ~5 s torch import itself overshot the
+budget) the fast-path never ran and the hang resumed.
+
+**Fix (this round).** Replaced the CUDA-only fast-path with a two-tier
+capability gate that emits every FINAL line without importing torch and
+without touching the network, so it cannot hang regardless of CUDA / token /
+network / budget:
+
+- **Tier 1 — model-cache check** (`run_all_arms.sh::_model_cached`): a pure
+  filesystem `find` over the HuggingFace hub cache
+  (`$HF_HUB_CACHE/models--<org>--<name>/snapshots/<hash>/*.{safetensors,bin,gguf,...}`).
+  For each distinct model referenced by `arms.json`, stat whether its weights
+  are already on disk. **No torch, no network, no token — instant and
+  environment-independent.** On the automated gate none of Llama-3.1-8B /
+  Gemma-4-E4B / GPT-OSS-20B is cached, so all 45 arms resolve to
+  `FINAL <arm>=BLOCKED` in ~0.04 s with zero torch imports. The script also
+  forces `HF_HUB_OFFLINE=1` for any real load, so a partial cache raises in
+  <1 s instead of hanging on a blackholed network. **No in-run download is
+  ever attempted** — that is what hung the earlier rounds. A real reproducer
+  pre-caches the models (`huggingface-cli download <repo>`; documented in the
+  README); the gate, which cannot, gets an honest BLOCKED.
+- **Tier 2 — CUDA check**: reached only when ≥1 model is cached, so the
+  single bounded torch import is paid at most once and only on a host that
+  can actually use the model. A cached 8B/20B model on a CPU host still
+  BLOCKs (cannot run on CPU).
+
+Arms that fail either tier get an immediate `FINAL <arm>=BLOCKED` and a
+`runs/BLOCKED__<arm>.json` reason (molecular arms get the SPEC §4.18
+unstated-setup reason, not the generic not-cached one) and are removed from
+the Phase-1/Phase-2 work list. The Phase-1 fit + Phase-2 eval now run **only**
+for arms whose model is cached AND CUDA is present.
+
+**Verified (this sandbox: .venv torch present, CUDA=False, no models cached).**
+`bash run_all_arms.sh` → exactly 45 `FINAL <arm>=BLOCKED` lines, `exit 0`, in
+**0.045 s** (was: 18 s round-5 / hang rounds 1–4). Robust to `bash -e`, to no
+`python` on PATH (grep-based key fallback), and to a cached-but-no-CUDA model
+(fake HF cache → that model's arms BLOCK with the cached-no-CUDA reason, the
+rest with the not-cached reason; still 45 lines). `smoke.sh` →
+`FINAL smoke=0.0000`. 28/28 tests pass.
+
+**Status: BLOCKED for every arm** — the honest outcome. No GPU and none of
+the paper's 8B/4B/20B models cached means no real numbers can be produced in
+this environment, and the molecular task's setup is unstated by the paper
+(SPEC §4.18). No synthetic fallback for results; `smoke.sh` is the only
+synthetic path and is never reported as a result. A GPU host that pre-caches
+the models runs the same script for real (Tier 1/2 pass → Phase 1 fit →
+Phase 2 eval → `FINAL <arm>=<accuracy>`).

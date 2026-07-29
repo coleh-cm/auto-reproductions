@@ -82,11 +82,22 @@ that blocks HumanEval/MBPP manifold fit independently of the GPU block.
 ## Reproducing the real numbers (GPU host)
 
 ```bash
+# 0. Pre-cache every model the arms reference (run_all_arms.sh runs OFFLINE and
+#    does NOT download in-run, so an uncached model is an honest BLOCKED, never a
+#    hang). Llama is gated -> accept the license + login first.
+huggingface-cli login
+huggingface-cli download meta-llama/Llama-3.1-8B-Instruct
+huggingface-cli download google/gemma-4-E4B-it
+# (GPT-OSS-20B for the molecular arms is a stretch target — see SPEC §4.18.)
+
+# 1. Fit the manifolds + run all 45 arms (skips any model not cached locally).
 .venv/bin/python -m mags.fit --model meta-llama/Llama-3.1-8B-Instruct --benchmark MATH-500 \
     --out manifolds/meta-llama_Llama-3.1-8B-Instruct__MATH-500.npz
 ./run_all_arms.sh           # fits missing manifolds, then runs all 45 arms
 ```
-`huggingface-cli login` with an accepted Llama token first. Each arm prints one
+`huggingface-cli login` with an accepted Llama token first, and pre-download
+each model with `huggingface-cli download <repo>` (the gate runs offline and
+does not download in-run). Each arm prints one
 `FINAL <arm_id>=<accuracy>` line; molecular arms also print
 `FINAL <arm_id>__binding_affinity=<kcal/mol>`.
 

@@ -1,2 +1,2 @@
 FINAL angular-steering__HumanEval__google_gemma-4-E4B-it=BLOCKED
-BLOCKED[angular-steering__HumanEval__google_gemma-4-E4B-it]: no CUDA GPU available; the paper's 8B/20B models require GPU (RTX 4090 / H200, SPEC §C.1). On a GPU host with cached models this fast-path is skipped.
+BLOCKED[angular-steering__HumanEval__google_gemma-4-E4B-it]: model google/gemma-4-E4B-it is not present in the HuggingFace cache (/root/.cache/huggingface/hub); the paper's 8B/20B models require a GPU host with the model pre-downloaded (SPEC §C.1). No in-run download is attempted (would hang an offline gate).
