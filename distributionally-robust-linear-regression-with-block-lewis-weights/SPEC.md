@@ -336,7 +336,10 @@ Datasets: `synthetic` (D1), `acs_income` (D2). Stretch arms (theory-fidelity, no
 - **U4 → `gdr/data_acs.py`**: folktables 2018 1-Year, log1p(PINCP) target, the
   10 ACSIncome features z-scored **globally** (no intercept ⇒ d=10, matching
   the paper's d=10 and the synthetic's no-intercept convention), adult_filter
-  (employed: AGEP>16, PINCP>100, WKHP>0), 200 individuals per state sampled
+  (employed: AGEP>16, PINCP>100, WKHP>0, **PWGTP>=1** — the full folktables
+  canonical filter, `folktables/acs.py:78-81`; Round-12 added the `PWGTP>=1`
+  clause that was previously omitted; it drops 0 rows on 2018 1-Year PUMS so no
+  committed number changes), 200 individuals per state sampled
   **without replacement**, m=51 (50 states + PR), n=10,200. Reproduces ERM
   mean MSE ≈ 107.3 (paper 108.2 ±5) and the worst ERM group = California
   (paper's headline, experiments.tex:189). Does NOT reproduce the paper's
@@ -374,6 +377,17 @@ Datasets: `synthetic` (D1), `acs_income` (D2). Stretch arms (theory-fidelity, no
 - **stretch arms (E16/E17/E18 accelerated)**: not implemented — the paper's §8
   numbers are the *unaccelerated* ball-oracle (U3); the accelerated MS loop
   (E16) is a theory-fidelity stretch not exercised by any §8 number.
+- **Round-12 review fixes (T2 + curve convention)**: (a) every result JSON now
+  carries `history.gap_best` = `cummin(history.gap)` — the best-so-far worst-group
+  suboptimality that `fig:acs_convergence` actually plots
+  (`experiments.tex:167`); the raw `gap` is kept (the T1 gate's first-crossing
+  index is unchanged). (b) every result JSON now carries `time_to_rel_gap` =
+  `history.time` at the `iters_to_rel_gap` crossing — the T2 wall-clock column of
+  `tab:acs_runtime` (`experiments.tex:176,185-186`); previously computed by
+  `time_to_gap` and discarded. (c) the OPT cache hit-validation now compares the
+  `n_i` signature the docstring promised. (d) `gdr/data_acs.py` applies the full
+  folktables `adult_filter` incl. `PWGTP>=1` (0 rows change). None changes a
+  committed FINAL line or gate value.
 
 ## Blockers (reported, not worked around)
 

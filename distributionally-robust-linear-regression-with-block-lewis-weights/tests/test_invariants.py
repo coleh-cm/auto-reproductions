@@ -339,3 +339,78 @@ def test_acs_cache_rejects_seed_mismatch(tmp_path):
     _save_cache(str(cache), p)
     _load_cache(str(cache), seed=None)
 
+
+# ---------------------------------------------------------------------------
+# Round-11 fixes: committed result JSONs carry the paper's figure-curve data
+# (gap_best = best-so-far / running-min, matching fig:acs_convergence's
+# "best-so-far worst-group suboptimality" caption, experiments.tex:167) and the
+# T2 wall-clock-to-1% (time_to_rel_gap, the second column of tab:acs_runtime,
+# experiments.tex:176,185-186).  These are deterministic functions of the
+# committed trajectory, so we pin them against the committed files.
+# ---------------------------------------------------------------------------
+def test_committed_history_has_best_so_far_curve():
+    """gap_best is the running-minimum of gap and is monotone non-increasing
+    (the paper's fig:acs_convergence curve; raw gap can be jagged)."""
+    import json
+    import os
+    d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    fn = os.path.join(d, "results", "acs_income_subgradient.json")
+    if not os.path.isfile(fn):
+        pytest.skip("committed ACS subgradient result not present")
+    r = json.load(open(fn))
+    g = np.asarray(r["history"]["gap"], dtype=float)
+    gb = np.asarray(r["history"].get("gap_best", []), dtype=float)
+    assert gb.size == g.size, "gap_best must be present and same length as gap"
+    # best-so-far == running minimum of the raw per-iteration gap
+    assert np.allclose(gb, np.minimum.accumulate(g)), "gap_best must be cummin(gap)"
+    # the paper's figure curve is monotone non-increasing (raw gap is not)
+    assert np.all(np.diff(gb) <= 0.0), "gap_best must be monotone non-increasing"
+
+
+def test_committed_time_to_rel_gap_consistent():
+    """time_to_rel_gap is the wall-clock at the iters_to_rel_gap crossing
+    (history.time at that index), the T2 second column of tab:acs_runtime."""
+    import json
+    import os
+    from gdr.runner import time_to_gap
+    d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in ["acs_income_ipm", "acs_income_ball_oracle_lewis",
+                 "synthetic_ball_oracle_lewis"]:
+        fn = os.path.join(d, "results", f"{name}.json")
+        if not os.path.isfile(fn):
+            continue
+        r = json.load(open(fn))
+        h = {"gap": r["history"]["gap"], "iter": r["history"]["iter"],
+             "time": r["history"]["time"], "opt": r.get("opt_norm", 1.0)}
+        it, t = time_to_gap(h, rel_gap=r["rel_gap"])
+        assert it == r["iters_to_rel_gap"], (name, it, r["iters_to_rel_gap"])
+        if it is None:
+            assert r["time_to_rel_gap"] is None
+        else:
+            assert r["time_to_rel_gap"] == pytest.approx(t, rel=0, abs=1e-9), name
+
+
+def test_opt_cache_n_i_signature_checked(tmp_path, monkeypatch):
+    """get_opt_cached's n_i signature is actually compared on a cache hit
+    (Round-11: the docstring promised an n_i check the code never performed;
+    a stale cache with matching m/n/d/A_sum but different per-group sizes must
+    be rebuilt, not silently reused)."""
+    import json
+    from run_arm import get_opt_cached
+    prob = {
+        "A": np.eye(4, 3), "b": np.ones(4), "offsets": np.array([0, 2, 4]),
+        "name": "synthetic", "m": 2, "d": 3, "n_i": np.array([2, 2]),
+    }
+    # run from tmp_path so get_opt_cached writes results/ there, not the repo
+    monkeypatch.chdir(tmp_path)
+    cache = tmp_path / "results" / "opt_synthetic_seed0.json"
+    cache.parent.mkdir(exist_ok=True)
+    # a stale cache that matches m/n/d/A_sum but has a MISMATCHED n_i signature
+    bad = {"opt": 1.234, "seed": 0, "m": 2, "n": 4, "d": 3,
+           "n_i": [99, 99, 99], "A_sum": float(np.abs(prob["A"]).sum())}
+    json.dump(bad, open(cache, "w"))
+    # the OPT epigraph of [I4x3; 1] min max_i ||A_i x - b_i||^2 is 0 (b in col space),
+    # definitely not 1.234 -> the stale cache must be rejected and rebuilt.
+    val = get_opt_cached(prob, "synthetic", 0)
+    assert abs(val - 1.234) > 1e-6, "stale cache with mismatched n_i was reused"
+

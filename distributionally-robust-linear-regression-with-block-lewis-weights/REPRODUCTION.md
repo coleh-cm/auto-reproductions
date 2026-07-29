@@ -520,3 +520,96 @@ or REPRODUCTION.md (B1 blocker, U1-U18 choices).
 No production code or committed result changed this round — the review confirmed the
 substance. 24/24 tests pass; smoke gate `FINAL smoke=ok` (all 7 arms make strict
 finite progress). Branch pushed so the round is survivable.
+
+## Round 12: deeper refutation-verified adversarial review of all 5 components (orchestration) + 4 fixes
+
+Ran a 16-agent orchestration: one adversarial reviewer per component
+(data_pipeline, method_core, training_loop, evaluation_metric, baseline_arm),
+each reading the ACTUAL code AND the authoritative paper LaTeX at
+`paper/arxiv-2607.00252-src/`, hunting for fidelity/completeness departures; then a
+*separate* verifier agent per finding that tried to REFUTE it (script is the
+evaluator — a finding is kept only if the refuter independently confirmed it).
+Result: 11 raw findings, **4 confirmed after refutation** (7 refuted), all in
+non-maths paths — no equation, sign, exponent, or gate number was wrong. The 4
+confirmed departures were all genuine and are fixed below; none changes a
+committed FINAL line or gate value.
+
+1. **`gdr/data_acs.py:44-49` — ACS adult_filter omitted the `PWGTP>=1` clause
+   (fidelity).** The paper uses the folktables `ACSIncome` task
+   (`experiments.tex:148`), whose canonical `adult_filter`
+   (`folktables/acs.py:78-81`) is `AGEP>16 AND PINCP>100 AND WKHP>0 AND PWGTP>=1`.
+   The production loader `_adult_filter` applied only the first three and the
+   docstring even called itself the folktables filter while dropping a clause
+   (`PWGTP` was not even loaded: `cols = FEATURES + [PINCP, ST]`). The sibling
+   `gdr/data.py:load_acs_income` *did* apply `PWGTP>=1`, so the two ACS paths were
+   inconsistent. **Impact: ZERO numerical** — `PWGTP>=1` drops 0 rows across all
+   51 2018 1-Year PUMS files (1.6645M rows pass the first three filters, 0 dropped
+   by `PWGTP>=1`, verified), so every committed ACS number is unchanged. Fix:
+   `PWGTP` is now loaded and `df = df[df["PWGTP"] >= 1]` added; the filter now
+   matches folktables exactly and the two ACS paths agree. (This was the one
+   confirmed data_pipeline finding; the other two data findings — synthetic
+   adversarial-spike rotation and the `gdr/data.py` cache — were already
+   disclosed/handled and were refuted as new issues.)
+
+2. **`run_arm.py:186` — T2 wall-clock-time-to-1% was computed and discarded
+   (completeness).** `experiments.tex:176,185-186` reports TWO columns of
+   `tab:acs_runtime`: iterations to 1% gap AND wall-clock time (s); SPEC T2 lists
+   the per-arm time-to-1% as a recorded target ("report only, no gate").
+   `gdr/runner.time_to_gap` returns BOTH `(iters, seconds)`, but `run_arm.py`
+   bound the seconds to `_t` and threw it away, and the only persisted wall-clock
+   field (`elapsed`) is the FULL best-of-grid search time (7.27s for BO-euclidean)
+   — a different, non-comparable quantity. The actual T2
+   (`history.time` at the crossing iter, e.g. 0.0031s for BO-euclidean, the scale
+   comparable to the paper's 0.019/0.062s) was never persisted. Fix: `run_arm.py`
+   now persists `time_to_rel_gap` (the `time_to_gap` seconds) in every result JSON.
+   Verified on the committed JSONs (e.g. BO_euc=0.0031s, IPM=0.099s, HB=0.0057s);
+   confirmed against a fresh run through the fixed `run_arm.py` (the gap
+   trajectory and `gap_best` are bit-identical; `time_to_rel_gap` differs only by
+   wall-clock noise).
+
+3. **`run_arm.py:97-100` — OPT cache docstring promised an `n_i` signature check
+   the code never performed (nit).** The docstring claimed the cache keeps a
+   data-dependent signature `(m, n, n_i hash)` so a stale cache from a different
+   construction is rebuilt; `n_i` was written to the cache file but the cache-hit
+   validation compared only `m, n, d, A_sum`. A stale cache with matching
+   `m/n/d/A_sum` but different per-group sizes would have been silently reused.
+   `A_sum` makes a collision practically implausible, but the documented
+   invariant was unimplemented. Fix: the validation now also compares `n_i`.
+   Existing caches still validate (they carry `n_i`); no cache rebuild. Added
+   `test_opt_cache_n_i_signature_checked` pinning the fix (a stale cache with
+   mismatched `n_i` is rejected).
+
+4. **First-order baseline curve shape — raw gap recorded, paper figure plots
+   best-so-far (fidelity).** The `fig:acs_convergence` caption
+   (`experiments.tex:167`) states each curve reports the **best-so-far** worst-
+   group suboptimality `F(x_t)-opt` (running-minimum). The four first-order arms
+   appended the RAW per-iteration gap (`h['gap'].append(gap_now(...))`) with no
+   running-min transform, and no plotting layer is committed, so the saved JSON
+   histories ARE the curve data — and they are jagged
+   (`acs_income_subgradient.json`: 127/300 steps increase, best-iterate gap
+   0.000871 vs final 0.001003; `smoothed_hb` 25 increases, `smoothed_nesterov`
+   21). The paper's curve for these arms is monotone non-increasing. Fix: every
+   result JSON now also carries `history.gap_best` = `cummin(history.gap)`, the
+   faithful figure-curve data (verified monotone non-increasing); the raw `gap`
+   is kept (the gate's first-crossing index is unchanged — the first raw crossing
+   == the first best-so-far crossing — so `iters_to_rel_gap` and every FINAL line
+   are identical). Added `test_committed_history_has_best_so_far_curve` and
+   `test_committed_time_to_rel_gap_consistent` pinning both fixes.
+
+All 14 result JSONs were regenerated in-place to add `gap_best` and
+`time_to_rel_gap` as deterministic functions of the already-committed trajectories
+(verified: every numeric/trajectory field — `gap`, `iter`, `time`, `x`,
+`iters_to_rel_gap`, `elapsed`, `opt` — is byte-identical to HEAD; only the two new
+fields were added). A fresh run of one arm (`acs_income_ipm`) through the fixed
+`run_arm.py` reproduces the gap trajectory and `gap_best` bit-identically,
+confirming the regen matches the fixed code path. The full gate re-run was
+attempted but the sandbox had leftover `run_all_arms.sh` processes from earlier
+rounds racing on `results/`; those were killed and the committed trajectories
+restored before the in-place regen, so the evidence is clean and deterministic
+(Round-10 established the trajectories are deterministic across runs — only
+`elapsed`/`time_to_rel_gap` vary with wall-clock).
+
+Test suite 24 -> 27 (+3: best-so-far curve, time_to_rel_gap consistency, OPT
+cache n_i check); smoke gate `FINAL smoke=ok` (all 7 arms strict finite progress,
+matching the round-11 feedback). No FINAL line or gate value changed; blocker B1
+unchanged and still disclosed.

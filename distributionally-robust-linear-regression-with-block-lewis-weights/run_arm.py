@@ -114,7 +114,8 @@ def get_opt_cached(problem, dataset: str, seed: int, solver: str = "CLARABEL"):
             with open(cache) as f:
                 d = json.load(f)
             if (d.get("m") == sig["m"] and d.get("n") == sig["n"]
-                    and d.get("d") == sig["d"] and d.get("A_sum") == sig["A_sum"]):
+                    and d.get("d") == sig["d"] and d.get("A_sum") == sig["A_sum"]
+                    and d.get("n_i") == sig["n_i"]):
                 return float(d["opt"])
         except Exception:
             pass
@@ -186,6 +187,25 @@ def main():
     it_to_gap, _t = time_to_gap(hist, rel_gap=args.rel_gap)
     value = "NR" if it_to_gap is None else str(it_to_gap)
 
+    # T2 (experiments.tex:176,185-186, second column of tab:acs_runtime): the
+    # wall-clock time to reach the 1% relative gap, i.e. history.time at the
+    # crossing iteration. The prior code bound this to ``_t`` and discarded it,
+    # so the only persisted wall-clock field (``elapsed``) was the full
+    # best-of-grid search time -- a different, non-comparable quantity. SPEC
+    # lists T2 as "report only, no gate"; persist it so the second column is
+    # actually reported (Round-11 review).
+    time_to_gap_val = _t if it_to_gap is not None else None
+    # gap_best: best-so-far (running-minimum) worst-group suboptimality. The
+    # paper's convergence figures (fig:acs_convergence caption,
+    # experiments.tex:167) plot best-so-far F(x_t)-opt, not the raw per-iteration
+    # gap. The first-order arms are non-monotone (subgradient jagged), so the
+    # raw ``gap`` curve is jagged while the paper's curve is monotone. Keep
+    # ``gap`` raw (the gate's first-crossing index is unchanged: the first raw
+    # crossing == the first best-so-far crossing) and add ``gap_best`` as the
+    # faithful figure-curve data (Round-11 review).
+    gap_arr = np.asarray(hist.get("gap", []), dtype=np.float64)
+    gap_best = np.minimum.accumulate(gap_arr).tolist() if gap_arr.size else []
+
     # save full history (committed evidence).  Gaps are on the normalized
     # (OPT=1) scale; the relative gap F'-1 == (F-OPT)/OPT is what the gate reads.
     os.makedirs("results", exist_ok=True)
@@ -193,11 +213,13 @@ def main():
     out = {
         "arm": arm_name, "dataset": args.dataset, "opt": opt, "opt_norm": opt_norm,
         "scale": scale, "F0_norm": F0_norm, "rel_gap": args.rel_gap,
-        "iters_to_rel_gap": it_to_gap, "elapsed": elapsed,
+        "iters_to_rel_gap": it_to_gap, "time_to_rel_gap": time_to_gap_val,
+        "elapsed": elapsed,
         "max_outer": args.max_outer, "time_budget": args.time_budget,
         "history": {k: (v.tolist() if hasattr(v, "tolist") else v)
                     for k, v in hist.items()},
     }
+    out["history"]["gap_best"] = gap_best
     with open(f"results/{args.dataset}_{arm_name}.json", "w") as f:
         json.dump(out, f, indent=2)
 

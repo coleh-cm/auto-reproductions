@@ -42,10 +42,18 @@ _STATE_NAMES = list(_STATE_CODES.keys())   # ordered, m=51
 
 
 def _adult_filter(df: pd.DataFrame) -> pd.DataFrame:
-    """folktables adult_filter (employed adults): AGEP>16, PINCP>100, WKHP>0."""
+    """folktables canonical adult_filter (employed adults): AGEP>16, PINCP>100,
+    WKHP>0, PWGTP>=1  (folktables/acs.py:78-81; the paper uses the ACSIncome task,
+    experiments.tex:148). The PWGTP>=1 clause was previously omitted (Round-11
+    review): it drops 0 rows on the 2018 1-Year PUMS (verified across all 51
+    states: 1.6645M rows pass the first three filters, 0 dropped by PWGTP>=1), so
+    the committed ACS results are unchanged numerically, but the filter now
+    matches folktables exactly instead of silently dropping a clause.
+    """
     df = df[df["AGEP"] > 16]
     df = df[df["PINCP"] > 100]
     df = df[df["WKHP"] > 0]
+    df = df[df["PWGTP"] >= 1]
     return df
 
 
@@ -68,7 +76,7 @@ def make_acs_income(
     states = states or _STATE_NAMES
     datadir = os.path.join(data_root, year, horizon)
     rng = np.random.default_rng(seed)
-    cols = FEATURES + ["PINCP", "ST"]
+    cols = FEATURES + ["PINCP", "ST", "PWGTP"]
     A_blocks = []
     b_blocks = []
     kept = []
