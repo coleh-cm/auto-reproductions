@@ -158,6 +158,25 @@ T3 (report-only): ERM mean 107.3 (paper 108.2 ±5 ✓), worst state California
   paper evidence. No production code or committed result changed; only the
   smoke's coverage.
 
+### Round-5: smoke diagnostics show arm progress (not just final gap)
+- Feedback: the smoke printed only the FINAL gap per arm, so the four
+  first-order arms showing `iters_to_5%=None` could be misread as broken arms
+  (a broken arm outputs the initial point, so its final gap == initial gap).
+- Verified the arms are NOT broken: on the smoke problem (d=5, m=10,
+  n_adv=2, E_ADV=1e3, 12 outer iters, tiny grids) every first-order arm makes
+  real monotone progress — subgradient 0.223→0.188, smoothed_gd 0.223→0.159,
+  smoothed_hb 0.223→0.160, smoothed_nesterov 0.223→0.152 — then PLATEAUs above
+  5%. With wider grids + 200 iters they keep improving (subgradient→0.139,
+  nesterov→0.060) but still do not cross 5% on this hard instance.
+- This plateau is exactly the paper's §8 T4 finding ("first-order methods'
+  plateau" on the heterogeneous instance, while IPM/BO converge fast), so the
+  smoke is consistent with the paper — it is NOT paper evidence (tiny
+  problem, tiny grids, 12 iters).
+- Fix: `smoke.sh` now prints `gap=<init>-><final>` per arm so the progress is
+  visible (a broken arm would show `init == final`); added a comment stating
+  the first-order plateau is the expected paper behavior. No production code
+  or committed result changed; only the smoke's diagnostic output.
+
 ### Blocker B1 (ACS heterogeneity, U4/U7)
 The reproduced ACS ERM-robust gap is ~1.8% vs the paper's ~25%, so the
 subgradient reaches 1% (paper: NR) and IPM/HB counts are compressed. The gap

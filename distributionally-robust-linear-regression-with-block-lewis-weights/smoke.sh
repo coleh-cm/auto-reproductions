@@ -32,6 +32,15 @@ from run_arm import normalize_problem, erm_warm_start
 # run here, so a latent runtime bug in them would have passed the gate.)  At
 # this size the E11 reset (Σw_i >= m) fires, so ball_oracle_euclidean and
 # ball_oracle_lewis are bit-identical -- the degeneracy the test suite checks.
+#
+# Expected smoke behavior (consistent with the paper, NOT paper evidence):
+# the four first-order arms (subgradient, smoothed_gd/hb/nesterov) make real
+# monotone progress (gap init->final shrinks) but PLATEAU well above 5%, so
+# their iters_to_5% is None.  This is exactly the paper's §8 T4 finding --
+# "first-order methods' plateau" on the heterogeneous instance, while the
+# second-order arms (IPM, ball-oracle) converge fast.  Printing init->final
+# (not just final) makes the progress visible so a "None" cannot be misread
+# as a broken arm: a broken arm would show init == final.
 prob = make_synthetic(d=5, m=10, n_adv=2, n_per_group=15, seed=1, E_ADV=1e3, DIST=3.0)
 xopt, OPT = solve_opt(prob)
 prob, scale = normalize_problem(prob, OPT)   # OPT == 1 after this (U15)
@@ -53,7 +62,8 @@ for arm, cfg in cfgs.items():
     a = "ball_oracle" if arm.startswith("ball_oracle") else arm
     h = run_arm(a, cfg, prob, x0, opt_norm, max_outer=12, time_budget=30.0)
     it, _ = time_to_gap(h, rel_gap=0.05)
-    last = f"{arm}: gap={h['gap'][-1]:.3f} iters_to_5%={it}"
+    g = h["gap"]
+    last = f"{arm}: gap={g[0]:.3f}->{g[-1]:.3f} iters_to_5%={it}"
     print(f"  smoke {last}", file=sys.stderr)
 # one FINAL line for the gate to find
 print(f"FINAL smoke=ok")
