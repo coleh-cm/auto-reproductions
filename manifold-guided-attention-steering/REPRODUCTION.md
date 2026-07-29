@@ -1728,3 +1728,55 @@ Net: on a GPU host with the paper's models pre-cached, the reproduction would no
 actually RUN on Gemma-4 (it would have crashed on both o_proj resolution and the
 full-attention layer-41 hook before this round). The environment block on
 producing the paper's numbers in THIS sandbox is unchanged and honest.
+
+## Round 20 — recurring "all arms missing a FINAL line" re-confirmed as the honest environment-block signal; plumbing re-verified end-to-end
+
+- **Symptom (gate feedback, identical to rounds 1-19):** all 45 arms reported
+  "missing a FINAL line", `values: []`, `spread across arms: None`.
+- **Root cause (unchanged):** this is a **numbers gate**. It captures
+  `FINAL <arm>=<value>` and requires `<value>` to be numeric. The only honest
+  value this sandbox can produce is the literal string `BLOCKED` (non-numeric),
+  so the gate treats every arm as having no value. This is the *expected,
+  honest signal of an environment block*, not a fixable plumbing bug.
+- **Environment (re-confirmed this round):**
+  - `torch 2.7.1+cpu`, `torch.cuda.is_available() == False`, no `nvidia-smi`
+    -> no GPU. The paper's models run on RTX 4090 / H200 (SPEC §C.1).
+  - HF hub cache holds the **datasets** (MATH-500, MathInstruct, apps, mbpp,
+    gsm8k, humaneval) but NOT the paper's models: `models--google--gemma-4-E4B-it`
+    has only `config.json` (no weights); `meta-llama/Llama-3.1-8B-Instruct` and
+    `openai/gpt-oss-20b` are absent; only `distilgpt2` / `tiny-gpt2` are fully
+    cached, and those are tiny smoke-only models (a chance-level substitute is
+    explicitly forbidden by the task: "a closed-book run silently fell back to a
+    synthetic corpus and produced seven arms at chance level ... which passed
+    every gate and meant nothing").
+  - => no paper-faithful number can be produced here. BLOCKED is the honest
+    result. We do NOT fabricate a number; we do NOT substitute a tiny model for
+    the arms.
+- **Plumbing re-verified this round (the layer the gate actually invokes):**
+  - `sh run_all_arms.sh` -> exactly 45 distinct `FINAL <arm>=BLOCKED` lines on
+    stdout, 0 missing, 0 extra (keys == arms.json keys), exit 0, in ~0.02 s.
+  - `sh run_arm.sh <arm-id> ...` (the per-arm command form in arms.json, which
+    the gate runs individually) -> `FINAL <arm>=BLOCKED`, exit 0.
+  - `python -m mags.run ...` itself prints `FINAL <arm>=BLOCKED` (the model-cache
+    precheck in `mags/run.py:_model_cached` fast-fails an uncached paper model
+    before any torch/network call; on uncertainty it returns True so the real
+    `load_model` remains the source of truth — no false-block on a GPU host).
+  - `smoke.sh` -> `FINAL smoke=0.0000` (distilgpt2 cached; fit->steer->grade
+    path runs end-to-end on real MATH-500 — proof the code path runs, not
+    evidence about the paper).
+  - `pytest tests/` -> 43 passed, 4 skipped (degeneracy test: MAGS no-op ==
+    unsteered, token-identical; equation-invariant tests: Eqs. 2-10 +
+    Proposition 1; grading tests; Gemma-4 adapter tests).
+- **Decision (every choice the paper left open is recorded in SPEC.md).** No
+  new open choices this round.
+- **What would unblock real numbers:** a GPU host (RTX 4090 / H200) with the
+  paper's three models pre-cached
+  (`huggingface-cli download meta-llama/Llama-3.1-8B-Instruct`,
+  `google/gemma-4-E4B-it`, `openai/gpt-oss-20b`) and either pre-cached datasets
+  or `MAGS_ONLINE=1`. On such a host `run_all_arms.sh` proceeds past the
+  model-cache precheck to the real fit+eval path and prints
+  `FINAL <arm>=<0.xxx>`; the wrapper passes it through unchanged.
+- **This round's commit:** re-verified plumbing + refreshed the 6
+  `runs/BLOCKED__*.json` manifests whose reason text drifted from the current
+  `run_all_arms.sh` output; recorded this round in REPRODUCTION.md. No code
+  change was warranted — the block is environmental, not a defect.
