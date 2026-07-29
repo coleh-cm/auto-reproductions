@@ -1,44 +1,45 @@
 {
   "agreement": {
     "maxout_vs_rbf": {
-      "n_both_wrong": 8397,
-      "n_m1_errors": 9999,
-      "p_pred_match_over_both_wrong": 0.5616291761398315,
-      "p_pred_match_over_m1_errors": 0.471647173166275
+      "n_both_wrong": 6381,
+      "n_m1_errors": 9906,
+      "p_pred_match_over_both_wrong": 0.47343677282333374,
+      "p_pred_match_over_m1_errors": 0.30496668815612793
     },
     "maxout_vs_softmax": {
-      "n_both_wrong": 9568,
-      "n_m1_errors": 9999,
-      "p_pred_match_over_both_wrong": 0.6172658801078796,
-      "p_pred_match_over_m1_errors": 0.5906590819358826
+      "n_both_wrong": 9643,
+      "n_m1_errors": 9906,
+      "p_pred_match_over_both_wrong": 0.6448200941085815,
+      "p_pred_match_over_m1_errors": 0.6277003884315491
     },
     "softmax_vs_rbf": {
-      "n_both_wrong": 9330,
+      "n_both_wrong": 8066,
       "n_m1_errors": 10000,
-      "p_pred_match_over_both_wrong": 0.7914255261421204,
-      "p_pred_match_over_m1_errors": 0.7383999824523926
+      "p_pred_match_over_both_wrong": 0.7102653384208679,
+      "p_pred_match_over_m1_errors": 0.5728999972343445
     }
   },
-  "description": "Shallow RBF on MNIST; FGSM eps=0.25; cross-model class agreement (section 8).",
+  "description": "Shallow RBF on MNIST; FGSM eps=0.25; cross-model class agreement (section 8). RBF confidence uses the UNNORMALIZED per-class exp(q) reading (SPEC \u00a76 item 9).",
   "hyperparams": {
     "batch_size": 100,
     "eps": 0.25,
     "lr": 0.1,
-    "maxout_epochs": 1,
+    "maxout_epochs": 10,
     "models": [
       "RBFNet",
       "MaxoutMLP",
       "SoftmaxRegression"
     ],
     "momentum": 0.5,
-    "patience": 100,
+    "patience": 10,
     "pieces": 5,
-    "rbf_epochs": 1,
-    "soft_epochs": 1,
+    "rbf_confidence_metric": "unnorm exp(q_k) (paper binary form, tex:595)",
+    "rbf_epochs": 10,
+    "soft_epochs": 10,
     "units": 240
   },
   "milestone": "M8",
-  "note": null,
+  "note": "Sub-scale run (rbf_epochs=10, maxout_epochs=10, soft_epochs=10, patience=10). The paper notes quadratic models are hard to train with SGD (tex:616-617); the RBF net may underfit. RBF confidence uses the unnormalized per-class exp(q) reading (SPEC \u00a76 item 9) so it CAN structurally reach the paper's 1.2%/60.6%/0% (a softmax reading is bounded below by 1/K and cannot).",
   "paper_target": {
     "agreement": {
       "rbf_pred_maxout_over_both_wrong": 0.543,
@@ -53,11 +54,11 @@
     "rbf_conf_on_mistakes": 0.012,
     "rbf_fgsm_error": 0.554
   },
-  "rbf_clean_accuracy": 0.9638000130653381,
-  "rbf_clean_confidence": 0.9871132969856262,
+  "rbf_clean_accuracy": 0.7731000185012817,
+  "rbf_clean_confidence": 0.3657187521457672,
   "rbf_fgsm_eval": {
-    "error_rate": 0.9832000136375427,
-    "mean_confidence_on_errors": 0.9897383451461792,
+    "error_rate": 0.9498999714851379,
+    "mean_confidence_on_errors": 0.24894440174102783,
     "n": 10000
   },
   "seed": 0

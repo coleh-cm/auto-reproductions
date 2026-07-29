@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
                  "patience=%d). The paper notes quadratic models are hard to train "
                  "with SGD (tex:616-617); the RBF net may underfit. RBF confidence "
                  "uses the unnormalized per-class exp(q) reading (SPEC §6 item 9) "
-                 "so it CAN structurally reach the paper's 1.2%/60.6%/0%% (a softmax "
+                 "so it CAN structurally reach the paper's 1.2%%/60.6%%/0%% (a softmax "
                  "reading is bounded below by 1/K and cannot)."
                  % (args.rbf_epochs, args.maxout_epochs, args.soft_epochs,
                     args.patience)) if sub_scale else None,

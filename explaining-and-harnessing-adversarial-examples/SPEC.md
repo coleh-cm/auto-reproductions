@@ -164,8 +164,8 @@ Targeted class i: x ← x + ε·∇ₓ p(y=i|x) on a Gaussian sample, resample u
 | Logistic reg: `w`, `b` | `[784]`, scalar; `s = x·w + b [B]` | M2 |
 | Maxout layer l: `W_l`, `b_l` | `W_l [d_{l-1}, U·P]`, `b_l [U·P]`; pre-max `a = xW_l+b_l [B, U·P]` → reshape `[B, U, P]` → `h_l = max over P [B, U]` | U=240 or 1600 units, P pieces |
 | Maxout net | 2 hidden maxout layers + softmax readout `[U,10]` | M3–M7, E1 |
-| RBF: `μ_k`, `β_k` | `μ_k [784]`; `β_k [784,784]` per class k=0..9 | q_k(x) = (x−μ_k)ᵀβ_k(x−μ_k) `[B]` |
-| RBF probabilities | `p(y=k\|x) ∝ exp(q_k(x))` — softmax over the 10 quad. forms; confidence = max_k of that softmax | **paper prints only the binary form; multiclass normalization unstated (see §5)** |
+| RBF: `μ_k`, `β_k` | `μ_k [784]`; `β_k` diagonal neg-def, `β_k = -diag(a_k)` with `a_k = softplus(raw_k) > 0` `[784]` per class k=0..9 (neg-def BY CONSTRUCTION) | q_k(x) = (x−μ_k)ᵀβ_k(x−μ_k) = −Σ_f a_{k,f}(x_f−μ_{k,f})² `[B]` (≤ 0) |
+| RBF probabilities | `p(y=k\|x) = exp(q_k(x))` — UNNORMALIZED per-class (the paper's binary E8 form extended per-class); confidence = max_k exp(q_k) ∈ (0,1]; argmax(q_k) for the prediction | **paper prints only the binary form; multiclass normalization + β structure (diagonal, neg-def by construction) recorded in §6 item 9** |
 
 Sign edge cases: `sign(g)=+1/0/−1` elementwise; zero gradient ⇒ zero perturbation for that element.
 

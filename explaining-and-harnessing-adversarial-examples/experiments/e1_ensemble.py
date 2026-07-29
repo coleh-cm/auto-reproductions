@@ -169,6 +169,17 @@ def main(argv: list[str] | None = None) -> int:
     clean_accs = [float(eval_clean(m, x_test, y_test)) for m in models]
 
     sub_scale = args.members < 12 or args.patience < 100 or args.epochs < 100
+    # Paper direction (tex:822-825): ensemble-targeted (91.1%) > single-targeted
+    # (87.9%) -- attacking the whole ensemble fools the ensemble MORE than
+    # attacking one member. At sub-scale (few undertrained members) both errors
+    # saturate near 100% and the direction can reverse; record it honestly.
+    direction_matches = ens_error >= single_error
+    direction_note = (
+        "direction matches paper (ensemble-targeted >= single-targeted)"
+        if direction_matches else
+        "direction REVERSED at sub-scale (single-targeted > ensemble-targeted); "
+        "both errors saturate near 100% with few undertrained members -- the "
+        "paper's 91.1>87.9 direction needs 12 converged nets.")
     record = {
         "milestone": "E1",
         "description": "Ensemble of N maxout nets; FGSM ensemble-targeted vs "
@@ -184,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "ensemble_targeted_error": ens_error,
         "single_member_targeted_error": single_error,
+        "direction_matches_paper": direction_matches,
         # Secondary diagnostics (the prior per-member-mean statistic).
         "mean_per_member_error_ensemble_targeted": ens_mean_per_member,
         "mean_per_member_error_single_targeted": single_mean_per_member_avg,
@@ -191,8 +203,9 @@ def main(argv: list[str] | None = None) -> int:
         "member_clean_accuracies": clean_accs,
         "paper_target": PAPER_TARGET,
         "note": ("Sub-scale run (members=%d, epochs=%d, patience=%d). The paper's "
-                 "91.1/87.9%% use 12 fully-converged nets."
-                 % (args.members, args.epochs, args.patience)) if sub_scale else None,
+                 "91.1/87.9%% use 12 fully-converged nets. %s"
+                 % (args.members, args.epochs, args.patience, direction_note))
+                 if sub_scale else None,
     }
 
     out_path = Path(args.out)

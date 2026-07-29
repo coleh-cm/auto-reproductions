@@ -1,46 +1,47 @@
 {
   "arms": {
     "baseline": {
-      "clean_accuracy": 0.8578000068664551,
+      "clean_accuracy": 0.9735000133514404,
       "fgsm_eval": {
-        "error_rate": 0.9998999834060669,
-        "mean_confidence_on_errors": 0.7563911080360413,
+        "error_rate": 0.9997000098228455,
+        "mean_confidence_on_errors": 0.8744972348213196,
         "n": 10000
       }
     },
     "bernoulli": {
-      "clean_accuracy": 0.8464000225067139,
+      "clean_accuracy": 0.9746999740600586,
       "fgsm_eval": {
-        "error_rate": 0.9998000264167786,
-        "mean_confidence_on_errors": 0.7404937744140625,
+        "error_rate": 0.9997000098228455,
+        "mean_confidence_on_errors": 0.8337117433547974,
         "n": 10000
       }
     },
     "uniform": {
-      "clean_accuracy": 0.8299000263214111,
+      "clean_accuracy": 0.9419999718666077,
       "fgsm_eval": {
-        "error_rate": 0.9991999864578247,
-        "mean_confidence_on_errors": 0.7054440379142761,
+        "error_rate": 0.9998000264167786,
+        "mean_confidence_on_errors": 0.85391765832901,
         "n": 10000
       }
     }
   },
-  "description": "Noise-training controls (+/-eps flips, U(-eps,eps)) on maxout; FGSM eps=0.25 eval after each.",
+  "description": "Noise-training controls (+/-eps flips, U(-eps,eps)) on maxout (NOISE-ONLY batches, no clean mixture, SPEC \u00a76 item 27); FGSM eps=0.25 eval after each.",
   "hyperparams": {
     "alpha": 0.5,
     "batch_size": 100,
     "dropout_input": 0.8,
     "eps": 0.25,
     "lr": 0.1,
-    "max_epochs": 1,
+    "max_epochs": 5,
     "model": "MaxoutMLP",
     "momentum": 0.5,
-    "patience": 100,
+    "noise_train_form": "noise-only batches (no clean mixture)",
+    "patience": 10,
     "pieces": 5,
     "units": 240
   },
   "milestone": "M7",
-  "note": "Sub-scale run (epochs=1, patience=100). The paper's 86.2/90.4 pct are from fully-converged maxout nets.",
+  "note": "Sub-scale run (epochs=5, patience=10). The paper's 86.2/90.4 pct are from fully-converged maxout nets.",
   "paper_target": {
     "bernoulli_fgsm_conf": 0.973,
     "bernoulli_fgsm_error": 0.862,

@@ -264,11 +264,27 @@ class SigmoidTopMLP(nn.Module):
 class RBFNet(nn.Module):
     """Shallow RBF network (M8).
 
-    Per class k a quadratic form
-        q_k(x) = (x - mu_k)^T beta_k (x - mu_k)     [B]   (NO minus sign, E8)
-    with mu [K, F] and beta [K, F, F].  Multiclass normalization (unstated by
-    the paper, which prints only the binary form) is taken as softmax over
-    the K quadratic forms, so ``logits(x)`` returns q(x) directly [B, K].
+    Per class k a NEGATIVE-DEFINITE-BY-CONSTRUCTION quadratic form
+        q_k(x) = -sum_f a_{k,f} (x_f - mu_{k,f})^2,   a_{k,f} = softplus(raw_{k,f}) > 0
+    (i.e. beta_k = -diag(a_k), always neg-semi-def). E8 (tex:595) prints the
+    binary form ``p(y=1|x) = exp((x-mu)^T beta (x-mu))`` with NO minus sign in
+    the exp; that is a valid (bounded by 1) probability ONLY when beta is
+    neg-semi-definite. The feedback's authoritative reading is that a
+    neg-definite beta is the faithful interpretation of E8 -- so we make beta
+    neg-def BY CONSTRUCTION rather than relying on an init that softmax-CE
+    training breaks (a free beta drifts positive to sharpen the softmax,
+    which destroys the paper's confidence-decay mechanism: q can go positive
+    and exp(q) -> >1 on off-manifold inputs).
+
+    The paper leaves beta's structure (full / diagonal / low-rank) UNSTATED
+    (SPEC §6 item 9); a diagonal (axis-aligned Gaussian) RBF is the standard
+    faithful choice, is neg-def by construction, and is cheap to evaluate
+    (O(B*K*F), no K*F^2 matmul). The unnormalized per-class exp(q_k) in (0,1] is
+    the model's probability (the paper's binary form extended per-class,
+    SPEC §6 item 9); argmax(q_k) is the prediction (normalization-invariant,
+    identical to the softmax argmax). Off-manifold inputs (large ||x-mu_k||^2)
+    give q_k -> -inf, so exp(q_k) -> 0: low confidence on FGSM-pushed and
+    N(0,I) rubbish inputs (paper 1.2% conf-on-mistakes, 0% rubbish error).
     """
 
     def __init__(self, n_classes: int = 10, in_dim: int = 784):
@@ -277,18 +293,34 @@ class RBFNet(nn.Module):
         self.in_dim = in_dim
         mu = 0.01 * torch.randn(n_classes, in_dim, dtype=torch.float32)
         self.mu = nn.Parameter(mu)
-        beta = -0.01 * torch.eye(in_dim, dtype=torch.float32)
-        beta = beta.unsqueeze(0).expand(n_classes, in_dim, in_dim).contiguous()
-        self.beta = nn.Parameter(beta.clone())
+        # a_{k,f} = softplus(raw_{k,f}) > 0 -> beta_k = -diag(a_k) neg-def.
+        # softplus(-4.6) ~= 0.01 -> a ~ 0.01 at init (matches the prior -0.01 I init).
+        raw = torch.full((n_classes, in_dim), -4.6, dtype=torch.float32)
+        self.raw = nn.Parameter(raw)
+
+    @property
+    def a(self) -> torch.Tensor:
+        """Per-class per-feature positive scale a = softplus(raw) > 0  [K, F]."""
+        return F.softplus(self.raw)
+
+    @property
+    def beta(self) -> torch.Tensor:
+        """Neg-def diagonal beta_k = -diag(a_k), returned as [K, F, F] for
+        introspection (NOT a Parameter; beta is derived from `raw`)."""
+        with torch.no_grad():
+            a = self.a  # [K, F]
+            beta = torch.zeros(self.n_classes, self.in_dim, self.in_dim,
+                               dtype=torch.float32, device=self.raw.device)
+            idx = torch.arange(self.in_dim)
+            beta[:, idx, idx] = -a
+            return beta
 
     def logits(self, x: torch.Tensor) -> torch.Tensor:
-        # diff: [B, K, F]
-        diff = x.unsqueeze(1) - self.mu.unsqueeze(0)
-        # temp = diff @ beta_k  : [B, K, F]
-        temp = torch.einsum("bkf,kfg->bkg", diff, self.beta)
-        # quad_k = diff * temp summed over F : [B, K]
-        quad = torch.einsum("bkf,bkf->bk", diff, temp)
-        return quad  # softmax over these = p(y=k|x)
+        # q_k = -sum_f a_{k,f} (x_f - mu_{k,f})^2  -> [B, K], all <= 0.
+        a = self.a  # [K, F]
+        diff = x.unsqueeze(1) - self.mu.unsqueeze(0)  # [B, K, F]
+        q = -(a.unsqueeze(0) * (diff ** 2)).sum(dim=-1)  # [B, K]
+        return q
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.logits(x)

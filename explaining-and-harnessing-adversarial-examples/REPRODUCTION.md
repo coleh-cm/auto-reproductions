@@ -209,3 +209,71 @@
   arm-named `FINAL <arm>=...`). Re-verified: `run_all_arms.sh` prints exactly the two arm-named
   `FINAL` lines on stdout; a gate simulation (`declared` vs. produced `FINAL` names) shows zero
   missing and zero extra arms; 29/29 tests pass.
+
+- 2026-07-29: **REJECT-feedback fixes (adversarial review round 2, 6 blocking
+  divergences).** All six blockers addressed; 45/45 tests pass (15 new
+  fix-invariant tests); results re-run and re-committed.
+  1. **RBF arms (M8/M9) could not reproduce the paper by construction.** A 10-way
+     softmax over the RBF quad forms is bounded below by 1/K=0.1, so it
+     structurally cannot reach the paper's conf-on-mistakes 1.2%, clean-conf
+     60.6%, or rubbish-error 0% (tex:600-604, 923). FIX: the RBF confidence and
+     the rubbish any-class-p>0.5 rule use the UNNORMALIZED per-class exp(q_k)
+     (the paper's binary E8 form extended per-class); argmax(q) (normalization-
+     invariant) is kept for the error rate. Additionally, β is now NEGATIVE-
+     DEFINITE BY CONSTRUCTION (diagonal RBF, β_k=-diag(softplus(raw_k))) — the
+     faithful reading of E8 (exp((x-μ)ᵀβ(x-μ)) is a valid probability only when
+     β is neg-semi-def); a free β with neg-def INIT drifts positive under
+     softmax-CE training (verified: eigenvalues up to +1.5 after 5 epochs),
+     which breaks the confidence-decay mechanism even with the fixed metric.
+     New eval.eval_fgsm_rbf / eval_clean_confidence_rbf / eval_rubbish_rbf;
+     SPEC §6 item 9 records the multiclass-extension consequence; m8 sub_scale
+     flag fixed to include the epoch knobs. Re-run M8/M9: RBF rubbish error =
+     0.0000 (paper 0%, structural match); RBF clean_conf 0.366 (paper 0.606,
+     sub-scale), conf-on-mistakes 0.249 < clean_conf (right direction: less
+     confident on adversarial mistakes; paper 0.012<<0.606). The prior softmax
+     metric gave clean_conf 0.987, conf-on-mistakes 0.990 (wrong — MORE
+     confident when fooled), rubbish 0.93 (paper 0%).
+  2. **M9 sigmoid-top was a frozen-swap artifact.** Copying the softmax-trained
+     readout and applying sigmoids with NO retraining mechanically forces rubbish
+     error -> 1.0 on N(0,I) (P(any logit>0)->1) regardless of training. FIX:
+     SigmoidTopMLP is TRAINED with the per-class independent-sigmoid BCE cost
+     (objectives.sigmoid_top_cost, train cost='sigmoid_top'), sharing the
+     maxout trunk architecture/init/SGD/external recipe (so the comparison
+     trains identically to the maxout+softmax net); only the top activation +
+     cost differ. SPEC §6 item 25 corrected. Re-run: trained sigmoid-top
+     rubbish error 0.0011 (paper 0.68) — same DIRECTION (sigmoid-top far more
+     robust than the softmax-top net's 0.82); magnitude sub-scale (5 epochs).
+  3. **E1 ensemble metric was unpapered and direction-reversed.** Reported the
+     MEAN of per-member error rates; no ensemble prediction was formed, and the
+     single-member arm always attacked member 0. FIX: the headline metric is
+     the error of the ensemble's aggregated prediction (argmax of the mean of
+     members' softmax probs); the single-member arm averages over which member
+     is targeted. The prior per-member-mean is kept as a secondary diagnostic.
+     SPEC §6 item 11 records the choice. Re-run (4 members, 3 epochs): both
+     errors saturate near 100% (sub-scale); the paper's 91.1>87.9 direction
+     needs 12 converged nets — recorded honestly (direction_matches_paper
+     field + note).
+  4. **M7 noise controls trained on an unpapered 0.5-clean/0.5-noisy mixture.**
+     The prose (tex:555-556) reads as training on NOISY inputs with no clean
+     mixture. FIX: train on NOISE-ONLY batches (L = J(θ, x+η, y), no clean term,
+     no alpha); the mixture halved the noise pressure on the control the paper
+     uses to argue noise << FGSM. SPEC §6 item 27. Re-run: bernoulli/uniform
+     FGSM error 0.9997/0.9998 (paper 86.2/90.4) — sub-scale, but the control's
+     point holds (noise training does NOT robustify: ~100% FGSM error, far from
+     the 17.9% of FGSM adversarial training).
+  5. **Paper experiments silently omitted.** The L1 weight-decay control
+     (Section 5, tex:426-433 — a NAMED quantified control) was missing with no
+     exclusion record. FIX: implemented experiments/m_l1_weight_decay.py
+     (coeff*||layer0.W||_1 on the first layer, sweeps 0.0025/0.00025/0.000025).
+     Re-run reproduces the paper's qualitative claim: coeff 0.0025 -> 88.6%
+     TRAIN error (stuck >5%, as the paper states); smaller 0.000025 -> trains
+     (2.18% train) but test 3.06% vs baseline 2.65% and FGSM 0.9994 — NO
+     regularization benefit, exactly as the paper says. The rotation-attack
+     (tex:346-347, 562-584) and trained-to-zero-on-rubbish (tex:963-965) arms
+     are now RECORDED as documented exclusions (SPEC §1, arms_metadata.json),
+     not silently omitted.
+  6. **Doc hygiene.** run_experiment.py help text no longer attributes dropout
+     rates (0.8/0.5) to "paper M4" (the paper states no rates); gate_result.json
+     stops calling the dropout-off gate "the paper's configuration" (the
+     paper's M4 net was dropout-on, tex:492); m9 now defaults n=10000 (the
+     paper's stated count, tex:905) — the prior committed run used n=2000.

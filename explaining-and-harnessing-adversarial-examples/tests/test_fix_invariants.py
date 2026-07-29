@@ -27,6 +27,13 @@ from fgsm_repro.train import TrainConfig, train, _maxout_layers_and_readout
 from fgsm_repro.data import MNISTData
 
 
+def _set_uniform_scale(rbf: RBFNet, c: float) -> None:
+    """Set the RBF per-feature scale a = c (uniform) via the raw parameter
+    (a = softplus(raw) -> raw = log(exp(c)-1)). beta_k = -diag(a) -> -c*I."""
+    import math
+    rbf.raw.data.fill_(math.log(math.expm1(c)))
+
+
 # ---------------- Fix 1: RBF unnormalized exp(q) metric ----------------- #
 def test_rbf_unnorm_probs_are_exp_of_logits():
     """The RBF 'probability' is the UNNORMALIZED per-class exp(q_k) (E8, tex:595),
@@ -50,9 +57,8 @@ def test_rbf_unnorm_confidence_decays_off_manifold():
     this (bounded below by 1/K)."""
     rbf = RBFNet(n_classes=3, in_dim=8)
     with torch.no_grad():
-        # centres near 0; a point far away (large norm) -> tiny confidence.
         rbf.mu.data.zero_()
-        rbf.beta.data = -torch.eye(8).unsqueeze(0).expand(3, 8, 8).contiguous()
+        _set_uniform_scale(rbf, 1.0)  # a=1 -> beta = -I
     near = torch.zeros(1, 8)  # at a centre -> q=0 -> exp=1
     far = 10.0 * torch.ones(1, 8)  # far from all centres -> q very negative
     conf_near = _rbf_unnorm_probs(rbf, near).max(dim=1).values
@@ -90,7 +96,7 @@ def test_rbf_rubbish_can_be_zero_error():
     rbf = RBFNet(n_classes=10, in_dim=784)
     with torch.no_grad():
         rbf.mu.data = 5.0 * torch.ones_like(rbf.mu.data)  # centres far from N(0,I)
-        rbf.beta.data = -0.5 * torch.eye(784).unsqueeze(0).expand(10, 784, 784).contiguous()
+        _set_uniform_scale(rbf, 0.5)  # a=0.5 -> beta = -0.5 I (strong neg-def)
     ev = eval_rubbish_rbf(rbf, n=200, dim=784, seed=0)
     assert ev.error_rate == 0.0, f"neg-def RBF far from rubbish should give 0% error, got {ev.error_rate}"
 
@@ -99,7 +105,7 @@ def test_eval_clean_confidence_rbf_in_unit_range_for_neg_def():
     """For a neg-def beta, exp(q) <= 1, so clean confidence in [0,1]."""
     rbf = RBFNet(n_classes=10, in_dim=784)
     with torch.no_grad():
-        rbf.beta.data = -0.01 * torch.eye(784).unsqueeze(0).expand(10, 784, 784).contiguous()
+        _set_uniform_scale(rbf, 0.01)  # a=0.01 -> beta = -0.01 I
     x = torch.rand(16, 784)
     c = eval_clean_confidence_rbf(rbf, x)
     assert 0.0 <= c <= 1.0

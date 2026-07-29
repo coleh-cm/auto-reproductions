@@ -44,7 +44,8 @@ running log and target numbers.
 - `experiments/` — one script per milestone: `m1_softmax.py`, `m2_logreg.py`,
   `m3_maxout_fgsm.py`, `m4_adversarial.py`, `m5_large_advtrain.py`,
   `m6_robustness_transfer.py`, `m7_noise_controls.py`, `m8_rbf.py`,
-  `m9_rubbish.py`, and the extended `e1_ensemble.py`. Each writes a parsed
+  `m9_rubbish.py`, the L1 weight-decay control `m_l1_weight_decay.py`
+  (Section 5), and the extended `e1_ensemble.py`. Each writes a parsed
   result JSON to `results/` with the milestone id, all hyperparameters, seed,
   and the grep-able paper target. Defaults are a documented **sub-scale** for
   CPU feasibility; the CLI exposes the full-scale knobs (e.g.
@@ -120,6 +121,14 @@ docker run --rm fgsm-repro                       # environment smoke test
 | M7 | Noise-training controls | 86.2% / 90.4% |
 | M8 | Shallow RBF, FGSM ε=0.25 | adv 55.4%, conf-on-error 1.2% |
 | M9 | Rubbish examples N(0, I₇₈₄) | maxout 98.35%, softmax-reg 59.8%, RBF 0% |
+| M-L1 | L1 weight-decay control (Section 5) | coeff 0.0025 → >5% train error; smaller → no benefit |
+
+The RBF arms (M8/M9) use the paper's unnormalized per-class `exp(q)` form (a
+softmax over `q` is bounded below by 1/K and cannot reproduce the paper's
+1.2%/60.6%/0%); `β` is negative-definite by construction (the faithful reading
+of E8). The M9 sigmoid-top arm is **trained** (per-class BCE), not a frozen
+softmax-to-sigmoid swap. The E1 ensemble metric is the error of the ensemble's
+mean-prob prediction. See `SPEC.md` §6 for every unstated choice.
 
 Measured numbers land in `results/<milestone>.json` and are compared against
 the grep-able paper lines recorded in `SPEC.md` and `REPRODUCTION.md`.

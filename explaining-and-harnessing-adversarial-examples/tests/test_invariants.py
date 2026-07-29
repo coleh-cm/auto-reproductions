@@ -143,25 +143,48 @@ def test_e7_eps0_equals_cross_entropy():
         assert torch.equal(J, Jt), f"E7(eps=0,alpha={alpha})={Jt} != J={J}"
 
 
-# --- E8: RBF quad form has NO minus sign ----------------------------------- #
+# --- E8: RBF quad form is negative-definite (no minus sign in the exp) ---- #
 def test_rbf_no_minus_sign():
-    """E8 (tex:595): p(y=1|x) = exp((x-mu)^T beta (x-mu)) — NO minus sign.
+    """E8 (tex:595): p(y=1|x) = exp((x-mu)^T beta (x-mu)) — NO minus sign in the
+    exp; the minus lives in beta (neg-semi-def), which is the faithful reading
+    of E8 (a valid probability requires beta neg-semi-def). RBFNet makes beta
+    neg-def BY CONSTRUCTION (beta_k = -diag(softplus(raw_k))), so the quad form
+    q_k <= 0 ALWAYS -> exp(q_k) in (0,1], and q_k -> -inf away from mu_k.
 
-    With beta = -I (negative-definite), the quad form must be <= 0 (so exp is
-    bounded by 1); with beta = +I it must be >= 0.  The implementation must
-    NOT insert a minus sign (which would flip this)."""
+    We assert: (a) q <= 0 for arbitrary inputs (neg-def by construction); (b) q
+    at a class centre mu_k is 0 (exp = 1, max confidence near mu -- the paper's
+    "confident only in the vicinity of mu", tex:596-598); (c) q decreases
+    (more negative) as the input moves away from mu_k; (d) the exp form is the
+    paper's (no extra minus sign flipping it)."""
     rbf = RBFNet(n_classes=3, in_dim=4)
     x = torch.rand(5, 4)
     with torch.no_grad():
-        # set beta to +I to test the sign: quad = (x-mu)^T I (x-mu) >= 0
-        rbf.beta.data = torch.eye(4).unsqueeze(0).expand(3, 4, 4).contiguous()
-        rbf.mu.data.zero_()
-        q = rbf.logits(x)  # [B, K], the quad forms (pre-softmax)
-    assert torch.all(q >= -1e-6), f"RBF quad with beta=+I should be >=0, got {q.min()}"
+        q = rbf.logits(x)  # [B, K]
+    # (a) neg-def by construction: q <= 0 for all inputs.
+    assert torch.all(q <= 1e-6), f"RBF q should be <= 0 (neg-def), got max {q.max()}"
+    # (b) at a class centre, q for that class is 0 (exp=1, max confidence).
     with torch.no_grad():
-        rbf.beta.data = -torch.eye(4).unsqueeze(0).expand(3, 4, 4).contiguous()
-        q2 = rbf.logits(x)
-    assert torch.all(q2 <= 1e-6), f"RBF quad with beta=-I should be <=0, got {q2.max()}"
+        q_at_mu = rbf.logits(rbf.mu)  # [K, K]: row k is q at mu_k
+    assert torch.allclose(q_at_mu.diagonal(), torch.zeros(3), atol=1e-5), (
+        f"q at own centre should be 0, got {q_at_mu.diagonal()}")
+    # (c) moving away from mu_k makes q_k more negative (confidence decays).
+    with torch.no_grad():
+        rbf.mu.data.zero_()
+        a = rbf.a  # [K, F], all > 0
+    near = torch.zeros(1, 4)
+    far = 10.0 * torch.ones(1, 4)
+    q_near = rbf.logits(near)[:, 0]
+    q_far = rbf.logits(far)[:, 0]
+    assert q_far.item() < q_near.item() - 1.0, (
+        f"q should decrease away from mu: near={q_near}, far={q_far}")
+    # (d) beta is neg-def diagonal: beta_k = -diag(a_k), a_k > 0.
+    b = rbf.beta  # [K, F, F]
+    for k in range(3):
+        diag = b[k].diag()
+        assert torch.all(diag <= 0), f"beta[{k}] diag should be <= 0"
+        # off-diagonal entries are exactly zero (diagonal parameterization).
+        off = b[k] - torch.diag(b[k].diag())
+        assert torch.all(off == 0), "beta should be diagonal"
 
 
 # --- cross-entropy NLL is non-negative ------------------------------------- #

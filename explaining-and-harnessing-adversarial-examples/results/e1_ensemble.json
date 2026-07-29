@@ -1,29 +1,42 @@
 {
   "base_seed": 0,
-  "description": "Ensemble of N maxout nets; FGSM ensemble-targeted vs single-member-targeted.",
-  "ensemble_targeted_error": 0.9994000196456909,
+  "description": "Ensemble of N maxout nets; FGSM ensemble-targeted vs single-member-targeted. Headline metric = error of the ensemble's mean-prob prediction (SPEC \u00a76 item 11).",
+  "direction_matches_paper": false,
+  "ensemble_targeted_error": 0.9976000189781189,
   "hyperparams": {
     "batch_size": 100,
+    "ensemble_prediction": "argmax(mean member softmax probs)",
     "eps": 0.25,
     "lr": 0.1,
-    "max_epochs": 1,
-    "members": 2,
+    "max_epochs": 3,
+    "members": 4,
     "momentum": 0.5,
-    "patience": 100,
+    "patience": 10,
     "pieces": 5,
+    "single_member_arm": "attack each member, average ensemble error",
     "units": 240
   },
+  "mean_per_member_error_ensemble_targeted": 0.9974250048398972,
+  "mean_per_member_error_single_targeted": 0.9970812499523163,
   "member_clean_accuracies": [
-    0.8578000068664551,
-    0.8420000076293945
+    0.9592999815940857,
+    0.9523000121116638,
+    0.9605000019073486,
+    0.9584000110626221
   ],
   "milestone": "E1",
-  "note": "Sub-scale run (members=2, epochs=1, patience=100). The paper's 91.1/87.9% use 12 fully-converged nets.",
+  "note": "Sub-scale run (members=4, epochs=3, patience=10). The paper's 91.1/87.9% use 12 fully-converged nets. direction REVERSED at sub-scale (single-targeted > ensemble-targeted); both errors saturate near 100% with few undertrained members -- the paper's 91.1>87.9 direction needs 12 converged nets.",
   "paper_target": {
     "citation": "paper/source/iclr2015.tex:819-825",
     "ensemble_targeted_error": 0.911,
     "quote": "error rate of 91.1% on adversarial examples designed to perturb the entire ensemble ... falls to 87.9%",
     "single_member_targeted_error": 0.879
   },
-  "single_member_targeted_error": 0.9996999800205231
+  "per_member_single_targeted_errors": [
+    0.9991999864578247,
+    0.9984999895095825,
+    0.9944999814033508,
+    0.9995999932289124
+  ],
+  "single_member_targeted_error": 0.9979499876499176
 }
