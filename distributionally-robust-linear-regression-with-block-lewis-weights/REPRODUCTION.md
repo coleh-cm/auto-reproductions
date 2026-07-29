@@ -231,11 +231,13 @@ Three fixes (all from the review's confirmed findings):
 
 Seven refuted findings (verifiers proved the code correct): the log1p target
 (disclosed U4, negligible, doesn't change the worst group), the block-Lewis
-T-vs-(T−1) iteration count (stale comment, MO25 averages T terms, guarantee
-holds), the p=∞ scale of `p_objective` (the paper itself puts finite-p and p=∞
-on different scales, body.tex:27), three IPM/ball-oracle docstring nits (behavior
-matches the paper), and the subgradient final-vs-min selection (standard reading
-of "within this budget"; plateau genuine either way). None required a change.
+T-vs-(T−1) iteration count (then a T-step loop; both T and T-1 yield valid
+overestimates with ‖w‖₁ ≤ 1.5(d+1), so the guarantee held — see Round-9, which
+later aligned the loop to SPEC E8's literal `t=1..T-1`), the p=∞ scale of
+`p_objective` (the paper itself puts finite-p and p=∞ on different scales,
+body.tex:27), three IPM/ball-oracle docstring nits (behavior matches the paper),
+and the subgradient final-vs-min selection (standard reading of "within this
+budget"; plateau genuine either way). None required a change at the time.
 
 Three further consistency/test-strength changes made this round (not review
 findings — discovered while re-checking the staged review fixes):
@@ -417,6 +419,16 @@ non-production paths changed). No committed result changed.
 
 
 ### Round-9: adversarial paper-review of all 5 components (orchestrate)
+
+> Note: two orchestration passes ran under "Round-9". This section records the
+> FIRST pass (lewis T-1 + subgradient key fixes). The SECOND pass — the
+> seed-blind ACS data-cache fix + 3 misleading-docstring fixes — is recorded
+> above under its own "Round-9" heading. Both are kept; they fixed different
+> things. After the lewis T-1 fix below, the two Lewis result JSONs
+> (`results/{synthetic,acs_income}_ball_oracle_lewis.json`) were regenerated from
+> the current (T-1) code so the committed evidence matches the committed code;
+> their FINAL lines are unchanged (synthetic=5, ACS=1), so `run_all.log` and the
+> gate are unaffected.
 
 - Ran an orchestration that, for each of the 5 components (data_pipeline,
   method_core, training_loop, evaluation_metric, baseline_arm), spawned an
