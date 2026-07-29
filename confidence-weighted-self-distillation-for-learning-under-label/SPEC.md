@@ -44,7 +44,7 @@ each citation also gives a grep string that resolves there.
 3. Gate: `w = λ σ((c − τ)/s)` — Eq. (2) (see §3).
 4. Softened prediction: `p̃ = stopgrad(softmax(z / T))` — Eq. (3) (see §3).
    Same forward pass as `p`; no second network, no extra parameters
-   (paper.md:22–23, grep `no second network`).
+   (paper.md:23, grep `no second network`).
 5. Target: `t = (1 − w) y + w p̃`, `w` broadcast per example over classes — Eq. (3).
    Stop-gradient is essential, else a trivial solution exists (paper.md:213–214,
    grep `trivial solution`).
