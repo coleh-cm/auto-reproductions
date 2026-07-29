@@ -1,0 +1,14 @@
+# Reproduction of "Confidence-Weighted Self-Distillation for Learning under Label Noise"
+# Method dependencies (direct): numpy, scikit-learn. Test runner: pytest.
+# Transitive deps of scikit-learn are pinned below for full reproducibility.
+numpy==2.5.1
+scikit-learn==1.9.0
+scipy==1.18.0
+joblib==1.5.3
+threadpoolctl==3.6.0
+narwhals==2.24.0
+pytest==9.1.1
+iniconfig==2.3.0
+packaging==26.2
+pluggy==1.6.0
+pygments==2.20.0

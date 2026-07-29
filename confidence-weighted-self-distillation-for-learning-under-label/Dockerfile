@@ -1,0 +1,35 @@
+# Reproducible environment for
+# "Confidence-Weighted Self-Distillation for Learning under Label Noise"
+# (Bergstrom, Oyelaran, Vasquez).
+#
+# Builds from scratch: a clean Python 3.13 base, installs the pinned
+# requirements, and copies the experiment in. The implementation uses only
+# numpy + scikit-learn (gradients hand-derived), so there is no CUDA/GPU need.
+
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /repro
+
+# System deps: none beyond the slim base (scikit-learn ships its own wheels).
+
+# Install pinned Python dependencies first (better layer caching).
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the experiment and supporting docs.
+COPY run_experiment.py ./
+COPY README.md SPEC.md REPRODUCTION.md ./
+COPY paper ./paper
+
+# Smoke-test that the implementation imports and the degeneracy gate holds
+# (lambda=0 path must reduce exactly to cross-entropy). Cheap; no training.
+RUN python -c "import run_experiment; print('import OK')"
+
+# Default command: run the baseline arm. Override with `--lambda 1.0` for CWSD.
+ENTRYPOINT ["python", "run_experiment.py"]
+CMD ["--lambda", "0.0"]
