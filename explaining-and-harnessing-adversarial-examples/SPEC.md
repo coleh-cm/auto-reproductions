@@ -28,7 +28,7 @@ figure. We reproduce the **MNIST core**; the rest is graded below.
 | — (excluded) | GoogLeNet/ImageNet Fig. 1 (ε=0.007) | qualitative | tex:381. Reason: 2014-era DistBelief GoogLeNet weights unavailable. |
 | — (excluded) | MP-DBM FGSM ε=0.25 → 97.5% | tex:793-800 | Reason: requires implementing the multi-prediction deep Boltzmann machine (Goodfellow et al. 2013a), a separate paper's model; out of budget. |
 
-Compute: CPU-only, 16 cores, Python 3.12, PyTorch. M5 (5 seeds × 2 arms) and E1 (12 nets) are
+Compute: CPU-only, 16 cores, Python 3.13, PyTorch. M5 (5 seeds × 2 arms) and E1 (12 nets) are
 the expensive items; seeds/ensemble members run as parallel processes.
 
 ---
@@ -359,9 +359,9 @@ milestone scripts set input 0.8 / hidden 1.0 to match the recipe's input-only dr
 - **Author-owned code**: GitHub search `adversarial examples goodfellow user:goodfeli` → **0 repos**.
   No official implementation of this paper was ever released (CleverHans is a later, different library).
 - **Decision: implement from scratch.** pylearn2/Theano itself is unmaintained since ~2016 and cannot
-  run on Python 3.12; the external yaml is used as *documentation of defaults* only.
+  run on Python 3.13; the external yaml is used as *documentation of defaults* only.
 
-Environment for our implementation: Python 3.12, PyTorch CPU (no GPU on this machine), MNIST via
+Environment for our implementation: Python 3.13, PyTorch CPU (no GPU on this machine), MNIST via
 raw IDX download (torchvision if its mirror works, else direct from a mirror).
 
 ---
