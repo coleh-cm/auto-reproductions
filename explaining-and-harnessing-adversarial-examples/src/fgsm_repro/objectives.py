@@ -151,8 +151,10 @@ def noise_train_cost(
     inputs (every example perturbed by random noise of max-norm <= eps); it does
     NOT state a clean/noisy mixture. We therefore train on noise-only batches:
         L = J(theta, x + eta, y)         # no clean term, no alpha
-    with eta regenerated every batch (like FGSM adversarial training,
-    tex:490-491) and detached (no gradient through the noise sampling).
+    with eta regenerated every batch (the standard per-batch default; the
+    paper does not state the noise regeneration cadence -- tex:490-491 refers
+    to FGSM adversarial-example regeneration, not additive noise) and
+    detached (no gradient through the noise sampling).
 
     Noise forms:
       * ``"bernoulli"``: eta = eps * b, b ~ Bernoulli-sign{+1,-1} i.i.d.
@@ -203,11 +205,20 @@ def sigmoid_top_cost(model: Classifier, x: torch.Tensor, y: torch.Tensor) -> tor
     softmax-trained readout weights and applying sigmoids with no retraining
     (which mechanically forces rubbish error -> 1.0 regardless of training).
     ``model.logits`` returns the pre-sigmoid readout scores [B, K].
+
+    Normalization: SUM over classes, MEAN over the batch
+        J = (1/B) sum_b sum_k BCE(sigmoid(logit_k(x_b)), 1[y_b == k])
+    (NOT PyTorch reduction='mean', which divides by B*K and scales the
+    gradient by 1/K -- the paper does not specify the normalization, so we use
+    the sum-over-classes / mean-over-batch form, the standard multilabel cost
+    where each example's loss is the sum of its per-class BCEs.)
     """
     logits = model.logits(x)  # [B, K]
     k = logits.shape[-1]
     target = F.one_hot(y, num_classes=k).to(logits.dtype)  # [B, K]
-    return F.binary_cross_entropy_with_logits(logits, target, reduction="mean")
+    # reduction='none' -> per-element BCE [B, K]; sum over classes, mean over batch.
+    bce = F.binary_cross_entropy_with_logits(logits, target, reduction="none")
+    return bce.sum(dim=1).mean()
 
 
 # --------------------------------------------------------------------------- #

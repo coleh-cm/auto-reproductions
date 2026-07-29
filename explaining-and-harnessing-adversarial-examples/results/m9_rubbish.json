@@ -12,8 +12,8 @@
       "n": 10000
     },
     "sigmoid_top": {
-      "error_rate": 0.0010999999940395355,
-      "mean_confidence_on_errors": 0.5259754657745361,
+      "error_rate": 0.7921000123023987,
+      "mean_confidence_on_errors": 0.8415315747261047,
       "n": 10000
     },
     "softmax_regression": {

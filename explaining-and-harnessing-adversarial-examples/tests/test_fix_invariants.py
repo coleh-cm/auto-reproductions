@@ -113,7 +113,9 @@ def test_eval_clean_confidence_rbf_in_unit_range_for_neg_def():
 
 # ---------------- Fix 2: sigmoid-top is TRAINED (per-class BCE) --------- #
 def test_sigmoid_top_cost_is_per_class_bce():
-    """sigmoid_top_cost = mean_b sum_k BCE(sigmoid(logit_k), onehot_k)."""
+    """sigmoid_top_cost = (1/B) sum_b sum_k BCE(sigmoid(logit_k), onehot_k)
+    (sum over classes, mean over batch -- NOT PyTorch reduction='mean' which
+    divides by B*K)."""
     torch.manual_seed(0)
     m = SigmoidTopMLP(units=8, pieces=2, in_dim=784, n_classes=10,
                      dropout_input_include=1.0, dropout_hidden_include=1.0, seed=0)
@@ -123,8 +125,12 @@ def test_sigmoid_top_cost_is_per_class_bce():
     with torch.no_grad():
         logits = m.logits(x)
         target = F.one_hot(y, 10).float()
-        expected = F.binary_cross_entropy_with_logits(logits, target, reduction="mean")
+        bce = F.binary_cross_entropy_with_logits(logits, target, reduction="none")
+        expected = bce.sum(dim=1).mean()  # sum over classes, mean over batch
     assert torch.allclose(got, expected, atol=1e-6)
+    # And it must NOT equal the B*K mean (which is 1/K times this).
+    bk_mean = F.binary_cross_entropy_with_logits(logits, target, reduction="mean")
+    assert not torch.allclose(got, bk_mean, atol=1e-6)
 
 
 def test_sigmoid_top_trains_and_predicts():

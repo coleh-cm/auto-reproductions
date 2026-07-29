@@ -358,6 +358,9 @@
         "qualitative": "coeff 0.0025 too large (>5% train error); smaller coefficients train but confer no regularization benefit"
       },
       "result_metric_paths": {
+        "fgsm_error_l1_2.5e-05": "arms.l1_2.5e-05.fgsm_eval.error_rate",
+        "test_error_l1_2.5e-05": "arms.l1_2.5e-05.clean_test_error",
+        "train_error_l1_0.00025": "arms.l1_0.00025.clean_train_error",
         "train_error_l1_0.0025": "arms.l1_0.0025.clean_train_error",
         "train_error_l1_2.5e-05": "arms.l1_2.5e-05.clean_train_error"
       },

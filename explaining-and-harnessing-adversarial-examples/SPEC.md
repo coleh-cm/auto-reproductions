@@ -428,12 +428,14 @@ Evaluation protocol:
       omitted entirely with no exclusion record. **Now implemented** as
       `experiments/m_l1_weight_decay.py`: adds `coeff * ||layer0.W||_1` (the L1 penalty on the
       FIRST maxout layer's incoming weights) to the training cost (`train.l1_first_layer_coeff`,
-      `objectives.l1_first_layer_penalty`), sweeps the paper's "too large" 0.0025 and a smaller
-      0.00025, and reports clean TRAIN + TEST error and FGSM error. The paper's qualitative
-      claim: 0.0025 is too pessimistic (>5% TRAIN error); smaller coefficients train but confer
-      no regularization benefit. The L1 penalty is ADDED to the cost (standard weight decay);
-      the paper notes this is more pessimistic than adversarial training, which SUBTRACTS the
-      penalty from the activation (tex:418-424).
+      `objectives.l1_first_layer_penalty`), sweeps three coefficients — the paper's "too large"
+      0.0025, an intermediate 0.00025, and a small 0.000025 that TRAINS — and reports clean
+      TRAIN + TEST error and FGSM error. The paper's qualitative claim: 0.0025 is too
+      pessimistic (>5% TRAIN error); smaller coefficients train but confer no regularization
+      benefit. (At sub-scale the "too large" threshold shifts down, so 0.00025 is also stuck
+      here; 0.000025 trains but confers no clean-test/FGSM benefit.) The L1 penalty is ADDED
+      to the cost (standard weight decay); the paper notes this is more pessimistic than
+      adversarial training, which SUBTRACTS the penalty from the activation (tex:418-424).
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):
