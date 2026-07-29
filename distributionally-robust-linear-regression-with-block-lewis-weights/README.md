@@ -142,9 +142,12 @@ monotonicity.
 
 **Synthetic (D1, seed=0; cond(AᵀA)=1.40e5; ERM/robust worst-group ratio 1.47)**
 — T4 is qualitative (`experiments.tex:106-109`): subgradient=NR, all smoothed
-first-order=NR (plateau), ipm=4, ball_oracle_euclidean=4, ball_oracle_lewis=4.
-Matches the paper: IPM and both ball-oracle arms reach the 1% target while
-first-order methods plateau above it; IPM reaches the lowest final loss.
+first-order=NR (plateau, HB final 9.1%), ipm=6, ball_oracle_euclidean=NR (final
+3.3%), ball_oracle_lewis=3 (0.34%). Matches the paper: IPM and the Lewis
+ball-oracle reach the 1% target while first-order methods plateau; **Lewis ≤
+Euclidean finally** (0.34% < 3.3%, the paper's "very slight benefit from
+Lewis", `experiments.tex:109`); both BO arms strictly decrease and beat the
+first-order plateau.
 
 **ACS Income (D2, seed=6; California is the worst ERM group; ERM mean 107.3)**
 — T1 gate (`experiments.tex:171-186`):

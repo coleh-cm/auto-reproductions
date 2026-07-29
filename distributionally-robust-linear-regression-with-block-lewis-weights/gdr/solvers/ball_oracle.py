@@ -33,7 +33,7 @@ import itertools
 import time
 import numpy as np
 
-from gdr.objectives import smoothed_grad_hess  # frozen interface (E4)
+from gdr.objectives import smoothed, smoothed_grad_hess  # frozen interface (E3, E4)
 from gdr.solvers import (
     DEFAULTS, as_list, get_opt, gap_now, seed_history,
     beta_delta_pairs, solve_pd, norm_M, norm_Minv, max_loss,
@@ -42,6 +42,8 @@ from gdr.solvers import (
 _INNER_CAP = 50          # inner Newton cap (SPEC E19)
 _NU_GROW = 60            # doublings to find nu_hi
 _NU_BISECT = 20          # bisection refinements of nu
+_LS_STEPS = 40           # backtracking line-search halvings (damped Newton)
+_LS_C1 = 1e-4            # Armijo sufficient-decrease constant
 
 
 def _geometry(problem, cfg):
@@ -72,57 +74,92 @@ def _geometry(problem, cfg):
     return M
 
 
-def _trust_step(g, H, M, r):
-    """More-Sorensen trust-region step s = -(H + nu M)^{-1} g with ||s||_M <= r.
+def _trust_step(g, H, M, r, q, x):
+    """More-Sorensen trust-region step over the FIXED ball {y : ||y - q||_M <= r}.
 
-    g [d], H [d,d] (already regularized), M [d,d], r >= 0 (or +inf).
-    Returns s [d].  nu = 0 if the unconstrained Newton step already satisfies
-    the trust region; otherwise bisect nu in [nu_lo, nu_hi] until ||s(nu)||_M
-    is at or just below r (SPEC E19; Moré-Sorensen).
+    Minimizes the quadratic model g^T s + (1/2) s^T H s at the current iterate x
+    subject to ||(x + s) - q||_M <= r (E19 subproblem, body.tex:31
+    O(q) := min_{||x-q||_M <= r_q} f(x)).  The KKT system is
+
+        (H + nu M) s = nu M (q - x) - g
+
+    with nu = 0 when the unconstrained Newton step already stays inside the
+    ball; otherwise bisect nu until ||(x + s(nu)) - q||_M <= r (Moré-Sorensen).
+
+    g [d], H [d,d] (regularized), M [d,d], r >= 0 (or +inf), q [d] ball center,
+    x [d] current iterate.  Returns s [d].
     """
-    d = g.shape[0]
-    if not np.isfinite(r):                  # no active trust region
-        return -solve_pd(H, g)             # [d]  plain Newton step
-    s0 = -solve_pd(H, g)                   # [d]  nu = 0 step
-    n0 = norm_M(s0, M)                     # scalar  ||s(0)||_M
-    if n0 <= r:
-        return s0                          # trust region inactive
-
-    # Increase nu until ||s(nu)||_M <= r (||s(nu)||_M is monotone decreasing).
+    offset = q - x                                 # [d]  ball-center offset
+    if not np.isfinite(r):                         # no active trust region
+        return -solve_pd(H, g)                     # [d]  plain Newton step
+    # nu = 0 step: solve H s = -g (offset term vanishes at nu=0).
+    s0 = -solve_pd(H, g)                           # [d]
+    if norm_M((x + s0) - q, M) <= r:               # inside the fixed ball
+        return s0
+    # nu > 0: (H + nu M) s = nu M offset - g.  ||x+s-q||_M is monotone decreasing
+    # in nu (the M-projection pulls s toward offset).  Grow nu then bisect.
     nu_hi = 1.0
     for _ in range(_NU_GROW):
-        s_hi = -solve_pd(H + nu_hi * M, g)  # [d]
-        if norm_M(s_hi, M) <= r:
+        s_hi = solve_pd(H + nu_hi * M, nu_hi * (M @ offset) - g)  # [d]
+        if norm_M((x + s_hi) - q, M) <= r:
             break
         nu_hi *= 2.0
     nu_lo = 0.0
-    # Bisect to bring ||s(nu)||_M down to ~ r.
     for _ in range(_NU_BISECT):
         nu_mid = 0.5 * (nu_lo + nu_hi)
-        s_mid = -solve_pd(H + nu_mid * M, g)  # [d]
-        if norm_M(s_mid, M) <= r:
+        s_mid = solve_pd(H + nu_mid * M, nu_mid * (M @ offset) - g)  # [d]
+        if norm_M((x + s_mid) - q, M) <= r:
             nu_hi = nu_mid
         else:
             nu_lo = nu_mid
-    return -solve_pd(H + nu_hi * M, g)      # [d]  boundary-respecting step
+    return solve_pd(H + nu_hi * M, nu_hi * (M @ offset) - g)  # [d]  boundary step
 
 
 def _solve_region(problem, M, q, r, beta, delta, tol_inner):
     """Inner trust-region Newton solve: minimize f_tilde over {||x-q||_M <= r}.
 
-    Starts at x = q and runs up to _INNER_CAP Newton steps.  Returns the final
-    x [d].  (E19 inner loop; experiments.tex:72-77.)
+    Starts at x = q and runs up to _INNER_CAP damped Newton steps, each
+    constrained to the FIXED ball centered at q (E19 subproblem, body.tex:31).
+    "Damped" Newton (experiments.tex:71): every accepted step must give an
+    Armijo sufficient decrease of the smoothed objective f_tilde.  The
+    More-Sorensen step ``s`` is a descent direction of f_tilde (``g^T s < 0``
+    because it decreases the model whose Hessian is PSD-regularized), so a
+    backtracking line search along ``s`` always finds a decrease in finitely
+    many halvings.  This makes f_tilde monotone non-increasing across inner
+    *and* outer iterations -- the genuine invariant the paper's "damped
+    Newton" implies (and the one tests/test_invariants.py checks).  Taking
+    the step unconditionally (no damping) lets a large trust region overshoot
+    and *increase* f_tilde on ill-scaled / high-curvature instances.  Returns
+    the final x [d].  (E19 inner loop; experiments.tex:72-77.)
     """
     d = problem["d"]
     I = np.eye(d, dtype=np.float64)
-    x = np.asarray(q, dtype=np.float64).copy()  # [d]
+    x = np.asarray(q, dtype=np.float64).copy()  # [d]  == q, so ||x-q||_M = 0
+    f_cur, _g0, _H0 = smoothed_grad_hess(problem, x, beta, delta)  # f_tilde(q)
     for _ in range(_INNER_CAP):
         _val, g, H = smoothed_grad_hess(problem, x, beta, delta)  # E4; g [d], H [d,d]
         H = H + 1e-12 * I                 # regularize for definiteness (SPEC E19)
         if norm_Minv(g, M) <= tol_inner:  # inner stopping (E19)
             break
-        s = _trust_step(g, H, M, r)        # [d]  More-Sorensen step
-        x = x + s                          # [d]
+        s = _trust_step(g, H, M, r, q, x)  # [d]  More-Sorensen step (fixed ball at q)
+        gs = float(g @ s)                  # directional derivative (descent: gs < 0)
+        # Backtracking line search: accept the first alpha in {1, .5, .25, ...}
+        # that gives Armijo sufficient decrease of f_tilde.  A smaller alpha
+        # keeps x+alpha*s inside the fixed ball (||.||_M is convex), so the
+        # trust-region constraint stays satisfied.
+        alpha = 1.0
+        accepted = False
+        for _bt in range(_LS_STEPS):
+            x_try = x + alpha * s
+            f_try = smoothed(problem, x_try, beta, delta)
+            if f_try <= f_cur + _LS_C1 * alpha * gs:   # Armijo (gs < 0)
+                accepted = True
+                break
+            alpha *= 0.5
+        if not accepted:
+            break                        # cannot decrease further -> at a min
+        x = x + alpha * s
+        f_cur = f_try
     return x
 
 
@@ -178,9 +215,13 @@ def run(problem, cfg, x0, max_outer, time_budget):
     deadline = t_start + float(time_budget)
     best = None
     best_final = np.inf
+    # Deterministic best-of-grid: evaluate EVERY config (grids are small and on
+    # rescaled data each run is fast), so the result does not depend on wall-clock
+    # timing/machine load.  The per-run deadline inside _run_single is the only
+    # safety net (a diverging config cannot hang forever).
     for r0, shrink, tol_inner in itertools.product(r0_grid, shrink_grid, tol_grid):
         for beta, delta in beta_delta_pairs(cfg):
-            if time.perf_counter() > deadline:
+            if time.perf_counter() > deadline and best is not None:
                 break
             h, final = _run_single(problem, M, x0, max_outer, deadline,
                                    float(r0), float(shrink),
@@ -188,7 +229,7 @@ def run(problem, cfg, x0, max_outer, time_budget):
             if final < best_final:
                 best_final = final
                 best = h
-        if time.perf_counter() > deadline:
+        if time.perf_counter() > deadline and best is not None:
             break
     if best is None:
         best = seed_history(problem, x0, opt)

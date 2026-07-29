@@ -122,3 +122,29 @@ def group_norm_p(problem: Problem, x: np.ndarray, p: float) -> float:
     if np.isinf(p):
         return float(gn.max())
     return float(np.sum(gn ** p) ** (1.0 / p))
+
+
+def rescale_problem(problem: Problem, s: float) -> Problem:
+    """Return a Problem with (A, b) <- (A, b)/sqrt(s)  (U15: the theory's WLOG
+    OPT=1 rescaling).  The worst-group objective min_x max_i ||A_{S_i} x - b_{S_i}||^2
+    is scaled by 1/s, so the *argmin* x* is unchanged and every *relative* gap
+    (F(x)-OPT)/OPT is unchanged; only absolute losses move by 1/s.  This lets the
+    standard O(1) tuning grids (smoothing beta/delta, IPM mu, trust-region r0,
+    step sizes) work uniformly across datasets whose raw losses span 1e2-1e7
+    (ACS ~1e2, synthetic ~1e6).  Offsets/m/d/n_i are unchanged.
+    """
+    if not np.isfinite(s) or s <= 0:
+        s = 1.0
+    scale = 1.0 / np.sqrt(s)
+    meta = dict(problem.get("meta", {}))
+    meta["rescale_s"] = float(s)
+    return Problem(
+        A=problem["A"] * scale,
+        b=problem["b"] * scale,
+        offsets=problem["offsets"],
+        name=problem["name"],
+        m=problem["m"],
+        d=problem["d"],
+        n_i=problem["n_i"],
+        meta=meta,
+    )

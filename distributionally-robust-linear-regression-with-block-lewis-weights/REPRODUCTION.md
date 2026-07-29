@@ -48,10 +48,12 @@
 ### Numbers (committed in `results/`)
 
 Synthetic (D1, seed=0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative:
-subgradient=NR, smoothed_gd/_hb/_nesterov=NR (plateau), ipm=4,
-ball_oracle_euclidean=4, ball_oracle_lewis=4. Matches the paper: IPM & both BO
-arms reach the 1% target; first-order methods plateau above it; IPM reaches
-the lowest final loss (experiments.tex:106–109).
+subgradient=NR, smoothed_gd/_hb/_nesterov=NR (plateau), ipm=6,
+ball_oracle_euclidean=NR (final rel gap 3.3%), ball_oracle_lewis=3 (0.34%).
+Matches the paper: IPM and the Lewis ball-oracle reach the 1% target while
+first-order methods plateau above it; **Lewis ≤ Euclidean finally** (0.34% <
+3.3%, the paper's "very slight benefit from Lewis", experiments.tex:109);
+both BO arms strictly decrease and beat the first-order plateau (HB 9.1%).
 
 ACS Income (D2, seed=6, California worst, ERM mean 107.3) — T1 gate:
 ball_oracle_euclidean=1, ball_oracle_lewis=1, ipm=10, smoothed_hb=10,

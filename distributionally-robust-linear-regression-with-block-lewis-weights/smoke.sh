@@ -16,22 +16,32 @@ from gdr.data_synthetic import make_synthetic
 from gdr.problem import max_loss
 from gdr.reference import solve_opt
 from gdr.runner import run_arm, time_to_gap
+from run_arm import normalize_problem, erm_warm_start
 
+# Tiny synthetic problem, all arms, very small grids, 6 outer iterations.
+# IMPORTANT: this exercises the SAME code path as run_arm.py -- in particular
+# the OPT=1 normalization (run_arm.normalize_problem, U15) that every real run
+# applies.  Without it the loss scale is O(E_ADV) and the subgradient's fixed
+# step sizes diverge (a 1e24 "gap" that is not a measurement); with it every
+# arm sees the O(1) loss scale the real runs use, so the smoke gap is finite
+# and meaningful (still NOT paper evidence -- small problem, tiny grids).
 prob = make_synthetic(d=5, m=10, n_adv=2, n_per_group=15, seed=1, E_ADV=1e3, DIST=3.0)
 xopt, OPT = solve_opt(prob)
-x0 = np.linalg.lstsq(prob["A"], prob["b"], rcond=None)[0]
+prob, scale = normalize_problem(prob, OPT)   # OPT == 1 after this (U15)
+opt_norm = 1.0
+x0 = erm_warm_start(prob)
 cfgs = {
-  "subgradient": {"lr_grid":[1e-2,1e-1], "schedule_grid":["const"]},
+  "subgradient": {"lr_grid":[1e-3,1e-2], "schedule_grid":["const","1/sqrt_t"]},
   "smoothed_hb": {"lr_grid":[1e-2,1e-1], "momentum_grid":[0.9], "beta_grid":[1e-1], "delta_grid":[1e-1]},
   "ipm": {"mu0_grid":[10.0], "theta_grid":[0.5]},
   "ball_oracle_lewis": {"geometry":"lewis","r0_grid":[10.0],"shrink_grid":[0.5],"beta_grid":[1e-1],"delta_grid":[1e-1]},
 }
 last = None
 for arm, cfg in cfgs.items():
-    cfg = dict(cfg); cfg["opt"] = OPT
+    cfg = dict(cfg); cfg["opt"] = opt_norm
     geom = cfg.pop("geometry", None)
     a = "ball_oracle" if arm.startswith("ball_oracle") else arm
-    h = run_arm(a, cfg, prob, x0, OPT, max_outer=6, time_budget=30.0)
+    h = run_arm(a, cfg, prob, x0, opt_norm, max_outer=12, time_budget=30.0)
     it, _ = time_to_gap(h, rel_gap=0.05)
     last = f"{arm}: gap={h['gap'][-1]:.3f} iters_to_5%={it}"
     print(f"  smoke {last}", file=sys.stderr)

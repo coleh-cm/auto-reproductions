@@ -88,10 +88,11 @@ def _newton_step(problem, cache, x, t, mu, inner_tol):
         l_i[i] = float(ri @ ri)            # scalar
         g_i[i] = 2.0 * (Ai.T @ ri)         # [d]
     gap = t - l_i                          # [m]  gap_i = t - l_i > 0
-    # Guard: if any gap_i <= 0 we are infeasible; clip to a tiny positive floor
-    # so the Newton system is still solvable (should not happen given the
-    # backtracking line search, but defends against round-off).
-    gap = np.maximum(gap, 1e-12)           # [m]
+    # Strict-feasibility domain of the log barrier (E21): if round-off has made
+    # any gap_i <= 0 here the previous step must be rejected (clamping would feed
+    # a fictitious positive gap into the Newton system and corrupt centering).
+    if np.any(gap <= 0.0):
+        return x.copy(), t, float("inf"), False
 
     inv_gap = 1.0 / gap                    # [m]
     inv_gap2 = inv_gap ** 2                # [m]
@@ -123,18 +124,37 @@ def _newton_step(problem, cache, x, t, mu, inner_tol):
     if decrement <= inner_tol:
         return x.copy(), t, decrement, False  # centering essentially done
 
-    # Damped Newton backtracking to keep gap_i = t - l_i > 0.
+    # Damped Newton step (BV04 §9.7): cap the step at 1/(1+lambda) with
+    # lambda = decrement, then Armijo-backtrack on the barrier merit
+    # Phi_mu = t - mu*sum ln(t-l_i) to GUARANTEE a decrease (not just feasibility).
     dx = dz[:d]                             # [d]
     dt = dz[d]                              # scalar
-    alpha = 1.0
+
+    def phi(xv, tv):
+        """Barrier merit Phi_mu = t - mu*sum ln(t - l_i(x)); inf if infeasible."""
+        r = problem["A"] @ xv - problem["b"]          # [n]
+        lv = np.empty(m, dtype=np.float64)
+        for i in range(m):
+            ri = r[int(offsets[i]):int(offsets[i + 1])]
+            lv[i] = float(ri @ ri)
+        gv = tv - lv
+        if np.any(gv <= 0.0):
+            return float("inf")
+        return float(tv) - mu * float(np.sum(np.log(gv)))
+
+    phi0 = phi(x, t)
+    alpha = min(1.0, 1.0 / (1.0 + decrement))  # BV04 damped-Newton cap
+    accepted = False
     for _ in range(60):
         x_new = x + alpha * dx             # [d]
         t_new = t + alpha * dt             # scalar
-        if t_new - float(group_losses(problem, x_new).max()) > 0.0:
+        # feasibility (gap_i > 0) AND Armijo decrease of the barrier merit
+        if (t_new - float(group_losses(problem, x_new).max()) > 0.0
+                and phi(x_new, t_new) <= phi0 - 1e-4 * alpha * decrement ** 2):
+            accepted = True
             break
         alpha *= 0.5
-    else:
-        # Could not find a feasible step; keep the point, signal accepted=False.
+    if not accepted:
         return x.copy(), t, decrement, False
     return x_new, float(t_new), decrement, True
 
