@@ -613,3 +613,31 @@ Test suite 24 -> 27 (+3: best-so-far curve, time_to_rel_gap consistency, OPT
 cache n_i check); smoke gate `FINAL smoke=ok` (all 7 arms strict finite progress,
 matching the round-11 feedback). No FINAL line or gate value changed; blocker B1
 unchanged and still disclosed.
+
+### Round-12 addendum: independent review-only pass + full gate re-run (verification)
+
+- A SECOND, independent orchestration (`gdr-round12-paper-fidelity-review`, 5
+  adversarial reviewers — one per component — reading the actual code and the
+  paper LaTeX, findings refutation-verified by a separate verifier each) ran
+  AFTER the 16-agent pass above. Result: **0 raw findings, 0 undisclosed
+  defects** — the 5 reviewers found nothing the 16-agent pass had missed. This
+  confirms the committed state (aa35500) has no remaining undisclosed
+  correctness violation across data_pipeline / method_core / training_loop /
+  evaluation_metric / baseline_arm.
+- Independently re-ran the FULL gate (`run_all_arms.sh 300 120` on both
+  datasets, fresh) and confirmed: all 16 `FINAL <dataset>_<arm>=<value>` lines
+  are byte-identical to `results/run_all.log`, AND `git status` is clean
+  afterward (every regenerated result JSON is byte-identical to the aa35500
+  commit) — i.e. the full re-run reproduces the committed evidence exactly,
+  independently confirming the in-place regen and the determinism claim
+  (Round-10). The only field that would differ on a re-run is wall-clock
+  timing (`elapsed`, `time_to_rel_gap`); here even those matched because the
+  re-run hit the same OPT cache and the same deterministic trajectories.
+- Re-verified the PWGTP fix (finding 1) is numerically safe: the OPT cache
+  (`results/opt_acs_income_seed6.json`) was a HIT during the re-run (its
+  `(m, n, d, n_i, A_sum)` signature matched the loaded problem), so the ACS
+  data after the full `PWGTP>=1` filter is byte-identical to before and
+  OPT=110.70265575288211 is unchanged — consistent with the claim that
+  `PWGTP>=1` drops 0 rows on the 2018 1-Year subsample.
+- Tests 27/27 pass; smoke `FINAL smoke=ok` (all 7 arms strict finite progress).
+  Branch `repro/block-lewis-gdr` pushed (HEAD = this addendum's commit).
