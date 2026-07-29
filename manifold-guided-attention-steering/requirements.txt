@@ -1,0 +1,78 @@
+# requirements.txt - Manifold-Guided Attention Steering (MAGS) reproduction
+# Python 3.13. Fully pinned (direct + transitive) for bit-for-bit reproducibility.
+# Resolved & import-verified on cpython-3.13 / linux-aarch64; same pins resolve on x86_64.
+
+# === Direct dependencies the method needs ===
+accelerate==1.14.0   # device_map loading for 8B-20B models
+datasets==5.0.1   # HuggingFace datasets - MATH-500, GSM8K, MBPP, APPS, MathInstruct
+huggingface-hub==0.36.2   # model/dataset download + revision SHAs (transitive, pinned)
+human-eval==1.0.3   # HumanEval pass@1 evaluation harness
+latex2sympy2-extended==1.11.0   # math_verify backend (transitive, pinned)
+math-verify==0.9.0   # boxed/number answer grading for MATH-500 and GSM8K
+matplotlib==3.11.1   # latent-trajectory (Fig.4) and attention-shift (Fig.5) figure reproduction
+numpy==2.5.1   # .npz activation/manifold storage; array math
+pillow==12.3.0   # rdkit image backend (transitive, pinned)
+pytest==9.1.1   # test runner (required by repro gate)
+rdkit==2026.3.4   # SMILES validity for molecular generation (Table 3 validity metric)
+safetensors==0.8.0   # model weight loading
+scikit-learn==1.9.0   # roc_auc_score (head AUROC), LogisticRegression (ITI probes), PCA
+scipy==1.18.0   # scikit-learn backend; percentile/qr helpers (transitive, pinned)
+sentencepiece==0.2.2   # Llama/Gemma tokenizer backend
+sympy==1.14.0   # math_verify backend (transitive, pinned)
+tokenizers==0.22.2   # HF fast tokenizers (transitive of transformers, pinned)
+torch==2.7.1   # PyTorch - tensors, SVD (Eq.5), forward passes, o_proj hooks
+transformers==4.57.1   # HuggingFace Transformers - load Llama-3.1-8B-Instruct, Gemma-4-E4B-it, GPT-OSS-20b; chat templates; generation
+
+# === Pinned transitive dependencies (lock the resolved set) ===
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+antlr4-python3-runtime==4.13.2
+anyio==4.14.2
+attrs==26.1.0
+certifi==2026.7.22
+charset-normalizer==3.4.9
+contourpy==1.3.3
+cycler==0.12.1
+dill==0.4.1
+filelock==3.32.0
+fire==0.7.1
+fonttools==4.63.0
+frozenlist==1.8.0
+fsspec==2026.6.0
+h11==0.16.0
+hf-xet==1.5.2
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.18
+iniconfig==2.3.0
+jinja2==3.1.6
+joblib==1.5.3
+kiwisolver==1.5.0
+markupsafe==3.0.3
+mpmath==1.3.0
+multidict==6.7.1
+multiprocess==0.70.19
+narwhals==2.24.0
+networkx==3.6.1
+packaging==26.2
+pandas==3.0.5
+pluggy==1.6.0
+propcache==0.5.2
+psutil==7.2.2
+pyarrow==25.0.0
+pygments==2.20.0
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+pyyaml==6.0.3
+regex==2026.7.19
+requests==2.34.2
+setuptools==83.0.0
+six==1.17.0
+termcolor==3.3.0
+threadpoolctl==3.6.0
+tqdm==4.70.0
+typing-extensions==4.16.0
+urllib3==2.7.0
+xxhash==3.8.1
+yarl==1.24.5
