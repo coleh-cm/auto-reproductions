@@ -144,6 +144,20 @@ exercised here; the from-scratch environment was instead verified via a fresh
   byte-identical to the provided paper text — one whitespace drift found and
   corrected (Eq. (2) block: the single-space filler line between `)` and `,`
   had been saved as an empty line). Header (title, date, Status) confirmed.
+- 2026-07-29: SPEC step re-executed for the new reproduction pass. Verified every
+  citation in SPEC.md against `paper/paper.md` on disk (all grep strings and line
+  ranges resolve: Eq. (1) 96–108, Eq. (2) 109–169, Eq. (3) 172–212, Eq. (4) 215–252,
+  degeneracy 253–280, hyperparameters 344–389, Table 1 399–414, output contract
+  466–470); no drift. Re-ran the §6 upstream check: paper link grep
+  (`http|www\.|github|arxiv|doi|available at`) still zero matches; GitHub repo
+  search `confidence-weighted self-distillation` and `cwsd label noise` both
+  `total_count: 0`. SPEC.md §5 interfaces match `run_experiment.py` as committed
+  (all nine functions + CLI flags, incl. `--rng-layout` / `--s` defaults). Re-ran
+  both arms from a fresh `uv venv --clear .venv` + pinned install: baseline
+  `FINAL accuracy=0.9370`, CWSD `FINAL accuracy=0.9611` — identical to §7's
+  recorded numbers; `pytest -q tests` → 23 passed. SPEC.md required no changes;
+  it remains the spec for this pass (already committed in `02041bd` and carried
+  forward unchanged through `26365a2`).
 
 ## Target numbers
 
