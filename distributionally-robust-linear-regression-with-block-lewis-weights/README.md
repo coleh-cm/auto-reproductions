@@ -113,7 +113,7 @@ docker run --rm gdr-block-lewis          # runs smoke_imports.py
 # all 7 method arms x 2 datasets + opt_reference (the §8 comparison)
 bash run_all_arms.sh                 # prints one FINAL line per (dataset, arm)
 
-# a tiny end-to-end smoke (same code path, finishes in ~1 min; NOT a result)
+# a tiny end-to-end smoke (all 7 arms, same code path, finishes in <1 s; NOT a result)
 bash smoke.sh
 ```
 

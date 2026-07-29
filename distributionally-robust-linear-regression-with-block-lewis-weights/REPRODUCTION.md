@@ -141,6 +141,23 @@ T3 (report-only): ERM mean 107.3 (paper 108.2 ±5 ✓), worst state California
   inside the 1.8% warm-start gap, so subgradient reaches it in 3 steps. This is
   honest scoping with full disclosure, not a weakened gate.
 
+### Round-4 review fixes (this pass)
+
+- **smoke.sh only proved 4 of 7 arm code paths run.** The smoke covered
+  `subgradient`, `smoothed_hb`, `ipm`, `ball_oracle_lewis` but silently skipped
+  `smoothed_gd`, `smoothed_nesterov`, and `ball_oracle_euclidean`. SPEC says
+  smoke "proves the path runs"; a latent runtime bug in the 3 skipped arms
+  would have passed the smoke gate undetected. Fix: smoke now runs ALL SEVEN
+  paper arms (§8.1.2) at the tiny scale with the same `normalize_problem` +
+  `erm_warm_start` code path as `run_arm.py`. All 7 run cleanly in <1 s; the
+  4 previously-covered arms reproduce their gaps verbatim (subgradient 0.188,
+  smoothed_hb 0.160, ipm 0.013 @iter 11, ball_oracle_lewis 0.050 @iter 1).
+  At this size the E11 reset (Σwᵢ ≥ m) fires, so `ball_oracle_euclidean` and
+  `ball_oracle_lewis` are bit-identical (0.050 @iter 1) — the degeneracy the
+  test suite (`tests/test_degeneracy.py`) checks. Smoke output is still NOT
+  paper evidence. No production code or committed result changed; only the
+  smoke's coverage.
+
 ### Blocker B1 (ACS heterogeneity, U4/U7)
 The reproduced ACS ERM-robust gap is ~1.8% vs the paper's ~25%, so the
 subgradient reaches 1% (paper: NR) and IPM/HB counts are compressed. The gap
