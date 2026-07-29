@@ -159,6 +159,21 @@ exercised here; the from-scratch environment was instead verified via a fresh
   it remains the spec for this pass (already committed in `02041bd` and carried
   forward unchanged through `26365a2`).
 
+- 2026-07-29: Setup step executed for a new reproduction pass (same paper_ref
+  `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id). Cloned the
+  reproductions repository into `$HOME` (HTTPS, token-credentialed), found the
+  slug folder already present from the prior pass (kept, per the running-log
+  convention). Re-wrote `/root/.repro_dir` with the absolute folder path (87
+  bytes, no trailing newline). Verified `paper/paper.md` against this pass's
+  provided paper text via an independent fresh transcription + `diff`: all
+  content lines (every number, symbol, and word, ~471 lines) match verbatim;
+  the only discrepancies were 5 whitespace-only filler lines from the PDF
+  extraction (`83`, `126`, `143`, `145`, `192`), exactly the class of line
+  that proved visually ambiguous in the prior pass (the `143` case, Eq. (2)
+  block, was adjudicated byte-for-byte in `26365a2`). The file was kept as
+  previously adjudicated. Header (title, date, Status section) confirmed;
+  this entry is this pass's setup record.
+
 ## Target numbers
 
 | Method | λ | Test accuracy |
