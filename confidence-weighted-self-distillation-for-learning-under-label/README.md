@@ -45,17 +45,20 @@ including every choice the paper leaves unstated (notably the gate sharpness
 | Cross-entropy (baseline)   | 0 | 0.9370         |
 | CWSD (ours)                | 1 | 0.9620          |
 
-Reproduced here (seed 0, defaults `--rng-layout init-first --s 0.15`):
-baseline **`0.9370`** (exact, 506/540), CWSD **`0.9611`** (gap 0.0009). Both
-within the ±0.004 acceptance. The baseline is reproduced *exactly* — this is the
-degeneracy check the paper itself prescribes (λ=0 ⇒ `t = y` ⇒ Eq. (4) is plain
-cross-entropy) and is the strongest correctness evidence; it does not depend on
-the unstated `s`. The one hyperparameter the paper omits that the CWSD arm
-depends on — the gate sharpness `s` — is calibrated against the paper's own
-reported CWSD accuracy under the RNG layout that already reproduces the
-baseline; the result is not a knife-edge of `s` (see `SPEC.md` §4 item 1 and
-`REPRODUCTION.md`). Run the tests to verify the no-op = baseline claim without
-trusting the implementation: `pytest -q` → 23 passed.
+Measured here (seed 0, defaults `--rng-layout init-first --s 0.15`, same as
+paper §5's bare commands): baseline **`0.9370`** (equals the paper's claimed
+0.9370), CWSD **`0.9611`** (paper claims 0.9620; measured −0.0009). The
+baseline equals the paper's claimed value; this is the degeneracy check the
+paper itself prescribes (λ=0 ⇒ `t = y` ⇒ Eq. (4) is plain cross-entropy) and is
+the strongest correctness evidence; it does not depend on the unstated `s`.
+The one hyperparameter the paper omits that the CWSD arm depends on — the gate
+sharpness `s` — is calibrated against the paper's own reported CWSD accuracy
+under the RNG layout that already matches the baseline; the result is not a
+knife-edge of `s` (see `SPEC.md` §4 item 1 and `REPRODUCTION.md`). Whether the
+CWSD arm's 0.0009 gap counts as a reproduction is not asserted; see
+`REPRODUCTION.md` for the measured-vs-claimed table. Run the tests to verify
+the no-op = baseline claim without trusting the implementation: `pytest -q`
+→ 23 passed.
 
 ## Quickstart
 

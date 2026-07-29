@@ -9,23 +9,54 @@
 
 ## Status
 
-**Implemented and reproducing.** `run_experiment.py` implements CWSD per SPEC §1/§5
-(hand-derived gradients, numpy + scikit-learn only; the stop-grad of Eq. (3) is
-structural). `tests/` holds the degeneracy gate (`tests/test_degeneracy.py`) and the
-equation-invariant tests (`tests/test_invariants.py`), plus data and CLI tests —
-23 pass. Both arms reproduce the paper's Table 1 within the ±0.004 acceptance
-under the chosen defaults:
+`run_experiment.py` implements CWSD per SPEC §1/§5 (hand-derived gradients, numpy +
+scikit-learn only; the stop-grad of Eq. (3) is structural). `tests/` holds the
+degeneracy gate (`tests/test_degeneracy.py`) and the equation-invariant tests
+(`tests/test_invariants.py`), plus data and CLI tests — 23 pass. Both arms have
+been run; their measured numbers are recorded below beside the paper's claimed
+numbers. The baseline (λ=0) arm has no dependence on the unstated gate sharpness
+`s`; the CWSD (λ=1) arm does, and `s` was calibrated against the paper's own
+reported CWSD number (see "Decisions" below). Whether these numbers constitute a
+reproduction is left to the reader; the table states the measured values, the
+claimed values, and the difference.
 
-| Method | λ | Paper | This run | gap |
-|---|---|---|---|---|
-| Cross-entropy baseline | 0 | 0.9370 | **0.9370** | 0.0000 (exact) |
-| CWSD | 1 | 0.9620 | **0.9611** | 0.0009 |
+## Results (measured vs claimed)
 
-The baseline is reproduced *exactly* (506/540); this is the degeneracy check the
-paper itself prescribes (λ=0 ⇒ t=y ⇒ Eq. (4) is plain CE) and is the strongest
-correctness evidence — it does not depend on the unstated `s`, so it cannot have
-been fit. The CWSD arm depends on the one unstated hyperparameter `s`; it is
-calibrated against the paper's own reported CWSD number (see "Decisions" below).
+Both arms were run from this folder with the venv Python and the defaults
+`--rng-layout init-first --s 0.15` (these are the program defaults, so the bare
+commands from paper §5 reproduce them). Each run prints exactly one line,
+`FINAL accuracy=<float>`. The numbers below are from `/tmp/baseline.log` and
+`/tmp/method.log`; both were re-run to confirm determinism (same command → same
+number).
+
+| Method | λ | Paper (claimed) | This run (measured) | measured − claimed | exact command |
+|---|---|---|---|---|---|
+| Cross-entropy baseline | 0 | 0.9370 | 0.9370 | 0.0000 | `python run_experiment.py --lambda 0.0` |
+| CWSD | 1 | 0.9620 | 0.9611 | −0.0009 | `python run_experiment.py --lambda 1.0` |
+
+The baseline arm's measured value equals the paper's claimed value exactly
+(0.9370 = 0.9370). The CWSD arm's measured value is 0.0009 below the paper's
+claimed value. No tolerance is asserted here.
+
+## Research-readiness gates
+
+Verdicts recorded per gate; `partial` is used where the honest answer is partial.
+`docker` is not installed in this environment, so the Docker build was not
+exercised here; the from-scratch environment was instead verified via a fresh
+`uv venv` + `uv pip install` build (see gate 1).
+
+| # | Gate | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Builds from scratch | partial | `Dockerfile` present and self-contained (python:3.13-slim, pinned `requirements.txt`, copies code + runs pytest as a build smoke test), but `docker build` was not run — `docker` is not installed in this environment. The from-scratch environment was instead verified by building a fresh venv: `uv venv --python 3.13 /tmp/freshvenv_test && uv pip install --python /tmp/freshvenv_test -r requirements.txt` succeeded, the CWSD arm ran (`FINAL accuracy=0.9611`), and `pytest -q` → 23 passed. |
+| 2 | README is accurate | pass | Followed the README "With uv" quickstart verbatim from a fresh venv (the `--clear` flag makes it idempotent); install succeeded and both arms produced the documented `FINAL accuracy=<float>` line. |
+| 3 | Packages are clear | pass | `requirements.txt` pins every dependency with a version (numpy 2.5.1, scikit-learn 1.9.0, scipy 1.18.0, joblib 1.5.3, threadpoolctl 3.6.0, narwhals 2.24.0, pytest 9.1.1 + its deps). Fresh install imports and runs with no missing-import failure. |
+| 4 | Entrypoint is obvious | pass | One documented command, `python run_experiment.py --lambda FLOAT`, drives the whole experiment via flags; no source edits needed. `--lambda` is required; all hyperparameters are CLI flags with the paper's values as defaults. |
+| 5 | Fast path | pass | The full 4000-step run completes in ~0.8 s, so the full run *is* the fast path; the whole train+eval path is exercised end to end in well under a couple of minutes. |
+| 6 | Deterministic / noise quantified | pass | Same command, same seed (0) → same number on re-run: baseline `0.9370` and CWSD `0.9611` reproduced on a second invocation. |
+| 7 | Degeneracy test in repo | pass | `tests/test_degeneracy.py` asserts the λ=0 path is bitwise identical to an independently written cross-entropy routine (per-step loss + every grad, and a 300-step SGD loop with identical params + accuracy). `pytest -q` → 23 passed. |
+| 8 | Data provenance stated | pass | Data is `sklearn.datasets.load_digits` (1797 × 8×8 digits, 10 classes), pinned via scikit-learn 1.9.0; split is stratified `train_test_split` at seed 0 (30% test); stated in README/SPEC. No manual download. |
+| 9 | Recorded number reproducible | pass | The exact commands recorded beside the numbers above, run again, produced the same numbers (baseline 0.9370, CWSD 0.9611). |
+| 10 | No hidden local state | pass | A fresh venv in a fresh location (`/tmp/freshvenv_test`) with only the repo files + pinned requirements installed runs the experiment and the tests with the recorded numbers; nothing depends on a hand-built env or home-directory state. |
 
 ## Decisions (every choice the paper left open)
 
