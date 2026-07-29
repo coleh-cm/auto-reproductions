@@ -95,6 +95,12 @@ def main(argv=None):
     max_new = (args.max_new_tokens if args.max_new_tokens and args.max_new_tokens > 0
                else config.DEFAULT_MAX_NEW_TOKENS.get(
                    "code" if args.benchmark in ("HumanEval", "MBPP") else "math", 512))
+    # SPEC §4.13: fit the manifold on traces in the SAME prompt format as eval, so
+    # the contrastive error subspace captures errors of the eval distribution. The
+    # chat template applies to the natural-language benchmarks (MATH-500/GSM8K/MBPP);
+    # HumanEval's eval is completion-style so its APPS fit is also completion-style.
+    from .generation import CHAT_TEMPLATE_BENCHMARKS
+    use_chat = args.benchmark in CHAT_TEMPLATE_BENCHMARKS
     paired = []
     for prob in train_problems:
         traces = []
@@ -105,7 +111,7 @@ def main(argv=None):
                 max_new_tokens=max_new, do_sample=True,
                 temperature=config.DEFAULT_SAMPLING_TEMP,
                 top_p=config.DEFAULT_SAMPLING_TOP_P,
-                seed=config.DEFAULT_SEED + s,
+                seed=config.DEFAULT_SEED + s, use_chat_template=use_chat,
             )
             ok = grade(prob.benchmark, text, prob)   # grade against the SOURCE benchmark
             traces.append((text, ids, acts, ok))

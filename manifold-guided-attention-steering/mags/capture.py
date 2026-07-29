@@ -36,8 +36,21 @@ class _CaptureHook:
         bsz, seq, H, dh = x_heads.shape
         if layer not in self.monitored:
             return None
+        # SPEC §4.7 (generated tokens only): capture DECODE steps only (seq==1).
+        # model.generate(use_cache=True) issues one prefill (seq>1) per trace whose
+        # last position is the activation at the LAST PROMPT-token position — that is a
+        # prompt-context activation (attends only to prompt tokens) which SPEC §4.7
+        # explicitly excludes from the means and the global centroid mu_c (Eq.6),
+        # warning it would shift mu_c. Skipping prefill here also keeps the FIT
+        # consistent with the inference controller (mags/steering.py:45), which only
+        # scores/steers decode steps (seq==1) — so the threshold pool (Eq.8) is
+        # calibrated on the same decode-step score distribution the controller emits.
+        # The activation captured at decode step k is the head output at the position
+        # of generated token k-1; pooling all captured rows yields one activation per
+        # decode step (per generated token after the first), aligned to generated tokens.
+        if seq != 1:
+            return None
         self._layer_shape[layer] = (H, dh)
-        # last position only
         last = x_heads[:, -1:, :, :].detach().to(torch.float32).cpu().numpy()
         self.buffer[layer].append(last[0, 0])   # [H, dh]
         return None
@@ -56,15 +69,20 @@ class _CaptureHook:
 
 @torch.no_grad()
 def capture_trace(model, tok, model_id, hook_registry, prompt_text, max_new_tokens,
-                  do_sample=True, temperature=1.0, top_p=0.95, seed=42):
+                  do_sample=True, temperature=1.0, top_p=0.95, seed=42,
+                  use_chat_template=False):
     """Generate one trace from ``prompt_text`` and capture per-head activations.
 
     ``hook_registry`` must be attached with this capture callback. Returns
     (text, token_ids, acts) where acts[layer] = [T_gen, H, dh] fp32.
+
+    ``use_chat_template`` (SPEC §4.13): the manifold must be fit on traces in the
+    SAME prompt format as eval, so the contrastive error subspace captures errors of
+    the eval distribution. Pass the benchmark's chat-template flag here too.
     """
     torch.manual_seed(seed)
-    ids = tok(prompt_text, return_tensors="pt").input_ids.to(model.device)
-    from .generation import _truncate_prompt
+    from .generation import _truncate_prompt, _tokenize_prompt
+    ids = _tokenize_prompt(tok, prompt_text, use_chat_template).to(model.device)
     ids = _truncate_prompt(model, ids, max_new_tokens)
     n_prompt = ids.shape[1]
     capture = _CaptureHook(hook_registry.layout.monitored_layers,
@@ -82,4 +100,13 @@ def capture_trace(model, tok, model_id, hook_registry, prompt_text, max_new_toke
     gen_ids = out[0, n_prompt:]
     text = tok.decode(gen_ids, skip_special_tokens=True)
     acts = capture.stacked()
-    return text, gen_ids.cpu().numpy(), acts
+    # Decode-only capture (SPEC §4.7): acts has T = (#decode forwards) rows, one per
+    # decode step. Each decode step k's activation sits at the position of generated
+    # token k-1, so the captured rows align to gen_ids[:-1] (the last generated token
+    # has no decode forward). Return the aligned gen-id prefix so the stored token_ids
+    # length matches A's T (build_head_activations pools rows and ignores token_ids, but
+    # a length mismatch would be a latent store inconsistency). ``text`` is the FULL
+    # completion (all generated tokens) for grading.
+    any_T = next((a.shape[0] for a in acts.values() if a.shape[0] > 0), 0)
+    aligned = gen_ids[:any_T]
+    return text, aligned.cpu().numpy(), acts

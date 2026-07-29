@@ -1581,6 +1581,86 @@ correction, 39 tests incl. degeneracy + invariants, smoke runs the real
 path), but no paper number is reproducible in this CPU-only, model-uncached
 sandbox. Branch `repro/manifold-guided-attention-steering` pushed.
 
+## Round 20 — orchestrated faithfulness review fixes (2 verified findings)
+
+Ran a 5-component adversarial faithfulness review (data, manifold-core,
+fit-select, eval-grading, baselines) against the authoritative LaTeX
+(`paper/latex_src/neurips_2026.tex`), with a refute-by-default verify phase
+(each finding independently refuted by reading the actual code; kept only if
+not refuted). 2 findings raised, 2 verified, 0 refuted. Both fixed; 5 new
+regression tests added (48 tests pass, smoke runs). Both findings are SILENT
+correctness bugs that produce plausible-but-WRONG numbers on a real GPU run
+and that 19 rounds of distilgpt2-only smoke could not catch (distilgpt2 has
+no chat template and the prefill/decode distinction is invisible without
+inspecting the forward-call count).
+
+### MAJOR — prefill-last prompt activation leaked into the manifold (data-1)
+`mags/capture.py:41-42` recorded `x_heads[:, -1:, :, :]` (the last position) on
+EVERY forward pass with no prefill (seq>1) guard. With
+`model.generate(use_cache=True)` and N generated tokens there are exactly N
+forwards (1 prefill + N-1 decodes), so the activation stack's row 0 was the
+prefill-last — the activation at the LAST PROMPT-token position, which attends
+only to prompt tokens. This row was pooled into the per-class means (Eq.2),
+the global correct centroid `μ_c` (Eq.6) and the threshold pool (Eq.8),
+directly violating SPEC §4.7 ("generated tokens only, prompt excluded"),
+whose stated rationale is exactly that the shared prompt would shift `μ_c`.
+Because prompts differ across problems, the prefill-last does NOT cancel in
+`μ_c` the way it cancels in the per-problem `δ` (Eq.3); `μ_c` — the centering
+reference in every inference proximity score (Eq.7) and every correction
+(Eq.9) — carried a problem-varying prompt-position bias. It also created a
+fit/inference inconsistency: the inference controller
+(`mags/steering.py:45`, `if seq != 1: return None`) never scores or steers
+the prefill, yet the threshold (Eq.8) was calibrated on a pool containing
+the prefill-last's score. **Fix:** `_CaptureHook.__call__` now captures
+decode steps only (seq==1); `T = N-1` rows aligned to `gen_ids[:-1]` (the
+last generated token has no decode forward); `capture_trace` returns the
+aligned gen-id prefix so the stored `token_ids` length matches `A`'s `T`.
+This makes fit and inference score the identical set of positions and keeps
+`μ_c` free of the prompt-position term. Verified empirically: max_new=4 on
+tiny-gpt2 now captures T=3 (was 4). Regression tests `test_capture_is_decode_only`
+and `test_capture_trace_aligned_gen_ids_length`. SPEC §4.7 updated with the
+realized enforcement and the honest prior-bug description.
+
+### MAJOR — no chat template applied to instruct-model prompts (eval-grading-1)
+`mags/generation.py:53` (`generate`) and `:85` (`cd_generate`) tokenized the
+prompt raw with `tok(prompt_text, return_tensors="pt").input_ids` and NEVER
+applied the tokenizer's chat template. SPEC §4.13 explicitly mandates "the
+model's HuggingFace chat template", and the paper runs instruction-tuned models
+(Llama-3.1-8B-Instruct, Gemma-4-E4b-it; tex:L386-387). The loaders set
+`prompt_text` to bare problem text, so for MATH-500/GSM8K/MBPP the instruct
+model was fed a raw user turn with no user/assistant chat priming. Instruct-
+tuned models degrade substantially when run as raw-continuation LMs (far fewer
+`\boxed{}`/`####`-terminated answers, forcing the math grader to fall back to
+last-number extraction; lower-quality code), silently deflating headline
+accuracy below the paper's claimed values (tex:L420-441). HumanEval was
+unaffected (its prompt is a raw function signature = the correct
+completion-style protocol). The same bug was duplicated in `cd_generate` and
+`capture.py:66`. **Fix:** `_tokenize_prompt(tok, prompt_text, use_chat_template)`
+(`mags/generation.py`) applies `tok.apply_chat_template([{role:user,...}],
+add_generation_prompt=True)` when requested, with a graceful fallback to raw
+tokenization for base models with no chat template (distilgpt2 smoke).
+`CHAT_TEMPLATE_BENCHMARKS = {"MATH-500","GSM8K","MBPP"}` (HumanEval excluded —
+completion-style). The flag is threaded to `generate`, `cd_generate`, AND
+`capture_trace` (manifold fit): the contrastive error subspace must be fit on
+traces in the SAME prompt format as eval (APPS-as-completion for HumanEval's
+manifold matches HumanEval's completion-style eval; APPS-as-chat for MBPP
+matches MBPP's chat eval). Callers updated: `eval.py run_arm`,
+`run.py` CD branch, `fit.py` trace collection. Regression tests
+`test_chat_template_set_and_humaneval_excluded`,
+`test_tokenize_prompt_chat_fallback_on_base_model`,
+`test_tokenize_prompt_no_chat_equals_raw`. SPEC §4.13 updated with the
+HumanEval exception and the fit/eval consistency rationale.
+
+### Environment block (unchanged, re-confirmed this round)
+aarch64 CPU-only, no GPU, Llama-3.1-8B-Instruct gated (no HF token), Gemma-4-E4B-it
+/GPT-OSS-20B unrunnable at the paper's eval scale on CPU. The two fixed bugs would
+have corrupted a real GPU run's numbers (biased `μ_c`/threshold; deflated
+natural-language-benchmark accuracy); on this sandbox all 45 arms still print
+`FINAL <arm>=BLOCKED` (the honest no-numbers sentinel), which the numbers gate
+reports as "missing a FINAL line" because `BLOCKED` is non-numeric — the
+expected, correct signal of an environment-blocked numbers gate (see round-16
+entry). Branch `repro/manifold-guided-attention-steering` pushed.
+
 ## Round 19 — orchestrated faithfulness review fixes (4 verified findings)
 
 Ran a 5-component adversarial faithfulness review (data, manifold-core, fit,

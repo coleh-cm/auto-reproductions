@@ -411,8 +411,9 @@ def _run(args, arm_id, bench, model_id, arm, emit):
         # (the expert run unsteered, SPEC §4.14), so we compute it per problem and
         # write the same results JSON the other arms write (reproduces the CD PPL
         # column the paper reports, tex:L433/L479).
-        from .generation import cd_generate, perplexity_of
+        from .generation import cd_generate, perplexity_of, CHAT_TEMPLATE_BENCHMARKS
         from .eval import bootstrap_ci
+        use_chat = bench in CHAT_TEMPLATE_BENCHMARKS
         corrects = []
         ppls = []
         per_problem = []
@@ -420,7 +421,7 @@ def _run(args, arm_id, bench, model_id, arm, emit):
             completion, gen_ids, prompt_ids = cd_generate(
                 model, amateur, tok, prob.prompt_text, max_new_tokens=max_new,
                 alpha_plausibility=config.CD_DEFAULT_ALPHA_PLAUS,
-                beta=config.CD_DEFAULT_BETA,
+                beta=config.CD_DEFAULT_BETA, use_chat_template=use_chat,
             )
             ok = grade(bench, completion, prob)
             ppl = float("nan")

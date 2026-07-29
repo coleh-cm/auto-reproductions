@@ -8,6 +8,41 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
+# SPEC §4.13: the model's HuggingFace chat template is the prompt-format decision for
+# the natural-language-instruction benchmarks. HumanEval is the exception: its prompt
+# is a raw function signature and the canonical HumanEval protocol is completion-style
+# (no chat priming), so the instruct model is run as a raw-continuation LM there. This
+# set drives ``use_chat_template`` for BOTH eval and the manifold fit (capture_trace):
+# the contrastive error subspace must be fit on traces in the SAME prompt format as
+# eval, or it captures errors of a different distribution (SPEC §4.13 + finding-2 fix).
+CHAT_TEMPLATE_BENCHMARKS = {"MATH-500", "GSM8K", "MBPP"}
+
+
+def _tokenize_prompt(tok, prompt_text, use_chat_template):
+    """Tokenize ``prompt_text``, applying the model's chat template when requested.
+
+    SPEC §4.13 mandates the HF chat template for instruct models on the
+    natural-language benchmarks. A base model (e.g. distilgpt2 smoke) has no chat
+    template; ``apply_chat_template`` is absent or raises, so we fall back to raw
+    tokenization rather than crashing — the chat template is a property of the
+    tokenizer, not the benchmark, and base models are only ever used for the
+    code-path smoke (never for paper numbers).
+    """
+    if not use_chat_template:
+        return tok(prompt_text, return_tensors="pt").input_ids
+    try:
+        messages = [{"role": "user", "content": prompt_text}]
+        ids = tok.apply_chat_template(
+            messages, add_generation_prompt=True, tokenize=True,
+            return_tensors="pt", return_dict=False,
+        )
+        if ids is None or (hasattr(ids, "shape") and ids.shape[-1] == 0):
+            return tok(prompt_text, return_tensors="pt").input_ids
+        return ids
+    except (TypeError, ValueError, AttributeError, RuntimeError):
+        # no chat template configured (base model) -> raw tokenization
+        return tok(prompt_text, return_tensors="pt").input_ids
+
 
 def _max_positions(model):
     """Best-effort model context length. Falls back to a large value when the
@@ -38,7 +73,8 @@ def _truncate_prompt(model, ids, max_new_tokens):
 
 @torch.no_grad()
 def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
-             do_sample=False, temperature=1.0, top_p=0.95, seed=42):
+             do_sample=False, temperature=1.0, top_p=0.95, seed=42,
+             use_chat_template=False):
     """Generate text with ``controller`` attached as the W_O pre-hook callback.
 
     Uses model.generate (use_cache=True) so decode forwards are seq==1 and the
@@ -48,9 +84,14 @@ def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
     returned so perplexity_of can compute CONDITIONAL PPL of the completion given
     the prompt under the unsteered base model (SPEC §4.14); the bare completion
     ids alone would give an unconditional PPL the paper never reports.
+
+    ``use_chat_template`` (SPEC §4.13): wrap the prompt in the model's HF chat
+    template for the natural-language-instruction benchmarks before generation;
+    HumanEval (completion-style) passes False. Base models without a chat
+    template fall back to raw tokenization (see _tokenize_prompt).
     """
     torch.manual_seed(seed)
-    ids = tok(prompt_text, return_tensors="pt").input_ids.to(model.device)
+    ids = _tokenize_prompt(tok, prompt_text, use_chat_template).to(model.device)
     ids = _truncate_prompt(model, ids, max_new_tokens)
     n_prompt = ids.shape[1]
     prompt_ids = ids[0].cpu().numpy()
@@ -76,13 +117,18 @@ def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
 
 @torch.no_grad()
 def cd_generate(expert, amateur, tok, prompt_text, max_new_tokens=1024,
-                alpha_plausibility=0.1, beta=0.5, seed=42):
+                alpha_plausibility=0.1, beta=0.5, seed=42, use_chat_template=False):
     """Greedy Contrastive Decoding (SPEC §4.17). Expert and amateur share the
-    tokenizer; we keep a parallel KV cache for the amateur and adapt expert logits."""
+    tokenizer; we keep a parallel KV cache for the amateur and adapt expert logits.
+
+    ``use_chat_template`` (SPEC §4.13): same convention as generate(); CD is run on
+    the same benchmarks so it must use the same prompt format as the other arms or
+    its logits/distribution comparison is against a different prompt distribution.
+    """
     from .baselines import ContrastiveDecoder
     torch.manual_seed(seed)
     cd = ContrastiveDecoder(expert, amateur, tok, alpha_plausibility, beta)
-    ids = tok(prompt_text, return_tensors="pt").input_ids.to(expert.device)
+    ids = _tokenize_prompt(tok, prompt_text, use_chat_template).to(expert.device)
     n_prompt = ids.shape[1]
     # prefill both
     out_e = expert(ids, use_cache=True)

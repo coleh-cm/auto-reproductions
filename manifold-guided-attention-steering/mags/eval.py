@@ -26,9 +26,10 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
     Returns dict {n, acc, ci95, ppl, per_problem:[{id, correct, ppl, completion}]}.
     ``grading`` defaults to mags.grading.grade.
     """
-    from .generation import generate, perplexity_of
+    from .generation import generate, perplexity_of, CHAT_TEMPLATE_BENCHMARKS
     if grading is None:
         from .grading import grade as grading
+    use_chat = benchmark in CHAT_TEMPLATE_BENCHMARKS
     per_problem = []
     corrects = []
     ppls = []
@@ -44,6 +45,7 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
         completion, gen_ids, prompt_ids = generate(
             model, tok, prob.prompt_text, controller,
             max_new_tokens=max_new_tokens, do_sample=False,
+            use_chat_template=use_chat,
         )
         if completion_limit:
             completion = completion[:completion_limit]
