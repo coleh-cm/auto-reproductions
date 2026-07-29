@@ -261,7 +261,27 @@ Evaluation protocol:
 19. **3-vs-7 logistic regression protocol**: which examples train/test, optimizer, stopping
     — all unstated; only clean 1.6% (tex:454) and adv 99% (tex:456) reported.
 20. **MNIST preprocessing**: [0,1] scaling IS stated (footnote, tex:334-337). Nothing else (no
-    centering) is stated or implied.
+     centering) is stated or implied.
+21. **E6 uniform-direction imprecision**: the displayed E6 (tex:411) uses the UNIFORM
+     perturbation η = −ε·sign(w). This is the worst case only for y=+1 examples; for y=−1 it
+     *decreases* the loss, so averaged over mixed labels E6 is NOT an upper bound on E5. The
+     true per-example worst case is η = −ε·y·sign(w) (since sign(∇ₓJ) = −y·sign(w), tex:407),
+     which IS always ≥ clean. `objectives.adversarial_logreg_cost` implements the paper's E6
+     verbatim (uniform direction, matching tex:411); the invariant test asserts the per-example
+     worst case. Both recorded as the paper's imprecision, not ours.
+22. **run_experiment.py knob mapping**: the graded harness CLI is `--lambda EPS --steps N
+     [--seed S] [--baseline]`. `--lambda` maps to the paper's ε (the FGSM perturbation
+     magnitude — the paper's free hyperparameter); ε=0 is the no-op setting that must equal
+     `--baseline` exactly (the degeneracy test). `--steps` is the SGD step count (the paper
+     states no epoch/step count). Chose: maxout 240 units (paper's M3 size), 5 pieces, 2
+     layers, init irange .005, SGD batch 100, LR .1, momentum .5→.7, α=0.5 (paper-stated),
+     ε=0.25 default (paper-stated for MNIST). **Dropout is DISABLED** (include prob 1.0) in
+     `run_experiment.py` specifically so the ε=0 degeneracy holds bit-for-bit: dropout masks
+     would diverge the RNG between the adv arm (extra forward for the input gradient) and the
+     baseline arm. Determinism: `MaxoutMLP` init draws from the GLOBAL torch RNG, so
+     `run_experiment.py` calls `torch.manual_seed(seed)` before constructing the model; the
+     batch-shuffle generator is seeded from `cfg.seed` inside `train()`. The monitor-best
+     checkpoint is loaded before evaluation (paper protocol).
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):
