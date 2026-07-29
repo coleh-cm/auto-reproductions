@@ -857,3 +857,79 @@ reference to <1e-5. AS registers hooks on all layers and rotates at
 non-monitored layers. Status still BLOCKED for every arm (no GPU / no
 cached/gated models; molecular setup unstated) — these are correctness fixes
 to the implementation, not new numbers.
+
+## Round 11 — gate root-cause analysis: the gate requires a NUMERIC FINAL value (BLOCKED is treated as "missing")
+
+**Symptom (gate feedback, rounds 1–10, identical).** Every one of the 45 arms
+reported `missing a FINAL line` with `values: []` / `spread across arms: None`,
+after TEN rounds of plumbing fixes that each verified in-sandbox that
+`run_all_arms.sh` (and each `arms.json` command) emits 45/45
+`FINAL <arm>=BLOCKED` lines with exit 0.
+
+**Root cause (best-supported explanation).** The gate parses each
+`FINAL <arm>=<value>` line, keeps only arms whose `<value>` is **numeric** (for
+the `values` list + `spread across arms` statistic), and reports an arm as
+`missing a FINAL line` when its value is not a number. `FINAL <arm>=BLOCKED`
+has a non-numeric value, so the gate records the arm as missing and excludes it
+from `values`. With all 45 arms BLOCKED this reproduces the feedback exactly:
+`values: []`, `spread across arms: None`, all 45 "missing a FINAL line".
+
+Evidence:
+- The only reproduction confirmed to have **passed the gate and published**
+  (`explaining-and-harnessing-adversarial-examples`, merged to `origin/main`)
+  emits `FINAL <arm>=<float>` for every arm (`run_experiment.py:167`
+  `print(f"FINAL {arm}={acc}")` with a float `acc`).
+- The `block-lewis-gdr` sibling emits the non-numeric string `"NR"` for
+  not-reached arms (`run_arm.py:188` `value = "NR" if ...`), and it is **not**
+  on `origin/main` (not published) — i.e. there is no confirmed case of a
+  non-numeric FINAL value being accepted by the gate.
+- `values: []` is empty; if the gate kept the `BLOCKED` strings as values it
+  would be `["BLOCKED", ...]`. It is `[]` because no numeric value was parsed.
+- Rounds 1–10 made BLOCKED lines *emit* and *exit 0* (POSIX-sh portability,
+  no-network cache precheck, exit-0 on BLOCKED) — none changed the gate's
+  report, because the gate never objected to the line's *presence* or the
+  *exit code*; it objected to the *non-numeric value*.
+
+**Why this cannot be "fixed" by the implementation step (and must not be).**
+Every one of the paper's 45 arms runs one of three models that need a GPU host
+with the weights pre-cached (SPEC §C.1): `meta-llama/Llama-3.1-8B-Instruct`
+(gated, fp16, RTX 4090), `google/gemma-4-E4B-it` (bf16, RTX 4090),
+`openai/gpt-oss-20b` (mxfp4, H200, ~40 GB). The gate environment (a fresh
+checkout / Docker image) has none of these cached and no GPU, so every arm is
+genuinely unrunnable — the honest result is `BLOCKED`, a number would be a
+fabrication. Producing a numeric value to satisfy the gate would require
+substituting a smaller/CPU model (e.g. the smoke `distilgpt2`), which is exactly
+the failure mode the reproduction rules forbid — "a closed-book run silently
+fell back to a synthetic corpus and produced seven arms at chance level ...
+which passed every gate and meant nothing." The task's own rule is "Real data,
+or no numbers ... a blocked result to report, not a cue to substitute synthetic
+data." So `FINAL <arm>=BLOCKED` IS the correct, sanctioned report of a blocked
+result; the publish step reports `rung=environment` for it.
+
+**What this step verified (so the publish step / reviewers do not re-derive it).**
+- `sh run_all_arms.sh` and `bash run_all_arms.sh` (and `bash -e`, and a minimal
+  `env -i` environment, and an environment with NO `python` on PATH at all)
+  each emit exactly 45 `FINAL <arm>=BLOCKED` lines — one per `arms.json` key,
+  byte-for-byte exact name match — and exit 0 (verified programmatically: 0
+  missing, 0 extra, `values == {"BLOCKED"}`). The all-BLOCKED fast path is pure
+  POSIX shell (filesystem model-cache stat), so it is independent of Python /
+  torch / transformers / network / CUDA / HF-token; it cannot hang.
+- Each `arms.json` command run directly (`python -m mags.run ...`) emits its
+  `FINAL <arm>=BLOCKED` line and exits 0 under: no token / fake token, online
+  / offline, partial HF cache present (e.g. the `gemma-4-E4B-it` config-only
+  snapshot), with and without transformers installed. The unconditional
+  `_model_cached` precheck in `mags/run.py::_run` blocks in <1 s before any
+  torch/transformers import.
+- `pytest` → 30/30; `smoke.sh` → `FINAL smoke=0.0000` (the real fit→steer→grade
+  path runs end-to-end on the cached `distilgpt2` + cached MATH-500; this is
+  path evidence only, NOT paper evidence — distilgpt2 cannot solve MATH-500).
+
+**Status.** Implementation complete and correct against the LaTeX source;
+deliverables present (`arms.json` 45-arm command map, `arms_contract.json`
+claimed values + CIs, `run_all_arms.sh`, `smoke.sh`, `tests/` degeneracy +
+equation-invariants + grading, committed `runs/BLOCKED__*.json` evidence).
+Every arm is a genuine `BLOCKED` (no GPU / no cached 8B/4B/20B models;
+molecular setup unstated by the paper, SPEC §4.18). The gate's "all missing"
+report is the expected signal for an environment-blocked GPU paper, not a
+plumbing bug to fix by fabricating numbers; the publish step reports
+`rung=environment`.
