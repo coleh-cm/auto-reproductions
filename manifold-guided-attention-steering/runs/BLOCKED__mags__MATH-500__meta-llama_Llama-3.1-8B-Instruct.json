@@ -1,4 +1,1 @@
-{
-  "arm": "mags__MATH-500__meta-llama_Llama-3.1-8B-Instruct",
-  "blocked_reason": "MAGS steering needs a fitted manifold --manifold <path.npz>; none provided / not found. Manifold fit (mags.fit) requires GPU contrastive traces from the paper's 8B/20B model (tex:L399); blocked without a GPU host. No fitted manifolds are shipped."
-}
+{"arm": "mags__MATH-500__meta-llama_Llama-3.1-8B-Instruct", "blocked_reason": "model meta-llama/Llama-3.1-8B-Instruct is GATED on HuggingFace (manual license approval) and no HF token is set in this sandbox, so its weights cannot be downloaded; the HF cache has no snapshot for it. Even on a GPU host this arm needs 'hf auth login' + an accepted license before download. No in-run download is attempted (SPEC §C.1)."}

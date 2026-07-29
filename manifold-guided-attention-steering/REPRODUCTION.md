@@ -34,6 +34,87 @@
 
 ## Log
 
+### 2026-07-29 — Round 22: inline faithfulness review + adversarial env-block confirmation (orchestration script crashed in its own synthesis loop; review done inline)
+
+- **Gate feedback this round (unchanged since round 1):** all 45 arms reported
+  "missing a FINAL line", `values: []`, `spread across arms: None`.
+- **Orchestration:** launched `mags-faithfulness-review` (6 components × {review,
+  adversarial-verify}) to review each component against the paper LaTeX. The
+  orchestrate script crashed at its synthesis step (`TypeError: 'NoneType' object
+  is not subscriptable`) because I mis-handled `pipeline`'s return shape — it
+  returns the last stage's outputs, not `(review, verified)` tuples. Rather than
+  relaunch, I performed the same review inline with direct tool access.
+- **Inline faithfulness review (paper LaTeX `paper/latex_src/neurips_2026.tex`
+  authoritative for maths):**
+  - **Method core (`mags/manifold.py`, `mags/steering.py`):** Eq.2 token-count-
+    weighted per-class means (manifold.py:158-163) ✓; Eq.3 `δ=μ_e−μ_c`
+    (manifold.py:175) ✓; Eq.4 `D∈R^{N×d_h}` rows=problems (manifold.py:178) ✓
+    (paper prints `D^T∈R^{d_h×N}`, tex:L220-228); Eq.5 compact SVD `B=Vh[:k]`
+    orthonormal rows `[k,d_h]` (manifold.py:193-195) ✓; Eq.6 global correct
+    centroid token-count-weighted (manifold.py:198-211) ✓; Eq.7 proximity
+    `‖B(a−μ_c)‖²` (manifold.py:33-40, steering.py:65) ✓; Eq.8 threshold = q-th
+    percentile of POOLED per-token scores over CORRECT train traces
+    (manifold.py:255-258 via `per_token_scores` iterating `head_acts.correct`)
+    ✓ (tex:L284-285); Eq.9 correction `a−αB^T B(a−μ_c)` in place before W_O
+    (steering.py:71) ✓ (tex:L308-317); Eq.10 `μ_c+P_⊥(a−μ_c)` at α=1 (manifold
+    invariant test) ✓; decode-only gating, prefill pass-through (steering.py:45)
+    ✓ (SPEC §4.9). **No number-affecting deviation found.**
+  - **Fit loop (`mags/fit.py`):** problem-level split discipline, selection AUROC
+    on held-out split only (manifold.py:324-328 never scores fit split — anti
+    selection-bias), top-K by mean-AUROC (tex:L305), diagnostic max-AUROC on
+    report split (tex:L298), keep-if-both-classes (tex:L399). **Faithful.**
+  - **Eval/grading (`mags/eval.py`, `mags/grading.py`):** greedy decode, math
+    boxed+numeric extraction (last boxed only), HumanEval official harness,
+    MBPP-sanitized assert exec, PPL under unsteered base. **Faithful.**
+  - **Baselines (`mags/baselines.py`):** ITI static `a+=α·σ_h·v_h` per-step,
+    per-head logistic probe, top-K by held-out accuracy; AS fixed-offset rotation
+    (θ=0 identity), plane Span(d_feat,d_PC0), per head_dim (Gemma-4 has two);
+    CD `logp_e−β·logp_a` with relative plausibility mask. **Faithful.**
+  - **Data pipeline (`mags/data/loaders.py`):** MathInstruct MATH-sourced subset
+    filter (SPEC §4.23), offline cache load. **Faithful.**
+  - **Verdict: no remaining number-affecting bug.** The implementation is ready
+    to produce the paper's numbers on a GPU host with the gated models
+    pre-downloaded + manifolds fitted; all 52 tests (48 pass + 4 skip) green.
+- **Adversarial env-block confirmation (REFUTE the block if possible):** probed
+  the actual sandbox:
+  - `nvidia-smi`: absent; `torch.cuda.is_available()`: False (torch 2.7.1+cpu).
+  - HF cache: all datasets cached; models cached = distilgpt2, tiny-gpt2,
+    google/gemma-4-E4B-it (ONLY config+tokenizer, 31MB, **NO .safetensors
+    weights**); meta-llama/Llama-3.1-8B-Instruct gated (no token); openai/gpt-oss-20b 20B.
+  - Network IS up (huggingface.co returns 200); gemma-4-E4B-it is NOT gated.
+  - **Could gemma-4-E4B-it weights be downloaded and run on CPU for the paper's
+    FULL config?** Gemma-4-E4B-it ≈ 4B params (text hidden 2560, 42 layers, head
+    dim 256/512). On a 16-core aarch64 CPU, ~3-10 tok/s for a 4B model. Per arm:
+    MATH-500 N=500 × 1024 tok ≈ 51k s ≈ 14 h; GSM8K N=1319 similar; HumanEval
+    N=164 × 512 ≈ 2.3 h; MBPP N=427. Across 20 Gemma arms that is **>280 h** —
+    infeasible in any gate budget (and a reduced-N run is forbidden: the task
+    requires the paper's full config, not a substitute). Steering arms (mags/
+    iti/as, 16 of 20 Gemma arms) additionally need a fitted manifold (GPU
+    contrastive traces), which no sandbox can produce. Even the single
+    `unsteered__MATH-500__gemma` arm alone is ~14 h on CPU.
+  - **No path to a real numeric value exists in this sandbox.** The honest
+    result is `BLOCKED` (non-numeric) for all 45 arms; the gate's "missing a
+    FINAL line / values:[]" is the numbers-gate correctly surfacing an
+    environment block (round-16 proof: BLOCKED is a literal string, never a
+    number, so the gate reports it as "no value"). Fabricating a number, a
+    synthetic-corpus fallback, or a numeric sentinel (-1/nan) would be a lie
+    (the closed-book cautionary tale in the task brief).
+- **Deliverables verified present:** arms.json (45 paper arms) ✓; run_all_arms.sh
+  (45/45 FINAL lines in 0.07 s) ✓; run_arm.sh (per-arm wrapper, FINAL fallback) ✓;
+  smoke.sh (FINAL smoke=0.0000, smoke path only) ✓; runs/ committed & NOT
+  gitignored (91 tracked files) ✓; README honest about what runs ✓; SPEC §4
+  records every open choice ✓; tests/ degeneracy + invariants ✓.
+- **Change this round:** `runs/BLOCKED__mags__MATH-500__meta-llama_Llama-3.1-8B-Instruct.json`
+  reason updated by the model-cache precheck now firing on gated Llama (more
+  specific: gated/manual-license + no token) before the manifold check — a more
+  accurate manifest, same BLOCKED outcome.
+- **Status unchanged:** implementation complete & faithful; numbers blocked by
+  environment (no GPU / no gated token / no paper-model weights). Will produce
+  the paper's numbers (Tables 1-2) on a GPU host with Llama-3.1-8B-Instruct +
+  Gemma-4-E4B-it pre-downloaded and manifolds fitted. Table 3 (molecular,
+  GPT-OSS-20B) remains a stretch target (SPEC §4.18: target protein / SMILES
+  corpus / AutoDock params all unstated).
+
 ### 2026-07-29 — Round 16: gate "all arms missing a FINAL line" — PROVEN (not hypothesized) to be numeric-rejection of BLOCKED, not a plumbing bug
 
 - **Symptom (gate feedback, identical to rounds 1-15):** all 45 arms reported
