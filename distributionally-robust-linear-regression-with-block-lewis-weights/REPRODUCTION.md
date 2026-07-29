@@ -828,3 +828,50 @@ committed versions; the trajectories (`gap`, `gap_best`, `x`, `iters_to_rel_gap`
 `opt`, `scale`) are bit-identical where deterministic. No implementation,
 SPEC, or blocker changed. Re-verified: 32/32 tests pass, smoke `FINAL smoke=ok`,
 all 16 JSONs match `run_all.log`. Branch `repro/block-lewis-gdr` pushed.
+
+### Round-17: fix smoke.sh Lewis-code-path bug (smoke was running the euclidean path for both ball arms)
+
+The round's smoke feedback reproduced exactly (`FINAL smoke=ok`, all 7 arms make
+strict finite progress: subgradient 0.223→0.188, smoothed_gd 0.223→0.159,
+smoothed_hb 0.223→0.160, smoothed_nesterov 0.223→0.152, ipm 0.223→0.013 @iter 11,
+ball_oracle_euclidean/lewis 0.223→0.050 @iter 1). On verifying the smoke against
+the solver dispatch, `smoke.sh` had a real bug that made its own "all seven arms
+exercised" comment false: the loop did `geom = cfg.pop("geometry", None)`,
+which *removed* `geometry` from the per-arm cfg before handing it to
+`run_arm`. The ball-oracle solver (`gdr/solvers/ball_oracle.py:56`) reads
+`cfg.get("geometry", "euclidean")`, so with `geometry` popped both
+`ball_oracle_euclidean` and `ball_oracle_lewis` smoke entries fell through to
+the **euclidean** default — `block_lewis_weights` / `geometry_M` /
+`should_reset_W` were never called by the smoke, so the Lewis code path was
+never exercised there (only by `run_arm.py --geometry lewis` in the full gate,
+which was always correct). This is a smoke-only bug; the full gate
+(`run_all_arms.sh` → `run_arm.py --geometry`) and the committed result JSONs
+are unaffected.
+
+Fix: keep `cfg["geometry"]` in the cfg passed to `run_arm` (stop popping it),
+and update the smoke comment to match the now-true behavior. Instrumented
+verification (monkey-patched `gdr.lewis` to count calls): with the fix the
+euclidean arm makes 0 Lewis calls (uses naive `M=AᵀA`) and the lewis arm makes
+1 call each to `block_lewis_weights`, `geometry_M`, `should_reset_W` — i.e.
+the Lewis path is genuinely exercised. At this smoke size `sum(w)=9 < m=10` so
+the E11 reset does *not* fire and the Lewis geometry `M=AᵀWA` is the one used;
+both ball arms nonetheless produce the same `0.223→0.050` trajectory because the
+trust-region radius `r0=10` is large enough that the M-norm constraint never
+binds in early iters, so the Newton step `-H⁻¹g` is geometry-independent here.
+(The bit-identical Lewis==Euclidean degeneracy is still checked in
+`tests/test_degeneracy.py` D1, on a problem where the reset *does* fire.)
+
+Re-verified end-to-end: 32/32 tests pass; `smoke.sh` prints `FINAL smoke=ok`
+with the exact feedback numbers; `run_all_arms.sh 300 120` reproduces the
+committed `results/run_all.log` byte-for-byte across all 16 (dataset,arm)
+FINAL lines (acs_income: subgradient=3, smoothed_gd=45, smoothed_hb=10,
+smoothed_nesterov=10, ipm=10, ball_oracle_euclidean=1, ball_oracle_lewis=1,
+opt_reference=0; synthetic: the four first-order=NR, ipm=5,
+ball_oracle_euclidean=9, ball_oracle_lewis=5, opt_reference=0) — T1 still
+holds (BO arms =1 ≤ 2 ✓, iters(BO)=1 < iters(IPM)=10 ≤ iters(HB)=10 ✓). The
+re-run only changed non-deterministic wall-clock fields in the result JSONs
+(`elapsed`, `history.time`, `time_to_rel_gap` — T2, report-only); the
+committed JSONs were restored (no evidence churn — the deterministic gate
+metric `iters_to_rel_gap` is unchanged and already committed). No
+implementation, SPEC, or blocker (B1) changed. Branch
+`repro/block-lewis-gdr` pushed.

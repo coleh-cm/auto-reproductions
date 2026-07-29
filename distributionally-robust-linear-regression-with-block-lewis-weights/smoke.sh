@@ -29,9 +29,15 @@ from run_arm import normalize_problem, erm_warm_start
 # All SEVEN paper arms (§8.1.2) are exercised so the smoke proves *every* arm
 # code path runs end-to-end -- not just a subset.  (The earlier smoke covered
 # only 4/7; smoothed_gd / smoothed_nesterov / ball_oracle_euclidean were never
-# run here, so a latent runtime bug in them would have passed the gate.)  At
-# this size the E11 reset (Σw_i >= m) fires, so ball_oracle_euclidean and
-# ball_oracle_lewis are bit-identical -- the degeneracy the test suite checks.
+# run here, so a latent runtime bug in them would have passed the gate.)  The
+# Lewis arm genuinely enters the block-Lewis code path (block_lewis_weights,
+# should_reset_W, geometry_M are all called); at this size sum(w)=9 < m=10 so
+# the E11 reset does NOT fire and the Lewis geometry M=A^T W A is the one used.
+# Both ball arms nonetheless produce the same trajectory here because the
+# trust-region radius r0=10 is large enough that the M-norm constraint never
+# binds, so the Newton step -H^{-1} g is geometry-independent in early iters.
+# (The bit-identical Lewis==Euclidean degeneracy is checked in tests/ on a
+# problem where the reset DOES fire.)
 #
 # Expected smoke behavior (consistent with the paper, NOT paper evidence):
 # the four first-order arms (subgradient, smoothed_gd/hb/nesterov) make real
@@ -72,7 +78,11 @@ last = None
 results = []   # (arm, g_init, g_final, iters_to_5%, ok)
 for arm, cfg in cfgs.items():
     cfg = dict(cfg); cfg["opt"] = opt_norm
-    geom = cfg.pop("geometry", None)
+    # keep cfg["geometry"] in cfg so the ball_oracle solver reads it (the
+    # solver module is always "ball_oracle"; geometry selects euclidean vs
+    # lewis inside _geometry).  Popping it made both ball_oracle_* smoke
+    # entries run the euclidean path, so the Lewis code path was never
+    # exercised here -- contradicting the "all seven arms" claim above.
     a = "ball_oracle" if arm.startswith("ball_oracle") else arm
     h = run_arm(a, cfg, prob, x0, opt_norm, max_outer=12, time_budget=30.0)
     it, _ = time_to_gap(h, rel_gap=0.05)
