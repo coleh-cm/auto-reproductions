@@ -641,3 +641,39 @@ unchanged and still disclosed.
   `PWGTP>=1` drops 0 rows on the 2018 1-Year subsample.
 - Tests 27/27 pass; smoke `FINAL smoke=ok` (all 7 arms strict finite progress).
   Branch `repro/block-lewis-gdr` pushed (HEAD = this addendum's commit).
+
+### Round-13: 5-component adversarial paper-fidelity review (orchestration) — 0 actionable findings
+
+- Ran a 5-component adversarial review (`gdr-paper-fidelity-review`, 16 agents:
+  3 reviewers per component with distinct lenses — correctness / completeness /
+  paper-fidelity — plus a refutation verifier for any rejection). Each reviewer
+  read the actual code files AND the paper `.tex` source and cited
+  code:line + paper:line for every claim.
+- Result: **4/5 components approved** (method-core, training-loop,
+  evaluation-metric, baseline-arm-harness). The 1 rejection (data-pipeline)
+  had its top issue **REFUTED** by the verifier: the adversarial-Hessian
+  eigenvector departure from experiments.tex:19 is a *documented, necessary*
+  resolution of an internal paper inconsistency — the literal
+  shared-eigenvectors construction (spike on a distinct U column per
+  adversarial group) was re-implemented and verified to give cond~5e4 but NO
+  ERM-vs-robust gap (ERM worst group becomes a normal group at the noise
+  floor), contradicting the headline experiments.tex:38. The code correctly
+  prioritizes the measurable headline (cond~1e5 AND clear gap) over a
+  structural property the paper itself cannot honor consistently; the choice
+  is recorded in SPEC.md sec8A and `data.py`'s `deversion_note`. So all 5
+  components are effectively clean.
+- Remaining findings are minor/nit and either already handled or already
+  disclosed: (a) IPM barrier form — the code uses the convergent
+  `Phi = t - mu·sum ln(t-l_i)` with decreasing μ (BV04 §11.2); the SPEC E21
+  *prose* (`mu·t - sum ln` paired with decreasing μ) would diverge, so the
+  code is correct and the SPEC prose is the typo, not the code; (b)
+  best-so-far figure curve — already handled (`run_arm.py:207` adds
+  `gap_best=cummin(gap)`; the first-crossing gate count is identical under
+  raw vs best-so-far); (c) cached synthetic OPT infeasible by ~1e-7 relative
+  (conservative bias, cannot move a 1% gate); (d) E9 *construction* is tested
+  but not the E9 *bound* body.tex:523-532 (test-coverage gap, not a
+  correctness error); (e) subgradient=3 vs paper NR is the documented B1
+  blocker.
+- No code change this round (review found no actionable defect); this commit
+  records the review result. Tests 27/27 pass; smoke `FINAL smoke=ok`. Branch
+  `repro/block-lewis-gdr` pushed.
