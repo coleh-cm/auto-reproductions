@@ -110,6 +110,25 @@ def erm_warm_start(problem) -> np.ndarray:
     return np.linalg.lstsq(problem["A"], problem["b"], rcond=None)[0]
 
 
+def normalize_problem(problem, opt):
+    """Rescale (A, b) by 1/sqrt(opt) so the normalized OPT == 1 (theory's WLOG
+    convention, body.tex:511-513 / U15).  x* is unchanged; group losses and the
+    objective all divide by opt, so the *relative* gap (F-OPT)/OPT == F'-1 is
+    unchanged.  This keeps every arm on an O(1) loss scale, which the IPM's
+    damped-Newton centering needs (it stalls on O(1e5) losses at cond 1e4+ even
+    though it converges at the same cond with O(1) losses).  Leverage scores and
+    block Lewis weights are scale-invariant, so the geometry is unaffected up to
+    the 1/opt factor folded into M.
+    """
+    s = float(np.sqrt(opt)) if opt > 0 else 1.0
+    if s == 1.0:
+        return problem, 1.0
+    prob = dict(problem)
+    prob["A"] = problem["A"] / s
+    prob["b"] = problem["b"] / s
+    return prob, s
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", required=True)
@@ -125,11 +144,14 @@ def main():
 
     problem = load_problem(args.dataset, args.seed)
     opt = get_opt_cached(problem, args.dataset, args.solver)
+    # normalize so OPT == 1 (U15); arms run on the normalized problem
+    problem, scale = normalize_problem(problem, opt)
+    opt_norm = 1.0
     x0 = erm_warm_start(problem)
 
     arm = args.arm
     cfg = dict(ARM_CONFIGS.get(arm, {}))
-    cfg["opt"] = opt
+    cfg["opt"] = opt_norm
     cfg["solver"] = args.solver
     if arm == "ball_oracle" and args.geometry is not None:
         cfg["geometry"] = args.geometry
@@ -138,18 +160,20 @@ def main():
         arm_name = arm
 
     t_start = time.perf_counter()
-    hist = run_arm(arm, cfg, problem, x0, opt,
+    hist = run_arm(arm, cfg, problem, x0, opt_norm,
                   max_outer=args.max_outer, time_budget=args.time_budget)
     elapsed = time.perf_counter() - t_start
 
     it_to_gap, _t = time_to_gap(hist, rel_gap=args.rel_gap)
     value = "NR" if it_to_gap is None else str(it_to_gap)
 
-    # save full history (committed evidence)
+    # save full history (committed evidence).  Gaps are on the normalized
+    # (OPT=1) scale; the relative gap F'-1 == (F-OPT)/OPT is what the gate reads.
     os.makedirs("results", exist_ok=True)
+    F0_norm = float(max_loss(problem, x0))
     out = {
-        "arm": arm_name, "dataset": args.dataset, "opt": opt,
-        "F0": float(max_loss(problem, x0)), "rel_gap": args.rel_gap,
+        "arm": arm_name, "dataset": args.dataset, "opt": opt, "opt_norm": opt_norm,
+        "scale": scale, "F0_norm": F0_norm, "rel_gap": args.rel_gap,
         "iters_to_rel_gap": it_to_gap, "elapsed": elapsed,
         "max_outer": args.max_outer, "time_budget": args.time_budget,
         "history": {k: (v.tolist() if hasattr(v, "tolist") else v)

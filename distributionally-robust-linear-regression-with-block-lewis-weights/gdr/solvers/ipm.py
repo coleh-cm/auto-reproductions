@@ -140,20 +140,37 @@ def _newton_step(problem, cache, x, t, mu, inner_tol):
 
 
 def _run_single(problem, x0, max_outer, deadline, mu0, theta, inner_tol, opt):
-    """One (mu0, theta) run from x0.  Returns (history, final F)."""
+    """One (mu0, theta) run from x0.  Returns (history, final F).
+
+    Each OUTER iteration = one barrier-parameter reduction mu <- theta*mu,
+    preceded by damped-Newton CENTERING on Phi_mu (inner Newton steps until the
+    Newton decrement <= inner_tol or the inner cap).  This is the standard
+    decreasing-mu central path (BV04 §11.2): one outer iteration is one mu
+    reduction, and the centering inside it is what lets a handful of outer
+    iterations reach high accuracy (the paper reports IPM = 8 outer iterations
+    to 1% on ACS, experiments.tex:107,180).  The reported gap is
+    ``max_loss(problem, x) - opt`` after each outer iteration.
+    """
     cache = _group_cache(problem)          # list of (Ai, AtA_i)
     h = seed_history(problem, x0, opt)     # iter 0 recorded
     x = h["x"].copy()                      # [d]
     t = float(max_loss(problem, x)) + 1.0  # strictly feasible t0 (E21 guard)
     mu = float(mu0)                         # barrier parameter
     t0 = time.perf_counter()
+    INNER_CAP = 50                         # centering Newton cap per outer iter
     for k in range(1, max_outer + 1):
         if h["gap"][-1] <= 0.0:
             break
         if time.perf_counter() > deadline:
             break
-        x, t, _dec, _acc = _newton_step(problem, cache, x, t, mu, inner_tol)  # E21
-        mu *= theta                        # reduce barrier parameter (experiments.tex:100)
+        # center on Phi_mu: inner damped-Newton until decrement <= inner_tol
+        for _ in range(INNER_CAP):
+            x, t, dec, acc = _newton_step(problem, cache, x, t, mu, inner_tol)
+            if (not acc) or dec <= inner_tol:
+                break
+            if time.perf_counter() > deadline:
+                break
+        mu *= theta                        # reduce barrier parameter (one outer iter)
         h["iter"].append(k)
         h["gap"].append(gap_now(problem, x, opt))
         t_elapsed = time.perf_counter() - t0

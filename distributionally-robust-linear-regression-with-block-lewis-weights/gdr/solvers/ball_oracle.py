@@ -53,9 +53,17 @@ def _geometry(problem, cfg):
     A = problem["A"]                       # [n, d]
     geom = cfg.get("geometry", "euclidean")
     if geom == "lewis":
-        from gdr.lewis import block_lewis_weights, geometry_M
+        from gdr.lewis import block_lewis_weights, geometry_M, should_reset_W
         w = block_lewis_weights(problem, p=np.inf)   # [m]  (E8)
-        M = geometry_M(problem, w, p=np.inf)         # [d, d]  (E11)
+        # E11 switch (Alg.1 lines 2-3): if sum_i w_i >= m, reset W <- I
+        # (naive euclidean geometry).  This fires only when m is small
+        # (||w||_1 <= 2(d+1)), so on the paper's instances (m=51,100) the Lewis
+        # geometry is used; it also gives a clean degeneracy: at the reset the
+        # Lewis arm is bit-identical to the Euclidean arm.
+        if should_reset_W(w, problem["m"]):
+            M = A.T @ A
+        else:
+            M = geometry_M(problem, w, p=np.inf)      # [d, d]  (E11)
     else:
         M = A.T @ A                         # [d, d]  naive euclidean geometry
     M = np.asarray(M, dtype=np.float64)

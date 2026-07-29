@@ -26,14 +26,15 @@ run_arm () {
 }
 
 # Arms the paper compares (§8.1.2): first-order, IPM, ball-oracle (ours), OPT ref.
+# Each entry is "<run_arm.py --arm value>:<geometry flag or none>".
 declare -a ARMS=(
   "subgradient:none"
   "smoothed_gd:none"
   "smoothed_hb:none"
   "smoothed_nesterov:none"
   "ipm:none"
-  "ball_oracle_euclidean:euclidean"
-  "ball_oracle_lewis:lewis"
+  "ball_oracle:euclidean"
+  "ball_oracle:lewis"
   "opt_reference:none"
 )
 
