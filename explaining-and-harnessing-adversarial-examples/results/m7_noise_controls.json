@@ -1,0 +1,53 @@
+{
+  "arms": {
+    "baseline": {
+      "clean_accuracy": 0.8578000068664551,
+      "fgsm_eval": {
+        "error_rate": 0.9998999834060669,
+        "mean_confidence_on_errors": 0.7563911080360413,
+        "n": 10000
+      }
+    },
+    "bernoulli": {
+      "clean_accuracy": 0.8464000225067139,
+      "fgsm_eval": {
+        "error_rate": 0.9998000264167786,
+        "mean_confidence_on_errors": 0.7404937744140625,
+        "n": 10000
+      }
+    },
+    "uniform": {
+      "clean_accuracy": 0.8299000263214111,
+      "fgsm_eval": {
+        "error_rate": 0.9991999864578247,
+        "mean_confidence_on_errors": 0.7054440379142761,
+        "n": 10000
+      }
+    }
+  },
+  "description": "Noise-training controls (+/-eps flips, U(-eps,eps)) on maxout; FGSM eps=0.25 eval after each.",
+  "hyperparams": {
+    "alpha": 0.5,
+    "batch_size": 100,
+    "dropout_input": 0.8,
+    "eps": 0.25,
+    "lr": 0.1,
+    "max_epochs": 1,
+    "model": "MaxoutMLP",
+    "momentum": 0.5,
+    "patience": 100,
+    "pieces": 5,
+    "units": 240
+  },
+  "milestone": "M7",
+  "note": "Sub-scale run (epochs=1, patience=100). The paper's 86.2/90.4 pct are from fully-converged maxout nets.",
+  "paper_target": {
+    "bernoulli_fgsm_conf": 0.973,
+    "bernoulli_fgsm_error": 0.862,
+    "citation": "paper/source/iclr2015.tex:555-557",
+    "quote": "randomly adding $\\pm\\eps$ to each pixel, or adding noise in $U(-\\eps, \\eps)$ ... 86.2% ... 97.3% ... 90.4% ... 97.8%",
+    "uniform_fgsm_conf": 0.978,
+    "uniform_fgsm_error": 0.904
+  },
+  "seed": 0
+}

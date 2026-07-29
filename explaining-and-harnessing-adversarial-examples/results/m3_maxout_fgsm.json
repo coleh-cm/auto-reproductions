@@ -1,0 +1,36 @@
+{
+  "clean_accuracy": 0.9758999943733215,
+  "clean_error": 0.024100005626678467,
+  "description": "Maxout 240x2 + input dropout on MNIST; FGSM eps=0.25.",
+  "eps": 0.25,
+  "fgsm_eval": {
+    "error_rate": 0.9979000091552734,
+    "mean_confidence_on_errors": 0.886899471282959,
+    "n": 10000
+  },
+  "hyperparams": {
+    "batch_size": 100,
+    "dropout_hidden_include": 1.0,
+    "dropout_input_include": 0.8,
+    "early_stop": "clean",
+    "epochs_run": 8,
+    "in_dim": 784,
+    "lr": 0.1,
+    "max_epochs": 8,
+    "model": "MaxoutMLP",
+    "momentum": 0.5,
+    "n_classes": 10,
+    "patience": 100,
+    "pieces": 5,
+    "units": 240
+  },
+  "milestone": "M3",
+  "note": "Sub-scale run (epochs=8, patience=100); the paper's 89.4 pct comes from a fully-converged net (patience 100).",
+  "paper_target": {
+    "citation": "paper/source/iclr2015.tex:338-339",
+    "error_rate": 0.894,
+    "mean_confidence_on_errors": 0.976,
+    "quote": "a maxout network misclassifies 89.4% of our adversarial examples with an average confidence of 97.6%"
+  },
+  "seed": 0
+}

@@ -1,0 +1,30 @@
+{
+  "clean_accuracy": 0.9215999841690063,
+  "clean_error": 0.07840001583099365,
+  "description": "Softmax regression on MNIST; FGSM eps=0.25.",
+  "eps": 0.25,
+  "fgsm_eval": {
+    "error_rate": 1.0,
+    "mean_confidence_on_errors": 0.9285903573036194,
+    "n": 10000
+  },
+  "hyperparams": {
+    "adv_train": false,
+    "batch_size": 100,
+    "in_dim": 784,
+    "lr": 0.1,
+    "max_epochs": 10,
+    "model": "SoftmaxRegression",
+    "momentum": 0.5,
+    "n_classes": 10,
+    "patience": 100
+  },
+  "milestone": "M1",
+  "paper_target": {
+    "citation": "paper/source/iclr2015.tex:333",
+    "error_rate": 0.999,
+    "mean_confidence_on_errors": 0.793,
+    "quote": "an error rate of 99.9\\% with an average confidence of"
+  },
+  "seed": 0
+}

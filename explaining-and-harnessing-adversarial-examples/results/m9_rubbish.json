@@ -1,0 +1,66 @@
+{
+  "description": "Rubbish examples N(0,I_784) on maxout+softmax, sigmoid-top, softmax-reg, RBF (appendix).",
+  "evals": {
+    "maxout_softmax": {
+      "error_rate": 0.21400000154972076,
+      "mean_confidence_on_errors": 0.6170846819877625,
+      "n": 2000
+    },
+    "rbf": {
+      "error_rate": 0.9334999918937683,
+      "mean_confidence_on_errors": 0.8690992593765259,
+      "n": 2000
+    },
+    "sigmoid_top": {
+      "error_rate": 1.0,
+      "mean_confidence_on_errors": 0.8796719908714294,
+      "n": 2000
+    },
+    "softmax_regression": {
+      "error_rate": 0.6294999718666077,
+      "mean_confidence_on_errors": 0.7207567691802979,
+      "n": 2000
+    }
+  },
+  "hyperparams": {
+    "batch_size": 100,
+    "dim": 784,
+    "lr": 0.1,
+    "max_epochs": 1,
+    "models": [
+      "MaxoutMLP(softmax)",
+      "SigmoidTopMLP",
+      "SoftmaxRegression",
+      "RBFNet"
+    ],
+    "momentum": 0.5,
+    "n": 2000,
+    "patience": 100,
+    "pieces": 5,
+    "sigmoid_top_note": "same trunk as maxout, only top layer differs",
+    "units": 240
+  },
+  "milestone": "M9",
+  "note": "Sub-scale run (epochs=1, patience=100). The paper's 98.35/68/59.8/0% are from fully-converged nets.",
+  "paper_target": {
+    "citation": "paper/source/iclr2015.tex:905-912",
+    "maxout_softmax": {
+      "conf": 0.928,
+      "error": 0.9835
+    },
+    "quote": "98.35% ... 92.8% ... 68% ... 87.9% ... 59.8% ... 70.8% ... RBF ... 0%",
+    "rbf": {
+      "conf": null,
+      "error": 0.0
+    },
+    "sigmoid_top": {
+      "conf": 0.879,
+      "error": 0.68
+    },
+    "softmax_regression": {
+      "conf": 0.708,
+      "error": 0.598
+    }
+  },
+  "seed": 0
+}

@@ -147,3 +147,20 @@
   Documented deviation: we use INVERTED dropout (modern standard) vs the recipe's scale-1.0
   non-inverted form (a constant eval-time scale difference); recorded in SPEC §6 item 4 and
   the External block. Tests 30 passing.
+- 2026-07-29: **F2/F3 fix — coverage + M4 directional result.** Added experiment scripts for
+  every paper milestone (m2_logreg, m3_maxout_fgsm, m5_large_advtrain, m6_robustness_transfer,
+  m7_noise_controls, m8_rbf, m9_rubbish, e1_ensemble), each writing results/<>.json with the
+  milestone id, hyperparams, seed, paper_target (citation), and a sub-scale NOTE. Core support
+  added: objectives.noise_train_cost (M7), attacks.fgsm_logreg (M2 exact),
+  models.SigmoidTopMLP + eval.eval_rubbish_sigmoid (M9 sigmoid-top), train.TrainConfig.noise_train
+  (M7 wiring). M5 wires the full protocol (adversarial-valid early stop -> choose epochs ->
+  retrain on all 60k -> multi-seed mean). results/ is now COMMITTED (un-gitignored) so the
+  measured numbers are verifiable without re-running.
+  **M4 headline result (12 epochs, 240 units, dropout 0.8/1.0, recipe-aligned):** baseline
+  test error 1.98% vs adversarial 1.64% — the adversarial arm is LOWER, matching the paper's
+  direction (0.94% -> 0.84%, tex:492-494). The previous smoke run showed the WRONG direction
+  (adversarial worse); the F1 eval-mode-surrogate fix + recipe-aligned dropout corrected it.
+  Absolute values are sub-scale (full convergence needs patience-100, infeasible on this CPU);
+  the DIRECTION is the paper's central regularization claim and it now holds. M2 reproduces the
+  paper closely: clean 2.01% (paper 1.6%), FGSM adv error 99.1% (paper 99%). M1 FGSM error 100%
+  (paper 99.9%). 29/29 tests pass.

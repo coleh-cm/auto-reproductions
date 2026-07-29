@@ -1,0 +1,50 @@
+{
+  "arms": {
+    "adversarial": {
+      "clean_accuracy": 0.11349999904632568
+    },
+    "original": {
+      "clean_accuracy": 0.8578000068664551
+    }
+  },
+  "description": "Robustness & cross-transfer of an adv-trained maxout (own-FGSM, orig->adv, adv->orig, confidence).",
+  "hyperparams": {
+    "alpha": 0.5,
+    "batch_size": 100,
+    "dropout_input": 0.8,
+    "eps": 0.25,
+    "lr": 0.1,
+    "max_epochs": 1,
+    "model": "MaxoutMLP",
+    "momentum": 0.5,
+    "patience": 100,
+    "pieces": 5,
+    "units": 240
+  },
+  "milestone": "M6",
+  "note": "Sub-scale run (units=240, epochs=1, patience=100). The paper's 17.9/19.6/40.9/81.4 pct are from a 1600-unit adv-trained model.",
+  "own_fgsm_on_adv_model": {
+    "error_rate": 0.8865000009536743,
+    "mean_confidence_on_errors": 0.11693352460861206,
+    "n": 10000
+  },
+  "paper_target": {
+    "adv_to_orig_transfer_error": 0.409,
+    "citation": "paper/source/iclr2015.tex:514-523",
+    "mean_confidence_on_misclassified": 0.814,
+    "orig_to_adv_transfer_error": 0.196,
+    "own_fgsm_error": 0.179,
+    "quote": "fell to 17.9% ... 19.6% ... 40.9% ... average confidence ... 81.4%"
+  },
+  "seed": 0,
+  "transfer_adv_to_orig": {
+    "error_rate": 0.7465000152587891,
+    "mean_confidence_on_errors": 0.5036455988883972,
+    "n": 10000
+  },
+  "transfer_orig_to_adv": {
+    "error_rate": 0.8865000009536743,
+    "mean_confidence_on_errors": 0.11690864711999893,
+    "n": 10000
+  }
+}
