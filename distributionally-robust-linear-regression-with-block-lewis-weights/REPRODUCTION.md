@@ -791,3 +791,40 @@ unchanged and still disclosed.
   0.223→0.050 @iter 1). Blocker B1 (ACS heterogeneity magnitude,
   subgradient-NR / IPM-HB counts) unchanged and still disclosed. Branch
   `repro/block-lewis-gdr` pushed.
+
+### Round-16: regenerate stale result JSONs so committed evidence matches the code schema (no impl change)
+
+The round's smoke feedback reproduced exactly (`FINAL smoke=ok`, all 7 arms make
+strict finite progress). On verifying the committed evidence against the code at
+HEAD, the **8 ACS Income result JSONs and `synthetic_opt_reference.json` were
+stale**: `run_arm.py` (since Round-12) writes two extra persisted fields —
+top-level `time_to_rel_gap` (the wall-clock seconds at the 1% crossing, T2) and
+`history.gap_best` (`np.minimum.accumulate(gap)`, the paper's best-so-far
+convergence curve, fig:acs_convergence) — but these 9 files still carried the
+pre-Round-12 schema (no such keys). The 7 other synthetic JSONs were already
+regenerated in Round-12 and carried the new schema, so the committed `results/`
+was internally inconsistent (synthetic had the fields, ACS did not). "Results
+committed, not gitignored" requires the committed evidence to match the code
+that produces it, so a stale-schema JSON is a claim with mismatched provenance.
+
+Fix: regenerated all 8 ACS arms (`run_arm.py --dataset acs_income --seed 6`,
+MAXOUTER=300, the paper's full config) and `synthetic_opt_reference` with the
+current code. The gate metric `iters_to_rel_gap` is deterministic (seeded data +
+deterministic linear-algebra solvers, no RNG in the optimizers), so it is
+**unchanged** and still matches `results/run_all.log` byte-for-byte across all
+16 (dataset,arm) files:
+
+```
+acs_income: subgradient=3 smoothed_gd=45 smoothed_hb=10 smoothed_nesterov=10
+            ipm=10 ball_oracle_euclidean=1 ball_oracle_lewis=1 opt_reference=0
+synthetic:  subgradient=NR smoothed_gd=NR smoothed_hb=NR smoothed_nesterov=NR
+            ipm=5 ball_oracle_euclidean=9 ball_oracle_lewis=5 opt_reference=0
+```
+
+T1 gate still holds (ACS): BO arms =1 ≤ 2 ✓ and iters(BO)=1 < iters(IPM)=10 ≤
+iters(HB)=10 ✓. Only the run-specific wall-clock fields (`elapsed`,
+`history.time`, `time_to_rel_gap` — T2, report-only) differ from the prior
+committed versions; the trajectories (`gap`, `gap_best`, `x`, `iters_to_rel_gap`,
+`opt`, `scale`) are bit-identical where deterministic. No implementation,
+SPEC, or blocker changed. Re-verified: 32/32 tests pass, smoke `FINAL smoke=ok`,
+all 16 JSONs match `run_all.log`. Branch `repro/block-lewis-gdr` pushed.
