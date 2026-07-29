@@ -16,8 +16,9 @@ GitHub); the method is implemented from scratch against the LaTeX source
 (`paper/latex_src/neurips_2026.tex`), which is the authoritative reference for
 every equation, table and reported number. The full method spec, symbol/shape
 table, equation citations, and the register of parameters the paper leaves
-unstated live in `SPEC.md`; the numbers-gate contract (45 arms with claimed
-values and bootstrap CIs) lives in `arms.json`.
+unstated live in `SPEC.md`; the 45-arm command map (what the gate runs) lives in
+`arms.json`, and the claimed values + bootstrap CIs (the numbers-gate data)
+live in `arms_contract.json`.
 
 ## Repository layout
 

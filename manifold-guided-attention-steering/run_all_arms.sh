@@ -25,8 +25,24 @@ mkdir -p runs manifolds
 
 if [ ! -f arms.json ]; then echo "arms.json missing" >&2; exit 1; fi
 
+# Resolve a python that can import the project deps. Prefer a local .venv
+# (the sandbox dev environment); fall back to `python`/`python3` on PATH (the
+# Docker image bakes deps into the base interpreter). The arms.json commands
+# use bare `python`, so putting .venv/bin first on PATH makes them resolve to
+# the same interpreter here. `json` is stdlib, so the mapfile/STEERING_PAIRS
+# calls below populate the loop even on a host whose python lacks the heavy
+# project deps -- each arm then exits non-zero and the grep||echo fallback
+# still emits its FINAL line.
+if [ -x "$(dirname "$0")/.venv/bin/python" ]; then
+    export PATH="$(cd "$(dirname "$0")" && pwd)/.venv/bin:$PATH"
+fi
+PYTHON="${PYTHON:-python}"
+command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python3
+command -v "$PYTHON" >/dev/null 2>&1 || { echo "no python interpreter found" >&2; exit 1; }
+export PYTHON
+
 # --- Phase 1: fit manifolds for steering arms (skip molecular, fully blocked) ---
-STEERING_PAIRS=$(.venv/bin/python - <<'PY'
+STEERING_PAIRS=$("$PYTHON" - <<'PY'
 import json
 arms = json.load(open("arms.json"))
 pairs = set()
@@ -46,22 +62,30 @@ echo "$STEERING_PAIRS" | while IFS=$'\t' read -r model bench; do
     out="manifolds/$(echo "$model" | tr '/' '_')__$(echo "$bench" | tr ' ' '_').npz"
     if [ -f "$out" ]; then echo "[fit] exists $out"; continue; fi
     echo "[fit] $model / $bench -> $out"
-    .venv/bin/python -m mags.fit --model "$model" --benchmark "$bench" --out "$out" \
+    "$PYTHON" -m mags.fit --model "$model" --benchmark "$bench" --out "$out" \
         > "runs/log__fit__${slug}.log" 2>&1 || echo "[fit] BLOCKED $model/$bench"
 done
 
 # --- Phase 2: run every arm ---
-mapfile -t ARMS < <(.venv/bin/python -c "import json;[print(k) for k in json.load(open('arms.json'))]")
+# Read arm names with a stdlib-only call so the loop is populated even on a
+# host whose `python` lacks the project deps (json is stdlib). Each arm command
+# is then eval'd; if it fails to import / load the model it exits non-zero and
+# the grep||echo fallback below still emits the FINAL line.
+mapfile -t ARMS < <("$PYTHON" -c "import json;[print(k) for k in json.load(open('arms.json'))]")
 status=0
 for arm in "${ARMS[@]}"; do
-    cmd=$(.venv/bin/python -c "import json;print(json.load(open('arms.json'))['$arm'])")
+    cmd=$("$PYTHON" -c "import json;print(json.load(open('arms.json'))['$arm'])")
+    # arms.json commands start with bare `python`; the PATH prepend above makes
+    # that resolve to the venv interpreter here, or to the base interpreter in
+    # the Docker image. eval it; on any failure (incl. `python` not found on a
+    # bare host) the grep||echo fallback below still emits the FINAL line.
     eval "$cmd" > "runs/log__${arm}.log" 2>&1
     rc=$?
     if [ $rc -ne 0 ]; then
         status=1
         grep -m1 "^FINAL " "runs/log__${arm}.log" || echo "FINAL ${arm}=BLOCKED"
     else
-        grep -m1 "^FINAL " "runs/log__${arm}.log"
+        grep -m1 "^FINAL " "runs/log__${arm}.log" || echo "FINAL ${arm}=BLOCKED"
     fi
 done
 exit $status

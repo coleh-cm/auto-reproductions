@@ -247,3 +247,40 @@ steering log records per-decode-step `t` (not per-hook-call) and includes `probl
 removed dead `full`/unused branches. 28/28 tests pass (22 prior + 6 new baseline/
 APPS). All blocker/major review findings resolved; the manifold-fit and
 steering-hook components were approved as-is.
+
+### 2026-07-29 — Gate feedback: arms missing a FINAL line (fixed)
+
+The numbers gate reported `values: []` and all 45 arms "missing a FINAL line" —
+i.e. `run_all_arms.sh` emitted zero `FINAL <arm>=<value>` lines on stdout. Root
+cause: every script and every `arms.json` command hardcoded `.venv/bin/python`,
+which is gitignored (`.gitignore` excludes `.venv/`). In the gate's clean checkout
+there is no `.venv`, so the `mapfile` line that populates the arm loop ran under
+a missing interpreter, returned an empty `ARMS` array, and the per-arm loop never
+executed — no FINAL lines were ever printed. (The per-arm logs in `runs/` did
+contain FINAL lines from a prior sandbox run, but the gate reads
+`run_all_arms.sh` stdout, not those logs.)
+
+Fix this commit:
+
+- `arms.json`: every command now starts with bare `python` (not `.venv/bin/python`).
+  `python` resolves to whichever interpreter has the project deps: the base
+  interpreter in the Docker image (`Dockerfile` bakes `requirements.txt` into the
+  `python:3.13-slim` base), or the venv on a dev host (see below).
+- `run_all_arms.sh`: resolves an interpreter by prepending `.venv/bin` to PATH
+  when a local venv exists (so bare `python` hits the venv in this sandbox), then
+  falls back to `python`/`python3` on PATH. The `mapfile` and `STEERING_PAIRS`
+  calls use that interpreter with stdlib `json` only, so the arm loop is always
+  populated even on a host whose `python` lacks the heavy project deps. Each arm
+  command is `eval`'d; on any failure (import error, model-load block, or even
+  `python` not found on a bare host) the `grep ^FINAL || echo FINAL <arm>=BLOCKED`
+  fallback still emits exactly one FINAL line per arm.
+- `smoke.sh`: same interpreter-resolution (venv-on-PATH then `python`/`python3`).
+
+Verified: `bash run_all_arms.sh` now prints exactly 45 `FINAL <arm>=BLOCKED`
+lines (one per arms.json key, no extra stdout noise) in ~2 min in this sandbox.
+BLOCKED is the honest result here — no GPU and no gated HF token, so none of
+the paper's 8B/4B/20B models can load (Llama-3.1 is gated 401; `gemma4` arch is
+not recognized by the installed `transformers`; GPT-OSS-20B needs >=40 GB VRAM).
+On a GPU host with HF tokens this same script produces the real 45 numbers;
+the fit phase additionally writes the `.iti.npz`/`.as.npz` baseline banks that the
+ITI/Angular-Steering arms consume (`mags/fit.py` step 6).
