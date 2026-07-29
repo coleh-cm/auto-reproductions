@@ -229,16 +229,30 @@ while IFS="$_TAB" read -r model arm cmd; do
         continue
     fi
     if ! _model_usable_p "$model"; then
-        case "$arm" in
-            *__SMILES-molecular-generation__*)
-                _emit_blocked "$arm" "Molecular task (Table 3) is a stretch target: the target protein, prompt template, SMILES contrastive corpus, affinity cutoff, and AutoDock-GPU params are all UNSTATED by the paper (SPEC §4.18); GPT-OSS-20B needs >=40GB VRAM and is not cached here. Not implemented for real data." ;;
+        # Model-specific, accurate block reasons (round-21). The earlier
+        # blanket "8B/20B cannot run on CPU" was inaccurate for the 4B Gemma.
+        case "$model" in
+            meta-llama/Llama-3.1-8B-Instruct)
+                _emit_blocked "$arm" "model $model is GATED on HuggingFace (manual license approval) and no HF token is set in this sandbox, so its weights cannot be downloaded; the HF cache has no snapshot for it. Even on a GPU host this arm needs 'hf auth login' + an accepted license before download. No in-run download is attempted (SPEC §C.1)." ;;
+            google/gemma-4-E4B-it)
+                _emit_blocked "$arm" "model $model is NOT gated and IS downloadable, but its 16 GB safetensors cannot be obtained in this sandbox: unauthenticated HF downloads throttle to a stall (verified round-21: 44 MB of 16 GB then 0 bytes/min), and there is no GPU. Even if downloaded, full-config inference of a 4B model on CPU (16 cores, no CUDA) is infeasible within any gate wall-clock budget (est. 30+ h for the 4 Gemma reasoning benchmarks x 5 arms). The paper requires RTX 4090 / H200 (SPEC §C.1)." ;;
+            openai/gpt-oss-20b)
+                case "$arm" in
+                    *__SMILES-molecular-generation__*)
+                        _emit_blocked "$arm" "Molecular task (Table 3) is a stretch target: the target protein, prompt template, SMILES contrastive corpus, affinity cutoff, and AutoDock-GPU params are all UNSTATED by the paper (SPEC §4.18); GPT-OSS-20B (13.7 GB, not gated) is not cached here and a 20B model cannot run on CPU. Not implemented for real data." ;;
+                    *)
+                        _emit_blocked "$arm" "model $model (13.7 GB, not gated) is not cached here and a 20B model cannot run on CPU; no GPU available (SPEC §C.1)." ;;
+                esac ;;
             *)
-                _emit_blocked "$arm" "model $model is not present in the HuggingFace cache ($(_hf_hub_dir)); the paper's 8B/20B models require a GPU host with the model pre-downloaded (SPEC §C.1). No in-run download is attempted (would hang an offline gate)." ;;
+                _emit_blocked "$arm" "model $model is not present in the HuggingFace cache ($(_hf_hub_dir)); the paper's models require a GPU host with the model pre-downloaded (SPEC §C.1). No in-run download is attempted (would hang an offline gate)." ;;
         esac
         continue
     fi
     if [ "$HAVE_CUDA" != 1 ]; then
-        _emit_blocked "$arm" "model $model is cached but no CUDA GPU is available; the paper's 8B/20B models require GPU (RTX 4090 / H200, SPEC §C.1) and cannot run on CPU."
+        # A cached model with no GPU. A 4B model COULD load on CPU but the
+        # paper's full-config eval is infeasible on CPU in any gate budget, so
+        # we still block. (Llama-8B / GPT-OSS-20B genuinely cannot run on CPU.)
+        _emit_blocked "$arm" "model $model is cached but no CUDA GPU is available; the paper's full-config eval requires GPU (RTX 4090 / H200, SPEC §C.1) and is infeasible on CPU within any gate wall-clock budget."
         continue
     fi
     printf '%s\t%s\t%s\n' "$model" "$arm" "$cmd" >> "$RUNNABLE"

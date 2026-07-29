@@ -1860,3 +1860,72 @@ producing the paper's numbers in THIS sandbox is unchanged and honest.
   `runs/BLOCKED__*.json` manifests whose reason text drifted from the current
   `run_all_arms.sh` output; recorded this round in REPRODUCTION.md. No code
   change was warranted — the block is environmental, not a defect.
+
+## Round 21 — fresh environment probe; corrected per-model block reasons (fixed a backtick regression)
+
+- **Gate feedback (identical to rounds 1-20):** all 45 arms "missing a FINAL
+  line", `values: []`, `spread across arms: None`. Re-confirmed: this is a
+  **numbers gate** that requires a NUMERIC `<value>`; the only honest value
+  this sandbox can produce is the literal string `BLOCKED` (non-numeric), so
+  every arm is treated as having no value. This is the honest
+  environment-block signal, not a fixable plumbing bug. We do NOT fabricate a
+  number and do NOT substitute a tiny/synthetic model into the arms (the
+  task's closed-book warning is explicit).
+- **Fresh environment probe this round (network IS open in this sandbox, no
+  HF token, no GPU):**
+  - `nvidia-smi` absent; `torch.cuda.is_available()==False` -> no GPU. Paper
+    runs on RTX 4090 / H200 (SPEC §C.1).
+  - HF hub reachability: `huggingface.co` returns 200 (network open).
+  - Model gating + cache status (via `HfApi.model_info`):
+    * `meta-llama/Llama-3.1-8B-Instruct` -> **gated=manual** (license approval
+      required); no HF token in sandbox -> weights cannot be downloaded; not
+      in cache.
+    * `google/gemma-4-E4B-it` -> **NOT gated**, has `model.safetensors`
+      (15.99 GB). Downloadable in principle.
+    * `openai/gpt-oss-20b` -> NOT gated, ~13.7 GB total (MXFP4). Downloadable
+      in principle.
+  - Empirical download attempt of gemma-4-E4B-it (not gated, the most
+    obtainable model): unauthenticated `snapshot_download` reached 44 MB of
+    16 GB then **stalled at 0 bytes/min** (rate-limited). The 16 GB weight
+    file is therefore unobtainable in this sandbox in any reasonable time.
+    Even if it had downloaded, full-config inference of a 4B model on 16
+    CPU cores (no CUDA) is infeasible within any gate wall-clock budget
+    (est. 30+ h for the 4 Gemma reasoning benchmarks x 5 arms).
+  - => no paper-faithful number can be produced here. BLOCKED is honest.
+- **Real code change this round (not just re-confirmation):** the prior
+  blanket block reason "the paper's 8B/20B models require GPU and cannot run
+  on CPU" was inaccurate for the 4B Gemma. Replaced with model-specific,
+  accurate reasons in `run_all_arms.sh`:
+    * Llama-3.1-8B-Instruct: gated, no token, cannot download.
+    * gemma-4-E4B-it: not gated / downloadable, but 16 GB download stalls
+      under unauthenticated rate-limiting AND full-config CPU inference is
+      infeasible (no GPU).
+    * gpt-oss-20b: not cached, 20B-on-CPU infeasible; the molecular arm is
+      additionally blocked on the paper's UNSTATED task params (SPEC §4.18).
+- **Regression caught and fixed this round:** the first version of the new
+  Llama reason embedded `` `huggingface-cli login` `` in backticks inside a
+  shell double-quoted string. Under `sh`, backticks are command substitution
+  -> the wrapper actually executed `huggingface-cli login`, which prompted
+  for a token and looped on invalid input, so `run_all_arms.sh` hung after
+  emitting only 1 of 45 FINAL lines. Replaced backticks with single quotes;
+  re-verified `sh -n`/`bash -n` clean and 45/45 FINAL lines restored.
+- **Re-verified this round:**
+  - `sh run_all_arms.sh` -> exactly 45 distinct `FINAL <arm>=BLOCKED` lines,
+    keys == arms.json keys (0 missing, 0 extra), exit 0, stderr empty.
+  - `sh run_arm.sh <arm> ...` -> `FINAL <arm>=BLOCKED`, exit 0.
+  - `smoke.sh` -> `FINAL smoke=0.0000` (distilgpt2 + real MATH-500; path
+    runs, not evidence about the paper).
+  - `pytest tests/` -> 52 passed (degeneracy: MAGS no-op == unsteered,
+    token-identical; equation invariants Eqs. 2-10 + Prop. 1; grading; Gemma-4
+    adapter).
+- **Decision:** no new open choices; all choices the paper left open remain
+  recorded in SPEC.md.
+- **What would unblock real numbers:** a GPU host (RTX 4090 / H200) with the
+  paper's three models pre-downloaded (Llama needs an accepted license +
+  `hf auth login`; gemma and gpt-oss are open) and datasets pre-cached or
+  `MAGS_ONLINE=1`. On such a host `run_all_arms.sh` proceeds past the
+  model-cache + CUDA gates to the real fit+eval path and prints
+  `FINAL <arm>=<0.xxx>`.
+- **This round's commit:** corrected per-model block reasons in
+  `run_all_arms.sh` (backtick regression fixed) + refreshed BLOCKED
+  manifests + this REPRODUCTION.md section.
