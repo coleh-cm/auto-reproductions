@@ -362,7 +362,91 @@
      retrain protocol as the adversarial arm (the paper ties the 60k retrain
      only to the adversarial-valid criterion, tex:505-506) — a symmetric-
      protocol choice that biases the baseline, if anything, upward.
-  Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
-  `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
-  error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
-  47/47 tests pass.
+   Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
+   `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
+   error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
+   47/47 tests pass.
+
+## Measured numbers vs paper claims
+
+All commands below are run from this reproduction folder with the pinned venv
+active (`source .venv/bin/activate`) and `OMP_NUM_THREADS=4 MKL_NUM_THREADS=4`
+exported (PyTorch's default thread pool over-spawns on multi-core; see
+`run_all_arms.sh`). "Paper" = the value reported in the authoritative LaTeX
+source `paper/source/iclr2015.tex` (citation in the last column). We state the
+measured number and the difference and let the reader judge; tolerance is not
+asserted here. Sub-scale runs (smaller nets / fewer epochs / single seed than
+the paper) are flagged — the paper's headline magnitudes need 1600-unit nets
+trained to convergence with patience-100 early stopping, infeasible on this
+CPU; the DIRECTION of every headline claim is what this reproduction checks.
+
+### A. The two arms (headline M4 comparison) — re-run fresh this session
+
+These are the "two arms" the reproduction step runs. Each prints exactly one
+line `FINAL <arm>=<clean test accuracy>`; clean test error = `1 − accuracy`.
+Output captured to `/tmp/baseline.log` and `/tmp/method.log` respectively.
+
+| Arm | Paper claim (tex) | Measured (this run) | Diff (measured − paper) | Exact command |
+|-----|-------------------|---------------------|-------------------------|---------------|
+| **baseline** (clean maxout training) | clean test error 0.94% (tex:492-494) | acc `0.9787999987602234` → error **2.12%** | +1.18 pp (sub-scale: dropout OFF for the ε=0 degeneracy gate; paper's M4 net was dropout-ON, tex:492) | `python run_experiment.py --baseline --steps 5000 --seed 0 --units 240 --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5` |
+| **method** (FGSM adversarial training, ε=0.25, α=0.5) | clean test error 0.84% (tex:492-494) | acc `0.9829000234603882` → error **1.71%** | +0.87 pp (same sub-scale caveat) | `python run_experiment.py --lambda 0.25 --steps 5000 --seed 0 --units 240 --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5` |
+
+Direction verdict (stated, not asserted as reproduction): the method arm's
+clean test error (1.71%) is LOWER than the baseline's (2.12%), matching the
+paper's direction (adversarial training reduces clean error, 0.94%→0.84%).
+Both arms are bit-identical to the prior committed `results/gate_result.json`
+run (deterministic, same seed → same float).
+
+### B. The robustness of the two arms under FGSM attack (M3 / M6)
+
+| Experiment | Paper claim (tex) | Measured | Diff | Exact command (produces `results/<file>`) |
+|------------|-------------------|----------|------|-------------------------------------------|
+| M3: baseline maxout 240×2 + dropout under FGSM ε=0.25 | adv error 89.4%, conf 97.6% (tex:338-339) | adv error **99.79%**, conf **88.69%** | +10.4 pp error / −8.9 pp conf (sub-scale: 8 epochs vs convergence) | `python experiments/m3_maxout_fgsm.py` → `results/m3_maxout_fgsm.json` |
+| M6: method (adv-trained) maxout, own-FGSM ε=0.25 | adv error 17.9%, conf-on-misclassified 81.4% (tex:514-523) | own-FGSM error **10.39%**, conf **65.08%** | −7.5 pp error / −16.3 pp conf (sub-scale: 240-unit/12-epoch model vs 1600-unit/patience-100) | `python experiments/m6_robustness_transfer.py` → `results/m6_robustness_transfer.json` |
+| M6: transfer orig→adv (attack from baseline model, score on adv model) | 19.6% (tex:516) | **33.98%** | +14.4 pp | same command |
+| M6: transfer adv→orig (attack from adv model, score on baseline model) | 40.9% (tex:517) | **67.30%** | +26.4 pp | same command |
+
+Direction verdict: M6 reproduces the paper's transfer asymmetry
+(orig→adv 33.98% < adv→orig 67.30%, cf. paper 19.6% < 40.9%) and the adv-trained
+model is markedly more robust to its own FGSM (10.39%) than the baseline model
+is (M3 99.79%) — both are the paper's qualitative claims.
+
+### C. Other MNIST milestones (sub-scale)
+
+| Milestone | Paper claim (tex) | Measured | Exact command → result file |
+|-----------|-------------------|----------|------------------------------|
+| M1: softmax regression, FGSM ε=0.25 | adv error 99.9%, conf 79.3% (tex:333) | adv error **100.0%**, conf **92.86%** | `python experiments/m1_softmax.py` → `results/m1_softmax.json` |
+| M2: logistic regression 3-vs-7, FGSM ε=0.25 (exact) | clean 1.6%, adv 99% (tex:454-456) | clean **2.01%**, adv **99.12%** | `python experiments/m2_logreg.py` → `results/m2_logreg.json` |
+| M5: maxout 1600×2 adv-trained, 5 seeds | baseline 1.14% → mean 0.782% (tex:497-512) | baseline **1.82%** → adv **1.44%** (1 seed, 240 units) | `python experiments/m5_large_advtrain.py` → `results/m5_large_advtrain.json` |
+| M7: noise controls, FGSM ε=0.25 (bernoulli / uniform) | 86.2%/97.3% , 90.4%/97.8% (tex:555-557) | bern **99.97%**/83.37% , unif **99.98%**/85.39% | `python experiments/m7_noise_controls.py` → `results/m7_noise_controls.json` |
+| M8: shallow RBF, FGSM ε=0.25 | adv error 55.4%, conf-on-mistakes 1.2%, clean conf 60.6% (tex:600-604) | sub-scale (RBF underfits); conf-on-mistakes < clean-conf (right direction); §8 agreement 53.6% arm = **38.7%** over softmax-errors / **58.8%** over both-wrong (maxout-adv set) | `python experiments/m8_rbf.py` → `results/m8_rbf.json` |
+| M9: rubbish N(0,I₇₈₄) | maxout+softmax 98.35%/92.8%, sigmoid-top 68%/87.9%, softmax-reg 59.8%/70.8%, RBF 0% (tex:905-924) | maxout+softmax **82.12%**/78.52%, sigmoid-top **79.21%**/84.15%, softmax-reg **81.75%**/78.75%, RBF **0.00%** | `python experiments/m9_rubbish.py` → `results/m9_rubbish.json` |
+| E1: 12-maxout ensemble, FGSM ε=0.25 | ensemble-targeted 91.1%, single-member 87.9% (tex:819-825) | ensemble **99.76%**, single **99.79%** (4 members, 3 epochs; direction reversed at sub-scale) | `python experiments/e1_ensemble.py` → `results/e1_ensemble.json` |
+| L1: weight-decay control (Section 5) | coeff 0.0025 too large (>5% train err); smaller coeff trains but no regularization benefit (tex:426-433) | 0.0025 → 88.64% train err (stuck, as paper); 2.5e-5 → trains (2.18% train) but test 3.06% vs baseline 2.65% and FGSM 99.94% — no benefit, as paper | `python experiments/m_l1_weight_decay.py` → `results/m_l1_weight_decay.json` |
+
+RBF rubbish error = 0.00% is a structural match to the paper's 0% (the
+unnormalized per-class exp(q) metric can reach 0; a softmax metric is bounded
+below by 1/K and cannot — see SPEC §6 item 9).
+
+## Research-readiness gates
+
+Walked against the committed tree on branch
+`repro/explaining-and-harnessing-adversarial-examples`. `partial` means the
+gate is substantially met but not fully verified in this environment.
+
+| # | Gate | Verdict | Evidence |
+|---|------|---------|----------|
+| 1 | Builds from scratch | **partial** | `Dockerfile` present and well-formed (python:3.13-slim, installs pinned `requirements.txt`, runs a deps-import + FGSM-`||η||∞==ε` smoke + `pytest tests/`). `docker` is not installed in this sandbox so `docker build`/`run` was NOT executed here; the equivalent from-scratch build (`uv pip install -r requirements.txt` into a fresh `.venv`) IS verified — imports clean, 47/47 tests pass. |
+| 2 | README is accurate | **pass** | Followed the Quickstart verbatim in this checkout: `uv`/pip install, `pytest -q` (47 passed), `./run_all_arms.sh` (two `FINAL` lines), `./smoke.sh` (one `FINAL` line), `python experiments/m1_softmax.py` (writes `results/m1_softmax.json`). No memory-filled gaps. |
+| 3 | Packages are clear | **pass** | `requirements.txt` pins every direct + transitive package with a version (torch 2.7.1, numpy 2.3.2, pytest 8.4.2 + 12 transitive pins). Install from clean succeeds and the code imports without missing-import errors. |
+| 4 | Entrypoint is obvious | **pass** | One documented command runs the headline comparison: `./run_all_arms.sh` (both arms) or `python run_experiment.py --baseline|--lambda EPS --steps ...` (single arm), flag-driven, no source edits. Per-milestone entrypoints: `python experiments/mX.py`. |
+| 5 | Fast path | **pass** | `smoke.sh` exercises the full adversarial-training path (data→model→FGSM input-grad probe→mixed loss→SGD→eval) in 200 steps / ~3 s, printing one `FINAL` line. Verified this session: `FINAL adversarial=0.11349999904632568`. |
+| 6 | Deterministic / noise quantified | **pass** | Same seed → bit-identical output. Re-ran the baseline arm fresh this session: `0.9787999987602234`, identical to the prior committed `results/gate_result.json` (different session). `tests/test_degeneracy.py` locks the `--lambda 0` == `--baseline` bit-identical property. `torch.manual_seed` before model construction; seeded dropout + batch-shuffle generators. |
+| 7 | Degeneracy test in repo | **pass** | `tests/test_degeneracy.py` asserts the method's no-op (`--lambda 0`, the Algorithm-B code path at ε=0) reproduces the `--baseline` arm at the cost / train-step / CLI level (bit-identical FINAL value). 47/47 tests pass. |
+| 8 | Data provenance stated | **pass** | `src/fgsm_repro/data.py` downloads the 4 raw MNIST IDX gz files from pinned mirrors (`https://storage.googleapis.com/cvdf-datasets/mnist/` then `https://ossci-datasets.s3.amazonaws.com/mnist/`) with 3 tries/mirror and a 10 s timeout; files are cached under `data/mnist/` (gitignored, regenerated on first run). Train/valid split is the fixed index slice train[0:50000]/valid[50000:60000]; full-data retrain uses all 60000 (tex:506). |
+| 9 | Recorded number reproducible | **pass** | The two headline numbers are recorded beside their exact commands (table A above) and were re-run this session, reproducing the committed floats exactly (baseline `0.9787999987602234`, method `0.9829000234603882`). Per-milestone numbers live in committed `results/*.json` beside the producing `experiments/mX.py` command. |
+| 10 | Nothing depends on hidden local state | **partial** | `.venv/` and `data/mnist/` are gitignored (regenerated from `requirements.txt` + the pinned download); `results/`, `paper/source/` (authoritative `iclr2015.tex`), `src/`, `experiments/`, `tests/` are all committed. Runs from a fresh clone of this branch with `uv pip install -r requirements.txt` (verified via the fresh `.venv` used this session). Docker end-to-end in a truly fresh container not executed (gate 1 caveat). Two empty scratch files (`err1.txt`, `err2.txt`) that were tracked have been removed this commit. |
+
+**Net:** 8 pass, 2 partial (gates 1 and 10, both resting solely on `docker`
+not being available in this sandbox; the non-Docker evidence for both is
+verified). No gate failed.
