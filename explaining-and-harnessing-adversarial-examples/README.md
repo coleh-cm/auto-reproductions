@@ -26,7 +26,14 @@ running log and target numbers.
 
 - `src/fgsm_repro/` — the implementation (models, attacks, objectives,
   train, eval). *(Added by the implementation step.)*
-- `experiments/` — one script per milestone (`m1_softmax.py` … `m9_rubbish.py`).
+- `experiments/` — one script per milestone: `m1_softmax.py`, `m2_logreg.py`,
+  `m3_maxout_fgsm.py`, `m4_adversarial.py`, `m5_large_advtrain.py`,
+  `m6_robustness_transfer.py`, `m7_noise_controls.py`, `m8_rbf.py`,
+  `m9_rubbish.py`, and the extended `e1_ensemble.py`. Each writes a parsed
+  result JSON to `results/` with the milestone id, all hyperparameters, seed,
+  and the grep-able paper target. Defaults are a documented **sub-scale** for
+  CPU feasibility; the CLI exposes the full-scale knobs (e.g.
+  `--units 1600 --epochs 100 --patience 100 --seeds 0,1,2,3,4` for M5).
 - `tests/` — degeneracy + shape tests (e.g. FGSM on a linear model must equal
   the closed-form max-norm adversary; `||η||_∞ == ε`; `x̃ == x` when `ε == 0`).
 - `requirements.txt` — pinned dependencies (torch CPU, numpy, pytest, and the
