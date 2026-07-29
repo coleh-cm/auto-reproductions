@@ -913,3 +913,27 @@ State unchanged: 32/32 tests pass; `smoke.sh` → `FINAL smoke=ok` (feedback
 numbers reproduced); `run_all_arms.sh 300 120` reproduces the committed
 `results/run_all.log` byte-for-byte; no implementation, SPEC, blocker (B1), or
 result JSON changed. Branch `repro/block-lewis-gdr` pushed.
+
+### Round-19: refresh stale `synthetic_ball_oracle_lewis.json` time_budget (100→120); re-verify full gate byte-identical
+
+The feedback smoke (`FINAL smoke=ok`, all 7 arms strict-finite progress) was
+reproduced byte-identically. A full `run_all_arms.sh 300 120` re-run confirmed
+the committed `results/run_all.log` reproduces byte-for-byte (16 `FINAL` lines
+identical). Comparing the regenerated per-arm JSONs to `HEAD`: all 16 are
+identical in every substantive field (gap history, `F0_norm`, `iters_to_rel_gap`,
+`scale`, `x` trajectory) — the only differences are the inherently
+non-deterministic wall-clock timing fields (`time_to_rel_gap`, `elapsed`,
+`history.time`).
+
+One real staleness artifact was found and fixed: the committed
+`results/synthetic_ball_oracle_lewis.json` carried `time_budget = 100.0` while
+*every other* committed result JSON (acs + synthetic, all 7 other arms) carried
+`time_budget = 120.0`. This was a leftover from Round-9's Lewis regeneration
+(run with `TIME=100`) that was not refreshed when the rest moved to `TIME=120`.
+The re-run regenerated it at `time_budget = 120.0`, consistent with all others
+and with `run_all_arms.sh`'s default. So the 16 result JSONs were re-committed
+with refreshed timing + the corrected `time_budget`; the deterministic
+substantive numbers are unchanged.
+
+No implementation, SPEC, blocker (B1), or `run_all.log` changed. 32/32 tests
+pass; `smoke.sh` → `FINAL smoke=ok`. Branch `repro/block-lewis-gdr` pushed.
