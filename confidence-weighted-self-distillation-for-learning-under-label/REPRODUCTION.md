@@ -9,13 +9,20 @@
 
 ## Status
 
-**Workspace set up.** The paper text is saved verbatim in `paper/paper.md`.
-Implementation has not started yet.
+**Spec written.** `SPEC.md` fixes the algorithm, shapes, equations with citations, the
+frozen interfaces for `run_experiment.py`, and the full list of things the paper leaves
+unstated (headline: the gate sharpness `s` in Eq. (2) has no value anywhere in the paper).
+No upstream code exists (checked the paper text, GitHub repo/code search). Next step:
+implementation.
 
 ## Running log
 
 - 2026-07-29: Cloned reproductions repository, created reproduction folder, saved paper
   text verbatim to `paper/paper.md`, started this log.
+- 2026-07-29: Wrote `SPEC.md` (method as algorithm with shapes, equation citations into
+  `paper/paper.md`, unstated-items list §4, frozen component interfaces §5, upstream-code
+  search record §6). Installed numpy 2.5.1 + scikit-learn 1.9.0; verified split arithmetic
+  empirically (1797 → 1257 train / 540 test).
 
 ## Target numbers
 
