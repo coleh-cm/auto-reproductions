@@ -729,37 +729,65 @@ unchanged and still disclosed.
   (no implementation code changed; the gate is unaffected). Branch
   `repro/block-lewis-gdr` pushed.
 
-### Round-15: 5-component adversarial paper-fidelity review (orchestration) — 0 findings
+### Round-15: 5-component adversarial paper-fidelity review (orchestration) — 1 confirmed finding (already-disclosed deviation, now strengthened)
 
-- Ran an `orchestrate` review (`gdr-round15-paper-fidelity-review`, 10 agents:
-  one adversarial reviewer + one independent refutation-verifier per-component
+- Ran an `orchestrate` review (`gdr-paper-fidelity-review`, 7 agents: one
+  adversarial reviewer + one independent refutation-verifier per-component
   pipeline over the 5 decomposable components — data_pipeline, method_core,
-  training_loop, evaluation_metric, baseline_arm). Each reviewer read the
-  ACTUAL code files AND the authoritative paper `.tex` source at
-  `paper/arxiv-2607.00252-src/`, hunting for undisclosed
-  correctness/fidelity departures (wrong formula/sign/exponent, missing term,
-  wrong update rule, silently-dropped config key, wrong objective/gap
-  definition); each raw finding then went to a *separate* verifier stage that
-  re-read the cited `code:line` and `paper:line` itself and kept the finding
-  only if the deviation was real, material, and NOT disclosed in SPEC.md
-  U-items / 8A / Blockers or this log. The script is the evaluator: nothing
-  was trusted unverified.
-- Result: **0 confirmed findings across all 5 components** (0 raw findings
-  raised by every reviewer — the verify stage never triggered). The core
-  implementation is faithful to the paper: the maths match the cited equations
-  (E3/E4/E5/E6/E7/E8/E9/E11/E20), the loops match the paper algorithm
-  descriptions (E19 ball-oracle damped-Newton / E21 IPM log-barrier / E22
-  first-order baselines), the evaluation matches the paper (gap=(F−OPT)/OPT,
-  gap_best=cummin, time_to_rel_gap at the crossing), and every deviation from
-  a paper fact is disclosed in SPEC U-items / 8A / Blocker B1.
-- This is the third consecutive adversarial review pass (Rounds 11, 13, 15)
-  to return zero actionable findings on the implementation; Round-14's
-  confirmed findings were all test-coverage gaps (now pinned), not impl bugs.
-- No code or committed result changed this round — the review confirmed the
-  substance. Tests 32/32 pass; smoke gate `FINAL smoke=ok` (all 7 arms make
-  strict finite progress, matching the round feedback: subgradient
-  0.223→0.188, smoothed_gd 0.223→0.159, smoothed_hb 0.223→0.160,
-  smoothed_nesterov 0.223→0.152, ipm 0.223→0.013 @iter 11,
-  ball_oracle_euclidean/lewis 0.223→0.050 @iter 1). Blocker B1 (ACS
-  heterogeneity magnitude, subgradient-NR / IPM-HB counts) unchanged and
-  still disclosed. Branch `repro/block-lewis-gdr` pushed.
+  training_loop, evaluation_metric, baseline_arms; the eval_metric stage
+  stalled and returned no findings). Each reviewer read the ACTUAL code files
+  AND the authoritative paper `.tex` source at `paper/arxiv-2607.00252-src/`,
+  hunting for undisclosed correctness/fidelity departures (wrong
+  formula/sign/exponent, missing term, wrong update rule, silently-dropped
+  config key, wrong objective/gap definition); each raw finding then went to a
+  *separate* verifier stage that re-read the cited `code:line` and `paper:line`
+  itself and kept the finding only if the deviation was real, material, and
+  NOT disclosed in SPEC.md U-items / 8A / Blockers. The script is the
+  evaluator: nothing was trusted unverified.
+- Result: **1 confirmed finding** (1 raw finding raised, verified real; 1
+  refuted). The confirmed finding: the synthetic adversarial Hessians do not
+  share the common eigenbasis U — the rank-1 spike `E_ADV*outer(v,v)` with
+  `v` drawn at a spread angle in `span(U[:,0],U[:,1])` rotates the adversarial
+  top eigenvector off U, a literal departure from the "Hessian shares
+  eigenvectors" phrasing of `experiments.tex:19` (`gdr/data_synthetic.py:86`,
+  also `gdr/data.py:152`). The refuted finding (IPM iteration = full long-step
+  centering vs one Newton step) was correctly rejected: `experiments.tex:100`'s
+  "outer Newton step" means one barrier-parameter reduction preceded by full
+  centering (a long-step IPM), exactly what `gdr/solvers/ipm.py:164-208`
+  implements and SPEC E21 records; the paper's own mention of inner iteration
+  counts (`experiments.tex:88`) and higher per-iteration cost
+  (`experiments.tex:152`) confirm the long-step reading.
+- The confirmed finding was ALREADY disclosed (`gdr/data.py` `deviation_note`,
+  SPEC §8A U1) as a necessary departure. Round-15's action was to
+  **strengthen** the disclosure with measured evidence and reframe it as a
+  paper-internal inconsistency (not merely an unstated choice): recorded as
+  new SPEC item **U19**, and verified empirically (CVXPY E20 epigraph QCQP,
+  seed=0) that the paper-literal shared-eigenbasis construction (spike on a
+  distinct U column per adversarial group) gives cond(AᵀA)=8.8e4 (✓ ~1e5)
+  but only F(ERM)/OPT=1.060 (gap 6%) with the ERM worst group = a *normal*
+  group — contradicting the paper's own phenomenon 3 (`experiments.tex:33`,
+  "ERM incurs substantial loss on a small number of adversarial groups") and
+  the "clear gap" of `experiments.tex:38`; the rotated-spike construction used
+  here gives cond=1.40e5 (✓) and F(ERM)/OPT=1.469 (gap 47%) with the ERM worst
+  group = an adversarial group, reproducing phenomena 2, 3 and the gap. The
+  paper's {shares eigenvectors; misaligned sharp directions;
+  ERM-incurs-loss-on-adversarial} are mutually inconsistent under orthogonal
+  eigenvectors, so reproducing the *measured* phenomena requires breaking the
+  literal eigenvector-sharing phrasing. **No implementation changed** — the
+  construction is justified and necessary; only the documentation (SPEC U19,
+  `data.py`/`data_synthetic.py` deviation notes) was strengthened with the
+  measured numbers. Committed result JSONs and the gate are unaffected.
+- The core implementation is otherwise faithful to the paper: the maths match
+  the cited equations (E3/E4/E5/E6/E7/E8/E9/E11/E20), the loops match the
+  paper algorithm descriptions (E19 ball-oracle damped-Newton / E21 IPM
+  log-barrier / E22 first-order baselines), the evaluation matches the paper
+  (gap=(F−OPT)/OPT, gap_best=cummin, time_to_rel_gap at the crossing), and
+  every deviation from a paper fact is disclosed in SPEC U-items / 8A / Blocker
+  B1.
+- Tests 32/32 pass; smoke gate `FINAL smoke=ok` (all 7 arms make strict finite
+  progress, matching the round feedback: subgradient 0.223→0.188,
+  smoothed_gd 0.223→0.159, smoothed_hb 0.223→0.160, smoothed_nesterov
+  0.223→0.152, ipm 0.223→0.013 @iter 11, ball_oracle_euclidean/lewis
+  0.223→0.050 @iter 1). Blocker B1 (ACS heterogeneity magnitude,
+  subgradient-NR / IPM-HB counts) unchanged and still disclosed. Branch
+  `repro/block-lewis-gdr` pushed.

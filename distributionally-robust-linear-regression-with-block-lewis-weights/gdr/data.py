@@ -198,15 +198,22 @@ def make_synthetic(seed=_SYN_SEED_DEFAULT, m=_SYN_M_DEFAULT, d=_SYN_D_DEFAULT,
             "Adversarial Hessians carry a rank-1 spike E_ADV*outer(v_k,v_k) with "
             "v_k in span(U[:,0],U[:,1]); this rotates the adversarial top "
             "eigenvector off the shared basis U, a literal departure from the "
-            "'shares eigenvectors' phrasing of experiments.tex:19.  Necessary: "
-            "with the spike pinned to a single shared eigenvector (a distinct U "
-            "column per adversarial group), the huge adversarial curvature "
-            "dominates the ERM gradient and ERM fits every adversarial group on "
-            "its own independent axis, leaving the ERM worst group to be a normal "
-            "group ~= the robust-opt band, i.e. ~no ERM-vs-robust gap, "
-            "contradicting experiments.tex:38.  Normal groups keep shared U "
-            "exactly.  Matches canonical gdr.data_synthetic.make_synthetic and "
-            "the measured gap in arms.json _dataset_overrides.synthetic."),
+            "'shares eigenvectors' phrasing of experiments.tex:19 (recorded as "
+            "a paper-internal inconsistency, SPEC U19).  Necessary AND "
+            "empirically verified (Round-15, CVXPY E20 epigraph QCQP, seed=0): "
+            "the paper-literal shared-eigenbasis construction (spike on a "
+            "distinct U column per adversarial group) gives cond(A^T A)=8.8e4 "
+            "but F(ERM)/OPT=1.060 (gap 6%) with the ERM worst group = a NORMAL "
+            "group, contradicting phenomenon 3 (ERM incurs substantial loss on "
+            "adversarial groups, experiments.tex:33) and the 'clear gap' of "
+            "experiments.tex:38; the rotated-spike construction used here gives "
+            "cond=1.40e5 and F(ERM)/OPT=1.469 (gap 47%) with the ERM worst group "
+            "= an adversarial group, reproducing phenomena 2,3 and the gap.  "
+            "The paper's {shares eigenvectors; misaligned sharp directions; "
+            "ERM-incurs-loss-on-adversarial} are mutually inconsistent under "
+            "orthogonal eigenvectors.  Normal groups keep shared U exactly.  "
+            "Matches canonical gdr.data_synthetic.make_synthetic and the "
+            "measured gap in arms.json _dataset_overrides.synthetic."),
         "stacked_gram_eig_min": gram_eig_min,
         "stacked_gram_eig_max": gram_eig_max,
         "stacked_gram_cond": gram_cond,                     # target ~1e5 (experiments.tex:38)

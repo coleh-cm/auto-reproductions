@@ -62,6 +62,16 @@ def make_synthetic(
     adversarial groups, while the robust optimum redistributes (experiments.tex:
     19-25, 33).  Normal groups share the orthonormal basis U and have moderate
     log-uniform eigenvalues; their optima concentrate near the center.
+
+    NOTE: the rotated 2D-subspace spike is a literal departure from the
+    "Hessian shares eigenvectors" phrasing of experiments.tex:19, recorded as a
+    paper-internal inconsistency (SPEC U19) and empirically verified necessary:
+    the paper-literal shared-eigenbasis construction (spike on a distinct U
+    column per adversarial group) yields only a ~6% ERM-vs-robust gap with the
+    ERM worst group = a NORMAL group, contradicting the paper's own phenomenon 3
+    and the "clear gap" of experiments.tex:38; this rotated construction yields
+    the measured ~47% gap (ERM worst group = adversarial).  See gdr/data.py
+    deviation_note for the full numbers.
     """
     rng = np.random.default_rng(seed)
     if center is None:
