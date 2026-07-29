@@ -351,6 +351,18 @@ Datasets: `synthetic` (D1), `acs_income` (D2). Stretch arms (theory-fidelity, no
 - **U11 → not implemented**: the regularizer f̂ (E10) is part of the
   *accelerated* Algorithm 1 (E18); the benchmarked §8 ball-oracle is
   unaccelerated (U3) and minimizes f̃ directly (E19), so f̂ is not used.
+- **E19 inner solve → damped Newton (Armijo line search)**: the paper says
+  the ball-oracle minimizes f̃ with a "damped Newton solver"
+  (experiments.tex:71). The inner trust-region (Moré–Sørenen) step is a
+  descent direction of f̃ (gᵀs<0 for the PSD-regularized model-decreasing
+  step), so we accept it only after an Armijo backtracking line search
+  (halving α from 1 until f̃(x+αs) ≤ f̃(x) + 1e-4·α·gᵀs). This makes f̃
+  monotone non-increasing — the genuine invariant of damped Newton and the one
+  tests/test_invariants.py::test_ball_oracle_monotone checks. Taking the step
+  unconditionally lets a large trust region overshoot and *increase* f̃ on
+  high-curvature instances (the pre-fix synthetic_euclidean gap jumped
+  0.4694→0.5802 at iter 1). Constant C1=1e-4, max 40 halvings (our choice; the
+  paper gives no inner-line-search constants).
 - **U15 → OPT=1 normalization**: `run_arm.py` rescales (A,b) by 1/√OPT so the
   normalized OPT=1 (theory's WLOG). This is *required* numerically: the IPM's
   damped-Newton centering stalls on O(1e5) losses at cond 1e4+ even though it

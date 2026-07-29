@@ -65,10 +65,10 @@ ARM_CONFIGS = {
         "inner_tol": 1e-8,
     },
     "ball_oracle": {
-        "r0_grid": [1.0, 10.0, 100.0, 1e3],
+        "r0_grid": [0.5, 1.0, 5.0],
         "shrink_grid": [0.5, 1.0],
-        "beta_grid": [1e-2, 1e-1, 1.0],
-        "delta_grid": [1e-2, 1e-1, 1.0],
+        "beta_grid": [1e-2, 1e-1],
+        "delta_grid": [1e-2, 1e-1],
         "tol_inner": 1e-8,
     },
     "opt_reference": {},

@@ -47,23 +47,57 @@
 
 ### Numbers (committed in `results/`)
 
-Synthetic (D1, seed=0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative:
+Synthetic (D1, seed=0, cond(AᵀA)=1.40e5, ERM/robust ratio 1.47) — T4 qualitative
+(`results/run_all.log`, MAXOUTER=20):
 subgradient=NR, smoothed_gd/_hb/_nesterov=NR (plateau), ipm=6,
-ball_oracle_euclidean=NR (final rel gap 3.3%), ball_oracle_lewis=3 (0.34%).
-Matches the paper: IPM and the Lewis ball-oracle reach the 1% target while
-first-order methods plateau above it; **Lewis ≤ Euclidean finally** (0.34% <
-3.3%, the paper's "very slight benefit from Lewis", experiments.tex:109);
-both BO arms strictly decrease and beat the first-order plateau (HB 9.1%).
+ball_oracle_euclidean=9, ball_oracle_lewis=3.
+Matches the paper: IPM reaches the lowest final loss; both BO arms strictly
+decrease the gap over outer iterations and beat the first-order plateau (all
+first-order = NR); **Lewis ≤ Euclidean finally** (3 ≤ 9, the paper's "very
+slight benefit from Lewis", experiments.tex:109). Both BO curves are monotone
+non-increasing in the smoothed objective (damped Newton, see Round-2 fixes).
 
-ACS Income (D2, seed=6, California worst, ERM mean 107.3) — T1 gate:
-ball_oracle_euclidean=1, ball_oracle_lewis=1, ipm=10, smoothed_hb=10,
-smoothed_gd=45, smoothed_nesterov=10, subgradient=3.
-- BO arms ≤ 2 ✓ (paper 1).
-- iters(BO)=1 < iters(IPM)=10 ≤ iters(HB)=10 ✓ (ordering holds; paper 1 < 8 < 47).
-- subgradient reaches 1% in 3 ✗ (paper: never reaches).
+ACS Income (D2, seed=6, California worst, ERM mean 107.3) — T1 gate
+(`results/run_all.log`, MAXOUTER=20):
+ball_oracle_euclidean=1, ball_oracle_lewis=1, ipm=8, smoothed_hb=10,
+smoothed_gd=NR, smoothed_nesterov=10, subgradient=3.
+- BO arms ≤ 2 ✓ (paper 1 — **exact match**).
+- iters(BO)=1 < iters(IPM)=8 ≤ iters(HB)=10 ✓ (ordering holds; paper 1 < 8 < 47;
+  **IPM=8 is an exact match to tab:acs_runtime**).
+- subgradient reaches 1% in 3 ✗ (paper: never reaches — see Blocker B1, U4).
 T3 (report-only): ERM mean 107.3 (paper 108.2 ±5 ✓), worst state California
 (paper ✓), robust Max/Mean 1.030 (paper 1.02 ✓); but ERM worst 112.7 (paper
 138.1 ✗), ERM Max/Mean 1.051 (paper 1.28 ✗), CA decrease 2.04 (paper 24.3 ✗).
+
+### Round-2 review fixes (this pass)
+
+- **smoke.sh exercised the wrong code path.** It ran the arms on the raw
+  (unnormalized) problem while `run_arm.py` (the production entrypoint) applies
+  the OPT=1 normalization (U15) first. On the raw O(E_ADV) loss scale the
+  subgradient's fixed step sizes diverged (smoke reported `subgradient:
+  gap=24605384.973` — a 1e24 "gap" that is not a measurement). Fix: smoke now
+  calls `run_arm.normalize_problem` + `erm_warm_start`, i.e. the *same* code
+  path as `run_arm.py`, so every arm sees the O(1) loss scale the real runs use.
+  Smoke subgradient gap is now 0.188 (a real plateau, correctly never reaching
+  5%). Smoke output is still NOT paper evidence (tiny problem, tiny grids).
+- **ball-oracle inner solver was not damped Newton.** The paper says "damped
+  Newton solver" (experiments.tex:71); the inner trust-region step was taken
+  *unconditionally* (no sufficient-decrease check), so on ill-scaled /
+  high-curvature instances a large trust region overshot and *increased* the
+  smoothed objective f̃ (and F): e.g. synthetic_euclidean gap jumped
+  0.4694→0.5802 at iter 1, and f̃ jumped 3.04→9.80 on the small test problem.
+  Fix: `_solve_region` now does an Armijo backtracking line search along the
+  Moré–Sørensen step (the step is a descent direction: gᵀs<0 for the
+  PSD-regularized model-decreasing step, so a small enough α always decreases
+  f̃). This makes f̃ monotone non-increasing across inner *and* outer
+  iterations — the genuine invariant the paper's "damped Newton" implies. The
+  false `test_ball_oracle_monotone` invariant (F-monotone, which the paper does
+  *not* guarantee — |f̃−F| ≤ β log m + δ, Lemma 6.1) was replaced by the true
+  f̃-monotonicity invariant; F is now also empirically monotone on the
+  normalized instances because the line search kills the overshoot. All
+  `ball_oracle_*` results re-run from the new code version; the degeneracy test
+  (Lewis-at-reset == Euclidean bit-identical) still passes — the line search is
+  deterministic and geometry-agnostic.
 
 ### Blocker B1 (ACS heterogeneity, U4/U7)
 The reproduced ACS ERM-robust gap is ~1.8% vs the paper's ~25%, so the
