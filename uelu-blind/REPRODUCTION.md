@@ -7,13 +7,15 @@
 
 ## Status
 
-**Current stage: workspace setup complete — implementation not yet started.**
+**Current stage: SPEC complete — upstream author code FOUND (gwr3n/uelu); implementation not yet started.**
 
 - [x] Reproduction folder created: `/root/auto-reproductions/uelu-blind`
 - [x] Folder path recorded in `$HOME/.repro_dir` (no trailing newline)
 - [x] Paper source saved to `paper/main.tex` (full LaTeX source, supplied verbatim with the workflow objective)
-- [ ] SPEC.md (method, equations, hyperparameters, "not stated" list)
-- [ ] Implementation of activations (GELU, ReLU, SiLU, DGELU, UELU-β, TUELU) and the five experiments
+- [x] SPEC.md (method, shapes, 40 verified grep-able citations, "not stated" list, frozen interfaces)
+- [x] Upstream-code search — FOUND: <https://github.com/gwr3n/uelu> (author Roberto Rossi's GitHub,
+      self-described "supporting code and data for arXiv:2607.03664"); recorded in SPEC.md §0
+- [ ] Implementation step: vendor upstream @ pinned commit, log changes needed to make it run
 - [ ] Smallest end-to-end run produces a parsed number
 - [ ] Adversarial review loop clean
 - [ ] Readiness gates walked
@@ -57,3 +59,12 @@ Region occupancy (closed / transition / open percentages) must be logged for all
 - **2026-07-29** — Workspace initialised. Repo `auto-reproductions` was already cloned at `$HOME`
   (remote `https://github.com/coleh-cm/auto-reproductions`, token-credentialed); pulled to latest.
   `uelu-blind/` created, `paper/main.tex` written verbatim, this file started. Committed.
+- **2026-07-29** — SPEC step complete. Read the full paper source; extracted every equation with
+  line-number citations (40/40 machine-verified against `paper/main.tex`). **Upstream code FOUND**
+  despite the redacted code-availability paragraph: author GitHub `gwr3n` (Roberto Rossi, Univ.
+  of Edinburgh) hosts `gwr3n/uelu`, self-described as supporting code for arXiv:2607.03664, with
+  scripts for all five experiments, an orchestrator, unpinned `requirements.txt`, and the authors'
+  own `study_outputs/` (checkpoints + aggregate CSV). SPEC.md records the algorithm, all tensor
+  shapes, frozen component interfaces, and 17 paper-silence items (softplus floor β_min=1e−3,
+  seed values 1..5, split-seed 123, cosine-to-zero for vision, weight tying, est. protocol,
+  population std, exact-erf GELU, …) with how upstream resolves each. Committed.
