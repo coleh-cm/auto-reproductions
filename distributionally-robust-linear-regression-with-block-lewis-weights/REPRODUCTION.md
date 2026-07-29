@@ -496,3 +496,27 @@ non-production paths changed). No committed result changed.
   only what runs and states the B1 blocker honestly; accelerated MS-oracle arms
   (E16-E18) remain deliberately unimplemented (only the unaccelerated ball-oracle
   that §8 actually benchmarks is implemented, per U3).
+
+## Round 11: parallel adversarial paper-fidelity review of all 5 components (orchestration)
+
+Ran a 5-agent orchestration (one adversarial reviewer per component: data_pipeline,
+method_core, training_loop, evaluation_metric, baseline_arm). Each reviewer read the
+ACTUAL code files AND the authoritative paper LaTeX source at
+`paper/arxiv-2607.00252-src/` (collectively ~97k tokens, ~132 tool calls), hunting
+for UNDISCLOSED correctness violations — wrong formula, wrong sign/exponent, missing
+term, wrong update rule, silently-dropped config key, wrong objective/gap definition.
+Findings were to be refutation-verified by an independent verifier (script is the
+evaluator); only survivors would be acted on.
+
+Result: every one of the 5 reviewers returned `{"findings": []}` — zero undisclosed
+correctness violations. The verify phase never triggered (nothing to refute).
+Confirming the earlier rounds' fixes held: the maths match the cited equations
+(E3/E4/E5/E6/E7/E8/E9/E11), the loops match the paper algorithm descriptions
+(E19 ball-oracle damped-Newton / E21 IPM log-barrier / E22 first-order baselines),
+the evaluation matches the paper (E20 epigraph OPT, F=max_i ||r_i||^2, gap
+(F-OPT)/OPT), and every deviation from a paper fact is disclosed in the SPEC U-list
+or REPRODUCTION.md (B1 blocker, U1-U18 choices).
+
+No production code or committed result changed this round — the review confirmed the
+substance. 24/24 tests pass; smoke gate `FINAL smoke=ok` (all 7 arms make strict
+finite progress). Branch pushed so the round is survivable.
