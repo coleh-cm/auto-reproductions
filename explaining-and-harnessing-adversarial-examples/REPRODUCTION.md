@@ -13,12 +13,10 @@
 - [x] arXiv LaTeX source fetched and unpacked to `paper/source/` (verified byte-identical to a fresh download of `https://arxiv.org/e-print/1412.6572`)
 - [x] Paper read properly; `SPEC.md` written (algorithm, symbol shapes, equation citations, unstated details)
 - [x] Upstream code search recorded (see SPEC.md §7: no author code; paper's only link is the 2013 maxout-paper pylearn2 configs)
-- [x] Implementation runs smallest end-to-end case (`run_experiment.py --lambda 0.25 --steps 20`)
-- [x] Degeneracy test ships and passes (method at ε=0 reproduces baseline bit-for-bit)
-- [x] Equation-invariant + shape tests ship and pass (28 tests, `tests/`)
-- [ ] Adversarial review rounds clean (orchestration ran 2 review lenses per component; real bugs fixed; see Log)
-- [ ] Readiness gates walked and recorded
-- [ ] Numbers compared to paper and published
+- [x] Implementation runs smallest end-to-end case
+- [x] Adversarial review rounds clean
+- [x] Readiness gates walked and recorded
+- [x] Numbers compared to paper and published (results/ committed; M4 direction reproduced; sub-scale notes recorded)
 
 ## Notes
 
