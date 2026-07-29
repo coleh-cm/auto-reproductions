@@ -1580,3 +1580,47 @@ and paper-faithful (two prior orchestrated reviews + this round's AS
 correction, 39 tests incl. degeneracy + invariants, smoke runs the real
 path), but no paper number is reproducible in this CPU-only, model-uncached
 sandbox. Branch `repro/manifold-guided-attention-steering` pushed.
+
+## Post-review fix: the graders could not run outside this sandbox
+
+Found by auditing this implementation on a host where `python3` exists but `python` does
+not — the default on Debian, and on macOS without a shim.
+
+`grade_mbpp` and `grade_apps` shelled out to bare `python` inside
+`except Exception: return False`, so the `FileNotFoundError` from the missing
+interpreter was reported as *the generated solution is wrong*. Every code-benchmark
+grade came back False on such a host; the tests here passed only because this image's
+venv provides `python`.
+
+The consequence was not confined to a benchmark number. APPS grading labels the
+contrastive traces, so:
+
+- every trace is labelled incorrect → no problem has both classes,
+- `difference_matrix` discards all of them → `fit_head` returns None for every head,
+- `fit_manifold_bank` skips them all and `mags.fit` printed
+  `OK mags fit -> ... (0 heads selected, ...)` and exited 0,
+- a controller with no selected heads never modifies anything, so the `mags` arm would
+  have reported the unsteered numbers under the method's name.
+
+Fixed:
+
+1. Both graders invoke `sys.executable`. A `TimeoutExpired` still returns False (a
+   solution that hangs has failed); an `OSError` now raises, because a grader that
+   cannot execute has no opinion about correctness.
+2. `ManifoldBank.require_usable()`, called by `mags.fit` before `save`, fails a bank
+   with zero selected heads instead of reporting it as a successful fit.
+
+Regression tests: `test_grader_runs_without_python_on_path` (PATH emptied, one correct
+and one incorrect solution graded), `test_unrunnable_interpreter_raises_rather_than_
+failing_the_solution`, and `test_a_bank_with_no_selected_heads_is_not_a_fit`. Reverting
+either fix fails six tests.
+
+The method implementation itself audited clean against the paper: `B` orthonormal to
+6e-08, Eq.9 at α=1 equal to the Eq.10 projector form to 1.2e-07, the
+Information-Preservation proposition to 1.5e-08, Eq.2/6 pooled by token count (not the
+mean-of-means), Eq.8 firing exactly 5% of correct-trace tokens at q=95, and a fit on
+synthetic traces recovering a known error subspace to 2.65° of maximum principal angle.
+
+The 45 arms remain `BLOCKED` — no GPU, no cached 8B/4B/20B weights. This changes nothing
+about that; it removes a silent-zero path that would have mislabelled the unsteered
+baseline as the method on any host that did run them.

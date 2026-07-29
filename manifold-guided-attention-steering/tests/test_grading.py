@@ -132,3 +132,35 @@ def test_grade_math_multi_boxed_scores_last_answer():
     pred2 = r"intermediate $\boxed{3}$ then $\boxed{\dfrac{1}{2}}$"
     assert grade_math(pred2, r"\dfrac{1}{2}"), "last boxed dfrac must pass"
     assert not grade_math(pred2, "3"), "intermediate boxed must not be scored"
+
+
+# ---------------------------------------------------------------------------
+# A grader must not turn "cannot run" into "the answer is wrong"
+# ---------------------------------------------------------------------------
+def test_grader_runs_without_python_on_path(monkeypatch, tmp_path):
+    """Invoking bare ``python`` scores every solution wrong on a python3-only host.
+
+    The silence does not stop at the benchmark number. APPS grading labels the
+    contrastive traces, so all-incorrect labels leave no problem with both classes,
+    every head's fit is degenerate, and the fit step reports 0 heads selected -- a
+    method that never ran, reported as a successful fit.
+    """
+    monkeypatch.setenv("PATH", str(tmp_path))     # no python, no python3, nothing
+    prob = Problem(id="t1", benchmark="MBPP", prompt_text="", gold="",
+                   extra={"test_list": ["assert add(1,2)==3"], "test_imports": []})
+
+    assert grade("MBPP", "def add(a,b):\n    return a+b\n", prob)
+    assert not grade("MBPP", "def add(a,b):\n    return a-b\n", prob)
+
+
+def test_unrunnable_interpreter_raises_rather_than_failing_the_solution(monkeypatch):
+    """A broken interpreter has no opinion about correctness, so it must not vote.
+
+    Distinct from test_subprocess_timeout_safety above: a solution that hangs has
+    genuinely failed, and that still returns False.
+    """
+    import pytest
+    monkeypatch.setattr("mags.grading.sys.executable", "/nonexistent/python")
+
+    with pytest.raises(RuntimeError, match="could not execute"):
+        _run_subprocess_ok("print('OK')")

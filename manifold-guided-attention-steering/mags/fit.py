@@ -157,6 +157,9 @@ def main(argv=None):
         layers_monitored=monitored, split_seed=config.DEFAULT_SEED, git_sha=git_sha,
         report_pids=report_pids,
     )
+    # "OK ... 0 heads selected" on exit 0 is a success message for a method that never
+    # ran: an empty bank steers nothing and reproduces the unsteered arm exactly.
+    bank.require_usable()
     bank.save(args.out)
     print(f"OK mags fit -> {args.out} ({len(bank.selected_heads)} heads selected, "
           f"{bank.n_problems_fit} fit / {bank.n_problems_select} select problems)")
