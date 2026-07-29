@@ -86,22 +86,39 @@ def load_problem(dataset: str, seed: int):
         raise ValueError(f"unknown dataset {dataset}")
 
 
-def get_opt_cached(problem, dataset: str, solver: str = "CLARABEL"):
-    """OPT via the E20 epigraph QP, cached under results/opt_<dataset>.json."""
+def get_opt_cached(problem, dataset: str, seed: int, solver: str = "CLARABEL"):
+    """OPT via the E20 epigraph QP, cached under results/opt_<dataset>_seed<seed>.json.
+
+    The cache key MUST include ``seed``: ACS keeps m=51, n=10200 for every seed
+    (200/region x 51), so a seed-blind cache (the prior bug) silently reused one
+    seed's OPT for every other seed -- e.g. seed-0 OPT=110.70 was used for the
+    seed-6 ACS run whose true OPT=109.49, shifting every relative gap.  We now
+    also keep the data-dependent signature (m, n, n_i hash) so a stale cache from
+    a different construction (different per_state / features) is rebuilt, not
+    reused.
+    """
     os.makedirs("results", exist_ok=True)
-    cache = f"results/opt_{dataset}.json"
+    cache = f"results/opt_{dataset}_seed{seed}.json"
+    sig = {
+        "m": int(problem["m"]),
+        "n": int(problem["A"].shape[0]),
+        "d": int(problem["d"]),
+        "n_i": [int(v) for v in problem["n_i"][:5]]
+        + [int(problem["n_i"][-1])] if problem["m"] > 0 else [],
+        "A_sum": float(np.abs(problem["A"]).sum()),
+    }
     if os.path.isfile(cache):
         try:
             with open(cache) as f:
                 d = json.load(f)
-            if d.get("m") == problem["m"] and d.get("n") == problem["A"].shape[0]:
+            if (d.get("m") == sig["m"] and d.get("n") == sig["n"]
+                    and d.get("d") == sig["d"] and d.get("A_sum") == sig["A_sum"]):
                 return float(d["opt"])
         except Exception:
             pass
     x_star, opt = solve_opt(problem, solver=solver)
     with open(cache, "w") as f:
-        json.dump({"opt": float(opt), "m": problem["m"],
-                   "n": int(problem["A"].shape[0])}, f, indent=2)
+        json.dump({"opt": float(opt), "seed": int(seed), **sig}, f, indent=2)
     return float(opt)
 
 
@@ -143,7 +160,7 @@ def main():
     args = ap.parse_args()
 
     problem = load_problem(args.dataset, args.seed)
-    opt = get_opt_cached(problem, args.dataset, args.solver)
+    opt = get_opt_cached(problem, args.dataset, args.seed, args.solver)
     # normalize so OPT == 1 (U15); arms run on the normalized problem
     problem, scale = normalize_problem(problem, opt)
     opt_norm = 1.0

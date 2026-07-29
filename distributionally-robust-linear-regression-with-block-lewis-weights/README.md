@@ -143,12 +143,12 @@ monotonicity.
 **Synthetic (D1, seed=0; cond(AᵀA)=1.40e5; ERM/robust worst-group ratio 1.47)**
 — T4 is qualitative (`experiments.tex:106-109`): subgradient=NR, all smoothed
 first-order=NR (plateau, HB final 9.1%), ipm=6, ball_oracle_euclidean=9,
-ball_oracle_lewis=3 (both final 0.34%). Matches the paper: IPM reaches the lowest
+ball_oracle_lewis=5 (both final 0.34%). Matches the paper: IPM reaches the lowest
 final loss; both BO arms strictly decrease the gap over outer iterations and
-beat the first-order plateau; **Lewis ≤ Euclidean** — Lewis reaches the 0.34%
-smoothing floor in 3 outer iterations vs Euclidean's 9 (the paper's "very slight
-benefit from Lewis", `experiments.tex:109`). Both BO curves are monotone
-non-increasing in the smoothed objective (damped Newton).
+beat the first-order plateau; **Lewis ≤ Euclidean** — both BO arms reach the
+0.34% smoothing floor, Lewis in 5 outer iterations vs Euclidean's 9 (the
+paper's "very slight benefit from Lewis", `experiments.tex:109`). Both BO
+curves are monotone non-increasing in the smoothed objective (damped Newton).
 
 **ACS Income (D2, seed=6; California is the worst ERM group; ERM mean 107.3)**
 — T1 gate (`experiments.tex:171-186`):
