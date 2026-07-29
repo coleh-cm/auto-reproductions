@@ -223,7 +223,10 @@ Training/optimization (nothing in this paper prints any of these):
    Depth = 2 hidden layers, pieces = 5 come only from the maxout paper / external config.
 3. **Dropout rates**: "also regularized with dropout" (tex:492) — no rates given.
 4. **Weight init & norm constraints**: nothing in this paper. External config uses uniform
-   `irange .005` and `max_col_norm 1.9365` per layer.
+   `irange .005` and `max_col_norm 1.9365` per layer — INCLUDING the softmax readout `y`
+   (`irange: .005`, zero bias). We align all three layers to `irange .005` + zero bias
+   (the readout previously used PyTorch's default ±1/√fan_in with random bias — a deviation
+   from the adopted recipe, now fixed; tested by `test_maxout_readout_init_matches_recipe`).
 5. **Early-stopping patience for the adversarial criterion**: patience 100 epochs is stated only
    for *clean* valid error in the original maxout recipe (tex:501-503); the adversarial-valid
    variant's patience is unstated. Also unstated: ε used for the adversarial validation set
@@ -284,8 +287,10 @@ Evaluation protocol:
      code path IS exercised at eps=0.) Determinism: `MaxoutMLP` init draws from the GLOBAL
      torch RNG, so `run_experiment.py` calls `torch.manual_seed(seed)` before constructing the
      model; the batch-shuffle generator is seeded from `cfg.seed` inside `train()`. The
-     monitor-best checkpoint is loaded before evaluation (paper protocol). Full-scale
-     milestone experiments (m4_adversarial.py etc.) re-enable dropout (0.8/0.5) — see item 3.
+      monitor-best checkpoint is loaded before evaluation (paper protocol). Full-scale
+      milestone experiments (m4_adversarial.py etc.) re-enable dropout (input include 0.8,
+      hidden include 1.0=off) — see item 3 and the External block below (corrected: the
+      pylearn2 recipe has dropout on the INPUT of h0 only, not on hidden layers).
 23. **Dropout state during surrogate generation (F1)**: the paper says only that adversarial
      examples should "resist the current version of the model" (tex:490-491) and never states
      whether dropout is on or off while generating the FGSM surrogate. The evaluation-time
@@ -301,12 +306,20 @@ Evaluation protocol:
 
 External (not from this paper; recorded from the still-live
 `lisa-lab/pylearn2` `pylearn2/scripts/papers/maxout/mnist_pi.yaml`, fetched 2026-07-29):
-240 units × 5 pieces × 2 maxout layers; uniform init irange .005; max_col_norm 1.9365;
-SGD batch 100, LR .1, exponential adjust 1.000004/update (min 1e-6); momentum .5 → .7 by epoch 250;
-dropout include-probs: input .8 (hidden default .5); early-stop on valid misclass, patience 100;
-monitor-best checkpoint; train 0:50000, valid 50000:60000. **We adopt these for M3/M4 arms and
-document them as external defaults, not paper-stated values.** For M5 (1600 units) the paper gives
-no recipe at all beyond α/ε/early-stop criterion.
+240 units × 5 pieces × 2 maxout layers; uniform init irange .005 (ALL three layers incl. the
+softmax readout `y`, with zero bias); max_col_norm 1.9365 (all three layers); SGD batch 100,
+LR .1, exponential adjust 1.000004/update (min 1e-6); momentum .5 → .7 by epoch 250;
+dropout `input_include_probs: {h0: .8}`, `input_scales: {h0: 1.}` — i.e. dropout on the INPUT of
+h0 only (the raw input x), include-prob 0.8, NON-inverted scaling (scale 1.0: train multiplies
+by the Bernoulli mask with no 1/include division; eval is identity). The recipe has NO dropout
+on h1's input or the readout's input. We adopt these for M3/M4 arms and document them as
+external defaults, not paper-stated values. **Two documented deviations from the recipe:**
+(a) we use INVERTED dropout (mask/include at train, identity at eval) — the modern standard,
+mathematically equivalent up to a constant eval-time scale (the recipe's scale-1.0 non-inverted
+form leaves eval activations ~1.25x the expected train value); (b) the model additionally
+exposes a `dropout_hidden_include` knob (default 1.0=off) for ablations, but the full-scale
+milestone scripts set input 0.8 / hidden 1.0 to match the recipe's input-only dropout. For M5
+(1600 units) the paper gives no recipe at all beyond α/ε/early-stop criterion.
 
 ---
 

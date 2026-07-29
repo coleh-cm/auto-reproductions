@@ -113,3 +113,37 @@
   recorded as the paper's own, SPEC sec6 item 21), E7 (tex:486-488, alpha=0.5, stop-grad
   tex:559-561), E8 (tex:595, RBF no minus sign). Degeneracy (eps=0==baseline EXACT) confirmed
   by reviewers and by tests.
+- 2026-07-29: **Rebuild pass (orchestrate, 5 parallel build+review units, 25 agents).**
+  Decomposed the implementation into data / method-core / train / eval / baseline-arm and
+  built each in its own subagent with a 2-lens adversarial review (correctness +
+  paper-fidelity) per unit, iterating once on rejection. All units were implemented to disk;
+  review caught real bugs that were fixed in-place afterward:
+  (a) `eval.eval_clean` was broken for the binary `LogisticRegression` (M2): `argmax` over a
+  `[B,1]` logits column always yields 0 and never matches `{-1,+1}` labels → accuracy 0.0.
+  Fixed to special-case K==1 with the logistic decision rule `+1 if score>0 else -1`.
+  (b) `run_experiment.py` dropout defaults (0.8/0.5) broke the ε=0 degeneracy: with dropout on
+  the method's extra forward draws a different mask, so adv(eps=0) diverges from baseline
+  (max abs diff 0.029, confirmed empirically). Fixed defaults to 1.0/1.0 (disabled) per SPEC
+  §6 item 22, and routed `--lambda 0` to `adv_train=True` (the method at its no-op) rather
+  than branch-switching to the clean path, so the degeneracy test genuinely exercises the
+  method. Verified bit-identical: `--lambda 0` and `--baseline` print the same FINAL line.
+  (c) `data.MNISTData` carried a 7th `seed` field beyond the frozen 6-field interface;
+  removed it (load is deterministic by index slicing, seed not needed).
+  (d) `3v7` docstring wrong test count (1962 → 2038); `eval_rubbish` dead `pred` var; added
+  `n_m1_errors` to `AgreementStats`. The `max_col_norm` axis bug (readout `dim=1`) was
+  already fixed in the rebuilt `train.py`. Tests now 28 passing (degeneracy at cost/train/CLI
+  levels, E1-E8 invariants, shapes). M1 softmax reproduces the paper's FGSM target: adv
+  error 100.0% (paper 99.9%, tex:333) at 5 epochs.
+- 2026-07-29: **F5 fix — align maxout readout init + dropout to the external recipe.** Adversarial
+  review found the softmax readout used PyTorch's default init (±1/√240 ≈ ±0.0645, random bias)
+  instead of the recipe's `irange: .005` (zero bias). Fixed: `MaxoutMLP` readout now inits
+  uniform ±0.005 with zero bias, matching `mnist_pi.yaml`'s `Softmax` layer `y`. Tested by
+  `test_maxout_readout_init_matches_recipe`. Also re-read the live recipe: its dropout is
+  `input_include_probs: {h0: .8}`, `input_scales: {h0: 1.}` — INPUT of h0 ONLY (the raw input),
+  include 0.8, NON-inverted (scale 1.0); there is NO h1 or readout-input dropout. (The earlier
+  review claim of a "missing third dropout site (h1→readout)" was a misread of the recipe —
+  only h0's input is listed.) The full-scale milestone scripts now set input 0.8 / hidden 1.0
+  (off) to match; the model keeps a `dropout_hidden_include` knob (default off) for ablations.
+  Documented deviation: we use INVERTED dropout (modern standard) vs the recipe's scale-1.0
+  non-inverted form (a constant eval-time scale difference); recorded in SPEC §6 item 4 and
+  the External block. Tests 30 passing.

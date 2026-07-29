@@ -52,11 +52,16 @@ EPS = 0.25
 ALPHA = 0.5
 
 # External maxout defaults (lisa-lab/pylearn2 mnist_pi.yaml; documented as
-# external, not paper-stated — see SPEC.md section 6).
+# external, not paper-stated — see SPEC.md section 6). The recipe's dropout
+# (input_include_probs: {h0: .8}, input_scales: {h0: 1.}) applies dropout to
+# the INPUT only (include 0.8); there is NO hidden / readout-input dropout.
+# We therefore set input include 0.8 and hidden include 1.0 (off) to match the
+# recipe, rather than the earlier 0.8/0.5 which added an unrecipe'd hidden
+# dropout site.
 DEFAULT_UNITS = 240
 DEFAULT_PIECES = 5
 DEFAULT_DROPOUT_INPUT = 0.8
-DEFAULT_DROPOUT_HIDDEN = 0.5
+DEFAULT_DROPOUT_HIDDEN = 1.0
 
 
 def _build_parser() -> argparse.ArgumentParser:

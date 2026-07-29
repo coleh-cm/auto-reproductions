@@ -268,3 +268,22 @@ def test_adversarial_train_backward_finite_with_dropout():
         assert p.grad.abs().sum() > 0
     # model must be back in train mode after the cost (the cost restores it).
     assert m.training
+
+
+# --- external-recipe alignment: readout init irange .005 + zero bias ------- #
+def test_maxout_readout_init_matches_recipe():
+    """F5: the adopted external pylearn2 mnist_pi.yaml sets ``irange: .005``
+    on the Softmax readout layer ``y`` (and pylearn2 biases start at 0). The
+    readout weight must therefore be uniform in [-0.005, 0.005] and its bias
+    must be exactly zero at construction -- NOT PyTorch's default
+    ±1/sqrt(fan_in) (~±0.0645 for fan_in=240) with random bias."""
+    from fgsm_repro.models import MaxoutMLP
+    torch.manual_seed(11)
+    m = MaxoutMLP(units=240, pieces=5, n_classes=10, seed=11)
+    w = m.readout.weight
+    b = m.readout.bias
+    assert w.abs().max().item() <= 0.005 + 1e-6, (
+        f"readout weight max abs {w.abs().max().item()} > 0.005 (not irange .005)")
+    assert torch.all(b == 0.0), f"readout bias must be zero, got {b}"
+    # and it must NOT be all-zero (uniform draw is non-degenerate)
+    assert w.abs().sum().item() > 0.0

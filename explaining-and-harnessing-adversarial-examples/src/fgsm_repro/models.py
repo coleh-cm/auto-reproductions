@@ -111,6 +111,27 @@ class MaxoutMLP(nn.Module):
     Dropout is applied ONLY in ``train()`` mode; ``eval()`` is identity
     (inverted-dropout scaling: mask / include at train time, no rescale at
     eval).  ``set_seed(seed)`` resets the generator.
+
+    External-recipe alignment (pylearn2 ``mnist_pi.yaml``, fetched 2026-07-29):
+      - both maxout layers AND the softmax readout use uniform init
+        ``irange .005`` with **zero bias** (the recipe sets ``irange: .005``
+        on all three layers, including the ``Softmax`` readout ``y``). The
+        readout was previously left at PyTorch's default init
+        (uniform ±1/sqrt(fan_in) with random bias), which is a deviation from
+        the adopted recipe -- now aligned.
+      - the recipe's dropout (``input_include_probs: {h0: .8}``,
+        ``input_scales: {h0: 1.}``) applies dropout to the INPUT of h0 only
+        (i.e. the raw input x), include-prob 0.8, with NON-inverted scaling
+        (scale 1.0: train multiplies by the Bernoulli mask with NO 1/include
+        division; eval is identity, so eval-time activations are ~1.25x the
+        expected train value). Our implementation uses INVERTED dropout
+        (mask/include at train, identity at eval) -- the modern standard,
+        mathematically equivalent up to a constant eval-time scale. This is a
+        documented minor deviation from the external recipe (the recipe is
+        not paper-stated). The recipe has NO dropout on h1's input or the
+        readout's input; ``dropout_hidden_include`` defaults to 1.0 (off) to
+        match, and the full-scale milestone scripts set input include 0.8 /
+        hidden include 1.0.
     """
 
     def __init__(
@@ -134,7 +155,12 @@ class MaxoutMLP(nn.Module):
 
         self.layer0 = _MaxoutLayer(in_dim, units, pieces)
         self.layer1 = _MaxoutLayer(units, units, pieces)
+        # Readout: pylearn2 recipe uses irange .005 + zero bias on the Softmax
+        # layer y (aligned; previously PyTorch default ±1/sqrt(fan_in)+rand bias).
         self.readout = nn.Linear(units, n_classes)
+        with torch.no_grad():
+            nn.init.uniform_(self.readout.weight, -0.005, 0.005)
+            nn.init.zeros_(self.readout.bias)
 
         self.gen = torch.Generator()
         self.set_seed(seed)
