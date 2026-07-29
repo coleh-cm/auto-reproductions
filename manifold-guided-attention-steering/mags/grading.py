@@ -84,9 +84,15 @@ def grade_humaneval(completion: str, problem) -> bool:
         raise RuntimeError(f"human_eval import failed: {e!r}")
     test = problem.extra["test"]
     entry = problem.extra["entry_point"]
-    res = check_correctness(problem.id, {"prompt": problem.prompt_text, "test": test,
-                                          "entry_point": entry}, completion,
-                            timeout=10.0)
+    # human_eval 1.0.3: check_correctness(problem: Dict, completion: str, timeout: float,
+    #   completion_id=None) -> Dict. The problem dict MUST carry `task_id` (read for the
+    #   return value) plus the prompt/test/entry_point the harness executes. Passing
+    #   positional args out of order (as the prior code did) raises
+    #   TypeError: multiple values for argument 'timeout', making every HumanEval grade
+    #   crash (HumanEval is one of four headline benchmarks, tex:L710-713).
+    problem_dict = {"task_id": problem.id, "prompt": problem.prompt_text,
+                    "test": test, "entry_point": entry}
+    res = check_correctness(problem_dict, completion, timeout=10.0)
     return res["passed"] if isinstance(res, dict) else (res == "passed")
 
 

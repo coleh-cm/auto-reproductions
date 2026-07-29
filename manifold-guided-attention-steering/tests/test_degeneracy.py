@@ -134,9 +134,9 @@ def test_degeneracy_alpha_zero_matches_unsteered():
         "Once upon a time there was a",
     ]
     for p in prompts:
-        txt_base, ids_base = generate(model, tok, p, NoOpController(), max_new_tokens=16)
+        txt_base, ids_base, _ = generate(model, tok, p, NoOpController(), max_new_tokens=16)
         ctrl = MAGSController(bank, alpha=0.0)   # no-op: correction term multiplied by 0
-        txt_mag, ids_mag = generate(model, tok, p, ctrl, max_new_tokens=16)
+        txt_mag, ids_mag, _ = generate(model, tok, p, ctrl, max_new_tokens=16)
         assert ids_base.tolist() == ids_mag.tolist(), \
             f"alpha=0 mismatch on prompt {p!r}: MAGS diverged from unsteered"
 
@@ -157,9 +157,9 @@ def test_degeneracy_untriggerable_matches_unsteered():
         "Once upon a time there was a",
     ]
     for p in prompts:
-        txt_base, ids_base = generate(model, tok, p, NoOpController(), max_new_tokens=16)
+        txt_base, ids_base, _ = generate(model, tok, p, NoOpController(), max_new_tokens=16)
         ctrl = MAGSController(bank, alpha=1.0)   # full strength, but never triggers
-        txt_mag, ids_mag = generate(model, tok, p, ctrl, max_new_tokens=16)
+        txt_mag, ids_mag, _ = generate(model, tok, p, ctrl, max_new_tokens=16)
         assert ids_base.tolist() == ids_mag.tolist(), \
             f"untriggerable mismatch on prompt {p!r}: MAGS diverged from unsteered"
 
@@ -177,9 +177,9 @@ def test_prefill_not_steered():
     for h in bank.selected_heads:
         bank.heads[tuple(h)].threshold = float("-inf")
     p = "The answer to 2+2 is"
-    _, ids_base = generate(model, tok, p, NoOpController(), max_new_tokens=4)
+    _, ids_base, _ = generate(model, tok, p, NoOpController(), max_new_tokens=4)
     ctrl = MAGSController(bank, alpha=1.0)
-    _, ids_mag = generate(model, tok, p, ctrl, max_new_tokens=4)
+    _, ids_mag, _ = generate(model, tok, p, ctrl, max_new_tokens=4)
     # first generated token comes from prefill (seq>1) forward -> controller passed through
     assert ids_base.tolist()[0] == ids_mag.tolist()[0], \
         "prefill was steered; controller must pass-through seq>1 (SPEC §4.9)"

@@ -60,16 +60,30 @@ class HookRegistry:
         return spec["o_proj_path"](self.model, layer)
 
     # -- hook lifecycle --
-    def attach(self, callback: Callable):
-        """Attach ``callback`` as a pre-hook on ``W_O`` of every monitored layer.
+    def attach(self, callback: Callable, layers=None):
+        """Attach ``callback`` as a pre-hook on ``W_O`` of the requested layers.
 
         ``callback(layer: int, x_heads: Tensor[bsz,seq,H,d_h]) -> Optional[Tensor[bsz,seq,H,d_h]]``
         receives a head-contiguous *view*; if it returns a tensor, that tensor (already
         head-contiguous) is reshaped back to ``[bsz, seq, H*d_h]`` and fed to ``W_O``.
+
+        ``layers`` selects which layers get hooks:
+          - None (default): the monitored layer subset (MAGS / ITI / capture — these
+            are targeted methods that only touch their selected heads; monitoring
+            only top-K heads keeps MAGS overhead O(K·k·d_h), tex:L376).
+          - "all": every layer in the stack (Angular Steering — the paper applies "a
+            fixed 2D rotation ... across all layers", tex:L394; SPEC §4.16/§5.5).
+          - an explicit list of layer indices.
         """
         self.detach()
         self.callback = callback
-        for layer in self.layout.monitored_layers:
+        if layers is None:
+            target_layers = self.layout.monitored_layers
+        elif layers == "all":
+            target_layers = list(range(self.layout.n_layers))
+        else:
+            target_layers = [l for l in layers if l < self.layout.n_layers]
+        for layer in target_layers:
             o_proj = self.get_o_proj(layer)
             handle = o_proj.register_forward_pre_hook(
                 self._make_hook(layer), prepend=True, with_kwargs=True

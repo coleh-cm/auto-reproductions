@@ -1,4 +1,1 @@
-{
-  "arm": "mags__SMILES-molecular-generation__openai_gpt-oss-20b",
-  "blocked_reason": "Molecular task (Table 3) target protein, prompt template, SMILES contrastive corpus, affinity cutoff and AutoDock-GPU params are all UNSTATED by the paper (SPEC \u00a74.18); GPT-OSS-20B needs >=40GB VRAM. Treated as a stretch target, not implemented for real data."
-}
+{"arm": "mags__SMILES-molecular-generation__openai_gpt-oss-20b", "blocked_reason": ""}

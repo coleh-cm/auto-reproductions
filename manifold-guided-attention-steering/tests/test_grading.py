@@ -65,3 +65,28 @@ def test_apps_grader_correct_and_wrong():
     wrong = "print(0)\n"
     assert not grade_apps(wrong, prob)
     assert grade_apps("", prob) is False  # no code -> fails
+
+
+def test_humaneval_pass_and_fail():
+    """HumanEval (N=164, tex:L710-713) via human_eval.execution.check_correctness.
+    Regression guard: the prior call passed arguments out of order (problem.id as
+    the problem dict, the dict as completion, completion as timeout, timeout=10.0
+    again) which raised TypeError: multiple values for argument 'timeout' and made
+    every HumanEval grade crash. The problem dict MUST carry task_id (read for the
+    return value) plus prompt/test/entry_point; the harness appends completion to
+    the prompt and calls check(entry_point), so the test field must define check()."""
+    from mags.data.loaders import Problem
+    test = ("from typing import List\n\n"
+            "def check(candidate):\n    assert candidate(1, 2) == 3\n"
+            "    assert candidate(0, 0) == 0\n    assert candidate(10, -5) == 5\n")
+    prob = Problem(id="HumanEval/0", benchmark="HumanEval",
+                   prompt_text="def add(a, b):\n    ", gold="",
+                   extra={"test": test, "entry_point": "add"})
+    assert grade("HumanEval", "    return a + b\n", prob), \
+        "correct completion must pass"
+    assert not grade("HumanEval", "    return a - b\n", prob), \
+        "wrong completion must fail"
+    # dispatch + the raw grader agree
+    from mags.grading import grade_humaneval
+    assert grade_humaneval("    return a + b\n", prob)
+    assert not grade_humaneval("    return a * b\n", prob)

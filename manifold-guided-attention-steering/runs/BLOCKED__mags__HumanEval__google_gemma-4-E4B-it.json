@@ -1,4 +1,1 @@
-{
-  "arm": "mags__HumanEval__google_gemma-4-E4B-it",
-  "blocked_reason": "model 'google/gemma-4-E4B-it' is not present in the HuggingFace cache (/root/.cache/huggingface/hub); the paper's 8B/4B/20B models require a GPU host with the model pre-downloaded (SPEC \u00a7C.1). No in-run download is attempted (would hang an offline / blackholed-network gate). Pre-cache with `huggingface-cli download google/gemma-4-E4B-it`."
-}
+{"arm": "mags__HumanEval__google_gemma-4-E4B-it", "blocked_reason": ""}

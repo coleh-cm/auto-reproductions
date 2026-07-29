@@ -15,15 +15,21 @@ def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
     """Generate text with ``controller`` attached as the W_O pre-hook callback.
 
     Uses model.generate (use_cache=True) so decode forwards are seq==1 and the
-    controller's prefill pass-through + decode-modify semantics hold. Returns the
-    decoded completion (prompt excluded) and the generated token ids.
+    controller's prefill pass-through + decode-modify semantics hold. Returns
+    (completion_text, gen_ids, prompt_ids) where gen_ids are the generated token
+    ids (prompt excluded) and prompt_ids are the tokenized prompt. prompt_ids is
+    returned so perplexity_of can compute CONDITIONAL PPL of the completion given
+    the prompt under the unsteered base model (SPEC §4.14); the bare completion
+    ids alone would give an unconditional PPL the paper never reports.
     """
     torch.manual_seed(seed)
     ids = tok(prompt_text, return_tensors="pt").input_ids.to(model.device)
     n_prompt = ids.shape[1]
+    prompt_ids = ids[0].cpu().numpy()
     # Install the controller through the model's HookRegistry when available.
     if hasattr(model, "_mags_registry") and controller is not None:
-        model._mags_registry.attach(controller)
+        layers = getattr(controller, "hook_layers", None)
+        model._mags_registry.attach(controller, layers=layers)
     try:
         out = model.generate(
             ids, max_new_tokens=max_new_tokens, do_sample=do_sample,
@@ -37,7 +43,7 @@ def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
         if hasattr(controller, "flush_log"):
             controller.flush_log()
     gen_ids = out[0, n_prompt:]
-    return tok.decode(gen_ids, skip_special_tokens=True), gen_ids.cpu().numpy()
+    return tok.decode(gen_ids, skip_special_tokens=True), gen_ids.cpu().numpy(), prompt_ids
 
 
 @torch.no_grad()
@@ -75,28 +81,54 @@ def cd_generate(expert, amateur, tok, prompt_text, max_new_tokens=1024,
 
 
 @torch.no_grad()
-def perplexity_of(model, tok, completion_text=None, token_ids=None):
+def perplexity_of(model, tok, completion_text=None, token_ids=None, prompt_ids=None):
     """Perplexity of a completion under ``model`` (token-level, mean over tokens).
 
     SPEC §4.14: PPL of the generated completion under the (unsteered) base model,
     averaged over problems. Secondary metric; not gated.
+
+    CONDITIONAL PPL (the protocol the paper's ~1.1-1.2 values imply, tex:L420-441):
+    the NLL of the completion tokens GIVEN the prompt under the unsteered model.
+    Pass ``prompt_ids`` (the prompt's token ids) together with the generated
+    ``token_ids``; the model is run on prompt+completion and the loss is averaged
+    over the completion positions only. Without ``prompt_ids`` this falls back to
+    the UNCONDITIONAL PPL of the bare completion (kept for backward compatibility
+    with smoke/diagnostics, but NOT what the paper reports).
 
     Prefer passing the actual generated ``token_ids`` (avoids re-tokenization, which
     can shift boundaries / drop EOS and yield a PPL not equal to the PPL of the
     generated tokens). Falls back to re-tokenizing ``completion_text`` only if ids
     are unavailable.
     """
+    import torch as _t
     if token_ids is None:
         ids = tok(completion_text, return_tensors="pt").input_ids
     else:
-        import torch as _t
         ids = _t.as_tensor(token_ids, dtype=_t.long).unsqueeze(0)
     ids = ids.to(model.device)
-    if ids.shape[1] < 2:
+    if prompt_ids is not None:
+        p_ids = _t.as_tensor(prompt_ids, dtype=_t.long).unsqueeze(0).to(model.device)
+        n_prompt = p_ids.shape[1]
+        full = _t.cat([p_ids, ids], dim=1)
+    else:
+        n_prompt = 0
+        full = ids
+    full = full.to(model.device)
+    n_gen = ids.shape[1]
+    if n_gen < 1:
         return float("nan")
-    out = model(ids, use_cache=False)
-    logits = out.logits[:, :-1, :]
-    targets = ids[:, 1:]
-    logp = F.log_softmax(logits, dim=-1)
-    tok_logp = logp.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+    out = model(full, use_cache=False)
+    logits = out.logits[:, :-1, :]            # predicts token at next position
+    targets = full[:, 1:]
+    # Completion token i (0-indexed) is at full position n_prompt + i; it is
+    # predicted by the logit at position n_prompt + i - 1, i.e. logits index
+    # (n_prompt + i - 1) and target index (n_prompt + i - 1).
+    start = n_prompt - 1
+    end = n_prompt + n_gen - 1
+    if start < 0:
+        start = 0
+    logits_gen = logits[:, start:end, :]
+    targets_gen = targets[:, start:end]
+    logp = F.log_softmax(logits_gen, dim=-1)
+    tok_logp = logp.gather(-1, targets_gen.unsqueeze(-1)).squeeze(-1)
     return float(torch.exp(-tok_logp.mean()).item())

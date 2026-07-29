@@ -95,9 +95,9 @@ def main():
     corrects = []
     for prob in problems:
         prompt = prob.prompt_text + "\nPlease box your final answer: $\\boxed{}$"
-        _, ids_b = generate(model, tok, prompt, NoOpController(), max_new_tokens=32)
+        _, ids_b, _ = generate(model, tok, prompt, NoOpController(), max_new_tokens=32)
         ctrl = MAGSController(bank, alpha=1.0)
-        _, ids_m = generate(model, tok, prompt, ctrl, max_new_tokens=32)
+        _, ids_m, _ = generate(model, tok, prompt, ctrl, max_new_tokens=32)
         # grade the steered completion (the path under test)
         txt = tok.decode(ids_m, skip_special_tokens=True)
         corrects.append(int(grade_math(txt, prob.gold)))

@@ -33,7 +33,7 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
     corrects = []
     ppls = []
     for i, prob in enumerate(problems):
-        completion, gen_ids = generate(
+        completion, gen_ids, prompt_ids = generate(
             model, tok, prob.prompt_text, controller,
             max_new_tokens=max_new_tokens, do_sample=False,
         )
@@ -43,7 +43,13 @@ def run_arm(model, tok, model_id, controller, benchmark, problems, max_new_token
         ppl = float("nan")
         if ppl_model is not None:
             try:
-                ppl = perplexity_of(ppl_model, tok, token_ids=gen_ids)
+                # SPEC §4.14: CONDITIONAL PPL of the completion given the prompt,
+                # under the unsteered base model (ppl_model). Using the exact
+                # generated token ids (no re-tokenization) + the prompt ids gives
+                # the NLL of the completion conditioned on the prompt — the
+                # protocol the paper's ~1.1-1.2 values imply (tex:L420-441).
+                ppl = perplexity_of(ppl_model, tok, token_ids=gen_ids,
+                                    prompt_ids=prompt_ids)
             except Exception:
                 ppl = float("nan")
         corrects.append(int(ok))

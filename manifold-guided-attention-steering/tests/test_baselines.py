@@ -80,12 +80,9 @@ def test_as_bank_uses_difference_in_means_d_feat():
     all_acts, pids = _make_all_acts(rng, n_heads_per_layer=2, layers=(0,), d_h=6)
     asb = fit_as_bank(all_acts, model_id="m", benchmark="b", angle_deg=30,
                       layers_monitored=[0])
-    assert 0 in asb.planes
-    p = asb.planes[0]
-    # recompute the true difference-in-means direction
-    c_all = np.concatenate([t for ha in all_acts.values() for t in ha.correct.values()
-                            for t in [t]], axis=0)
-    # gather per the same layer pooling
+    p = asb.plane                       # single global plane (layer=-1)
+    assert p.layer == -1
+    # recompute the true difference-in-means direction (pooled over the layer's heads)
     cs = [t for (l, h), ha in all_acts.items() if l == 0
           for pid in ha.correct for t in ha.correct[pid]]
     iss = [t for (l, h), ha in all_acts.items() if l == 0
@@ -107,8 +104,7 @@ def test_as_rotation_is_target_angle_not_fixed_offset():
                       layers_monitored=[0])
     ctrl = AngularSteeringController(asb, angle_deg=45.0)
     import torch
-    # an activation with a known angle in the plane
-    p = asb.planes[0]
+    p = asb.plane
     # place activation purely along d_feat (angle 0) and along d_pc0 (angle 90)
     for start_deg in (0, 30, 90, 200):
         a = np.cos(np.deg2rad(start_deg)) * p.d_feat + np.sin(np.deg2rad(start_deg)) * p.d_pc0
@@ -120,6 +116,33 @@ def test_as_rotation_is_target_angle_not_fixed_offset():
             f"target-angle form: output angle {ang_out} != 45 (start {start_deg})"
 
 
+def test_as_applies_the_same_global_plane_at_every_layer():
+    """Paper tex:L394 / SPEC §4.16: AS is "a fixed 2D rotation ... across all
+    layers". The controller must (a) request hooks on ALL layers (hook_layers='all')
+    and (b) apply the SAME global plane at every layer it is called with — not
+    pass through non-monitored layers. The prior per-layer-monitored-only impl
+    rotated only 4 of 32 layers, which the review flagged as a major paper-fidelity
+    deviation."""
+    rng = np.random.default_rng(5)
+    all_acts, pids = _make_all_acts(rng, n_heads_per_layer=1, layers=(0, 1), d_h=6)
+    asb = fit_as_bank(all_acts, model_id="m", benchmark="b", angle_deg=30,
+                      layers_monitored=[0, 1])
+    ctrl = AngularSteeringController(asb, angle_deg=30.0)
+    assert ctrl.hook_layers == "all", "AS must request hooks on ALL layers"
+    import torch
+    p = asb.plane
+    # the SAME plane is applied at every layer index, including ones NOT monitored
+    for layer in (0, 1, 5, 17, 31):
+        a = np.cos(np.deg2rad(10)) * p.d_feat + np.sin(np.deg2rad(10)) * p.d_pc0
+        x = torch.from_numpy(a[None, None, None, :]).float()
+        out = ctrl(layer, x)
+        assert out is not None, f"AS must rotate at layer {layer} (not pass-through)"
+        a_out = out.numpy()[0, 0, 0]
+        ang_out = np.degrees(np.arctan2(a_out @ p.d_pc0, a_out @ p.d_feat))
+        assert abs(((ang_out - 30 + 180) % 360) - 180) < 1e-2, \
+            f"layer {layer}: output angle {ang_out} != 30 (global plane not applied)"
+
+
 def test_as_persists_and_reloads(tmp_path):
     rng = np.random.default_rng(4)
     all_acts, pids = _make_all_acts(rng, layers=(0, 1))
@@ -128,7 +151,7 @@ def test_as_persists_and_reloads(tmp_path):
     npz = str(tmp_path / "as.npz")
     asb.save(npz)
     asb2 = ASBank.load(npz)
-    assert set(asb2.planes) == set(asb.planes)
-    for l in asb.planes:
-        assert np.allclose(asb2.planes[l].d_feat, asb.planes[l].d_feat)
-        assert np.allclose(asb2.planes[l].d_pc0, asb.planes[l].d_pc0)
+    assert asb2.layers_monitored == asb.layers_monitored
+    assert asb2.plane.layer == -1
+    assert np.allclose(asb2.plane.d_feat, asb.plane.d_feat)
+    assert np.allclose(asb2.plane.d_pc0, asb.plane.d_pc0)

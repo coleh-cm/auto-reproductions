@@ -199,18 +199,32 @@ class ITIController:
 # ---------------------------------------------------------------------------
 @dataclass
 class ASPlane:
-    layer: int
-    d_feat: np.ndarray          # [d_h] unit, contrastive direction
-    d_pc0: np.ndarray           # [d_h] unit, pooled PC1
+    layer: int                   # -1 = global (one plane applied at every layer)
+    d_feat: np.ndarray           # [d_h] unit, contrastive direction
+    d_pc0: np.ndarray            # [d_h] unit, pooled PC1
 
 
 @dataclass
 class ASBank:
+    """Angular Steering bank: a SINGLE global (d_feat, d_PC0) plane computed from
+    the contrastive activation set and applied as one fixed 2D rotation at EVERY
+    layer.
+
+    Paper (tex:L394): Angular Steering "applies a fixed 2D rotation in the
+    mean-difference span across all layers"; SPEC §4.16 "rotate all layers";
+    SPEC §5.5 "plane from candidate directions at ALL layers, applied at every
+    layer". A single fixed rotation applied uniformly is the faithful reading of
+    "fixed ... across all layers" (one rotation, all layers), and it does not
+    require per-layer activations for non-monitored layers: the plane is pooled
+    across the monitored layers/heads (the contrastive set) and reused at every
+    layer. ``layers_monitored`` is kept for provenance (which layers fed the
+    plane); the controller requests hooks on ALL layers via ``hook_layers='all'``.
+    """
     model_id: str
     benchmark: str
     angle_deg: float
-    layers_monitored: list
-    planes: dict                # layer -> ASPlane
+    layers_monitored: list        # layers whose activations computed the plane
+    plane: ASPlane               # the single global plane (layer=-1)
 
     @classmethod
     def load(cls, path_npz: str, path_manifest: str | None = None) -> "ASBank":
@@ -220,20 +234,15 @@ class ASBank:
         with open(path_manifest) as f:
             man = json.load(f)
         z = np.load(path_npz)
-        planes = {}
-        for l in man["layers_monitored"]:
-            planes[l] = ASPlane(layer=l, d_feat=z[f"dfeat__l{l}"],
-                                 d_pc0=z[f"dpc0__l{l}"])
+        plane = ASPlane(layer=-1, d_feat=z["dfeat_global"], d_pc0=z["dpc0_global"])
         return cls(model_id=man["model_id"], benchmark=man["benchmark"],
                    angle_deg=man["angle_deg"], layers_monitored=man["layers_monitored"],
-                   planes=planes)
+                   plane=plane)
 
     def save(self, path_npz: str, path_manifest: str | None = None):
-        arrays = {}
-        for l, p in self.planes.items():
-            arrays[f"dfeat__l{l}"] = p.d_feat.astype(np.float32)
-            arrays[f"dpc0__l{l}"] = p.d_pc0.astype(np.float32)
-        np.savez(path_npz, **arrays)
+        np.savez(path_npz,
+                 dfeat_global=self.plane.d_feat.astype(np.float32),
+                 dpc0_global=self.plane.d_pc0.astype(np.float32))
         import json
         if path_manifest is None:
             path_manifest = path_npz + ".manifest.json"
@@ -245,75 +254,90 @@ class ASBank:
 
 def fit_as_bank(all_head_acts: dict, *, model_id: str, benchmark: str,
                 angle_deg: float, layers_monitored: list) -> ASBank:
-    """Build a per-layer (d_feat, d_PC0) plane from the contrastive activation set.
+    """Build a SINGLE global (d_feat, d_PC0) plane from the contrastive activation
+    set, pooled across all monitored layers/heads/traces/token-steps.
 
-    d_feat = unit(mean_incorrect - mean_correct) over all pooled per-head activations
-    of the layer (across all heads, all traces, all token steps). d_PC0 = top-1 right
-    singular vector of the pooled centered activations. Both are contrastive/dataset
-    directions, computed at fit time and persisted (the ManifoldBank does not store
-    them)."""
-    # gather per-layer pooled activations grouped by class
-    layer_correct = {l: [] for l in layers_monitored}
-    layer_incorrect = {l: [] for l in layers_monitored}
+    d_feat = unit(mean_incorrect - mean_correct) — the contrastive direction
+    (SPEC §4.16; correct vs incorrect traces as the contrast set, tex:L394).
+    d_PC0 = top-1 right singular vector of the pooled centered activations.
+    Both are [d_h] directions; head_dim is constant across layers for every
+    supported model, so one global plane applies at every layer's per-head output.
+    The plane is computed from the monitored layers' captured activations (the
+    contrastive set) and reused at all layers at inference — the "fixed rotation
+    across all layers" the paper describes.
+    """
+    c_all = []   # pooled correct activations [M_c, d_h]
+    i_all = []   # pooled incorrect activations [M_i, d_h]
     for (l, h), ha in all_head_acts.items():
-        if l not in layer_correct:
+        if l not in layers_monitored:
             continue
         for pid in ha.problems():
             for t in ha.correct[pid]:
-                layer_correct[l].append(t)        # [T,d_h] -> pooled below
+                c_all.append(t)            # [T, d_h]
             for t in ha.incorrect[pid]:
-                layer_incorrect[l].append(t)
-    planes = {}
-    for l in layers_monitored:
-        c = layer_correct[l]; i = layer_incorrect[l]
-        if not c or not i:
-            continue
-        c_all = np.concatenate(c, axis=0)        # [M_c, d_h]
-        i_all = np.concatenate(i, axis=0)        # [M_i, d_h]
-        d_feat = (i_all.mean(axis=0) - c_all.mean(axis=0))    # difference-in-means
-        # d_PC0 from pooled centered activations (correct+incorrect combined)
-        pooled = np.concatenate([c_all, i_all], axis=0)
-        pooled_c = pooled - pooled.mean(axis=0)
-        # top-1 right singular vector
-        try:
-            _, _, Vh = np.linalg.svd(pooled_c, full_matrices=False)
-            d_pc0 = Vh[0]
-        except Exception:
-            d_pc0 = np.zeros_like(d_feat); d_pc0[0] = 1.0
-        nf = np.linalg.norm(d_feat)
-        if nf < 1e-12:
-            d_feat = np.zeros_like(d_pc0); d_feat[0] = 1.0
-        else:
-            d_feat = d_feat / nf
-        np_ = np.linalg.norm(d_pc0)
-        d_pc0 = d_pc0 / np_ if np_ > 1e-12 else np.eye(d_feat.shape[0])[0]
-        # orthogonalize d_feat against d_pc0 so the plane basis is orthonormal
-        d_feat = d_feat - (d_feat @ d_pc0) * d_pc0
-        nf2 = np.linalg.norm(d_feat)
-        d_feat = d_feat / nf2 if nf2 > 1e-12 else np.zeros_like(d_feat)
-        planes[l] = ASPlane(layer=l, d_feat=d_feat.astype(np.float32),
-                             d_pc0=d_pc0.astype(np.float32))
+                i_all.append(t)
+    if not c_all or not i_all:
+        # degenerate: fall back to an axis-aligned plane so the controller still
+        # has a valid orthonormal basis (a real fit never reaches here)
+        d_h = next(iter(all_head_acts.values())).correct[
+            next(iter(next(iter(all_head_acts.values())).correct))].shape[-1] \
+            if all_head_acts else 8
+        plane = ASPlane(layer=-1,
+                        d_feat=np.eye(d_h)[0].astype(np.float32),
+                        d_pc0=np.eye(d_h)[1].astype(np.float32))
+        return ASBank(model_id=model_id, benchmark=benchmark, angle_deg=angle_deg,
+                      layers_monitored=layers_monitored, plane=plane)
+    c_all = np.concatenate(c_all, axis=0)        # [M_c, d_h]
+    i_all = np.concatenate(i_all, axis=0)        # [M_i, d_h]
+    d_feat = (i_all.mean(axis=0) - c_all.mean(axis=0))    # difference-in-means
+    # d_PC0 from pooled centered activations (correct+incorrect combined)
+    pooled = np.concatenate([c_all, i_all], axis=0)
+    pooled_c = pooled - pooled.mean(axis=0)
+    try:
+        _, _, Vh = np.linalg.svd(pooled_c, full_matrices=False)
+        d_pc0 = Vh[0]
+    except Exception:
+        d_pc0 = np.zeros_like(d_feat); d_pc0[0] = 1.0
+    nf = np.linalg.norm(d_feat)
+    if nf < 1e-12:
+        d_feat = np.zeros_like(d_pc0); d_feat[0] = 1.0
+    else:
+        d_feat = d_feat / nf
+    np_ = np.linalg.norm(d_pc0)
+    d_pc0 = d_pc0 / np_ if np_ > 1e-12 else np.eye(d_feat.shape[0])[0]
+    # orthogonalize d_feat against d_pc0 so the plane basis is orthonormal
+    d_feat = d_feat - (d_feat @ d_pc0) * d_pc0
+    nf2 = np.linalg.norm(d_feat)
+    d_feat = d_feat / nf2 if nf2 > 1e-12 else np.zeros_like(d_feat)
+    plane = ASPlane(layer=-1, d_feat=d_feat.astype(np.float32),
+                    d_pc0=d_pc0.astype(np.float32))
     return ASBank(model_id=model_id, benchmark=benchmark, angle_deg=angle_deg,
-                  layers_monitored=layers_monitored, planes=planes)
+                  layers_monitored=layers_monitored, plane=plane)
 
 
 class AngularSteeringController:
     """Target-angle Angular Steering (SPEC §4.16). Rotates each head's attention
-    output in the layer's (d_feat, d_PC0) plane so its angle becomes the target
-    angle. Applied at every monitored layer, every decode step."""
+    output in the global (d_feat, d_PC0) plane so its angle becomes the target
+    angle. The SAME fixed plane is applied at EVERY layer (paper tex:L394 "a fixed
+    2D rotation ... across all layers"; SPEC §4.16 "rotate all layers"; SPEC §5.5
+    "applied at every layer"). ``hook_layers='all'`` asks the HookRegistry to
+    install W_O pre-hooks on every layer so the rotation reaches non-monitored
+    layers too (the prior implementation only rotated the monitored subset, which
+    made AS behave like a targeted method rather than the uniform-across-all-layers
+    baseline the paper compares against)."""
+    # request hooks on ALL layers (registry resolves 'all' to range(n_layers))
+    hook_layers = "all"
+
     def __init__(self, as_bank: ASBank, angle_deg: float | None = None):
         self.target = float(np.deg2rad(angle_deg if angle_deg is not None
                                        else as_bank.angle_deg))
-        self.planes = as_bank.planes    # layer -> ASPlane
+        self.plane = as_bank.plane      # the single global ASPlane
 
     def __call__(self, layer, x_heads):
         bsz, seq, H, dh = x_heads.shape
         if seq != 1:
             return None
-        plane = self.planes.get(layer)
-        if plane is None:
-            return None
-        d_feat, d_pc0 = plane.d_feat, plane.d_pc0
+        d_feat, d_pc0 = self.plane.d_feat, self.plane.d_pc0
         x = x_heads.detach().to(torch.float32).cpu().numpy()
         out = x.copy()
         a = out[0, 0]                      # [H, dh]

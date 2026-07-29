@@ -781,3 +781,79 @@ cached/gated 8B/4B/20B models; molecular setup unstated by the paper). The
 change is one line of plumbing (exit 0) plus its justification: it makes the
 per-arm commands the gate actually runs *deliver* the honest FINAL lines they
 were already printing, instead of having them discarded on a non-zero exit.
+
+## Round 8 — adversarial review (orchestrate) findings fixed
+
+Ran `orchestrate` with 6 component reviewers (gate-fix, manifold-fit,
+steering-hook, baselines, eval-grading, data), each adversarially checked
+against the authoritative LaTeX + SPEC. Verdicts: manifold-fit, steering-hook,
+data APPROVED (minor/nit only); baselines and eval-grading REJECTED with real
+blockers/majors; gate-fix reviewer stalled (re-verified by hand — POSIX-sh fix
+holds). All blocker/major findings verified against the actual code and fixed:
+
+**BLOCKER — HumanEval grading (grading.py:87).** `grade_humaneval` called
+`check_correctness(problem.id, {prompt,test,entry_point}, completion,
+timeout=10.0)` but human_eval 1.0.3's signature is
+`check_correctness(problem: Dict, completion: str, timeout: float,
+completion_id=None)`. The call passed the string id as the problem dict, the
+dict as completion, the completion as timeout, and timeout=10.0 again →
+`TypeError: multiple values for argument 'timeout'` (reproduced by execution),
+crashing EVERY HumanEval grade (HumanEval is 1 of 4 headline benchmarks,
+N=164, tex:L710-713). Also the dict omitted the `task_id` key
+`check_correctness` reads. Fixed: `check_correctness({"task_id": problem.id,
+"prompt": problem.prompt_text, "test": test, "entry_point": entry},
+completion, timeout=10.0)`. Verified: a correct completion now grades True,
+a wrong one False (was: both raised TypeError). Added
+`tests/test_grading.py::test_humaneval_pass_and_fail` (the missing test that
+let the blocker ship undetected — the suite claimed HumanEval coverage but
+never exercised it).
+
+**MAJOR — PPL was unconditional (eval.py / generation.py).** `perplexity_of`
+ran `model(gen_ids)` on the bare completion tokens with NO prompt context,
+computing UNCONDITIONAL PPL. The paper's PPL values (~1.1-1.2 for Llama,
+tex:L420-441) are only attainable as CONDITIONAL PPL (NLL of the completion
+given the prompt under the unsteered model, SPEC §4.14). Fixed: `generate` now
+returns `(completion, gen_ids, prompt_ids)`; `perplexity_of(model, tok,
+token_ids=, prompt_ids=)` runs the model on prompt+completion and averages
+NLL over the completion positions only (start=n_prompt-1, end=n_prompt+n_gen-1).
+Verified numerically: matches a hand-computed reference conditional PPL exactly
+(<1e-5), and the unconditional fallback still matches its reference. Callers
+updated (eval.py, tests/test_degeneracy.py, smoke.py — all 3-tuple now). The
+no-re-tokenization requirement is preserved (exact gen ids used; prompt is
+deterministic text so its tokenization is reproducible).
+
+**MAJOR — Angular Steering only rotated monitored layers (baselines.py /
+model_adapter.py).** AS was built and applied only on `layers_monitored`
+(4 of 32 Llama layers): `fit_as_bank` looped `for l in layers_monitored`, the
+controller returned None for any layer without a plane, and the registry
+registered hooks only on monitored layers. This contradicts the paper's
+defining property — "a fixed 2D rotation in the mean-difference span across
+all layers" (tex:L394), SPEC §4.16 "rotate all layers", SPEC §5.5 "applied at
+every layer" — and made AS behave like a targeted method rather than the
+uniform-across-all-layers baseline. Fixed: AS now uses a SINGLE global
+(d_feat, d_PC0) plane pooled across the monitored layers/heads (the
+contrastive set; head_dim is constant across layers so one [d_h] plane
+applies at every layer) and applies it at EVERY layer. `HookRegistry.attach`
+gains a `layers` arg (None→monitored for MAGS/ITI/capture which are targeted
+by design; "all"→every layer for AS); `AngularSteeringController.hook_layers
+= "all"` requests all layers; `generate` reads `controller.hook_layers`.
+`ASBank` now stores one global `plane` (layer=-1) instead of a per-layer dict.
+Verified: AS registers hooks on all n_layers (6 for distilgpt2) and rotates at
+non-monitored layer indices too; MAGS/capture still default to monitored
+(overhead O(K·k·d_h) preserved, tex:L376). Updated `tests/test_baselines.py`
+(global plane) + added `test_as_applies_the_same_global_plane_at_every_layer`.
+
+**Accepted minor/nits (not blocking, recorded):** manifold-fit head-AUROC
+held-out split falls back to train on tiny N (manifold.py:311, never hit at
+real N); steering-hook `.view` vs `.reshape` fragility (model_adapter.py:97,
+safe for current models); AS extraction-point adaptation (per-head W_O input,
+not residual pre-norm — already a documented SPEC §5.5 adaptation); CD
+comment wording nit. These do not affect correctness at the paper's scale.
+
+**Verification.** `pytest` → 30/30 (was 28; +HumanEval, +AS-all-layers).
+`smoke.sh` → `FINAL smoke=0.0000`. `sh run_all_arms.sh` (dash) → 45/45
+`FINAL <arm>=BLOCKED` lines. PPL conditional computation matches a hand
+reference to <1e-5. AS registers hooks on all layers and rotates at
+non-monitored layers. Status still BLOCKED for every arm (no GPU / no
+cached/gated models; molecular setup unstated) — these are correctness fixes
+to the implementation, not new numbers.
