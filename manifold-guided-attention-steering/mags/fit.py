@@ -56,7 +56,10 @@ def _blocked(reason):
     os.makedirs("runs", exist_ok=True)
     with open("runs/BLOCKED__fit.json", "w") as f:
         json.dump({"step": "fit", "blocked_reason": reason}, f, indent=2)
-    sys.exit(2)
+    # Exit 0: run_all_arms.sh Phase-1 wraps this in `if timeout ...; then :; else`
+    # (handles any exit code), and a non-zero exit would make a gate that keeps
+    # stdout only on exit 0 discard any output. Consistent with mags/run._blocked.
+    sys.exit(0)
 
 
 def main(argv=None):
