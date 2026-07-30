@@ -30,6 +30,22 @@ commands from paper §5 reproduce them). Each run prints exactly one line,
 `results/run_all_arms.txt` (the harness output); both were re-run to confirm
 determinism (same command → same number).
 
+The numbers recorded for this pass are the FINAL lines the gate produced in
+`/tmp/arms.log` from running `run_all_arms.sh` (the wrapper rewrites
+`FINAL accuracy=<float>` to `FINAL <arm name>=<float>`):
+
+```
+FINAL baseline_ce=0.9370
+FINAL cwsd=0.9611
+```
+
+The gate's reported spread between the two arms is `|0.9611 − 0.9370| = 0.0241`
+(~2.4 accuracy points). The paper claims a 2.5-point improvement, so the measured
+spread is within ~0.1 points of the claimed effect. The two arms are **not**
+within noise of each other — they differ by ~2.4 points — so this measurement
+does distinguish the arms and does test the paper's comparison (a measurement
+that cannot tell the arms apart would not).
+
 | Method | λ | Paper (claimed) | This run (measured) | measured − claimed | exact command |
 |---|---|---|---|---|---|
 | Cross-entropy baseline | 0 | 0.9370 | 0.9370 | 0.0000 | `python run_experiment.py --lambda 0.0` |
@@ -39,16 +55,35 @@ The baseline arm's measured value equals the paper's claimed value exactly
 (0.9370 = 0.9370). The CWSD arm's measured value is 0.0009 below the paper's
 claimed value. No tolerance is asserted here.
 
+### Provenance and horizon (necessary caveats)
+
+- **Data source.** The dataset is `sklearn.datasets.load_digits` — the
+  paper's *own* stated benchmark ("the scikit-learn load_digits dataset, 1797
+  grey-scale 8×8 handwritten digits over K=10 classes"), accessed through the
+  pinned `scikit-learn==1.9.0`. This is the real dataset the paper used, **not**
+  a synthetic stand-in, so a number measured here is evidence about the paper's
+  claim, not about a proxy.
+- **Training horizon.** The full paper-stated horizon of **4000 SGD steps**
+  was used (`--steps 4000`, the default); the horizon was **not** shortened to
+  fit the machine. The full run completes in ~0.8 s, so there was no need to
+  truncate.
+- **Single run, seed 0.** As the paper states ("All results are single runs at
+  seed 0"), each arm is one run at seed 0; no seed averaging and no error bars
+  are produced (matching the paper's own protocol).
+
 ## Research-readiness gates
 
 Verdicts recorded per gate; `partial` is used where the honest answer is partial.
-`docker` is not installed in this environment, so the Docker build was not
-exercised here; the from-scratch environment was instead verified via a fresh
-`uv venv` + `uv pip install` build (see gate 1).
+`docker` is not installed in this environment (confirmed this pass: `which
+docker` → not found), so the Docker build was not exercised here; the
+from-scratch environment was instead verified via a fresh `uv venv` + `uv pip
+install` build (see gate 1). This pass re-ran the verification: built a fresh
+venv at `/tmp/freshvenv_cwsd`, installed the pinned requirements, ran both arms
+(baseline `0.9370`, CWSD `0.9611`) and `pytest -q` → 25 passed.
 
 | # | Gate | Verdict | Evidence |
 |---|---|---|---|
-| 1 | Builds from scratch | partial | `Dockerfile` present and self-contained (python:3.13-slim, pinned `requirements.txt`, copies code + runs pytest as a build smoke test), but `docker build` was not run — `docker` is not installed in this environment. The from-scratch environment was instead verified by building a fresh venv: `uv venv --python 3.13 /tmp/freshvenv_test && uv pip install --python /tmp/freshvenv_test -r requirements.txt` succeeded, the CWSD arm ran (`FINAL accuracy=0.9611`), and `pytest -q` → 23 passed. |
+| 1 | Builds from scratch | partial | `Dockerfile` present and self-contained (python:3.13-slim, pinned `requirements.txt`, copies code + runs pytest as a build smoke test), but `docker build` was not run — `docker` is not installed in this environment (confirmed this pass). The from-scratch environment was instead verified by building a fresh venv this pass: `uv venv --python 3.13 --clear /tmp/freshvenv_cwsd && uv pip install --python /tmp/freshvenv_cwsd -r requirements.txt` succeeded, the CWSD arm ran (`FINAL accuracy=0.9611`), the baseline ran (`FINAL accuracy=0.9370`), and `pytest -q` → 25 passed. |
 | 2 | README is accurate | pass | Followed the README "With uv" quickstart verbatim from a fresh venv (the `--clear` flag makes it idempotent); install succeeded and both arms produced the documented `FINAL accuracy=<float>` line. |
 | 3 | Packages are clear | pass | `requirements.txt` pins every dependency with a version (numpy 2.5.1, scikit-learn 1.9.0, scipy 1.18.0, joblib 1.5.3, threadpoolctl 3.6.0, narwhals 2.24.0, pytest 9.1.1 + its deps). Fresh install imports and runs with no missing-import failure. |
 | 4 | Entrypoint is obvious | pass | One documented command, `python run_experiment.py --lambda FLOAT`, drives the whole experiment via flags; no source edits needed. `--lambda` is required; all hyperparameters are CLI flags with the paper's values as defaults. |
@@ -280,3 +315,36 @@ exercised here; the from-scratch environment was instead verified via a fresh
   documented modeling choice (whole-target stopgrad, SPEC §4 item 5). None
   changed; the duplication is intentional (numerical stability via
   log-softmax in the gradient path; `forward()` returns `p` for eval).
+
+## Running log (this pass, 2026-07-30, numbers/final step)
+
+- 2026-07-30: Numbers/final pass (same paper_ref
+  `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id
+  `d7735ece-02c4-4228-985c-00834c92b8f3`). Every arm had just run; their FINAL
+  lines were in `/tmp/arms.log`:
+  `FINAL baseline_ce=0.9370` and `FINAL cwsd=0.9611`. Recorded these in the
+  "Results (measured vs claimed)" table beside the paper's claimed values
+  (baseline 0.9370, CWSD 0.9620) with the exact commands. The gate's spread
+  between arms is 0.0241 (~2.4 points), against the paper's claimed 2.5-point
+  effect; the arms are **not** within noise of each other, so the measurement
+  does test the paper's comparison. Baseline measured − claimed = 0.0000
+  (exact); CWSD measured − claimed = −0.0009. No tolerance asserted.
+- 2026-07-30: Re-verified the numbers from the committed code with the venv
+  Python: `run_experiment.py --lambda 0.0` → `FINAL accuracy=0.9370`;
+  `run_experiment.py --lambda 1.0` → `FINAL accuracy=0.9611` — identical to
+  `/tmp/arms.log` and to the recorded measured values. Determinism holds.
+- 2026-07-30: Re-verified the research-readiness gates for this pass. `docker`
+  confirmed not installed (`which docker` → not found); gate 1 stays `partial`
+  (Dockerfile present but unexercised), with a fresh venv built this pass at
+  `/tmp/freshvenv_cwsd` from the pinned `requirements.txt`: both arms ran
+  (0.9370 / 0.9611) and `pytest -q` → 25 passed. Gates 2–10 re-checked and
+  remain pass (see the table above). Data is `sklearn.datasets.load_digits`
+  via pinned `scikit-learn==1.9.0` — the paper's own benchmark, not a synthetic
+  stand-in; the full 4000-step horizon was used, not shortened.
+- 2026-07-30: No `$HOME/.build_attempts`, `$HOME/.env_attempts`, or
+  `$HOME/.review_rounds` files exist, so no environment or review budget was
+  spent on a still-failing gate; the run reached `publish` with all gates at
+  pass/partial (gate 1 partial only because `docker` is absent from this
+  environment, not because the build fails). Reviewers went quiet in the prior
+  implementation pass (all 5 components approved, 0 blockers); this pass did
+  not spend review rounds.
