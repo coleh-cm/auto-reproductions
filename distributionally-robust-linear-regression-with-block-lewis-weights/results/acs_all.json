@@ -228,7 +228,7 @@
     "final_gap": 0.12696846825018326,
     "iterations_to_1pct_init": 58,
     "iterations_to_1pct_opt": 18,
-    "wall_final": 0.006780544004868716
+    "wall_final": 0.006547147000674158
   },
   "smoothed_gd": {
     "arm": "smoothed_gd",
@@ -449,7 +449,7 @@
     "final_gap": 0.09831965408183407,
     "iterations_to_1pct_init": 70,
     "iterations_to_1pct_opt": 38,
-    "wall_final": 0.045253160991705954
+    "wall_final": 0.047760504006873816
   },
   "smoothed_heavy_ball": {
     "arm": "smoothed_heavy_ball",
@@ -671,7 +671,7 @@
     "final_gap": 0.044724664638820855,
     "iterations_to_1pct_init": 41,
     "iterations_to_1pct_opt": 27,
-    "wall_final": 0.04686847300035879
+    "wall_final": 0.04775708803208545
   },
   "smoothed_nesterov": {
     "arm": "smoothed_nesterov",
@@ -892,7 +892,7 @@
     "final_gap": 0.03961249067658912,
     "iterations_to_1pct_init": 33,
     "iterations_to_1pct_opt": 20,
-    "wall_final": 0.046757638978306204
+    "wall_final": 0.048386637994553894
   },
   "ipm": {
     "arm": "ipm",
@@ -1000,29 +1000,29 @@
       1.98906411696953e-06,
       9.59660184207678e-07,
       3.545139861671487e-07,
-      -1.3016432376389275e-09,
-      -2.1054722765256884e-07,
-      -3.33608099367666e-07,
-      -4.0598591510843107e-07,
-      -4.485558804390166e-07,
-      -4.7359439747651777e-07,
-      -4.883214757001042e-07,
-      -4.96983730613465e-07,
-      -5.020787057219422e-07,
-      -5.05075490764284e-07,
-      -5.068381057071747e-07,
-      -5.078749438780505e-07,
-      -5.084848027081534e-07,
-      -5.088434278377463e-07,
-      -5.090544021868482e-07,
-      -5.091785482136402e-07,
-      -5.092514641091839e-07
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
     ],
     "gap0": 24.75889440299177,
-    "final_gap": -5.092514641091839e-07,
+    "final_gap": 0.0,
     "iterations_to_1pct_init": 16,
     "iterations_to_1pct_opt": 14,
-    "wall_final": 0.08300735097145662
+    "wall_final": 0.08336949901422486
   },
   "ball_oracle_euclidean": {
     "arm": "ball_oracle_euclidean",
@@ -1076,7 +1076,7 @@
     "final_gap": 0.0459301801712968,
     "iterations_to_1pct_init": 1,
     "iterations_to_1pct_opt": 1,
-    "wall_final": 0.8252437799819745
+    "wall_final": 0.8163231779471971
   },
   "ball_oracle_lewis": {
     "arm": "ball_oracle_lewis",
@@ -1132,6 +1132,6 @@
     "final_gap": 0.04593018017132522,
     "iterations_to_1pct_init": 1,
     "iterations_to_1pct_opt": 1,
-    "wall_final": 0.7975805110181682
+    "wall_final": 0.8151915310299955
   }
 }

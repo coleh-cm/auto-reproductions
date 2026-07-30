@@ -39,6 +39,17 @@ def gap_curve(
     if w.size == 0:
         raise ValueError("gap_curve: empty worst_losses (no iterates) -- refusing to report OK on nothing")
     gaps = w - float(opt)
+    # A large negative gap means OPT was computed ABOVE the true minimum (wrong
+    # reference).  A tiny negative slack (~1e-6) is solver tolerance and is
+    # clipped to 0; a large one is a bug we must surface, not hide (task: "No
+    # success path may report OK on an empty result" — a wrong OPT is exactly
+    # that, and a silently-clipped curve would let a broken run pass the gate).
+    if np.min(gaps) < -1e-3:
+        raise ValueError(
+            f"gap_curve: gap {np.min(gaps):.3g} << 0 — OPT ({opt}) exceeds a "
+            f"measured F(x_t) ({np.min(w):.6g}); the reference optimum is wrong"
+        )
+    gaps = np.maximum(gaps, 0.0)          # clip solver-tolerance slack to 0
     best = np.minimum.accumulate(gaps)
     return best
 

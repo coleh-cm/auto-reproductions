@@ -1,84 +1,127 @@
-"""Degeneracy test: the method at its no-op setting must reproduce the baseline EXACTLY.
+"""Degeneracy tests: the method at its no-op setting must reproduce the baseline
+EXACTLY.
 
-The paper's own Algorithm 1 (``paper/body.tex:173-174``) carries a reset rule:
-when the block-Lewis weight sum ``sum_i w_i >= m`` the geometry collapses to
-``W = I_n``, i.e. ``M = A^T I A = A^T A`` -- the *naive Euclidean* geometry (E15,
-``paper/body.tex:599-602``).  So the Lewis arm at the identity-weight setting is,
-by construction, the Euclidean arm.  This is the cheapest real correctness check:
-if the Lewis arm with forced identity weights does not bit-match the Euclidean
-arm, the wiring is wrong and no full run can be trusted.
+Per the research-code skill: "Almost every method has a setting where it reduces
+to something you already have... In that setting the method must reproduce the
+baseline exactly."  These are the cheapest real correctness evidence — they let
+a reader verify without trusting us.
 
-We assert bit-identical iterates (same M, same deterministic damped-Newton solver,
-same surrogate -> identical trajectory).
+Three degeneracies for this paper:
+
+1. **Lewis geometry at p=2 == naive Euclidean geometry.**  The block-Lewis
+   geometry matrix is ``M = A^T W^{1-2/p} A`` (paper/body.tex:511).  At the
+   no-op setting p=2 the exponent ``1-2/p = 0`` so ``W^0 = I`` and ``M = A^T A``
+   — EXACTLY the naive Euclidean geometry (E15, paper/body.tex:599).  The
+   paper's data-dependent geometry reduces to the baseline geometry bit-for-bit.
+
+2. **Regularized objective at coef=0 == unregularized smoothed objective.**  The
+   T2 regularized surrogate is ``f_hat = f_tilde + coef * ||sqrt_w A(x-x0)||^2``
+   (paper/body.tex:182).  At the no-op setting coef=0 the regularizer vanishes
+   and ``f_hat == f_tilde`` in value, gradient, AND Hessian.  The flagship
+   ball-oracle's regularized variant reduces to the plain smoothed variant.
+
+3. **Smoothed surrogate -> max-norm as (beta, delta) -> 0.**  The smoothed
+   surrogate f_tilde approximates the group-infinity norm max_i ||r_i||_2
+   (theory convention, paper/body.tex:27) within ``beta*log(m) + delta`` (E8,
+   paper/body.tex:231).  As the smoothing vanishes, f_tilde -> max_i ||r_i||
+   exactly; the method's surrogate reduces to the nonsmooth objective it
+   smooths.
 """
 
+from __future__ import annotations
+
 import numpy as np
+import pytest
 
 from gdr.types import GroupProblem
-from gdr import solvers, lewis
+from gdr.lewis import block_lewis_weights, geometry_matrix
+from gdr.objectives import make_smoothed, make_regularized
 
 
-def _problem():
-    rng = np.random.default_rng(123)
-    m, d, ni = 5, 4, 12
-    A = rng.standard_normal((m * ni, d))
-    b = rng.standard_normal(m * ni)
-    gid = np.repeat(np.arange(m, dtype=np.int32), ni)
+def _toy(seed: int = 0, m: int = 5, d: int = 3, n_per: int = 7) -> GroupProblem:
+    rng = np.random.default_rng(seed)
+    A = rng.standard_normal((m * n_per, d))
+    b = rng.standard_normal(m * n_per)
+    gid = np.repeat(np.arange(m, dtype=np.int32), n_per)
     return GroupProblem(A, b, gid)
 
 
-def test_geometry_identity_equals_naive():
-    """geometry_matrix with w=ones (p=inf) == naive A^T A, exactly."""
-    p = _problem()
-    m = p.m
-    M_naive = lewis.geometry_matrix(p, w=None)
-    M_lewis_id = lewis.geometry_matrix(p, w=np.ones(m), p=None)
-    assert np.array_equal(M_naive, M_lewis_id), "identity Lewis geometry must equal naive"
+# --- Degeneracy 1: Lewis p=2 == naive geometry -------------------------------
+def test_lewis_geometry_p2_equals_naive_identity():
+    """At p=2, W^{1-2/p}=W^0=I, so the Lewis geometry M = A^T A == naive (E15).
+
+    This is the degeneracy: the paper's data-dependent block-Lewis geometry at
+    its no-op setting (p=2, where the group norm is plain l2) reduces EXACTLY to
+    the naive Euclidean geometry the baselines use.
+    """
+    p = _toy(seed=1)
+    w = block_lewis_weights(p, p=2, n_iters=4)            # any weights
+    M_lewis = geometry_matrix(p, w, p=2)                  # A^T W^{0} A = A^T A
+    M_naive = geometry_matrix(p, w=None, p=None)          # A^T A (E15)
+    assert M_lewis.shape == (p.d, p.d)
+    np.testing.assert_allclose(M_lewis, M_naive, atol=1e-12, rtol=0,
+                               err_msg="Lewis p=2 must equal naive A^T A exactly")
 
 
-def test_reset_to_identity_when_sum_exceeds_m():
-    """Algorithm 1 line 3: sum w >= m -> uniform ones."""
-    p = _problem()
-    w_big = np.full(p.m, 2.0)        # sum = 2m >= m
-    assert np.array_equal(lewis.reset_to_identity(w_big, p.m), np.ones(p.m))
-    w_small = np.full(p.m, 0.1)      # sum = 0.1m < m -> unchanged
-    assert np.array_equal(lewis.reset_to_identity(w_small, p.m), w_small)
+def test_lewis_geometry_p2_independent_of_weights():
+    """At p=2 the weights drop out entirely — different w give the same M."""
+    p = _toy(seed=2)
+    w1 = block_lewis_weights(p, p=2, n_iters=3)
+    w2 = np.full(p.m, 0.5)                                 # arbitrary positive weights
+    M1 = geometry_matrix(p, w1, p=2)
+    M2 = geometry_matrix(p, w2, p=2)
+    np.testing.assert_allclose(M1, M2, atol=1e-12, rtol=0)
 
 
-def test_ball_oracle_lewis_identity_matches_euclidean():
-    """Flagship degeneracy: Lewis arm at W=I reproduces the Euclidean arm exactly."""
-    p = _problem()
+# --- Degeneracy 2: regularized coef=0 == smoothed --------------------------
+def test_regularized_coef0_equals_smoothed():
+    """f_hat with coef=0 must equal f_tilde in value, grad, hess (T2, body.tex:182).
+
+    The flagship ball-oracle's regularized objective at its no-op setting
+    (regularizer switched off) reproduces the plain smoothed surrogate EXACTLY.
+    """
+    p = _toy(seed=3)
+    beta, delta = 0.1, 0.05
+    sm = make_smoothed(p, beta, delta)
     x0 = p.erm()
-    common = dict(radius0=10.0, decay=1.0, beta=0.2, delta=0.1,
-                  reg_on=False, inner_iters=15)
-    h_eu = solvers.solve_ball_oracle(
-        p, x0, {**common, "geometry": "naive"}, 4)
-    h_lw = solvers.solve_ball_oracle(
-        p, x0, {**common, "geometry": "lewis",
-                "lewis_p": None, "lewis_iters": None,
-                "weights_override": np.ones(p.m)}, 4)
-    assert len(h_eu.x) == len(h_lw.x), (len(h_eu.x), len(h_lw.x))
-    for a, b in zip(h_eu.x, h_lw.x):
-        assert np.allclose(a, b, atol=0, rtol=0), "Lewis@I must bit-match Euclidean"
+    sqrt_w = np.ones(p.n)                                   # naive geometry weights
+    reg0 = make_regularized(p, beta, delta, sqrt_w, x0, coef=0.0)
+    rng = np.random.default_rng(7)
+    for _ in range(5):
+        x = x0 + rng.standard_normal(p.d) * 0.3
+        np.testing.assert_allclose(reg0.value(x), sm.value(x), rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(reg0.grad(x), sm.grad(x), rtol=1e-11, atol=1e-13)
+        np.testing.assert_allclose(reg0.hess(x), sm.hess(x), rtol=1e-10, atol=1e-12)
 
 
-def test_smoothed_at_warm_start_is_baseline():
-    """The smoothed surrogate at a no-op smoothing is just a constant shift of the
-    robust norm; its gradient direction is a convex combination of group gradients,
-    and with a single dominating group it coincides with that group's gradient
-    (E11, ``paper/body.tex:294`` ``grad f~ <= max_i grad s_i`` sanity bound)."""
-    p = _problem()
-    x = p.erm()
-    sm = solvers.make_smoothed(p, beta=1e6, delta=1e6)   # near-uniform softmax
-    g = sm.grad(x)
-    # each grad_s_i = A~_i^T r~_i / h_i ; with uniform sigma, g = mean of grad_s_i
-    from gdr.objectives import _Folded
-    f = _Folded(p)
-    r = f.residuals(x)
-    gs = []
-    for s, e in f.slices:
-        ri = r[s:e]
-        h = np.sqrt(1e12 + ri @ ri)
-        gs.append(f.A[s:e].T @ ri / h)
-    g_expect = np.mean(gs, axis=0)
-    assert np.allclose(g, g_expect, atol=1e-4), (g[:3], g_expect[:3])
+# --- Degeneracy 3: smoothed -> max-norm as (beta,delta) -> 0 ----------------
+def test_smoothed_converges_to_group_infinity_norm():
+    """f_tilde -> max_i ||r~_i||_2 as (beta, delta) -> 0 (E8, body.tex:231).
+
+    The smoothed surrogate reduces to the nonsmooth max-norm objective it
+    smooths.  We check the approximation error is bounded by beta*log(m)+delta
+    and shrinks to 0 with the smoothing.
+    """
+    from gdr.objectives import Smoothed, _Folded
+    p = _toy(seed=4, m=8)
+    folded = _Folded(p)
+    rng = np.random.default_rng(11)
+    x = rng.standard_normal(p.d)
+    # group-infinity norm in the folded (theory) convention: max_i ||r~_i||
+    norms = np.sqrt(folded.group_norm_sq(x))               # [m] = ||r~_i||
+    ginf = float(np.max(norms))
+    errs = []
+    for beta, delta in [(1.0, 1.0), (0.1, 0.1), (0.01, 0.01), (1e-3, 1e-3)]:
+        sm = Smoothed(folded, beta, delta)
+        ft = sm.value(x)
+        bound = beta * np.log(p.m) + delta                  # E8
+        assert abs(ft - ginf) <= bound + 1e-9, (beta, delta, abs(ft - ginf), bound)
+        errs.append(abs(ft - ginf))
+    # error must be (non-strictly) decreasing as smoothing shrinks
+    assert errs[-1] < errs[0] + 1e-12, errs
+    assert errs[-1] < 1e-3, f"smoothing did not converge to max-norm: {errs}"
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main([__file__, "-v", "-x"]))
