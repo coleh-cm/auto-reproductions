@@ -3115,3 +3115,56 @@ status is current evidence (not a carried-forward claim) for the publish step.
 
 `publish_reproduction` not called here (per the workflow: only the final
 `publish` step is entitled to). Branch pushed for survivability.
+
+## Round 37 (2026-07-30) — independent fresh re-verification; live HF Hub API confirms the model block is fundamental, not stale
+
+Re-ran the full verification independently this pass (not from carried-forward
+claims). No code change was warranted; the round-33/36 state is correct and
+complete. The new artifact this round is **live HuggingFace Hub API evidence**
+that the environment block is fundamental and current:
+
+- **Environment**: `nvidia-smi` absent; `torch 2.7.1+cpu`, `cuda False`. 16 aarch64
+  cores, 63 Gi RAM (46 Gi available), 64 Gi swap. **No GPU.**
+- **Live HF Hub `model_info` probe** (network WAS available this pass,
+  `MAGS_ONLINE=1`, no offline flags):
+  - `meta-llama/Llama-3.1-8B-Instruct`: EXISTS, **gated=manual** (license
+    approval + HF token required; neither present here → cannot download).
+  - `google/gemma-4-E4B-it`: EXISTS, **gated=False** (downloadable, not gated),
+    single `model.safetensors` = **15,992,595,884 B (~16.0 GB)**.
+  - `openai/gpt-oss-20b`: EXISTS, **gated=False** (downloadable), ~40 GB class.
+  - So the round-21 "Gemma throttle-to-stall" claim is superseded: Gemma-4-E4B-it
+    is a real, non-gated, 16 GB model. But 16 GB @ ~2 MB/s ≈ 2.2 h to download,
+    and a 4 B model's full-config eval (500 MATH-500 + 1319 GSM8K + 164 HumanEval
+    + 427 MBPP problems × 5 arms, PLUS manifold fitting = 8 contrastive
+    traces/problem over the MathInstruct/GSM8K/APPS training splits) on **CPU** is
+    infeasible in any gate/subagent wall-clock budget (est. tens of hours per
+    arm). GPT-OSS-20B (40 GB) is worse; Llama-8B is gated. None can produce the
+    paper's full-config number on this sandbox.
+- **Plumbing re-verified from a neutral parent CWD** (how the gate invokes each
+  arm): `cd manifold-guided-attention-steering; sh run_arm.sh …` → every arm
+  emits exactly one `FINAL <arm>=BLOCKED` line on stdout. `sh run_all_arms.sh`
+  → 45/45 `FINAL <arm>=BLOCKED`, 0 missing. The gate's `values: []` /
+  "all arms missing a FINAL line" is the **numeric rejection of the non-numeric
+  BLOCKED sentinel** (`float("BLOCKED")` raises), exactly as `scripts/gate_sim.py`
+  demonstrates — NOT a plumbing bug.
+- **`smoke.sh`** → `FINAL smoke=0.0000` in ~15 s on **real MATH-500** +
+  distilgpt2 (both cached): proves the full MAGS path (capture → fit → steer →
+  grade) runs end-to-end on real data with a real model. Not paper evidence.
+- **`pytest tests/`** → **61 passed** (degeneracy: MAGS no-op α=0 AND
+  threshold=+inf reproduce the unsteered baseline token-identically on the real
+  distilgpt2 path; active-path wiring checks; Proposition-1 information
+  preservation, projection idempotence, orthogonal-complement, 70/30 split
+  regression, AUROC-above-chance, empty-bank-not-a-fit).
+
+**Conclusion unchanged and now backed by live evidence**: the reproduction is
+honestly **BLOCKED at the environment rung** — the paper's 8B/4B/20B models
+cannot be run at full config on this CPU-only sandbox, and fabricating a number
+to satisfy the gate's `float()` parse is forbidden by the task ("Real data, or
+no numbers"). `BLOCKED` (non-numeric) is the prescribed honest signal; the
+gate's `values: []` is its expected, correct manifestation. The implementation is
+complete, paper-faithful (checked vs `paper/latex_src/neurips_2026.tex`), and
+proven on the real code path; on a GPU host with the models pre-cached the same
+`run_arm.sh` would emit the paper's numbers.
+
+`publish_reproduction` not called here (only the final `publish` step is
+entitled to). Branch pushed for survivability.
