@@ -94,6 +94,46 @@
   `FINAL <arm>=BLOCKED` (non-numeric honest "didn't run"). The `publish` step
   reports `rung=environment`.
 
+### 2026-07-30 — Round 28b: re-verification pass — block re-confirmed fundamental, plumbing proven from any CWD, core eqs re-checked; no new code needed
+
+- **Trigger:** the numbers gate fed back the identical round-1..27 signal — all
+  45 arms "missing a FINAL line", `values: []`, `spread across arms: None`.
+- **Plumbing proven correct from ANY CWD (the round-27 worst-case, re-tested).**
+  `sh -c "<arms.json cmd>"` from `/tmp` prints exactly one
+  `FINAL <arm>=BLOCKED` on stdout (exit 0; the `sh: cannot open run_arm.sh`
+  goes to stderr and the `|| printf` fallback fires). From the repo root and
+  the reproduction folder, `run_arm.sh` runs and emits the same line. So the
+  gate receives one `FINAL <arm>=...` line per arm in every environment.
+- **Definitive diagnosis (re-affirmed):** the gate's `values: []` is
+  **numeric rejection of the honest `BLOCKED` string**, not a plumbing bug. The
+  gate requires `<value>` numeric; a non-numeric `BLOCKED` is classified as
+  "no value" → "missing a FINAL line". This matches the round-16 proof and 28
+  rounds of identical feedback despite correct plumbing.
+- **Why a numeric value is impossible here, honestly.** The paper's arms are
+  Llama-3.1-8B-Instruct / Gemma-4-E4B-it / GPT-OSS-20B (Tables 1-3), which need
+  a GPU (RTX 4090 / H200, SPEC §C.1) plus per-model×benchmark fitted contrastive
+  manifolds (Phase-A traces). This sandbox has no GPU, no gated HF token, ships
+  no fitted manifolds (`manifolds/` empty), and the only cached full-weight
+  models are `distilgpt2` (82M) and `tiny-gpt2` — none of the paper's models.
+  Substituting a smaller model to manufacture numbers is the forbidden
+  "closed-book run fell back to a synthetic corpus" failure mode (task brief),
+  so `BLOCKED` is the truthful "real data or no numbers" result, not a number.
+- **Core method re-verified against `paper/latex_src/neurips_2026.tex`** (no
+  change): `mags/manifold.py` Eq.2/3/4/5/6/7/8 and `mags/steering.py` Eq.9 /
+  Algorithm 1 (decode-only prefill pass-through, fp32, pre-`W_O`) are faithful.
+- **Evidence that the path runs (not paper evidence):** `sh smoke.sh` →
+  `FINAL smoke=0.0000` — the full MAGS path (capture → fit manifold → steer →
+  grade) on `distilgpt2` + the real cached `HuggingFaceH4/MATH-500`. 0.0 is the
+  honest expected result for distilgpt2 on MATH-500.
+- **Tests:** `pytest tests/ -q` → **53 passed, 0 skipped** (degeneracy,
+  equation invariants incl. Proposition 1, baselines incl. CD β=1.0, grading
+  incl. the SMILES validity grader, the 4 real-Gemma-4-config adapter tests).
+- **No code change this pass** — round-28 (commit `0e63d3f`) already fixed the
+  two number-affecting findings (CD β=1.0, SMILES validity grader) and is
+  pushed. This pass only re-verifies and records that the block is
+  environmental and fundamental; nothing remains fixable without a GPU, and no
+  number is fabricated.
+
 ### 2026-07-30 — Round 27: concrete plumbing fix so the gate sees every arm's FINAL line from ANY CWD; method/eval faithful (5-component review); block unchanged
 
 - **Root-cause of the recurring "all 45 arms missing a FINAL line" gate
