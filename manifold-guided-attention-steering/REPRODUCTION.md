@@ -34,6 +34,53 @@
 
 ## Log
 
+### 2026-07-30 — Round 24: fresh env re-probe corrects a stale block claim; block re-confirmed; plumbing re-verified (45/45 FINAL, 52 tests, smoke green)
+
+- **Gate feedback (unchanged since round 1):** all 45 arms reported
+  "missing a FINAL line", `values: []`, `spread across arms: None`. This is the
+  numbers gate correctly surfacing an environment block (BLOCKED is a literal
+  string, never a number) — see the round-16/15 definitive diagnosis below.
+- **Fresh environment re-probe (this sandbox = the gate-class sandbox):**
+  - `torch 2.7.1+cpu`, `torch.cuda.is_available()==False`, 0 devices. aarch64,
+    16 cores, 63 GB RAM. **No GPU.**
+  - HF cache holds the **datasets** (MATH-500, MathInstruct, apps, mbpp, gsm8k)
+    but **no model weights**. Network is UP (huggingface.co → 200).
+  - `meta-llama/Llama-3.1-8B-Instruct`: `gated=manual` (still gated, no HF token) →
+    cannot download. Block reason unchanged.
+  - `google/gemma-4-E4B-it`: `gated=False`, 16 GB `model.safetensors`.
+    **CORRECTION:** the round-21 claim that unauthenticated downloads
+    "throttle to a stall (44 MB of 16 GB then 0 bytes/min)" is **no longer
+    true**. A fresh 80 s probe downloaded 167 MB at a steady **~2.1 MB/s**
+    (no stall) → ~2 h for the full 16 GB. So Gemma IS obtainable here given
+    time; the real blocker for it is **no GPU** (CPU full-config eval of a 4B
+    model over 4 benchmarks × 5 arms is infeasible in any gate budget, est.
+    30+ h). Updated all 20 Gemma block manifests + `run_all_arms.sh` to state
+    this accurately (a repo must not repeat a stale "stall" claim).
+  - `openai/gpt-oss-20b`: not gated, ~13.7 GB; 20B cannot run on CPU. Block
+    reason unchanged.
+- **Conclusion unchanged:** the paper's full-config numbers (Tables 1-3) cannot
+  be produced in this sandbox — no GPU to run the paper's 8B/4B/20B models at
+  the full eval sizes (MATH-500 N=500, GSM8K N=1319, HumanEval N=164, MBPP
+  N=427; 500 molecules for Table 3). The honest result is `FINAL <arm>=BLOCKED`
+  for all 45 arms; the numbers gate reports this as "all missing a FINAL line"
+  because BLOCKED is non-numeric. Per the task ("Real data, or no numbers… a
+  closed-book run silently fell back to a synthetic corpus… which passed every
+  gate and meant nothing"), I do **not** substitute a smaller/non-paper model
+  or a synthetic corpus to fabricate a passing number. The implementation is
+  complete and ready to run on a GPU host with pre-cached models (README §"How
+  to run for real").
+- **Re-verified this round:**
+  - `sh run_all_arms.sh` → exactly 45 distinct `FINAL <arm>=BLOCKED` lines, exit 0.
+  - `sh run_arm.sh <…>` (the per-arm form the gate invokes) → `FINAL <arm>=BLOCKED` in <1 s.
+  - `pytest tests/ -q` → **52 passed** (degeneracy: MAGS no-op == unsteered
+    token-identical; Eq.2-10 + Proposition 1 invariants; grading; Gemma-4
+    adapter; round-20 prefill-leak fix).
+  - `sh smoke.sh` → `FINAL smoke=0.0000` (synthetic distilgpt2 fixture; path
+    runs, not evidence about the paper).
+- **Change this round:** corrected the 20 Gemma block manifests +
+  `run_all_arms.sh` Gemma case to the accurate, freshly-measured download
+  status. No code path that affects a real number changed.
+
 ### 2026-07-29 — Round 22: inline faithfulness review + adversarial env-block confirmation (orchestration script crashed in its own synthesis loop; review done inline)
 
 - **Gate feedback this round (unchanged since round 1):** all 45 arms reported
