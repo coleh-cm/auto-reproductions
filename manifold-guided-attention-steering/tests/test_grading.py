@@ -161,3 +161,28 @@ def test_mathinstruct_gold_extraction_per_source():
     assert _extract_mathinstruct_gold(
         "data/CoT/math50k_camel.json",
         r"therefore $\boxed{7}$") == "7"
+
+
+def test_smiles_validity_grader():
+    """SMILES Validity (Table 3, tex:L527): a SMILES is valid iff RDKit parses it.
+    The grade() dispatch must route SMILES-molecular-generation to the validity
+    grader (not raise ValueError), and the grader must accept canonical SMILES
+    and reject garbage/empty."""
+    from mags.grading import grade, smiles_is_valid, grade_smiles_validity
+    # canonical valid SMILES
+    assert smiles_is_valid("CCO")            # ethanol
+    assert smiles_is_valid("c1ccccc1")       # benzene
+    assert smiles_is_valid("CC(=O)O")        # acetic acid
+    assert smiles_is_valid("C1CCCCC1")       # cyclohexane
+    # invalid / empty
+    assert not smiles_is_valid("")
+    assert not smiles_is_valid("   ")
+    assert not smiles_is_valid("not a smiles!!!")
+    assert not smiles_is_valid("C1CC")       # unbalanced ring closure (digit 1 unpaired)
+    # dispatch routes the molecular benchmark to the validity grader
+    assert grade("SMILES-molecular-generation", "CCO", None) is True
+    assert grade("SMILES-molecular-generation", "garbage!!", None) is False
+    # grade_smiles_validity is the per-molecule predicate; fraction over 500 is
+    # the Table-3 Validity % (computed in eval, not here).
+    assert grade_smiles_validity("c1ccccc1") and not grade_smiles_validity("")
+

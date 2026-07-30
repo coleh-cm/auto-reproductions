@@ -34,6 +34,66 @@
 
 ## Log
 
+### 2026-07-30 — Round 28: fix 2 confirmed number-affecting findings from the 5-component faithfulness review (CD coefficient; SMILES Validity grader)
+
+- **Orchestrated faithfulness review (`orchestrate`, `mags-faithfulness-v2`,
+  5 components × 1 review subagent each, vs authoritative LaTeX).** Reviewed the
+  data pipeline, method core (manifold+steering), fit loop (capture+adapter),
+  eval metric (grading+generation), and baselines against
+  `paper/latex_src/neurips_2026.tex`. 3 components faithful (data, method,
+  fit). **2 confirmed number-affecting findings** (each verified against the
+  actual code + paper tex; both fixed this round):
+  1. **Contrastive Decoding amateur coefficient (`mags/baselines.py:449`).**
+     The reproduction used `score = log p_exp − 0.5·log p_ama` (β=0.5). The
+     MAGS paper (tex:L396) defines CD only qualitatively ("contrasts the token
+     distributions of a large expert model and a smaller amateur model") and
+     cites `li2023contrastive` (Li et al., Contrastive Decoding, ACL 2023) as
+     authoritative. The CD paper's objective (verified from the arXiv HTML,
+     Eq.3) is `CD-score = log(p_exp/p_ama) = log p_exp − log p_ama` with
+     **coefficient 1 on BOTH log-probs** — there is **no β parameter**. The
+     CD paper's hyperparameters are α (plausibility=0.1) and τ (amateur
+     temperature, applied as `softmax(logits_ama/τ)`, =1.0 for OPT/Llama-class).
+     The prior β=0.5 was a confusion with the amateur temperature τ=0.5 (a
+     different operation: `softmax(logits/0.5) ≠ 0.5·log p`). β=0.5 halved the
+     amateur penalty, weakening the contrast toward greedy-expert and changing
+     the argmax within the plausible set — number-affecting for all 8 CD arms
+     (MATH-500/GSM8K/HumanEval/MBPP × Llama/Gemma, Tables 1-2).
+     **Fix:** `CD_DEFAULT_BETA = 1.0` (`mags/config.py`), `ContrastiveDecoder`
+     default `beta=1.0` (`mags/baselines.py`), `cd_generate` default
+     `beta=1.0` (`mags/generation.py`), test updated to `beta=1.0`
+     (`tests/test_baselines.py`). Verified `score == log p_exp − 1.0·log p_ama`
+     exactly (matches CD Eq.3). τ=1.0 is a no-op, so no amateur-temperature
+     machinery is needed. SPEC §4.17 records the correction.
+  2. **SMILES Validity grader absent (`mags/grading.py:190`).** The `grade()`
+     dispatch handled only MATH-500/GSM8K/HumanEval/MBPP/APPS/MATH-500-train
+     and raised `ValueError` for `SMILES-molecular-generation`; no Validity
+     (RDKit parse) or Binding Affinity (AutoDock-GPU) computation existed.
+     **Validity** ("fraction of generated SMILES parseable", tex:L527) is
+     well-defined and needs no unstated protein, so it is implementable:
+     added `smiles_is_valid`/`grade_smiles_validity` (RDKit parse, with a
+     syntactic fallback) and wired `SMILES-molecular-generation` into the
+     `grade()` dispatch. **Binding Affinity** (AutoDock-GPU kcal/mol) still
+     needs the unstated target protein + AutoDock-GPU binary + docking params
+     (SPEC §4.18), so it remains a documented stretch block. The whole
+     molecular task is blocked upstream (`mags/run.py:250-255`: no molecules
+     generated because the prompt template / SMILES corpus / target protein
+     are unstated), so neither metric produces numbers without a GPU host +
+     the unstated setup — but the Validity grader now exists so a future GPU
+     run that generates molecules can score them. Added
+     `test_smiles_validity_grader` (canonical SMILES accepted, garbage/empty/
+     unbalanced-ring rejected, dispatch routes correctly). SPEC §4.18 records
+     the Validity implementation + the Binding Affinity stretch block.
+- **Re-verified this round:**
+  - `pytest tests/ -q` → **53 passed** (+1 SMILES validity test; 52 prior).
+  - CD `score == log p_exp − log p_ama` (Eq.3) verified numerically.
+  - `sh smoke.sh` → `FINAL smoke=0.0000`; `sh run_all_arms.sh` → 45 FINAL lines.
+  - `sh -c "<arms.json cmd>"` from `/tmp` → 1 FINAL line per arm (plumbing fix
+    from round 27 holds).
+- **Environment block (unchanged):** no GPU / no gated token; the paper's
+  8B/4B/20B models cannot load on this CPU sandbox. Every arm prints
+  `FINAL <arm>=BLOCKED` (non-numeric honest "didn't run"). The `publish` step
+  reports `rung=environment`.
+
 ### 2026-07-30 — Round 27: concrete plumbing fix so the gate sees every arm's FINAL line from ANY CWD; method/eval faithful (5-component review); block unchanged
 
 - **Root-cause of the recurring "all 45 arms missing a FINAL line" gate

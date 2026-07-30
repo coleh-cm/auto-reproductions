@@ -4,6 +4,11 @@
 - HumanEval: official execution harness (human_eval.execution.check_correctness).
 - MBPP (sanitized): execute the generated code against the problem's test_list asserts
   in a sandboxed subprocess with a 10 s timeout (SPEC §5.6).
+- SMILES-molecular-generation: Validity = fraction of generated SMILES parseable
+  (tex:L527, "fraction of generated SMILES parseable; higher is better"). Uses
+  RDKit (pinned in requirements.txt). Binding Affinity (AutoDock-GPU kcal/mol,
+  tex:L527) needs the paper's unstated target protein + AutoDock-GPU binary +
+  params (SPEC §4.18), so it is a documented stretch block, not graded here.
 """
 from __future__ import annotations
 import multiprocessing
@@ -185,6 +190,43 @@ def _run_subprocess_ok(code: str, timeout: int = 10) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# SMILES Validity (molecular generation, Table 3, tex:L527)
+# ---------------------------------------------------------------------------
+def smiles_is_valid(smiles: str) -> bool:
+    """A generated SMILES is valid iff RDKit can parse it into a molecule
+    (tex:L527: "fraction of generated SMILES parseable; higher is better").
+    Trims whitespace/newlines; an empty string is invalid. RDKit is pinned in
+    requirements.txt; if it is unavailable a syntactic fallback (balanced-ring
+    + atom-bond char check) is used so the metric is still computable, just
+    less strict.
+    """
+    s = (smiles or "").strip()
+    if not s:
+        return False
+    try:
+        from rdkit import Chem
+        return Chem.MolFromSmiles(s) is not None
+    except Exception:
+        # Fallback (no rdkit): a SMILES must have balanced ring-closure digits
+        # and only valid atom/bond chars. This is permissive, not equivalent
+        # to RDKit, but lets the metric run on a host without rdkit.
+        from collections import Counter
+        digits = [c for c in s if c.isdigit()]
+        dc = Counter(digits)
+        if any(v % 2 for v in dc.values()):
+            return False
+        valid = set("BCNOPSFIcnopsfiH0123456789%()[]@+-=#/\\.:,")
+        return all(c in valid or c.isupper() for c in s)
+
+
+def grade_smiles_validity(completion: str, problem=None) -> bool:
+    """Per-molecule validity: True iff the completion parses as a SMILES.
+    Used by eval to compute the fraction-valid (Validity %) over the 500
+    generated molecules (tex:L527)."""
+    return smiles_is_valid(completion)
+
+
+# ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 def grade(benchmark: str, completion: str, problem) -> bool:
@@ -198,6 +240,8 @@ def grade(benchmark: str, completion: str, problem) -> bool:
         return grade_mbpp(completion, problem)
     if benchmark == "APPS-train":
         return grade_apps(completion, problem)
+    if benchmark == "SMILES-molecular-generation":
+        return grade_smiles_validity(completion, problem)
     # MATH-500-train: the MathInstruct contrastive-trace source (SPEC §4.13,
     # load_mathinstruct) tags its problems `MATH-500-train`; its gold is a
     # \\boxed{} answer extracted from the MathInstruct `output`, identical in

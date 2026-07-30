@@ -117,7 +117,7 @@ def generate(model, tok, prompt_text, controller, max_new_tokens=1024,
 
 @torch.no_grad()
 def cd_generate(expert, amateur, tok, prompt_text, max_new_tokens=1024,
-                alpha_plausibility=0.1, beta=0.5, seed=42, use_chat_template=False):
+                alpha_plausibility=0.1, beta=1.0, seed=42, use_chat_template=False):
     """Greedy Contrastive Decoding (SPEC §4.17). Expert and amateur share the
     tokenizer; we keep a parallel KV cache for the amateur and adapt expert logits.
 

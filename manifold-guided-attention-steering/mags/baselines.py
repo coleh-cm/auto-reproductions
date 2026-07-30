@@ -426,8 +426,11 @@ class AngularSteeringController:
 # ---------------------------------------------------------------------------
 # Contrastive Decoding (SPEC §4.17): expert vs amateur logits at each decode step.
 # Implemented as a logits processor (operates at the distribution level, no hooks).
-# CD (Li et al. 2023): score = log p_expert - beta * log p_amateur, with adaptive
-# plausibility masking on the EXPERT's plausible set. Defaults: alpha_p=0.1, beta=0.5.
+# CD (Li et al. 2023, li2023contrastive — the paper MAGS cites at tex:L396): the
+# CD-score is log p_exp - log p_ama (Eq.3, coefficient 1 on BOTH log-probs; there
+# is NO beta parameter). The amateur temperature tau (a separate op,
+# softmax(logits_ama/tau); =1.0 for OPT/Llama-class) is not a coefficient on log
+# p. We use beta=1.0 (the plain log-ratio). Defaults: alpha_p=0.1, beta=1.0.
 # ---------------------------------------------------------------------------
 class ContrastiveDecoder:
     """Stateful expert/amateur contrastive decoder.
@@ -435,7 +438,7 @@ class ContrastiveDecoder:
     Used inside a custom greedy decode loop (mags.generation.cd_generate) because the
     amateur needs its own forward at each step. Not a W_O hook controller.
     """
-    def __init__(self, expert_model, amateur_model, tok, alpha_plausibility=0.1, beta=0.5):
+    def __init__(self, expert_model, amateur_model, tok, alpha_plausibility=0.1, beta=1.0):
         self.expert = expert_model
         self.amateur = amateur_model
         self.tok = tok

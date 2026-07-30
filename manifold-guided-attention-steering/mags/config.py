@@ -39,7 +39,14 @@ AS_ANGLE_GRID = list(range(0, 360, 30))
 AS_DEFAULT_ANGLE_DEG = 30
 # SPEC §4.17: Contrastive Decoding.
 CD_DEFAULT_ALPHA_PLAUS = 0.1
-CD_DEFAULT_BETA = 0.5
+# CD amateur log-prob coefficient. Li et al. 2023 (li2023contrastive, the paper
+# the MAGS paper cites at tex:L396) defines CD-score = log p_exp - log p_ama
+# (Eq.3, coefficient 1 on BOTH log-probs); there is NO beta parameter. The
+# MAGS paper does not restate the objective, so the CD paper is authoritative.
+# The amateur temperature tau (a SEPARATE op, softmax(logits_ama/tau); =1.0
+# for OPT/Llama-class) is not a coefficient on log p. We use 1.0 (the plain
+# log-ratio); tau=1.0 is a no-op, so no amateur-temperature machinery is needed.
+CD_DEFAULT_BETA = 1.0
 CD_AMATEUR = {
     "meta-llama/Llama-3.1-8B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
     "google/gemma-4-E4B-it": "google/gemma-3-1b-it",

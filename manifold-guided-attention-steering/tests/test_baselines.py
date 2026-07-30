@@ -282,7 +282,7 @@ def test_cd_plausibility_mask_is_relative_to_expert_max():
     # a fake vocab of 5 tokens; expert strongly favors token 0
     expert_logits = torch.tensor([[0.0, -1.0, -2.0, -8.0, -10.0]])
     amateur_logits = torch.tensor([[-5.0, -5.0, -5.0, -5.0, -5.0]])
-    cd = ContrastiveDecoder(None, None, None, alpha_plausibility=0.1, beta=0.5)
+    cd = ContrastiveDecoder(None, None, None, alpha_plausibility=0.1, beta=1.0)
     score = cd.adapted_logits(expert_logits, amateur_logits)
     p_e = F.softmax(expert_logits, dim=-1)
     p_max = float(p_e.max())
