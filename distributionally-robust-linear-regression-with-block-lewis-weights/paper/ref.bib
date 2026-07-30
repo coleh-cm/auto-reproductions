@@ -1,0 +1,2095 @@
+@book{nw06,
+  title={Numerical optimization},
+  author={Nocedal, Jorge and Wright, Stephen J},
+  year={2006},
+  publisher={Springer}
+}
+
+@InProceedings{cpo20,
+  title = 	 {Distributionally Robust Formulation and Model Selection for the Graphical Lasso},
+  author =       {Cisneros-Velarde, Pedro and Petersen, Alexander and Oh, Sang-Yun},
+  booktitle = 	 {Proceedings of the Twenty Third International Conference on Artificial Intelligence and Statistics},
+  pages = 	 {756--765},
+  year = 	 {2020},
+  editor = 	 {Chiappa, Silvia and Calandra, Roberto},
+  volume = 	 {108},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {08},
+  publisher =    {PMLR},
+  eprint={1905.08975},
+  archivePrefix={arXiv},
+  primaryClass={stat.ML},
+}
+
+
+@article{bkm19,
+  title={Robust Wasserstein profile inference and applications to machine learning},
+  author={Blanchet, Jose and Kang, Yang and Murthy, Karthyek},
+  journal={Journal of Applied Probability},
+  volume={56},
+  number={3},
+  pages={830--857},
+  year={2019},
+  eprint={1610.05627},
+  archivePrefix={arXiv},
+  primaryClass={math.ST},
+  publisher={Cambridge University Press}
+}
+
+@misc{ksj18,
+      title={Global linear convergence of Newton's method without strong-convexity or Lipschitz gradients}, 
+      author={Sai Praneeth Karimireddy and Sebastian U. Stich and Martin Jaggi},
+      year={2018},
+      eprint={1806.00413},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/1806.00413}, 
+}
+
+@InProceedings{syls16,
+  title = 	 {AdaDelay: Delay Adaptive Distributed Stochastic Optimization},
+  author = 	 {Sra, Suvrit and Yu, Adams Wei and Li, Mu and Smola, Alex},
+  booktitle = 	 {Proceedings of the 19th International Conference on Artificial Intelligence and Statistics},
+  pages = 	 {957--965},
+  year = 	 {2016},
+  editor = 	 {Gretton, Arthur and Robert, Christian C.},
+  volume = 	 {51},
+  series = 	 {Proceedings of Machine Learning Research},
+  address = 	 {Cadiz, Spain},
+  month = 	 {05},
+  publisher =    {PMLR},
+  abstract = 	 {We develop distributed stochastic convex optimization algorithms under a delayed gradient model in which server nodes update parameters and worker nodes compute stochastic (sub)gradients. Our setup is motivated by the behavior of real-world distributed computation systems; in particular, we analyze a setting wherein worker nodes can be differently slow at different times. In contrast to existing approaches, we do not impose a worst-case bound on the delays experienced but rather allow the updates to be sensitive to the actual delays experienced. This sensitivity allows use of larger stepsizes, which can help speed up initial convergence without having to wait too long for slower machines; the global convergence rate is still preserved. We experiment with different delay patterns, and obtain noticeable  improvements for large-scale real datasets with billions of examples and features.},
+eprint={1508.05003},
+      archivePrefix={arXiv},
+      primaryClass={stat.ML},
+}
+
+
+@misc{ajk24,
+      title={Acceleration Meets Inverse Maintenance: Faster $\ell_{\infty}$-Regression}, 
+      author={Deeksha Adil and Shunhua Jiang and Rasmus Kyng},
+      year={2024},
+      eprint={2409.20030},
+      archivePrefix={arXiv},
+      primaryClass={cs.DS},
+      url={https://arxiv.org/abs/2409.20030}, 
+}
+
+@inproceedings{bcll18,
+author = {Bubeck, S\'{e}bastien and Cohen, Michael B. and Lee, Yin Tat and Li, Yuanzhi},
+title = {An homotopy method for lp regression provably beyond self-concordance and in input-sparsity time},
+year = {2018},
+isbn = {9781450355599},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+abstract = {We consider the problem of linear regression where the ℓ2n norm loss (i.e., the usual least squares loss) is replaced by the ℓpn norm. We show how to solve such problems up to machine precision in \~{O}p(n|1/2 − 1/p|) (dense) matrix-vector products and \~{O}p(1) matrix inversions, or alternatively in \~{O}p(n|1/2 − 1/p|) calls to a (sparse) linear system solver. This improves the state of the art for any p∉{1,2,+∞}. Furthermore we also propose a randomized algorithm solving such problems in input sparsity time, i.e., \~{O}p(N + poly(d)) where N is the size of the input and d is the number of variables. Such a result was only known for p=2. Finally we prove that these results lie outside the scope of the Nesterov-Nemirovski’s theory of interior point methods by showing that any symmetric self-concordant barrier on the ℓpn unit ball has self-concordance parameter Ω(n).},
+booktitle = {Proceedings of the 50th Annual ACM SIGACT Symposium on Theory of Computing},
+pages = {1130–1137},
+numpages = {8},
+keywords = {Input sparsity time, lp cone, regression, self-concordance},
+location = {Los Angeles, CA, USA},
+series = {STOC 2018},
+eprint={1711.01328},
+      archivePrefix={arXiv},
+      primaryClass={math.OC},
+}
+
+@incollection{john1948,
+	title        = {Extremum problems with inequalities as subsidiary conditions},
+	author       = {John, Fritz},
+	year         = 1948,
+	booktitle    = {Studies and Essays Presented to R. Courant on his 60th Birthday},
+	publisher    = {Interscience Publishers, Inc},
+	pages        = {187--204}
+}
+
+@book{nn94,
+  title={Interior Point Polynomial Algorithms in Convex Programming},
+  author={Nesterov, Y. and Nemirovskii, A.},
+  isbn={9780898715156},
+  lccn={93038912},
+  series={SIAM studies in applied and numerical mathematics: Society for Industrial and Applied Mathematics},
+  year={1994},
+  publisher={Society for Industrial and Applied Mathematics}
+}
+
+@inproceedings{chjjs22,
+author = {Carmon, Yair and Hausler, Danielle and Jambulapati, Arun and Jin, Yujia and Sidford, Aaron},
+title = {Optimal and adaptive monteiro-svaiter acceleration},
+year = {2022},
+isbn = {9781713871088},
+publisher = {Curran Associates Inc.},
+address = {Red Hook, NY, USA},
+abstract = {We develop a variant of the Monteiro-Svaiter (MS) acceleration framework that removes the need to solve an expensive implicit equation at every iteration. Consequently, for any p ≥ 2 we improve the complexity of convex optimization with Lipschitz pth derivative by a logarithmic factor, matching a lower bound. We also introduce an MS subproblem solver that requires no knowledge of problem parameters, and implement it as either a second-or first-order method via exact linear system solution or MinRes, respectively. On logistic regression our method outperforms previous second-order acceleration schemes, but under-performs Newton's method; simply iterating our first-order adaptive subproblem solver performs comparably to L-BFGS.},
+booktitle = {Proceedings of the 36th International Conference on Neural Information Processing Systems},
+articleno = {1479},
+numpages = {13},
+location = {New Orleans, LA, USA},
+series = {NIPS '22},
+eprint={2205.15371},
+archivePrefix={arXiv},
+primaryClass={math.OC},
+}
+
+@inbook{bjlls19,
+author = {Bubeck, S\'{e}bastien and Jiang, Qijia and Lee, Yin Tat and Li, Yuanzhi and Sidford, Aaron},
+title = {Complexity of highly parallel non-smooth convex optimization},
+year = {2019},
+publisher = {Curran Associates Inc.},
+address = {Red Hook, NY, USA},
+abstract = {A landmark result of non-smooth convex optimization is that gradient descent is an optimal algorithm whenever the number of computed gradients is smaller than the dimension d. In this paper we study the extension of this result to the parallel optimization setting. Namely we consider optimization algorithms interacting with a highly parallel gradient oracle, that is one that can answer poly(d) gradient queries in parallel. We show that in this case gradient descent is optimal only up to \~{O}(√d) rounds of interactions with the oracle. The lower bound improves upon a decades old construction by Nemirovski which proves optimality only up to d1/3 rounds (as recently observed by Balkanski and Singer), and the suboptimality of gradient descent after √d rounds was already observed by Duchi, Bartlett and Wainwright. In the latter regime we propose a new method with improved complexity, which we conjecture to be optimal. The analysis of this new method is based upon a generalized version of the recent results on optimal acceleration for highly smooth convex optimization.},
+booktitle = {Proceedings of the 33rd International Conference on Neural Information Processing Systems},
+articleno = {1247},
+numpages = {10},
+eprint={1906.10655},
+archivePrefix={arXiv},
+primaryClass={math.OC},
+}
+
+@inbook{akps19,
+author = {Deeksha Adil and Rasmus Kyng and Richard Peng and Sushant Sachdeva},
+title = {Iterative Refinement for {$\ell_p$}-norm Regression},
+booktitle = {Proceedings of the 2019 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)},
+chapter = {},
+pages = {1405-1424},
+year = {2019},
+doi = {10.1137/1.9781611975482.86},
+URL = {https://epubs.siam.org/doi/abs/10.1137/1.9781611975482.86},
+eprint = {https://epubs.siam.org/doi/pdf/10.1137/1.9781611975482.86},
+    abstract = { Abstract We give improved algorithms for the ℓp-regression problem, minx ‖x‖p such that Ax = b, for all p ∊ (1, 2) ∪ (2, ∞). Our algorithms obtain a high accuracy solution in iterations, where each iteration requires solving an m × m linear system, with m being the dimension of the ambient space. Incorporating a procedure for maintaining an approximate inverse of the linear systems that we need to solve at each iteration, we give algorithms for solving ℓp-regression to 1/poly(n) accuracy that runs in time Õp(mmax{ω, 7/3}), where ω is the matrix multiplication constant. For the current best value of ω > 2.37, this means that we can solve ℓp regression as fast as ℓ2 regression, for all constant p bounded away from 1. Our algorithms can be combined with nearly-linear time solvers for linear systems in graph Laplacians to give minimum ℓp-norm flow / voltage solutions to 1/poly(n) accuracy on an undirected graph with m edges in time. For sparse graphs and for matrices with similar dimensions, our iteration counts and running times improve upon the p-norm regression algorithm by [Bubeck-Cohen-Lee-Li STOC'18], as well as general purpose convex optimization algorithms. At the core of our algorithms is an iterative refinement scheme for ℓp-norms, using the quadratically-smoothed ℓp-norms introduced in the work of Bubeck et al. Formally, given an initial solution, we construct a problem that seeks to minimize a quadratically-smoothed ℓp norm over a subspace, such that a crude solution to this problem allows us to improve the initial solution by a constant factor, leading to algorithms with fast convergence. },
+    eprint={1901.06764},
+    archivePrefix={arXiv},
+    primaryClass={cs.DS},
+}
+
+
+@article{lfn18,
+  title={Relatively smooth convex optimization by first-order methods, and applications},
+  author={Lu, Haihao and Freund, Robert M and Nesterov, Yurii},
+  journal={SIAM Journal on Optimization},
+  volume={28},
+  number={1},
+  pages={333--354},
+  year={2018},
+  publisher={SIAM},
+eprint={1610.05708},
+      archivePrefix={arXiv},
+      primaryClass={math.OC},
+}
+
+@article{qsz02,
+title = {A primal–dual algorithm for minimizing a sum of Euclidean norms},
+journal = {Journal of Computational and Applied Mathematics},
+volume = {138},
+number = {1},
+pages = {127-150},
+year = {2002},
+issn = {0377-0427},
+doi = {https://doi.org/10.1016/S0377-0427(01)00357-0},
+url = {https://www.sciencedirect.com/science/article/pii/S0377042701003570},
+author = {Liqun Qi and Defeng Sun and Guanglu Zhou},
+keywords = {Primal–dual algorithm, Sum of norms, Semismooth, VLSL design, Euclidean facilities location, Steiner minimum trees},
+abstract = {We study the problem of minimizing a sum of Euclidean norms. This nonsmooth optimization problem arises in many different kinds of modern scientific applications. In this paper we first transform this problem and its dual problem into a system of strongly semismooth equations, and give some uniqueness theorems for this problem. We then present a primal–dual algorithm for this problem by solving this system of strongly semismooth equations. Preliminary numerical results are reported, which show that this primal–dual algorithm is very promising.}
+}
+
+@inproceedings{bllssw21,
+author = {van den Brand, Jan and Lee, Yin Tat and Liu, Yang P. and Saranurak, Thatchaphol and Sidford, Aaron and Song, Zhao and Wang, Di},
+title = {Minimum cost flows, MDPs, and ${\ell_1}$-regression in nearly linear time for dense instances},
+year = {2021},
+isbn = {9781450380539},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3406325.3451108},
+doi = {10.1145/3406325.3451108},
+abstract = {In this paper we provide new randomized algorithms with improved runtimes for solving linear programs with two-sided constraints. In the special case of the minimum cost flow problem on n-vertex m-edge graphs with integer polynomially-bounded costs and capacities we obtain a randomized method which solves the problem in \~{O}(m + n1.5) time. This improves upon the previous best runtime of \~{O}(m √n) [Lee-Sidford’14] and, in the special case of unit-capacity maximum flow, improves upon the previous best runtimes of m4/3 + o(1) [Liu-Sidford’20, Kathuria’20] and \~{O}(m √n) [Lee-Sidford’14] for sufficiently dense graphs. In the case of ℓ1-regression in a matrix with n-columns and m-rows we obtain a randomized method which computes an є-approximate solution in \~{O}(mn + n2.5) time. This yields a randomized method which computes an є-optimal policy of a discounted Markov Decision Process with S states and, A actions per state in time \~{O}(S2 A + S2.5). These methods improve upon the previous best runtimes of methods which depend polylogarithmically on problem parameters, which were \~{O}(mn1.5) [Lee-Sidford’15] and \~{O}(S2.5 A) [Lee-Sidford’14, Sidford-Wang-Wu-Ye’18] respectively. To obtain this result we introduce two new algorithmic tools of possible independent interest. First, we design a new general interior point method for solving linear programs with two sided constraints which combines techniques from [Lee-Song-Zhang’19, Brand et al.’20] to obtain a robust stochastic method with iteration count nearly the square root of the smaller dimension. Second, to implement this method we provide dynamic data structures for efficiently maintaining approximations to variants of Lewis-weights, a fundamental importance measure for matrices which generalize leverage scores and effective resistances.},
+booktitle = {Proceedings of the 53rd Annual ACM SIGACT Symposium on Theory of Computing},
+pages = {859–869},
+numpages = {11},
+keywords = {Data Structure, Interior Point Method, Linear Program},
+location = {Virtual, Italy},
+series = {STOC 2021},
+eprint={2101.05719},
+      archivePrefix={arXiv},
+      primaryClass={cs.DS},
+}
+
+@article{and96,
+author = {Andersen, Knud D.},
+title = {An Efficient Newton Barrier Method for Minimizing a Sum of Euclidean Norms},
+journal = {SIAM Journal on Optimization},
+volume = {6},
+number = {1},
+pages = {74-95},
+year = {1996},
+doi = {10.1137/0806006},
+URL = {https://doi.org/10.1137/0806006},
+eprint = {https://doi.org/10.1137/0806006},
+    abstract = { A new Newton barrier method is proposed for minimizing a sum of Euclidean norms (MSN), \$F( x ) = \sum\_{i = 1}^k \| A\_i^T x - b\_i \|\_2 \$. MSN is a nonsmooth problem because F is not differentiable at any point x where any of the norms is zero. The method used is based on approximating F with a smooth function, which in the limit has the same optimal value as F. MSN is shown to have a dual problem with properties very similar to duality theory in linear programming. This is used in the development of the method and to give a proof of when an optimal solution for the smooth approximation is \$\epsilon \$-optimal (measured in the duality gap) for the original problem. An implementation of the algorithm is described for large sparse problems and numerical results are presented for problems with more than 270,000 nonlinear variables. These problems arise from plastic collapse analysis. }
+}
+
+
+@InProceedings{mo24_notus,
+  title = 	 {Optimal bounds for $\ell_p$ sensitivity sampling via $\ell_2$ augmentation},
+  author =       {Munteanu, Alexander and Omlor, Simon},
+  booktitle = 	 {Proceedings of the 41st International Conference on Machine Learning},
+  pages = 	 {36769--36796},
+  year = 	 {2024},
+  editor = 	 {Salakhutdinov, Ruslan and Kolter, Zico and Heller, Katherine and Weller, Adrian and Oliver, Nuria and Scarlett, Jonathan and Berkenkamp, Felix},
+  volume = 	 {235},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {07},
+  publisher =    {PMLR},
+  pdf = 	 {https://raw.githubusercontent.com/mlresearch/v235/main/assets/munteanu24a/munteanu24a.pdf},
+  url = 	 {https://proceedings.mlr.press/v235/munteanu24a.html},
+  abstract = 	 {Data subsampling is one of the most natural methods to approximate a massively large data set by a small representative proxy. In particular, sensitivity sampling received a lot of attention, which samples points proportional to an individual importance measure called sensitivity. This framework reduces in very general settings the size of data to roughly the VC dimension $d$ times the total sensitivity $\mathfrak S$ while providing strong $(1\pm\varepsilon)$ guarantees on the quality of approximation. The recent work of Woodruff &amp; Yasuda (2023c) improved substantially over the general $\tilde O(\varepsilon^{-2}\mathfrak Sd)$ bound for the important problem of $\ell_p$ subspace embeddings to $\tilde O(\varepsilon^{-2}\mathfrak S^{2/p})$ for $p\in[1,2]$. Their result was subsumed by an earlier $\tilde O(\varepsilon^{-2}\mathfrak Sd^{1-p/2})$ bound which was implicitly given in the work of Chen &amp; Derezinski (2021). We show that their result is tight when sampling according to plain $\ell_p$ sensitivities. We observe that by augmenting the $\ell_p$ sensitivities by $\ell_2$ sensitivities, we obtain better bounds improving over the aforementioned results to optimal linear $\tilde O(\varepsilon^{-2}(\mathfrak S+d)) = \tilde O(\varepsilon^{-2}d)$ sampling complexity for all $p \in [1,2]$. In particular, this resolves an open question of Woodruff &amp; Yasuda (2023c) in the affirmative for $p \in [1,2]$ and brings sensitivity subsampling into the regime that was previously only known to be possible using Lewis weights (Cohen &amp; Peng, 2015). As an application of our main result, we also obtain an $\tilde O(\varepsilon^{-2}\mu d)$ sensitivity sampling bound for logistic regression, where $\mu$ is a natural complexity measure for this problem. This improves over the previous $\tilde O(\varepsilon^{-2}\mu^2 d)$ bound of Mai et al. (2021) which was based on Lewis weights subsampling.},
+  eprint={2406.00328},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS},
+}
+
+@article{berk2021fairness,
+  title={Fairness in criminal justice risk assessments: The state of the art},
+  author={Berk, Richard and Heidari, Hoda and Jabbari, Shahin and Kearns, Michael and Roth, Aaron},
+  journal={Sociological Methods \& Research},
+  volume={50},
+  number={1},
+  pages={3--44},
+  year={2021},
+  publisher={Sage Publications Sage CA: Los Angeles, CA}
+}
+
+@inproceedings{selbst2019fairness,
+  title={Fairness and abstraction in sociotechnical systems},
+  author={Selbst, Andrew D and Boyd, Danah and Friedler, Sorelle A and Venkatasubramanian, Suresh and Vertesi, Janet},
+  booktitle={Proceedings of the conference on fairness, accountability, and transparency},
+  pages={59--68},
+  year={2019}
+}
+
+@book{conn2000trust,
+  title={Trust region methods},
+  author={Conn, Andrew R and Gould, Nicholas IM and Toint, Philippe L},
+  year={2000},
+  publisher={SIAM}
+}
+
+@inproceedings{veale2018fairness,
+  title={Fairness and accountability design needs for algorithmic support in high-stakes public sector decision-making},
+  author={Veale, Michael and Van Kleek, Max and Binns, Reuben},
+  booktitle={Proceedings of the 2018 chi conference on human factors in computing systems},
+  pages={1--14},
+  year={2018}
+}
+
+@article{data2014seizing,
+  title={Seizing Opportunities, Preserving Values},
+  author={Data, Big},
+  journal={The White House Report Washington},
+  year={2014}
+}
+
+
+@article{kleinberg2016inherent,
+  title={Inherent trade-offs in the fair determination of risk scores},
+  author={Kleinberg, Jon and Mullainathan, Sendhil and Raghavan, Manish},
+  journal={arXiv preprint arXiv:1609.05807},
+  year={2016}
+}
+
+@misc{chouldechova2016fair,
+  title={Fair prediction with disparate impact: A study of bias in recidivism prediction instruments. Big Data, 5 (2), 153-163},
+  author={Chouldechova, Alexandra},
+  year={2016}
+}
+
+@inproceedings{agarwal2019fair,
+  title={Fair regression: Quantitative definitions and reduction-based algorithms},
+  author={Agarwal, Alekh and Dud{\'\i}k, Miroslav and Wu, Zhiwei Steven},
+  booktitle={International Conference on Machine Learning},
+  pages={120--129},
+  year={2019},
+  organization={PMLR}
+}
+
+@article{barocas2016big,
+  title={Big data's disparate impact},
+  author={Barocas, Solon and Selbst, Andrew D},
+  journal={Calif. L. Rev.},
+  volume={104},
+  pages={671},
+  year={2016},
+  publisher={HeinOnline}
+}
+
+@article{corbett2023measure,
+  title={The measure and mismeasure of fairness},
+  author={Corbett-Davies, Sam and Gaebler, Johann D and Nilforoshan, Hamed and Shroff, Ravi and Goel, Sharad},
+  journal={The Journal of Machine Learning Research},
+  volume={24},
+  number={1},
+  pages={14730--14846},
+  year={2023},
+  publisher={JMLRORG}
+}
+
+@article{cohen2024fairness,
+  title={Fairness of linear regression in decision making},
+  author={Cohen-Addad, Vincent and Gavva, Surya Teja and Karthik, CS and Mathieu, Claire and Namrata},
+  journal={International journal of data science and analytics},
+  volume={18},
+  number={3},
+  pages={337--347},
+  year={2024},
+  publisher={Springer}
+}
+
+@InProceedings{cjjs21,
+  title = 	 {Thinking Inside the Ball: Near-Optimal Minimization of the Maximal Loss},
+  author =       {Carmon, Yair and Jambulapati, Arun and Jin, Yujia and Sidford, Aaron},
+  booktitle = 	 {Proceedings of Thirty Fourth Conference on Learning Theory},
+  pages = 	 {866--882},
+  year = 	 {2021},
+  editor = 	 {Belkin, Mikhail and Kpotufe, Samory},
+  volume = 	 {134},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {15--19 Aug},
+  publisher =    {PMLR},
+  pdf = 	 {http://proceedings.mlr.press/v134/carmon21a/carmon21a.pdf},
+  url = 	 {https://proceedings.mlr.press/v134/carmon21a.html},
+  abstract = 	 {We characterize the complexity of minimizing $\max_{i\in[N]} f_i(x)$ for convex, Lipschitz functions $f_1,\ldots, f_N$. For non-smooth functions, existing methods require $O(N\epsilon^{-2})$ queries to a first-order oracle to compute an $\epsilon$-suboptimal point and $\widetilde{O}(N\epsilon^{-1})$ queries if the $f_i$ are $O(1/\epsilon)$-smooth.  We develop methods with improved complexity bounds of $\widetilde{O}(N\epsilon^{-2/3} + \epsilon^{-8/3})$ in the non-smooth case and $\widetilde{O}(N\epsilon^{-2/3} + \sqrt{N}\epsilon^{-1})$ in the $O(1/\epsilon)$-smooth case.  Our methods consist of a recently proposed ball optimization oracle acceleration algorithm (which we refine) and a careful implementation of said oracle for the softmax function.  We also prove an oracle complexity lower bound scaling as $\Omega(N\epsilon^{-2/3})$, showing that our dependence on $N$ is optimal up to polylogarithmic factors.}
+}
+
+
+@article{duchi2016statistics,
+  title={Statistics of robust optimization: A generalized empirical likelihood approach. arXiv},
+  author={Duchi, J and Glynn, P and Namkoong, Hongseok},
+  journal={Machine Learning},
+  year={2016}
+}
+
+
+@article{chen2022fair,
+  title={Fair assortment planning},
+  author={Chen, Qinyi and Golrezaei, Negin and Susan, Fransisca and Baskoro, Edy},
+  journal={arXiv preprint arXiv:2208.07341},
+  year={2022}
+}
+
+@article{yu2024efficient,
+  title={Efficient Algorithms for Empirical Group Distributional Robust Optimization and Beyond},
+  author={Yu, Dingzhi and Cai, Yunuo and Jiang, Wei and Zhang, Lijun},
+  journal={arXiv preprint arXiv:2403.03562},
+  year={2024}
+}
+
+@article{zhang2024stochastic,
+  title={Stochastic approximation approaches to group distributionally robust optimization},
+  author={Zhang, Lijun and Zhao, Peng and Zhuang, Zhen-Hua and Yang, Tianbao and Zhou, Zhi-Hua},
+  journal={Advances in Neural Information Processing Systems},
+  volume={36},
+  year={2024}
+}
+
+@inproceedings{kleinberg2018algorithmic,
+  title={Algorithmic fairness},
+  author={Kleinberg, Jon and Ludwig, Jens and Mullainathan, Sendhil and Rambachan, Ashesh},
+  booktitle={Aea papers and proceedings},
+  volume={108},
+  pages={22--27},
+  year={2018}
+}
+
+@article{soma2022optimal,
+  title={Optimal algorithms for group distributionally robust optimization and beyond},
+  author={Soma, Tasuku and Gatmiry, Khashayar and Jegelka, Stefanie},
+  journal={arXiv preprint arXiv:2212.13669},
+  year={2022}
+}
+
+@article{golrezaei2024online,
+  title={Online Combinatorial Optimization with Group Fairness Constraints},
+  author={Golrezaei, Negin and Niazadeh, Rad and Patel, Kumar Kshitij and Susan, Fransisca},
+  journal={Available at SSRN 4824251},
+  year={2024}
+}
+
+@InProceedings{aakmrz22,
+  title = 	 {Active Sampling for Min-Max Fairness},
+  author =       {Abernethy, Jacob D and Awasthi, Pranjal and Kleindessner, Matth{\"a}us and Morgenstern, Jamie and Russell, Chris and Zhang, Jie},
+  booktitle = 	 {Proceedings of the 39th International Conference on Machine Learning},
+  pages = 	 {53--65},
+  year = 	 {2022},
+  editor = 	 {Chaudhuri, Kamalika and Jegelka, Stefanie and Song, Le and Szepesvari, Csaba and Niu, Gang and Sabato, Sivan},
+  volume = 	 {162},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {07},
+  publisher =    {PMLR},
+  pdf = 	 {https://proceedings.mlr.press/v162/abernethy22a/abernethy22a.pdf},
+  url = 	 {https://proceedings.mlr.press/v162/abernethy22a.html},
+  abstract = 	 {We propose simple active sampling and reweighting strategies for optimizing min-max fairness that can be applied to any classification or regression model learned via loss minimization. The key intuition behind our approach is to use at each timestep a datapoint from the group that is worst off under the current model for updating the model. The ease of implementation and the generality of our robust formulation make it an attractive option for improving model performance on disadvantaged groups. For convex learning problems, such as linear or logistic regression, we provide a fine-grained analysis, proving the rate of convergence to a min-max fair solution.}
+}
+
+
+@MISC {var_stackexchange,
+    TITLE = {Bound the variance of the product of two random varables.},
+    AUTHOR = {Davide Giraudo},
+    HOWPUBLISHED = {Mathematics Stack Exchange},
+    URL = {https://math.stackexchange.com/q/1044864},
+    YEAR={2014},
+    MONTH={11},
+}
+
+@article{ms13,
+author = {Monteiro, Renato D. C. and Svaiter, B. F.},
+title = {An Accelerated Hybrid Proximal Extragradient Method for Convex Optimization and Its Implications to Second-Order Methods},
+journal = {SIAM Journal on Optimization},
+volume = {23},
+number = {2},
+pages = {1092-1125},
+year = {2013},
+doi = {10.1137/110833786},
+URL = { 
+        https://doi.org/10.1137/110833786
+},
+eprint = { 
+        https://doi.org/10.1137/110833786
+}
+}
+
+
+@misc{
+svwz24,
+title={On Socially Fair Regression and Low-Rank Approximation},
+author={Zhao Song and Ali Vakilian and David Woodruff and Samson Zhou},
+year={2024},
+url={https://openreview.net/forum?id=KJHUYWviZ6}
+}
+
+@misc{ob18,
+      title={Finite-sample analysis of M-estimators using self-concordance}, 
+      author={Dmitrii Ostrovskii and Francis Bach},
+      year={2020},
+      eprint={1810.06838},
+      archivePrefix={arXiv},
+      primaryClass={math.ST},
+      url={https://arxiv.org/abs/1810.06838}, 
+}
+
+@inproceedings{msbacon,
+author = {Carmon, Yair and Jambulapati, Arun and Jiang, Qijia and Jin, Yujia and Lee, Yin Tat and Sidford, Aaron and Tian, Kevin},
+title = {Acceleration with a ball optimization oracle},
+year = {2020},
+isbn = {9781713829546},
+publisher = {Curran Associates Inc.},
+address = {Red Hook, NY, USA},
+abstract = {Consider an oracle which takes a point x and returns the minimizer of a convex function undefined in an ℓ2 ball of radius r around x. It is straightforward to show that roughly r-1 log 1/ε calls to the oracle suffice to find an e-approximate minimizer of undefined in an ℓ2 unit ball. Perhaps surprisingly, this is not optimal: we design an accelerated algorithm which attains an ε-approximate minimizer with roughly r-2/3 log 1/ε oracle queries, and give a matching lower bound. Further, we implement ball optimization oracles for functions with locally stable Hessians using a variant of Newton's method and, in certain cases, stochastic first-order methods. The resulting algorithm applies to a number of problems of practical and theoretical import, improving upon previous results for logistic and ℓ∞ regression and achieving guarantees comparable to the state-of-the-art for ℓp regression.},
+booktitle = {Proceedings of the 34th International Conference on Neural Information Processing Systems},
+articleno = {1599},
+numpages = {12},
+series = {NIPS '20},
+eprint={2003.08078},
+      archivePrefix={arXiv},
+        primaryClass={math.OC}
+}
+
+@misc{mo23_arxiv,
+      title={The Change-of-Measure Method, Block Lewis Weights, and Approximating Matrix Block Norms}, 
+      author={Naren Sarayu Manoj and Max Ovsiankin},
+      year={2023},
+      eprint={2311.10013},
+      archivePrefix={arXiv},
+      primaryClass={math.FA}
+}
+
+@inbook{mo23,
+      title={The Change-of-Measure Method, Block Lewis Weights, and Approximating Matrix Block Norms}, 
+      author={Naren Sarayu Manoj and Max Ovsiankin},
+      year={2025},
+      eprint={2311.10013},
+      archivePrefix={arXiv},
+      primaryClass={math.FA},
+      booktitle = {Proceedings of the 2025 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)}
+}
+
+@inproceedings{cd21,
+  title={Query complexity of least absolute deviation regression via robust uniform convergence},
+  author={Chen, Xue and Dereziński, Michał},
+  booktitle={Conference on Learning Theory},
+  pages={1144--1179},
+  year={2021},
+  organization={PMLR},
+  eprint={2102.02322},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+
+@inproceedings{clmps16,
+  title={Geometric median in nearly linear time},
+  author={Cohen, Michael B and Lee, Yin Tat and Miller, Gary and Pachocki, Jakub and Sidford, Aaron},
+  booktitle={Proceedings of the forty-eighth annual ACM symposium on Theory of Computing},
+  pages={9--21},
+  year={2016},
+  eprint={1606.05225},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@article{acco00,
+  title={An efficient primal-dual interior-point method for minimizing a sum of Euclidean norms},
+  author={Andersen, Knud D and Christiansen, Edmund and Conn, Andrew R and Overton, Michael L},
+  journal={SIAM Journal on Scientific Computing},
+  volume={22},
+  number={1},
+  pages={243--262},
+  year={2000},
+  publisher={SIAM}
+}
+
+@article{xy97,
+  title={An efficient algorithm for minimizing a sum of Euclidean norms with applications},
+  author={Xue, Guoliang and Ye, Yinyu},
+  journal={SIAM Journal on Optimization},
+  volume={7},
+  number={4},
+  pages={1017--1036},
+  year={1997},
+  publisher={SIAM}
+}
+
+
+@article{rudelson1996,
+  title={Random vectors in the isotropic position},
+  author={Rudelson, Mark},
+  journal={Journal of Functional Analysis},
+  volume={164},
+  number={1},
+  pages={60--72},
+  year={1999},
+  publisher={Elsevier},
+  eprint={math/9608208},
+  archivePrefix={arXiv},
+  primaryClass={math.MG}
+}
+
+@book{Wainwright_2019, place={Cambridge}, series={Cambridge Series in Statistical and Probabilistic Mathematics}, title={High-Dimensional Statistics: A Non-Asymptotic Viewpoint}, publisher={Cambridge University Press}, author={Wainwright, Martin J.}, year={2019}, collection={Cambridge Series in Statistical and Probabilistic Mathematics}}
+
+@article{yy06,
+  title={Model selection and estimation in regression with grouped variables},
+  author={Yuan, Ming and Lin, Yi},
+  journal={Journal of the Royal Statistical Society Series B: Statistical Methodology},
+  volume={68},
+  number={1},
+  pages={49--67},
+  year={2006},
+  publisher={Oxford University Press}
+}
+
+@article{bach07,
+  title={Consistency of the group lasso and multiple kernel learning.},
+  author={Bach, Francis R},
+  journal={Journal of Machine Learning Research},
+  volume={9},
+  number={6},
+  year={2008},
+  eprint={0707.3390},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+
+@article{sra12,
+  title={Fast projections onto mixed-norm balls with applications},
+  author={Sra, Suvrit},
+  journal={Data Mining and Knowledge Discovery},
+  volume={25},
+  pages={358--377},
+  year={2012},
+  publisher={Springer},
+  eprint={1204.1437},
+  archivePrefix={arXiv},
+  primaryClass={stat.ML}
+}
+
+@article{sfht13,
+ ISSN = {10618600},
+ URL = {http://www.jstor.org/stable/43304828},
+ author = {Noah Simon and Jerome Friedman and Trevor Hastie and Robert Tibshirani},
+ journal = {Journal of Computational and Graphical Statistics},
+ number = {2},
+ pages = {231--245},
+ publisher = {[American Statistical Association, Taylor & Francis, Ltd., Institute of Mathematical Statistics, Interface Foundation of America]},
+ title = {A Sparse-Group Lasso},
+ volume = {22},
+ year = {2013}
+}
+
+@inproceedings{hrr22,
+  title={The vector balancing constant for zonotopes},
+  author={Bozzai, Rainie and Reis, Victor and Rothvoss, Thomas},
+  booktitle={2023 IEEE 64th Annual Symposium on Foundations of Computer Science (FOCS)},
+  pages={1292--1300},
+  year={2023},
+  organization={IEEE},
+  eprint={2210.16460},
+  archivePrefix={arXiv},
+  primaryClass={math.MG}
+}
+
+@article{mu19,
+  title={Entropy numbers of finite dimensional mixed-norm balls and function space embeddings with small mixed smoothness},
+  author={Mayer, Sebastian and Ullrich, Tino},
+  journal={Constructive Approximation},
+  volume={53},
+  pages={249--279},
+  year={2021},
+  publisher={Springer},
+  eprint={1904.04619},
+  archivePrefix={arXiv},
+  primaryClass={math.FA}
+}
+
+@article{kv15,
+  title={Volumes of unit balls of mixed sequence spaces},
+  author={Kempka, Henning and Vyb\'{i}ral, Jan},
+  journal={Mathematische Nachrichten},
+  volume={290},
+  number={8-9},
+  pages={1317--1327},
+  year={2017},
+  publisher={Wiley Online Library},
+  eprint={1505.05867},
+  archivePrefix={arXiv},
+  primaryClass={math.FA}
+}
+
+@misc{ps12,
+      title={Combinatorial Inequalities and Subspaces of L1}, 
+      author={Joscha Prochno and Carsten Schuett},
+      year={2012},
+      eprint={1204.6025},
+      archivePrefix={arXiv},
+      primaryClass={math.FA}
+}
+
+@misc{jkb22,
+      title={Limit theorems for mixed-norm sequence spaces with applications to volume distribution}, 
+      author={Michael Juhos and Zakhar Kabluchko and Joscha Prochno},
+      year={2022},
+      eprint={2209.08937},
+      archivePrefix={arXiv},
+      primaryClass={math.PR}
+}
+
+@misc{hy19,
+      title={On Function Spaces with Mixed Norms --- A Survey}, 
+      author={Long Huang and Dachun Yang},
+      year={2019},
+      eprint={1908.03291},
+      archivePrefix={arXiv},
+      primaryClass={math.CA}
+}
+
+@article{ptj87,
+ author = {Alain Pajor and Nicole Tomczak-Jaegermann},
+ journal = {Proceedings of the American Mathematical Society},
+ number = {4},
+ pages = {637--642},
+ publisher = {American Mathematical Society},
+ title = {Subspaces of Small Codimension of Finite-Dimensional Banach Spaces},
+ volume = {97},
+ year = {1986}
+}
+
+@inproceedings{clmmps14,
+  title={Uniform sampling for matrix approximation},
+  author={Cohen, Michael B and Lee, Yin Tat and Musco, Cameron and Musco, Christopher and Peng, Richard and Sidford, Aaron},
+  booktitle={Proceedings of the 2015 Conference on Innovations in Theoretical Computer Science},
+  pages={181--190},
+  year={2015},
+  eprint={1408.5099},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@misc{kla23,
+      title={Logarithmic bounds for isoperimetry and slices of convex sets}, 
+      author={Bo'az Klartag},
+      year={2023},
+      eprint={2303.14938},
+      archivePrefix={arXiv},
+      primaryClass={math.FA}
+}
+
+@article{pwz23,
+  title={Computing Approximate {$\ell_p$} Sensitivities},
+  author={Padmanabhan, Swati and Woodruff, David and Zhang, Richard},
+  journal={Advances in Neural Information Processing Systems},
+  volume={36},
+  year={2024},
+  eprint={2311.04158},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+
+@article{js01,
+author = {Johnson, William and Schechtman, Gideon},
+year = {2000},
+month = {09},
+pages = {},
+title = {Finite dimensional subspaces of {$L_p$}},
+volume = {1},
+journal = {Handbook of the Geometry of Banach Spaces}
+}
+
+@article{Lewis1978,
+author = {Lewis, D.},
+journal = {Studia Mathematica},
+keywords = {Basis; P-Absolutely Summing Operators; Extension; L2-Factorization Norm; Projection; Banach-Mazur Distance},
+language = {eng},
+number = {2},
+pages = {207-212},
+title = {Finite dimensional subspaces of {$L_{p}$}},
+url = {http://eudml.org/doc/218208},
+volume = {63},
+year = {1978},
+}
+
+@inproceedings{wy23_sens,
+  title={Sharper Bounds for {$\ell_p$} Sensitivity Sampling},
+  author={Woodruff, David and Yasuda, Taisuke},
+  booktitle={International Conference on Machine Learning},
+  pages={37238--37272},
+  year={2023},
+  organization={PMLR},
+  eprint={2306.00732},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{jlls23,
+  title={Sparsifying sums of norms},
+  author={Jambulapati, Arun and Lee, James R and Liu, Yang P and Sidford, Aaron},
+  booktitle={2023 IEEE 64th Annual Symposium on Foundations of Computer Science (FOCS)},
+  pages={1953--1962},
+  year={2023},
+  organization={IEEE},
+  eprint={2305.09049},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{ccly19,
+  title={A near-optimal algorithm for approximating the john ellipsoid},
+  author={Cohen, Michael B and Cousins, Ben and Lee, Yin Tat and Yang, Xin},
+  booktitle={Conference on Learning Theory},
+  pages={849--873},
+  year={2019},
+  organization={PMLR},
+  eprint={1905.11580},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@article{blm89,
+  title={Approximation of zonoids by zonotopes},
+  author={Bourgain, Jean and Lindenstrauss, Joram and Milman, Vitali},
+  year={1989}
+}
+
+@article{sz01,
+  title={Embedding Subspaces of {$L_p$} into {$\ell_n^p$}, {$0< p< 1$}},
+  author={Schechtman, Gideon and Zvavitch, Artem},
+  journal={Mathematische Nachrichten},
+  volume={227},
+  number={1},
+  pages={133--142},
+  year={2001},
+  publisher={Wiley Online Library}
+}
+
+@book{folland1999real,
+  title={Real Analysis: Modern Techniques and Their Applications},
+  author={Folland, G.B.},
+  isbn={9780471317166},
+  lccn={98037260},
+  series={Pure and Applied Mathematics: A Wiley Series of Texts, Monographs and Tracts},
+  year={1999},
+  publisher={Wiley}
+}
+
+@article{sgbernoulli,
+author = {Buldygin, V. and Moskvichova, K.},
+year = {2013},
+month = {08},
+pages = {33-49},
+title = {The sub-Gaussian norm of a binary random variable},
+volume = {86},
+journal = {Theory of Probability and Mathematical Statistics},
+doi = {10.1090/S0094-9000-2013-00887-4}
+}
+
+@article{vh15,
+  title={Chaining, interpolation and convexity II: The contraction principle},
+  author={van Handel, Ramon},
+  journal={The Annals of Probability},
+  volume={46},
+  number={3},
+  pages={1764--1805},
+  year={2018},
+  publisher={JSTOR},
+  eprint={1610.05199},
+  archivePrefix={arXiv},
+  primaryClass={math.PR}
+}
+
+@article{lww19,
+  title={Tight bounds for the subspace sketch problem with applications},
+  author={Li, Yi and Wang, Ruosong and Woodruff, David P},
+  journal={SIAM Journal on Computing},
+  volume={50},
+  number={4},
+  pages={1287--1335},
+  year={2021},
+  publisher={SIAM},
+  eprint={1904.05543},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{ss08,
+  title={Graph sparsification by effective resistances},
+  author={Spielman, Daniel A and Srivastava, Nikhil},
+  booktitle={Proceedings of the fortieth annual ACM symposium on Theory of computing},
+  pages={563--568},
+  year={2008},
+  eprint={0803.0929},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{fl11,
+  title={A unified framework for approximating and clustering data},
+  author={Feldman, Dan and Langberg, Michael},
+  booktitle={Proceedings of the forty-third annual ACM symposium on Theory of computing},
+  pages={569--578},
+  year={2011},
+  eprint={1106.1379},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+
+@book{lt91,
+  title={Probability in Banach Spaces: Isoperimetry and Processes},
+  author={Ledoux, M. and Talagrand, M.},
+  isbn={9783540520139},
+  lccn={lc91010765},
+  series={A Series of Modern Surveys in Mathematics Series},
+  url={https://books.google.com/books?id=cyKYDfvxRjsC},
+  year={1991},
+  publisher={Springer}
+}
+
+
+@book{rothvoss,
+  title={Asymptotic Convex Geometry},
+  author={Thomas Rothvoss},
+  url={https://sites.math.washington.edu/~rothvoss/lecturenotes/AsymptoticConvexGeometry-24-FEB-2023.pdf},
+  year={2023},
+}
+
+@book{bauschke2011convex,
+  title={Convex Analysis and Monotone Operator Theory in Hilbert Spaces},
+  author={Bauschke, H.H. and Combettes, P.L.},
+  isbn={9781441994677},
+  lccn={2011926587},
+  series={CMS Books in Mathematics},
+  url={https://books.google.com/books?id=cxL3jL7ONjQC},
+  year={2011},
+  publisher={Springer New York}
+}
+
+@book{woj91,
+  title={Banach Spaces for Analysts},
+  author={Wojtaszczyk, P.},
+  isbn={9780521566759},
+  lccn={90001476},
+  series={Cambridge Studies in Advanced Mathematics},
+  url={https://books.google.com/books?id=KASRmUgIzJYC},
+  year={1996},
+  publisher={Cambridge University Press}
+}
+
+@book{tal21,
+   title =     {Upper and Lower Bounds for Stochastic Processes: Decomposition Theorems},
+   author =    {Michel Talagrand},
+   publisher = {Springer},
+   isbn =      {9783030825942},
+   year =      {2021},
+   series =    {Ergebnisse der Mathematik und ihrer Grenzgebiete. 3. Folge / A Series of Modern Surveys in Mathematics, 60; 60},
+   edition =   {2nd ed. 2021},
+   volume =    {},
+   url =       {https://link.springer.com/book/10.1007/978-3-030-82595-9}
+}
+
+@inproceedings{cp15,
+  title={{$\ell_p$} row sampling by lewis weights},
+  author={Cohen, Michael B and Peng, Richard},
+  booktitle={Proceedings of the forty-seventh annual ACM symposium on Theory of computing},
+  pages={183--192},
+  year={2015},
+  eprint={1412.0588},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{mmwy21,
+  title={Active Linear Regression for {$\ell_p$} Norms and Beyond}, 
+  author={Musco, Cameron and Musco, Christopher and Woodruff, David P and Yasuda, Taisuke},
+  booktitle={2022 IEEE 63rd Annual Symposium on Foundations of Computer Science (FOCS)},
+  pages={744--753},
+  year={2022},
+  organization={IEEE},
+  eprint={2111.04888},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+
+
+@phdthesis{lee16,
+  author    = {Yin Tat Lee},
+  title     = {Faster Algorithms for Convex and Combinatorial Optimization},
+  year      = {2016},
+  school    = {Massachusetts Institute of Technology}
+}
+
+@inproceedings{lee22,
+  title={Spectral hypergraph sparsification via chaining},
+  author={Lee, James R},
+  booktitle={Proceedings of the 55th Annual ACM Symposium on Theory of Computing},
+  pages={207--218},
+  year={2023},
+  eprint={2209.04539},
+  archivePrefix={arXiv},
+  primaryClass={math.PR}
+}
+
+@inproceedings{kkty21a,
+  title={Spectral hypergraph sparsifiers of nearly linear size},
+  author={Kapralov, Michael and Krauthgamer, Robert and Tardos, Jakab and Yoshida, Yuichi},
+  booktitle={2021 IEEE 62nd Annual Symposium on Foundations of Computer Science (FOCS)},
+  pages={1159--1170},
+  year={2022},
+  organization={IEEE},
+  eprint={2106.02353},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@misc{sy19,
+  doi = {10.48550/arXiv.1807.04974},
+  
+  url = {https://arxiv.org/abs/1807.04974},
+  
+  author = {Soma, Tasuku and Yoshida, Yuichi},
+  
+  keywords = {Data Structures and Algorithms (cs.DS), Discrete Mathematics (cs.DM), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {Spectral Sparsification of Hypergraphs},
+  
+  publisher = {arXiv},
+  
+  year = {2018},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+
+@misc{ls19,
+      title={Solving Linear Programs with Sqrt(rank) Linear System Solves}, 
+      author={Yin Tat Lee and Aaron Sidford},
+      year={2019},
+      eprint={1910.08033},
+      archivePrefix={arXiv},
+      primaryClass={cs.DS}
+}
+
+@misc{bst19,
+  doi = {10.48550/arXiv.1905.01495},
+  
+  url = {https://arxiv.org/abs/1905.01495},
+  
+  author = {Bansal, Nikhil and Svensson, Ola and Trevisan, Luca},
+  
+  keywords = {Data Structures and Algorithms (cs.DS), Discrete Mathematics (cs.DM), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  
+  title = {New Notions and Constructions of Sparsification for Graphs and Hypergraphs},
+  
+  publisher = {arXiv},
+  
+  year = {2019},
+  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+@inproceedings{flps21,
+  title={Computing Lewis Weights to High Precision},
+  author={Fazel, Maryam and Lee, Yin Tat and Padmanabhan, Swati and Sidford, Aaron},
+  booktitle={Proceedings of the 2022 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)},
+  pages={2723--2742},
+  year={2022},
+  organization={SIAM},
+  eprint={2110.15563},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{wy22_oneshot,
+  title={Online lewis weight sampling},
+  author={Woodruff, David P and Yasuda, Taisuke},
+  booktitle={Proceedings of the 2023 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)},
+  pages={4622--4666},
+  year={2023},
+  organization={SIAM},
+  eprint={2207.08268},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@book{vershynin_2018, place={Cambridge}, series={Cambridge Series in Statistical and Probabilistic Mathematics}, title={High-Dimensional Probability: An Introduction with Applications in Data Science}, DOI={10.1017/9781108231596}, publisher={Cambridge University Press}, author={Vershynin, Roman}, year={2018}, collection={Cambridge Series in Statistical and Probabilistic Mathematics}}
+
+@inproceedings{wy22,
+  title={High-dimensional geometric streaming in polynomial space},
+  author={Woodruff, David P and Yasuda, Taisuke},
+  booktitle={2022 IEEE 63rd Annual Symposium on Foundations of Computer Science (FOCS)},
+  pages={732--743},
+  year={2022},
+  organization={IEEE},
+ eprint={2204.03790},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{jls21,
+  title={Improved iteration complexities for overconstrained p-norm regression},
+  author={Jambulapati, Arun and Liu, Yang P and Sidford, Aaron},
+  booktitle={Proceedings of the 54th Annual ACM SIGACT Symposium on Theory of Computing},
+  pages={529--542},
+  year={2022},
+  eprint={2111.01848},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@inproceedings{jls22,
+  title={Chaining, group leverage score overestimates, and fast spectral hypergraph sparsification},
+  author={Jambulapati, Arun and Liu, Yang P and Sidford, Aaron},
+  booktitle={Proceedings of the 55th Annual ACM Symposium on Theory of Computing},
+  pages={196--206},
+  year={2023},
+  eprint={2209.10539},
+  archivePrefix={arXiv},
+  primaryClass={cs.DS}
+}
+
+@article{nie2010efficient,
+  title={Efficient and robust feature selection via joint {$\ell_{2, 1}$}-norms minimization},
+  author={Nie, Feiping and Huang, Heng and Cai, Xiao and Ding, Chris},
+  journal={Advances in neural information processing systems},
+  volume={23},
+  year={2010}
+}
+
+@article{chen2018tight,
+  title={Tight bounds for collaborative pac learning via multiplicative weights},
+  author={Chen, Jiecao and Zhang, Qin and Zhou, Yuan},
+  journal={Advances in neural information processing systems},
+  volume={31},
+  year={2018}
+}
+
+@article{nguyen2018improved,
+  title={Improved algorithms for collaborative PAC learning},
+  author={Nguyen, Huy and Zakynthinou, Lydia},
+  journal={Advances in Neural Information Processing Systems},
+  volume={31},
+  year={2018}
+}
+
+@inproceedings{zhang2024optimal,
+  title={Optimal multi-distribution learning},
+  author={Zhang, Zihan and Zhan, Wenhao and Chen, Yuxin and Du, Simon S and Lee, Jason D},
+  booktitle={The Thirty Seventh Annual Conference on Learning Theory},
+  pages={5220--5223},
+  year={2024},
+  organization={PMLR}
+}
+
+@article{haghtalab2022demand,
+  title={On-demand sampling: Learning optimally from multiple distributions},
+  author={Haghtalab, Nika and Jordan, Michael and Zhao, Eric},
+  journal={Advances in Neural Information Processing Systems},
+  volume={35},
+  pages={406--419},
+  year={2022}
+}
+
+@inproceedings{mohri2019agnostic,
+  title={Agnostic federated learning},
+  author={Mohri, Mehryar and Sivek, Gary and Suresh, Ananda Theertha},
+  booktitle={International conference on machine learning},
+  pages={4615--4625},
+  year={2019},
+  organization={PMLR}
+}
+
+@article{hanneke2019value,
+  title={On the value of target data in transfer learning},
+  author={Hanneke, Steve and Kpotufe, Samory},
+  journal={Advances in Neural Information Processing Systems},
+  volume={32},
+  year={2019}
+}
+
+@article{bullins2021stochastic,
+  title={A stochastic newton algorithm for distributed convex optimization},
+  author={Bullins, Brian and Patel, Kshitij and Shamir, Ohad and Srebro, Nathan and Woodworth, Blake E},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  pages={26818--26830},
+  year={2021}
+}
+
+@article{mcmahan2016s,
+  title={S. Hampsonet al.,“Communication-efficient learning of deep networks from decentralizeddata,”},
+  author={McMahan, HB and Moore, E and Ramage, D},
+  journal={arXiv preprint arXiv:1602.05629},
+  year={2016}
+}
+
+@inproceedings{woodworth2020local,
+  title={Is local SGD better than minibatch SGD?},
+  author={Woodworth, Blake and Patel, Kumar Kshitij and Stich, Sebastian and Dai, Zhen and Bullins, Brian and Mcmahan, Brendan and Shamir, Ohad and Srebro, Nathan},
+  booktitle={International Conference on Machine Learning},
+  pages={10334--10343},
+  year={2020},
+  organization={PMLR}
+}
+
+@article{patel2024limits,
+  title={The limits and potentials of local sgd for distributed heterogeneous learning with intermittent communication},
+  author={Patel, Kumar Kshitij and Glasgow, Margalit and Zindari, Ali and Wang, Lingxiao and Stich, Sebastian U and Cheng, Ziheng and Joshi, Nirmit and Srebro, Nathan},
+  journal={arXiv preprint arXiv:2405.11667},
+  year={2024}
+}
+
+@article{valiant1984theory,
+  title={A theory of the learnable},
+  author={Valiant, Leslie G},
+  journal={Communications of the ACM},
+  volume={27},
+  number={11},
+  pages={1134--1142},
+  year={1984},
+  publisher={ACM New York, NY, USA}
+}
+
+@book{vapnik2013nature,
+  title={The nature of statistical learning theory},
+  author={Vapnik, Vladimir},
+  year={2013},
+  publisher={Springer science \& business media}
+}
+
+@inproceedings{niazadeh2021online,
+  title={Online learning via offline greedy algorithms: Applications in market design and optimization},
+  author={Niazadeh, Rad and Golrezaei, Negin and Wang, Joshua R and Susan, Fransisca and Badanidiyuru, Ashwinkumar},
+  booktitle={Proceedings of the 22nd ACM Conference on Economics and Computation},
+  pages={737--738},
+  year={2021}
+}
+
+@article{chen2023interpolating,
+  title={Interpolating item and user fairness in recommendation systems},
+  author={Chen, Qinyi and Liang, Jason Cheuk Nam and Golrezaei, Negin and Bouneffouf, Djallel},
+  journal={arXiv preprint arXiv:2306.10050},
+  year={2023}
+}
+
+@article{nemhauser1978analysis,
+  title={An analysis of approximations for maximizing submodular set functions—I},
+  author={Nemhauser, George L and Wolsey, Laurence A and Fisher, Marshall L},
+  journal={Mathematical programming},
+  volume={14},
+  number={1},
+  pages={265--294},
+  year={1978},
+  publisher={Springer}
+}
+
+@article{bertsimas2011price,
+  title={The price of fairness},
+  author={Bertsimas, Dimitris and Farias, Vivek F and Trichakis, Nikolaos},
+  journal={Operations research},
+  volume={59},
+  number={1},
+  pages={17--31},
+  year={2011},
+  publisher={INFORMS}
+}
+@article{hitsch2010makes,
+  title={What makes you click?—Mate preferences in online dating},
+  author={Hitsch, Gunter J and Hortacsu, Ali and Ariely, Dan},
+  journal={Quantitative marketing and Economics},
+  volume={8},
+  pages={393--427},
+  year={2010},
+  publisher={Springer}
+}
+
+@article{asadpour2022sequential,
+  title={Sequential Submodular Maximization and Applications to Ranking an Assortment of Products},
+  author={Asadpour, Arash and Niazadeh, Rad and Saberi, Amin and Shameli, Ali},
+  journal={Operations Research},
+  year={2022},
+  publisher={INFORMS}
+}
+
+@article{goyal2016near,
+  title={Near-optimal algorithms for the assortment planning problem under dynamic substitution and stochastic demand},
+  author={Goyal, Vineet and Levi, Retsef and Segev, Danny},
+  journal={Operations Research},
+  volume={64},
+  number={1},
+  pages={219--235},
+  year={2016},
+  publisher={INFORMS}
+}
+
+@article{torrico2021structured,
+  title={Structured robust submodular maximization: offline and online algorithms},
+  author={Torrico, Alfredo and Singh, Mohit and Pokutta, Sebastian and Haghtalab, Nika and Naor, Joseph and Anari, Nima},
+  journal={INFORMS Journal on Computing},
+  volume={33},
+  number={4},
+  pages={1590--1607},
+  year={2021},
+  publisher={INFORMS}
+}
+
+@article{chouldechova2018frontiers,
+  title={The frontiers of fairness in machine learning},
+  author={Chouldechova, Alexandra and Roth, Aaron},
+  journal={arXiv preprint arXiv:1810.08810},
+  year={2018}
+}
+
+
+@article{hazan2012projection,
+  title={Projection-free online learning},
+  author={Hazan, Elad and Kale, Satyen},
+  journal={arXiv preprint arXiv:1206.4657},
+  year={2012}
+}
+
+@article{hazan2016introduction,
+  title={Introduction to online convex optimization},
+  author={Hazan, Elad and others},
+  journal={Foundations and Trends{\textregistered} in Optimization},
+  volume={2},
+  number={3-4},
+  pages={157--325},
+  year={2016},
+  publisher={Now Publishers, Inc.}
+}
+
+@article{dayan2021federated,
+  title={Federated learning for predicting clinical outcomes in patients with COVID-19},
+  author={Dayan, Ittai and Roth, Holger R and Zhong, Aoxiao and Harouni, Ahmed and Gentili, Amilcare and Abidin, Anas Z and Liu, Andrew and Costa, Anthony Beardsworth and Wood, Bradford J and Tsai, Chien-Sung and others},
+  journal={Nature medicine},
+  volume={27},
+  number={10},
+  pages={1735--1743},
+  year={2021},
+  publisher={Nature Publishing Group US New York}
+}
+
+@article{ben2013robust,
+  title={Robust solutions of optimization problems affected by uncertain probabilities},
+  author={Ben-Tal, Aharon and Den Hertog, Dick and De Waegenaere, Anja and Melenberg, Bertrand and Rennen, Gijs},
+  journal={Management Science},
+  volume={59},
+  number={2},
+  pages={341--357},
+  year={2013},
+  publisher={INFORMS}
+}
+
+
+@inproceedings{roth2020federated,
+  title={Federated learning for breast density classification: A real-world implementation},
+  author={Roth, Holger R and Chang, Ken and Singh, Praveer and Neumark, Nir and Li, Wenqi and Gupta, Vikash and Gupta, Sharut and Qu, Liangqiong and Ihsani, Alvin and Bizzo, Bernardo C and others},
+  booktitle={Domain Adaptation and Representation Transfer, and Distributed and Collaborative Learning: Second MICCAI Workshop, DART 2020, and First MICCAI Workshop, DCL 2020, Held in Conjunction with MICCAI 2020, Lima, Peru, October 4--8, 2020, Proceedings 2},
+  pages={181--191},
+  year={2020},
+  organization={Springer}
+}
+
+@article{blum2017collaborative,
+  title={Collaborative PAC learning},
+  author={Blum, Avrim and Haghtalab, Nika and Procaccia, Ariel D and Qiao, Mingda},
+  journal={Advances in Neural Information Processing Systems},
+  volume={30},
+  year={2017}
+}
+
+@article{levy2020large,
+  title={Large-scale methods for distributionally robust optimization},
+  author={Levy, Daniel and Carmon, Yair and Duchi, John C and Sidford, Aaron},
+  journal={Advances in Neural Information Processing Systems},
+  volume={33},
+  pages={8847--8860},
+  year={2020}
+}
+
+@article{kairouz2019advances,
+  title={Advances and open problems in federated learning. CoRR},
+  author={Kairouz, Peter and McMahan, H Brendan and Avent, Brendan and Bellet, Aur{\'e}lien and Bennis, Mehdi and Bhagoji, Arjun Nitin and Bonawitz, Keith and Charles, Zachary and Cormode, Graham and Cummings, Rachel and others},
+  journal={arXiv preprint arXiv:1912.04977},
+  year={2019}
+}
+
+@article{bergen2012genome,
+  title={Genome-wide association studies of schizophrenia: does bigger lead to better results?},
+  author={Bergen, Sarah E and Petryshen, Tracey L},
+  journal={Current opinion in psychiatry},
+  volume={25},
+  number={2},
+  pages={76--82},
+  year={2012},
+  publisher={LWW}
+}
+
+@article{carmon2022distributionally,
+  title={Distributionally robust optimization via ball oracle acceleration},
+  author={Carmon, Yair and Hausler, Danielle},
+  journal={arXiv preprint arXiv:2203.13225},
+  year={2022}
+}
+
+@misc{mcmahan_ramage_2017, 
+	title={Federated Learning: Collaborative Machine Learning without Centralized Training Data}, 
+	url={https://ai.googleblog.com/2017/04/federated-learning-collaborative.html}, 
+	journal={Google AI Blog}, 
+	author={McMahan, Brendan and Ramage, Daniel}, 
+	year={2017}, 
+	month={Apr}
+}
+
+@article{krause2008robust,
+  title={Robust Submodular Observation Selection.},
+  author={Krause, Andreas and McMahan, H Brendan and Guestrin, Carlos and Gupta, Anupam},
+  journal={Journal of Machine Learning Research},
+  volume={9},
+  number={12},
+  year={2008}
+}
+
+@article{sagawa2019distributionally,
+  title={Distributionally robust neural networks for group shifts: On the importance of regularization for worst-case generalization},
+  author={Sagawa, Shiori and Koh, Pang Wei and Hashimoto, Tatsunori B and Liang, Percy},
+  journal={arXiv preprint arXiv:1911.08731},
+  year={2019}
+}
+
+
+@inproceedings{anari2019structured,
+  title={Structured robust submodular maximization: Offline and online algorithms},
+  author={Anari, Nima and Haghtalab, Nika and Naor, Seffi and Pokutta, Sebastian and Singh, Mohit and Torrico, Alfredo},
+  booktitle={The 22nd International Conference on Artificial Intelligence and Statistics},
+  pages={3128--3137},
+  year={2019},
+  organization={PMLR}
+}
+
+@article{deng2022fairness,
+  title={Fairness in the Autobidding World with Machine-learned Advice},
+  author={Deng, Yuan and Golrezaei, Negin and Jaillet, Patrick and Liang, Jason Cheuk Nam and Mirrokni, Vahab},
+  journal={arXiv preprint arXiv:2209.04748},
+  year={2022}
+}
+
+@incollection{lovasz1983submodular,
+  title={Submodular functions and convexity},
+  author={Lov{\'a}sz, L{\'a}szl{\'o}},
+  booktitle={Mathematical programming the state of the art},
+  pages={235--257},
+  year={1983},
+  publisher={Springer}
+}
+
+
+@article{quanrud2015online,
+  title={Online learning with adversarial delays},
+  author={Quanrud, Kent and Khashabi, Daniel},
+  journal={Advances in neural information processing systems},
+  volume={28},
+  year={2015}
+}
+
+
+@inproceedings{kakade2007playing,
+  title={Playing games with approximation algorithms},
+  author={Kakade, Sham M and Kalai, Adam Tauman and Ligett, Katrina},
+  booktitle={Proceedings of the thirty-ninth annual ACM symposium on Theory of computing},
+  pages={546--555},
+  year={2007}
+}
+
+@article{dudik2020oracle,
+  title={Oracle-efficient online learning and auction design},
+  author={Dudik, Miroslav and Haghtalab, Nika and Luo, Haipeng and Schapire, Robert E and Syrgkanis, Vasilis and Vaughan, Jennifer Wortman},
+  journal={Journal of the ACM (JACM)},
+  volume={67},
+  number={5},
+  pages={1--57},
+  year={2020},
+  publisher={ACM New York, NY, USA}
+}
+
+@book{boyd2004convex,
+  title={Convex optimization},
+  author={Boyd, Stephen P and Vandenberghe, Lieven},
+  year={2004},
+  publisher={Cambridge university press}
+}
+
+@inproceedings{zinkevich2003online,
+  title={Online convex programming and generalized infinitesimal gradient ascent},
+  author={Zinkevich, Martin},
+  booktitle={Proceedings of the 20th international conference on machine learning (icml-03)},
+  pages={928--936},
+  year={2003}
+}
+
+@article{kalai2005efficient,
+  title={Efficient algorithms for online decision problems},
+  author={Kalai, Adam and Vempala, Santosh},
+  journal={Journal of Computer and System Sciences},
+  volume={71},
+  number={3},
+  pages={291--307},
+  year={2005},
+  publisher={Elsevier}
+}
+
+@misc{dekel_2012,
+  author = {Ofer Dekel},
+  title = {Combinatorial Optimization},
+  howpublished = {Online},
+  year = {2012},
+  note = {[Online; accessed 2024-01-17]},
+  url = {https://courses.cs.washington.edu/courses/cse599s/12sp/scribes/lecture16.pdf}
+}
+
+
+@incollection{nash1996non,
+  title={Non-cooperative games},
+  author={Nash Jr, John},
+  booktitle={Essays on Game Theory},
+  pages={22--33},
+  year={1996},
+  publisher={Edward Elgar Publishing}
+}
+
+@article{fan1953minimax,
+  title={Minimax theorems},
+  author={Fan, Ky},
+  journal={Proceedings of the National Academy of Sciences},
+  volume={39},
+  number={1},
+  pages={42--47},
+  year={1953},
+  publisher={National Acad Sciences}
+}
+
+@article{shalev2012online,
+  title={Online learning and online convex optimization},
+  author={Shalev-Shwartz, Shai and others},
+  journal={Foundations and Trends{\textregistered} in Machine Learning},
+  volume={4},
+  number={2},
+  pages={107--194},
+  year={2012},
+  publisher={Now Publishers, Inc.}
+}
+
+@misc{gdpr,
+	title = {Regulation ({EU}) 2016/679 of the {European} {Parliament} and of the {Council} of 27 {April} 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data, and repealing {Directive} 95/46/{EC} ({General} {Data} {Protection} {Regulation}) ({Text} with {EEA} relevance)},
+	shorttitle = {{GDPR}},
+	url = {http://data.europa.eu/eli/reg/2016/679/2016-05-04/eng},
+	language = {en},
+	urldate = {2023-04-18},
+	author = {{European Parliament} and {Council of the European Union}},
+	month = may,
+	year = {2016},
+	note = {Legislative Body: OP\_DATPRO},
+	pages = {1--88},
+	file = {EUR-Lex HTML (EN):/Users/fransiscasusan/Zotero/storage/XQ6MCG2B/HTML.html:text/html;EUR-Lex PDF (EN):/Users/fransiscasusan/Zotero/storage/7U72K868/2016 - Regulation (EU) 2016679 of the European Parliamen.pdf:application/pdf},
+}
+
+@misc{ftcact,
+	title = {Federal {Trade} {Commission} {Act} {Section} 5: {Unfair} or {Deceptive} {Acts} or {Practices}},
+	shorttitle = {{FTC} {Act}},
+	url = {https://www.federalreserve.gov/boarddocs/supmanual/cch/200806/ftca.pdf},
+	language = {(en)},
+	author = {{U.S. Federal Trade Commission} and {U.S. Department of Justice}},
+        year = {1994}
+}
+
+@misc{cpra,
+	title = {The {California} {Privacy} {Rights} {Act} of 2020},
+	shorttitle = {{CPRA}},
+	url = {https://oag.ca.gov/system/files/initiatives/pdfs/19-0021A1\%20\%28Consumer\%20Privacy\%20-\%20Version\%203\%29_1.pdf},
+	author = {{Cal. Legis. Serv.}},
+        year = {2020}
+}
+
+
+@book{luce2012individual,
+  title={Individual choice behavior: A theoretical analysis},
+  author={Luce, R Duncan},
+  year={2012},
+  publisher={Courier Corporation}
+}
+
+@article{rahmattalabi2019exploring,
+  title={Exploring algorithmic fairness in robust graph covering problems},
+  author={Rahmattalabi, Aida and Vayanos, Phebe and Fulginiti, Anthony and Rice, Eric and Wilder, Bryan and Yadav, Amulya and Tambe, Milind},
+  journal={Advances in neural information processing systems},
+  volume={32},
+  year={2019}
+}
+
+@article{mcfadden1973conditional,
+  title={Conditional logit analysis of qualitative choice behavior},
+  author={McFadden, Daniel and others},
+  year={1973},
+  publisher={Institute of Urban and Regional Development, University of California~…}
+}
+
+@article{plackett1975analysis,
+  title={The analysis of permutations},
+  author={Plackett, Robin L},
+  journal={Journal of the Royal Statistical Society Series C: Applied Statistics},
+  volume={24},
+  number={2},
+  pages={193--202},
+  year={1975},
+  publisher={Oxford University Press}
+}
+
+@misc{eudsa2022,
+	title = {Regulation ({EU}) 2022/2065 of the {European} {Parliament} and of the {Council} of 19{October} 2022 on a {Single} {Market} {For} {Digital} {Services} and amending {Directive}2000/31/{EC} ({Digital} {Services} {Act}) ({Text} with {EEA} relevance)},
+	url = {http://data.europa.eu/eli/reg/2022/2065/oj/eng},
+	language = {en},
+	urldate = {2023-04-18},
+	author = {{European Parliament} and {Council of the European Union}},
+	month = oct,
+	year = {2022},
+	note = {Legislative Body: EP, CONSIL},
+	file = {EUR-Lex HTML (EN):/Users/fransiscasusan/Zotero/storage/QSRKW4BR/HTML.html:text/html;EUR-Lex PDF (EN):/Users/fransiscasusan/Zotero/storage/JDXRC3RE/2022 - Regulation (EU) 20222065 of the European Parliame.pdf:application/pdf},
+}
+
+@article{tang2023beyond,
+  title={Beyond submodularity: a unified framework of randomized set selection with group fairness constraints},
+  author={Tang, Shaojie and Yuan, Jing},
+  journal={Journal of Combinatorial Optimization},
+  volume={45},
+  number={4},
+  pages={102},
+  year={2023},
+  publisher={Springer}
+}
+
+@article{shalev2007primal,
+  title={A primal-dual perspective of online learning algorithms},
+  author={Shalev-Shwartz, Shai and Singer, Yoram},
+  journal={Machine Learning},
+  volume={69},
+  pages={115--142},
+  year={2007},
+  publisher={Springer}
+}
+
+@article{kok2015assortment,
+  title={Assortment planning: Review of literature and industry practice},
+  author={K{\"o}k, A G{\"u}rhan and Fisher, Marshall L and Vaidyanathan, Ramnath},
+  journal={Retail supply chain management: Quantitative models and empirical studies},
+  pages={175--236},
+  year={2015},
+  publisher={Springer}
+}
+
+@inproceedings{chierichetti2019matroids,
+  title={Matroids, matchings, and fairness},
+  author={Chierichetti, Flavio and Kumar, Ravi and Lattanzi, Silvio and Vassilvtiskii, Sergei},
+  booktitle={The 22nd International Conference on Artificial Intelligence and Statistics},
+  pages={2212--2220},
+  year={2019},
+  organization={PMLR}
+}
+
+@article{celis2017multiwinner,
+  title={Multiwinner voting with fairness constraints},
+  author={Celis, L Elisa and Huang, Lingxiao and Vishnoi, Nisheeth K},
+  journal={arXiv preprint arXiv:1710.10057},
+  year={2017}
+}
+
+@article{tsang2019group,
+  title={Group-fairness in influence maximization},
+  author={Tsang, Alan and Wilder, Bryan and Rice, Eric and Tambe, Milind and Zick, Yair},
+  journal={arXiv preprint arXiv:1903.00967},
+  year={2019}
+}
+
+@inproceedings{dwork2012fairness,
+  title={Fairness through awareness},
+  author={Dwork, Cynthia and Hardt, Moritz and Pitassi, Toniann and Reingold, Omer and Zemel, Richard},
+  booktitle={Proceedings of the 3rd innovations in theoretical computer science conference},
+  pages={214--226},
+  year={2012}
+}
+
+@article{loi2019philosophical,
+  title={A Philosophical Theory of Fairness for Prediction-Based Decisions.},
+  author={Loi, Michele and Herlitz, Anders and Heidari, Hoda},
+  journal={Available at SSRN 3450300},
+  year={2019}
+}
+
+@article{hardt2016equality,
+  title={Equality of opportunity in supervised learning},
+  author={Hardt, Moritz and Price, Eric and Srebro, Nati},
+  journal={Advances in neural information processing systems},
+  volume={29},
+  year={2016}
+}
+
+@article{zliobaite2015relation,
+  title={On the relation between accuracy and fairness in binary classification},
+  author={Zliobaite, Indre},
+  journal={arXiv preprint arXiv:1505.05723},
+  year={2015}
+}
+
+@inproceedings{kearns2018preventing,
+  title={Preventing fairness gerrymandering: Auditing and learning for subgroup fairness},
+  author={Kearns, Michael and Neel, Seth and Roth, Aaron and Wu, Zhiwei Steven},
+  booktitle={International conference on machine learning},
+  pages={2564--2572},
+  year={2018},
+  organization={PMLR}
+}
+
+@inproceedings{kearns2019empirical,
+  title={An empirical study of rich subgroup fairness for machine learning},
+  author={Kearns, Michael and Neel, Seth and Roth, Aaron and Wu, Zhiwei Steven},
+  booktitle={Proceedings of the conference on fairness, accountability, and transparency},
+  pages={100--109},
+  year={2019}
+}
+
+@inproceedings{singh2018fairness,
+  title={Fairness of exposure in rankings},
+  author={Singh, Ashudeep and Joachims, Thorsten},
+  booktitle={Proceedings of the 24th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining},
+  pages={2219--2228},
+  year={2018}
+}
+
+@article{singh2019policy,
+  title={Policy learning for fairness in ranking},
+  author={Singh, Ashudeep and Joachims, Thorsten},
+  journal={Advances in neural information processing systems},
+  volume={32},
+  year={2019}
+}
+
+@inproceedings{biega2018equity,
+  title={Equity of attention: Amortizing individual fairness in rankings},
+  author={Biega, Asia J and Gummadi, Krishna P and Weikum, Gerhard},
+  booktitle={The 41st international acm sigir conference on research \& development in information retrieval},
+  pages={405--414},
+  year={2018}
+}
+
+
+
+@inproceedings{celis2017ranking,
+  title={Ranking with Fairness Constraints},
+  author={Celis, L Elisa and Straszak, Damian and Vishnoi, Nisheeth K},
+  booktitle={45th International Colloquium on Automata, Languages, and Programming (ICALP 2018)},
+  year={2018},
+  organization={Schloss Dagstuhl-Leibniz-Zentrum fuer Informatik}
+}
+
+@article{bertsimas2012efficiency,
+  title={On the efficiency-fairness trade-off},
+  author={Bertsimas, Dimitris and Farias, Vivek F and Trichakis, Nikolaos},
+  journal={Management Science},
+  volume={58},
+  number={12},
+  pages={2234--2250},
+  year={2012},
+  publisher={INFORMS}
+}
+
+@inproceedings{manshadi2021fair,
+  title={Fair dynamic rationing},
+  author={Manshadi, Vahideh and Niazadeh, Rad and Rodilitz, Scott},
+  booktitle={Proceedings of the 22nd ACM Conference on Economics and Computation},
+  pages={694--695},
+  year={2021}
+}
+
+@article{liu2022combinatorial,
+  title={Combinatorial Bandits with Linear Constraints: Beyond Knapsacks and Fairness},
+  author={Liu, Qingsong and Xu, Weihang and Wang, Siwei and Fang, Zhixuan},
+  journal={Advances in Neural Information Processing Systems},
+  volume={35},
+  pages={2997--3010},
+  year={2022}
+}
+
+@article{joseph2016fairness,
+  title={Fairness in learning: Classic and contextual bandits},
+  author={Joseph, Matthew and Kearns, Michael and Morgenstern, Jamie H and Roth, Aaron},
+  journal={Advances in neural information processing systems},
+  volume={29},
+  year={2016}
+}
+
+@inproceedings{garcia2021maxmin,
+  title={Maxmin-fair ranking: individual fairness under group-fairness constraints},
+  author={Garcia-Soriano, David and Bonchi, Francesco},
+  booktitle={Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery \& Data Mining},
+  pages={436--446},
+  year={2021}
+}
+
+@inproceedings{balseiro2021regularized,
+  title={Regularized online allocation problems: Fairness and beyond},
+  author={Balseiro, Santiago and Lu, Haihao and Mirrokni, Vahab},
+  booktitle={International Conference on Machine Learning},
+  pages={630--639},
+  year={2021},
+  organization={PMLR}
+}
+
+@article{harper2015movielens,
+  title={The movielens datasets: History and context},
+  author={Harper, F Maxwell and Konstan, Joseph A},
+  journal={Acm transactions on interactive intelligent systems (tiis)},
+  volume={5},
+  number={4},
+  pages={1--19},
+  year={2015},
+  publisher={Acm New York, NY, USA}
+}
+
+@article{besbes2014stochastic,
+  title={Stochastic multi-armed-bandit problem with non-stationary rewards},
+  author={Besbes, Omar and Gur, Yonatan and Zeevi, Assaf},
+  journal={Advances in neural information processing systems},
+  volume={27},
+  year={2014}
+}
+
+@article{jafarnia2021online,
+  title={Online learning for stochastic shortest path model via posterior sampling},
+  author={Jafarnia-Jahromi, Mehdi and Chen, Liyu and Jain, Rahul and Luo, Haipeng},
+  journal={arXiv preprint arXiv:2106.05335},
+  year={2021}
+}
+
+@article{ribeiro2002reinforcement,
+  title={Reinforcement learning agents},
+  author={Ribeiro, CHCR},
+  journal={Artificial intelligence review},
+  volume={17},
+  pages={223--250},
+  year={2002},
+  publisher={Springer}
+}
+
+@inproceedings{chen2018online,
+  title={Online continuous submodular maximization},
+  author={Chen, Lin and Hassani, Hamed and Karbasi, Amin},
+  booktitle={International Conference on Artificial Intelligence and Statistics},
+  pages={1896--1905},
+  year={2018},
+  organization={PMLR}
+}
+
+@inproceedings{thắng2021online,
+  title={Online non-monotone DR-submodular maximization},
+  author={Thắng, Nguyễn Kim and Srivastav, Abhinav},
+  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume={35},
+  number={11},
+  pages={9868--9876},
+  year={2021}
+}
+
+@article{streeter2008online,
+  title={An online algorithm for maximizing submodular functions},
+  author={Streeter, Matthew and Golovin, Daniel},
+  journal={Advances in Neural Information Processing Systems},
+  volume={21},
+  year={2008}
+}
+
+@inproceedings{kempe2003maximizing,
+  title={Maximizing the spread of influence through a social network},
+  author={Kempe, David and Kleinberg, Jon and Tardos, {\'E}va},
+  booktitle={Proceedings of the ninth ACM SIGKDD international conference on Knowledge discovery and data mining},
+  pages={137--146},
+  year={2003}
+}
+
+@book{miettinen1999nonlinear,
+  title={Nonlinear multiobjective optimization},
+  author={Miettinen, Kaisa},
+  volume={12},
+  year={1999},
+  publisher={Springer Science \& Business Media}
+}
+
+@inproceedings{dobzinski2006improved,
+  title={An improved approximation algorithm for combinatorial auctions with submodular bidders},
+  author={Dobzinski, Shahar and Schapira, Michael},
+  booktitle={Proceedings of the seventeenth annual ACM-SIAM symposium on Discrete algorithm},
+  pages={1064--1073},
+  year={2006}
+}
+
+@article{hooker2012combining,
+  title={Combining equity and utilitarianism in a mathematical programming model},
+  author={Hooker, John N and Williams, H Paul},
+  journal={Management Science},
+  volume={58},
+  number={9},
+  pages={1682--1693},
+  year={2012},
+  publisher={INFORMS}
+}
+
+@article{mulvany2021fair,
+  title={Fair scheduling of heterogeneous customer populations},
+  author={Mulvany, Justin and Randhawa, Ramandeep S},
+  journal={Available at SSRN 3803016},
+  year={2021}
+}
+
+@article{baek2021fair,
+  title={Fair exploration via axiomatic bargaining},
+  author={Baek, Jackie and Farias, Vivek},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  pages={22034--22045},
+  year={2021}
+}
+
+@article{freund2023group,
+  title={Group fairness in dynamic refugee assignment},
+  author={Freund, Daniel and Lykouris, Thodoris and Paulson, Elisabeth and Sturt, Bradley and Weng, Wentao},
+  journal={arXiv preprint arXiv:2301.10642},
+  year={2023}
+}
+
+
+@article{wang2023survey,
+  title={A survey on the fairness of recommender systems},
+  author={Wang, Yifan and Ma, Weizhi and Zhang, Min and Liu, Yiqun and Ma, Shaoping},
+  journal={ACM Transactions on Information Systems},
+  volume={41},
+  number={3},
+  pages={1--43},
+  year={2023},
+  publisher={ACM New York, NY}
+}
+
+
+@article{kusner2017counterfactual,
+  title={Counterfactual fairness},
+  author={Kusner, Matt J and Loftus, Joshua and Russell, Chris and Silva, Ricardo},
+  journal={Advances in neural information processing systems},
+  volume={30},
+  year={2017}
+}
+
+@inproceedings{ustun2019fairness,
+  title={Fairness without harm: Decoupled classifiers with preference guarantees},
+  author={Ustun, Berk and Liu, Yang and Parkes, David},
+  booktitle={International Conference on Machine Learning},
+  pages={6373--6382},
+  year={2019},
+  organization={PMLR}
+}
+
+@inproceedings{donahue2020fairness,
+  title={Fairness and utilization in allocating resources with uncertain demand},
+  author={Donahue, Kate and Kleinberg, Jon},
+  booktitle={Proceedings of the 2020 conference on fairness, accountability, and transparency},
+  pages={658--668},
+  year={2020}
+}
+
+@book{ehrgott2005multicriteria,
+  title={Multicriteria optimization},
+  author={Ehrgott, Matthias},
+  volume={491},
+  year={2005},
+  publisher={Springer Science \& Business Media}
+}
+
+
+@inproceedings{goel2018non,
+  title={Non-discriminatory machine learning through convex fairness criteria},
+  author={Goel, Naman and Yaghini, Mohammad and Faltings, Boi},
+  booktitle={Proceedings of the 2018 AAAI/ACM Conference on AI, Ethics, and Society},
+  pages={116--116},
+  year={2018}
+}
+
+@article{deldjoo2024fairness,
+  title={Fairness in recommender systems: research landscape and future directions},
+  author={Deldjoo, Yashar and Jannach, Dietmar and Bellogin, Alejandro and Difonzo, Alessandro and Zanzonelli, Dario},
+  journal={User Modeling and User-Adapted Interaction},
+  volume={34},
+  number={1},
+  pages={59--108},
+  year={2024},
+  publisher={Springer}
+}
+
+
+@incollection{aminian2023fair,
+  title={Fair markovian search},
+  author={Aminian, Mohammad Reza and Manshadi, Vahideh and Niazadeh, Rad},
+  booktitle={Fair Markovian Search: Aminian, Mohammad Reza| uManshadi, Vahideh| uNiazadeh, Rad},
+  year={2023},
+  publisher={[Sl]: SSRN}
+}
+
+
+@article{gupta2022socially,
+  title={Socially fair and hierarchical facility location problems},
+  author={Gupta, Swati and Moondra, Jai and Singh, Mohit},
+  journal={arXiv preprint arXiv:2211.14873},
+  year={2022}
+}
+
+
+@article{ma2023fairness,
+  title={Fairness maximization among offline agents in online-matching markets},
+  author={Ma, Will and Xu, Pan and Xu, Yifan},
+  journal={ACM Transactions on Economics and Computation},
+  volume={10},
+  number={4},
+  pages={1--27},
+  year={2023},
+  publisher={ACM New York, NY}
+}
+
+@inproceedings{heidari2021allocating,
+  title={Allocating opportunities in a dynamic model of intergenerational mobility},
+  author={Heidari, Hoda and Kleinberg, Jon},
+  booktitle={Proceedings of the 2021 ACM Conference on Fairness, Accountability, and Transparency},
+  pages={15--25},
+  year={2021}
+}
+
+
+@article{dwork2011fairness,
+  title={Fairness through awareness. corr abs/1104.3913 (2011)},
+  author={Dwork, Cynthia and Hardt, Moritz and Pitassi, Toniann and Reingold, Omer and Zemel, Richard S},
+  journal={arXiv preprint arXiv:1104.3913},
+  year={2011}
+}
+
+@inproceedings{calders2009building,
+  title={Building classifiers with independency constraints},
+  author={Calders, Toon and Kamiran, Faisal and Pechenizkiy, Mykola},
+  booktitle={2009 IEEE international conference on data mining workshops},
+  pages={13--18},
+  year={2009},
+  organization={IEEE}
+}
+
+@inproceedings{kasy2021fairness,
+  title={Fairness, equality, and power in algorithmic decision-making},
+  author={Kasy, Maximilian and Abebe, Rediet},
+  booktitle={Proceedings of the 2021 ACM Conference on Fairness, Accountability, and Transparency},
+  pages={576--586},
+  year={2021}
+}
+
+@inproceedings{abebe2020roles,
+  title={Roles for computing in social change},
+  author={Abebe, Rediet and Barocas, Solon and Kleinberg, Jon and Levy, Karen and Raghavan, Manish and Robinson, David G},
+  booktitle={Proceedings of the 2020 conference on fairness, accountability, and transparency},
+  pages={252--260},
+  year={2020}
+}
+
+@article{park2020understanding,
+  title={Understanding racial disparities in exposure to traffic-related air pollution: Considering the spatiotemporal dynamics of population distribution},
+  author={Park, Yoo Min and Kwan, Mei-Po},
+  journal={International journal of environmental research and public health},
+  volume={17},
+  number={3},
+  pages={908},
+  year={2020},
+  publisher={MDPI}
+}
+
+@inproceedings{roughgarden2018optimal,
+  title={An optimal learning algorithm for online unconstrained submodular maximization},
+  author={Roughgarden, Tim and Wang, Joshua R},
+  booktitle={Conference On Learning Theory},
+  pages={1307--1325},
+  year={2018},
+  organization={PMLR}
+}
+
+
+@article{ding2021retiring,
+  title={Retiring Adult: New Datasets for Fair Machine Learning},
+  author={Ding, Frances and Hardt, Moritz and Miller, John and Schmidt, Ludwig},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  pages={6478--6490},
+  year={2021}
+}
+
+@article{diamond2016cvxpy,
+  title={{CVXPY}: A {Python}-embedded modeling language for convex optimization},
+  author={Diamond, Steven and Boyd, Stephen},
+  journal={Journal of Machine Learning Research},
+  volume={17},
+  number={83},
+  pages={1--5},
+  year={2016}
+}
+
+@article{agrawal2018rewriting,
+  title={A rewriting system for convex optimization problems},
+  author={Agrawal, Akshay and Verschueren, Robin and Diamond, Steven and Boyd, Stephen},
+  journal={Journal of Control and Decision},
+  volume={5},
+  number={1},
+  pages={42--60},
+  year={2018},
+  publisher={Taylor \& Francis}
+}

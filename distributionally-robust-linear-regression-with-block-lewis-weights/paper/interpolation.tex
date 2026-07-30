@@ -1,0 +1,1113 @@
+\section{Interpolating Between Average and Robust Losses}
+\label{sec:gp_interpolating_proof}
+
+In this section, we prove \Cref{mainthm:gp_regression_iteration_complexity}. As before, our proof follows the outline in \Cref{sec:gp_reg_overview}. The main technical challenges are to establish a form of strong convexity for our objective $f$ and then to build a solver for the proximal problem \eqref{eq:gp_prox_intro_reg}. 
+
+The rest of this section is organized as follows. In \Cref{sec:gp_objective_calculus}, we derive calculus facts about our objective $f$, including bounds on its Hessian and the promised strong convexity (particularly \Cref{lemma:strong_convexity_gp} and the more general result it builds on, \Cref{lemma:strong_convexity_component}). In \Cref{sec:gp_iterate_facts}, we prove some facts about the iterates of \Cref{alg:optimal_ms_acceleration} when applied to our setting. In \Cref{sec:gp_prox_solver}, we more precisely define and analyze our solver for proximal sub-problems. This section is fairly technical and we give a more detailed outline there. Finally, in \Cref{sec:gp_interpolating_alg}, we assemble all these components and analyze \Cref{alg:gp_regression_alg}, thereby proving \Cref{mainthm:gp_regression_iteration_complexity}.
+
+Throughout this analysis, we rescale the problem so that $f(\xstar) = 1$. It is now sufficient to solve for an $\eps$-additive error solution.
+
+\subsection{Calculus for the objective}
+\label{sec:gp_objective_calculus}
+
+In this section, we work out some calculus facts related to our objective $\gnorm{\mA\vx-\vb}{p}^p$. Throughout this discussion, let $f(\vx) \coloneqq \gnorm{\mA\vx-\vb}{p}^p$.
+
+\begin{lemma}
+\label{lemma:gp_regression_hessian_upperbound}
+For any $\vz\in\R^d$, we have
+\begin{align*}
+    p\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2 \le \vz^{\top}\inparen{\nabla^2 f(\vx)}\vz \le p(p-1)\sum_{i=1}^m\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_regression_hessian_upperbound}]
+Let us first calculate the derivative and hessian for $f(\cdot)$ using the chain rule and usual matrix differentiation rules:
+\begin{align}
+    f(\vx) &= \sum_{i=1}^m\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^p\enspace,\nonumber\\
+    \nabla f(\vx) &= p\sum_{i=1}^m \norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-2}\mA_{S_i}^{\top}(\mA_{S_i}\vx - \vb_{S_i})\enspace,\label{eq:f_grad}\\
+    \nabla^2 f(\vx) &= p\sum_{i=1}^m\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-2}\mA_{S_i}^{\top}\mA_{S_i} \nonumber\\
+    &\quad + p(p-2)\sum_{i=1}^m\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-4}\left(\mA_{S_i}^{\top}(\mA_{S_i}\vx - \vb_{S_i})(\mA_{S_i}\vx - \vb_{S_i})^{\top}\mA_{S_i}\right)\enspace.\label{eq:f_hess}
+\end{align}
+Using this formula, we take the quadratic form with respect to a vector $\vz$. By Cauchy-Schwarz, notice that
+\begin{align*}
+    &\quad \vz^{\top}\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-4}\left(\mA_{S_i}^{\top}(\mA_{S_i}\vx - \vb_{S_i})(\mA_{S_i}\vx - \vb_{S_i})^{\top}\mA_{S_i}\right)\vz \\
+    &= \norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-4}\ip{\mA_{S_i}\vz, \mA_{S_i}\vx-\vb_{S_i}}^2 \le \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2.
+\end{align*}
+With that, we have
+\begin{align}
+    \vz^{\top}\inparen{\nabla^2 f(\vx)}\vz &\le p\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}^{p-2}\norm{\mA_{S_i}\vz}_2^2 + (p-2)\norm{\mA_{S_i}\vx-\vb_{S_i}}^{p-2}\norm{\mA_{S_i}\vz}_2^2 \enspace,\nonumber\\
+    &= p(p-1)\sum_{i=1}^m\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2\enspace.\label{eq:f_quad_form}
+\end{align}
+For the lower bound, we use our calculation for $\nabla^2 f(\vx)$ to write
+\begin{align*}
+    \vz^{\top}\inparen{\nabla^2 f(\vx)}\vz \ge p\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2,
+\end{align*}
+completing the proof of \Cref{lemma:gp_regression_hessian_upperbound}.
+\end{proof}
+
+\subsubsection{Strong Convexity of the Objective}
+
+The main pair of results of this section are \Cref{lemma:strong_convexity_gp} and \Cref{lemma:strong_convexity_component}. We can think of \Cref{lemma:strong_convexity_gp} as a form of strong convexity for our objective.
+
+\begin{lemma}[Strong convexity of $f$]
+\label{lemma:strong_convexity_gp}
+Let $f(\vx) \coloneqq \gnorm{\mA\vx-\vb}{p}^p$. For all $\vd\in\R^d$, we have
+\begin{align*}
+    f(\vx+\vd) \ge f(\vx) + \ip{\nabla f(\vx),\vd} + \frac{4}{2^p}\gnorm{\mA\vd}{p}^p,
+\end{align*}
+and therefore
+\begin{align*}
+    \norm{\vx-\xstar}_{\mM} \le 2^{3/2 - 3/p}d^{1/2-1/p}(f(\vx)-f(\xstar))^{1/p}\enspace.
+\end{align*}
+\end{lemma}
+
+\lemmastrongconvexitycomponent
+
+To motivate \Cref{lemma:strong_convexity_component}, let us see how \Cref{lemma:strong_convexity_component} implies \Cref{lemma:strong_convexity_gp}.
+
+\begin{proof}[Proof of \Cref{lemma:strong_convexity_gp}]
+Note that
+\begin{align*}
+    \nabla f(\vx) = \sum_{i=1}^m p\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^{p-2}\mA_{S_i}^{\top}(\mA_{S_i}\vx-\vb_{S_i})\enspace.
+\end{align*}
+This implies
+\begin{align*}
+    \sum_{i=1}^m p\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^{p-2}\ip{\mA_{S_i}\vx-\vb_{S_i},\mA_{S_i}\vd} = \ip{\nabla f(\vx),\vd}\enspace.
+\end{align*}
+Combining this and applying \Cref{lemma:strong_convexity_component} (which is a strong convexity lemma for $\|\cdot\|_2^p$ that we prove subsequently in this section), we get
+\begin{align*}
+    f(\vx+\vd) &= \gnorm{\mA(\vx+\vd)-\vb}{p}^p = \gnorm{\mA\vd+(\mA\vx-\vb)}{p}^p\enspace,\\
+    &= \sum_{i=1}^m \norm{\mA_{S_i}\vd+(\mA_{S_i}\vx-\vb_{S_i})}_2^p\enspace,\\
+    &\ge^{\text{(\Cref{lemma:strong_convexity_component})}} \sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p + p\|\mA_{S_i}\vx-\vb_{S_i}\|_2^{p-2}\ip{(\mA_{S_i}\vx-\vb_{S_i}),\mA_{S_i}\vd}+ \frac{4}{2^p}\norm{\mA_{S_i}\vd}_2^p\enspace,\\
+    &= \sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p + \ip{p\|\mA_{S_i}\vx-\vb_{S_i}\|_2^{p-2}\mA_{S_i}^{\top}(\mA_{S_i}\vx-\vb_{S_i}),\vd}+ \frac{4}{2^p}\norm{\mA_{S_i}\vd}_2^p\enspace,\\
+    &=^{\text{\eqref{eq:f_grad}}} \gnorm{\mA\vx-\vb}{p}^p + \ip{\nabla f(\vx),\vd} + \frac{4}{2^p}\gnorm{\mA\vd}{p}^p = f(\vx) + \ip{\nabla f(\vx),\vd} + \frac{4}{2^p}\gnorm{\mA\vd}{p}^p\enspace.
+\end{align*}
+We now take care of the second statement. Observe that at optimality, we have $\nabla f(\xstar) = 0$. Plugging this in (replace $\vx$ by $\vx^\star$ and $\vd$ by $\vx-\vx^\star$ above), rearranging, and taking $p$th roots gives
+\begin{align*}
+    \gnorm{\mA(\vx-\xstar)}{p} \le \left(\frac{4}{2^p}\right)^{-1/p}(f(\vx)-f(\xstar))^{1/p} = \frac{2}{4^{1/p}}(f(\vx)-f(\xstar))^{1/p}\enspace. 
+    % \le \frac{(f(\vx)-f(\xstar))^{1/p}}{2}.
+\end{align*}
+Next, recall that by \Cref{thm:gp_regression_blw_intro},
+\begin{align*}
+    \norm{\vx-\xstar}_{\mM} = \norm{\mW^{1/2-1/p}\mA(\vx-\xstar)}_2 \le (2d)^{1/2-1/p}\gnorm{\mA(\vx-\xstar)}{p}\enspace.
+\end{align*}
+Stitching the inequalities together completes the proof of \Cref{lemma:strong_convexity_gp}.
+\end{proof}
+
+In the rest of this subsection, we prove \Cref{lemma:strong_convexity_component}. We begin with a few numerical inequalities. 
+% In the following, let $K_p \coloneqq \frac{4}{2^p}$.
+
+\begin{lemma}
+\label{lemma:gp_sc_galpha}
+For $\alpha \le -1/2$ and $p\ge 2$, $g(\alpha) := \frac{1+p\alpha}{(-(2\alpha+1))^{p/2}}$ is nonincreasing in $\alpha$.
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_sc_galpha}]
+We first take the derivative of $g$ with respect to $\alpha$,
+\begin{align*}
+    g'(\alpha) &= \frac{p(-(2\alpha+1))^{p/2} - \inparen{(-2)\frac{p}{2}\inparen{-(2\alpha+1)}^{p/2-1}}(1+p\alpha)}{(-(2\alpha+1))^p}\enspace,\\
+    &= \frac{p(-(2\alpha+1)^{p/2}) + p\inparen{-(2\alpha+1)}^{p/2-1}(1+p\alpha)}{(-(2\alpha+1))^p}\enspace,\\
+    &= p\cdot\frac{(-(2\alpha+1)) + (1+p\alpha)}{(-(2\alpha+1))^{p/2+1}}\enspace,\\
+    &= p\cdot\frac{(p-2)\alpha}{(-(2\alpha+1))^{p/2+1}} \le 0\enspace,
+\end{align*}
+where in the final inequality we used that $p\geq 2$ and $\alpha\leq -1/2$. This completes the proof of the lemma.
+\end{proof}
+We also need the following lemma, which is similar to a result due to \citeauthor{akps19} \cite[Lemma 4.5]{akps19}. It amounts to proving \Cref{lemma:strong_convexity_component} when the dimension $k=1$.
+\begin{lemma}[Case A. of \Cref{lemma:gp_sc_alphaall}]\label{lemma:adil_sc_lemma}
+For any $\alpha\in\R$ and $p \ge 2$,
+% $$1 + p\alpha + \frac{p-1}{p2^p}\cdot\gamma_p(1,\alpha) \leq \abs{1+\alpha}^p 
+% % \leq 1 + p\alpha + 2^p\cdot\gamma_p(1,\alpha)
+% \enspace,$$
+% where $\gamma_p(1,\alpha) := \mathbb{I}_{\alpha\leq 1}\cdot \frac{p\alpha^2}{2} + \mathbb{I}_{\alpha > 1}\cdot \left(|\alpha|^p + \frac{p}{2} - 1\right)$. In particular, for $p\geq 2$,
+% $$1 + p\alpha + \frac{p-1}{p2^p}\cdot\alpha^p \leq \abs{1+\alpha}^p\enspace.$$
+\begin{align*}
+    \abs{1+\alpha}^p \ge 1+p\alpha+\frac{4}{2^p}\abs{\alpha}^p\enspace.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:adil_sc_lemma}]
+    % The first statement of \Cref{lemma:adil_sc_lemma} follows directly from the Lemma 4.5 in \cite{akps19} by setting $x=1$ and $\Delta = \alpha$ in their lemma's statement. Furthermore, for the special case of $p\geq 2$ we consider two special cases: $\alpha \leq 1$ and $\alpha > 1$. When $\alpha > 1$, we note that,
+    % \begin{align*}
+    %     \frac{p-1}{p2^p}\cdot\gamma_p(1, \alpha) = \frac{p-1}{p2^p}\cdot\left(\alpha^p + \frac{p}{2} - 1\right) \geq \frac{p-1}{p2^p}\cdot \alpha^p\enspace,
+    % \end{align*}
+    % which implies the required statement. When $\alpha \leq 1$ note that,
+    % \begin{align*}
+    %     \frac{p-1}{p2^p}\cdot\gamma_p(1, \alpha)
+    % \end{align*}
+Note that the inequality is true when $p=2$ and becomes an equality. We consider the case when $p>2$ and use $h(\alpha)$ to denote the error function,
+\begin{align*}
+    h(\alpha) \coloneqq \abs{1+\alpha}^p - \inparen{1+p\alpha+\frac{4}{2^p}\abs{\alpha}^p}\enspace.
+\end{align*}
+We aim to show $h(\alpha) \ge 0$ for all $\alpha \in \R$. Let us first write the derivatives of $h$.
+\begin{align*}
+    h'(\alpha) &= p\inparen{\abs{1+\alpha}^{p-2}(1+\alpha) - \inparen{1 + \frac{4}{2^p}\abs{\alpha}^{p-2}\alpha}}\enspace,\\
+    h''(\alpha) &= p(p-1)\inparen{\abs{1+\alpha}^{p-2}-\frac{4}{2^p}\abs{\alpha}^{p-2}} = p(p-1)\inparen{\abs{1+\alpha}^{p-2}-\abs{\frac{\alpha}{2}}^{p-2}}\enspace.
+\end{align*}
+It is now easy to verify the following statements about $h$,
+\begin{itemize}
+    \item[I.] $h'(-2) = h''(-2) = 0$ and $h''(\alpha) > 0$ for $\alpha < -2$, $\Rightarrow$ within the range $(-\infty,-2]$ the function $h$ is minimized at $-2$;
+    \item[II.] $h'(-2)=0$ and $h''(\alpha) \leq 0$ for $\alpha\in (-2, -2/3]$ $\Rightarrow$ $h'(\alpha) < 0$ in the range $(-2, -2/3]$, i.e., in that range the function $h$ is minimized at $-2/3$;
+    \item[III.] $h'(-2/3) < 0 = h'(0)$ and $h''(\alpha) > 0$ for $\alpha > -2/3$ $\Rightarrow$ the function $h$ is decreasing in $(-2/3,0)$ and increasing in $[0, \infty)$, i.e., within the range $(-2/3, \infty)$ the function $h$ is minimized at $0$.
+\end{itemize}
+As a result of the above observations, it is enough to check the inequality at the inputs $\alpha \in \inbraces{-2, -2/3, 0}$. We have for $p>2$,
+\begin{align*}
+    h(-2) &= 1 - \inparen{1-2p+4} = 2p -4 > 0\enspace,\\
+    h\inparen{-\frac{2}{3}} &= \frac{1}{3^p} - \inparen{1-\frac{2p}{3}+\frac{4}{2^p}\abs{\frac{2}{3}}^p} = \frac{1}{3^p}-1+\frac{2p}{3}-\frac{4}{3^p} = -1 + \frac{2p}{3}-\frac{3}{3^p} > 0\\
+    h(0) &= 1 - 1 = 0\enspace.
+\end{align*}
+This implies that $h(\alpha)\geq 0$ for all values of $\alpha$, concluding the proof of \Cref{lemma:adil_sc_lemma}.
+% We now claim that it was enough to check it at those three points. This is because the function $h(\alpha)$ is convex when $\alpha \le -2$ and $\alpha \ge -2/3$, is concave when $\alpha \in [-2, -2/3]$, and $\alpha = 0$ and $\alpha = -2$ are critical points for $h(\alpha)$. 
+% Hence, wherever $h$ is convex, it is minimized at any of its critical points in that range (i.e. at $\alpha=-2$ and $\alpha=-0$). Wherever $h$ is concave, it is minimized at at least one of the endpoints of the interval where $h$ is concave (i.e. at $\alpha=-2$ and $\alpha=-2/3$). We checked that $h(\alpha) \ge 0$ at these three points, and this means we can conclude the proof of \Cref{lemma:adil_sc_lemma}.
+\end{proof}
+
+Next, we prove a special case of \Cref{lemma:strong_convexity_component}.
+
+% \begin{lemma}
+% \label{lemma:gp_sc_alphalarge}
+% For $\alpha$ such that $\abs{\frac{1}{\alpha}+1} \ge \frac{1}{2}$, $\beta\ge0$, and $p\ge 2$, we have
+% \begin{align*}
+%     \inparen{(1+\alpha)^2+\beta^2}^{p/2} \ge 1+p\alpha + K_p\inparen{\alpha^2+\beta^2}^{p/2},
+% \end{align*}
+% where $K_p = \frac{4}{2^p}$.
+% \end{lemma}
+% \begin{proof}[Proof of \Cref{lemma:gp_sc_alphalarge}]
+% When $\beta=0$, the result follows from \cite[Lemma 4.5]{akps19}. We now show that the first derivative of the LHS with respect to $\beta$ is always at least that of the RHS:
+% \begin{align*}
+%     p\beta\inparen{(1+\alpha)^2+\beta^2}^{p/2-1} \overset{?}{\ge} \beta \cdot pK_p\inparen{\alpha^2+\beta^2}^{p/2-1}
+% \end{align*}
+% Rearranging, it is enough to show that for all $\beta \ge 0$,
+% \begin{align*}
+%     \frac{(1+\alpha)^2+\beta^2}{\alpha^2+\beta^2} \overset{?}{\ge} K_p^{\frac{2}{p-2}}.
+% \end{align*}
+% When $\alpha=-1/2$, the statement is trivially true. When $\alpha < -1/2$, the above function is increasing in $\beta$, so plugging in $\beta=0$ and verifying
+% \begin{align*}
+%     \frac{(1+\alpha)^2}{\alpha^2} \ge K_p^{\frac{2}{p-2}}
+% \end{align*}
+% suffices. When $\alpha > -1/2$, the above function is decreasing in $\beta$, and 
+% \begin{align*}
+%     \lim_{\beta\rightarrow\infty} 1+\frac{2\alpha+1}{\alpha^2+\beta^2} = 1 > K_p^{\frac{2}{p-2}}.
+% \end{align*}
+% This gives us the conclusion of \Cref{lemma:gp_sc_alphalarge}.
+% \end{proof}
+
+% Next, we prove another special case of \Cref{lemma:strong_convexity_component} that was not covered by \Cref{lemma:gp_sc_alphalarge}.
+
+% \begin{lemma}
+% \label{lemma:gp_sc_alphasmall}
+% For $\alpha$ such that $\abs{\frac{1}{\alpha}+1}\le \frac{1}{2}$, $\beta\ge 0$, and $p \ge 2$, we have
+% \begin{align*}
+%     \inparen{(1+\alpha)^2+\beta^2}^{p/2} \ge 1+p\alpha + K_p\inparen{\alpha^2+\beta^2}^{p/2},
+% \end{align*}
+% where $K_p = \frac{4}{2^p}$.
+% \end{lemma}
+% \begin{proof}[Proof of \Cref{lemma:gp_sc_alphasmall}]
+% Here, we will fix $\alpha$ arbitrarily in that range and prove that the approximation error is always nonnegative by minimizing the error function in $\beta$:
+% \begin{align*}
+%     h(\beta) \coloneqq \inparen{(1+\alpha)^2+\beta^2}^{p/2} - \inparen{1+p\alpha + K_p\inparen{\alpha^2+\beta^2}^{p/2}} \overset{?}{\ge} 0
+% \end{align*}
+% Let us write the derivative of $h(\beta)$.
+% \begin{align*}
+%     h'(\beta) &= p\beta\inparen{\inparen{(1+\alpha)^2+\beta^2}^{p/2-1}-K_p\inparen{\alpha^2+\beta^2}^{p/2-1}}
+% \end{align*}
+% Next, let us see when $h'(\beta) \ge 0$ and otherwise. It is enough to confirm the values of $\beta$ for which
+% \begin{align*}
+%     \frac{\inparen{1+\alpha}^2+\beta^2}{\alpha^2+\beta^2} \ge K_p^{\frac{2}{p-2}} = \inparen{1-\frac{1}{p}}^{\frac{2}{p-2}} \cdot 2^{\frac{-2p}{p-2}}.
+% \end{align*}
+% Since we know that the LHS is increasing in $\beta$ when $\alpha \le -1/2$, we just have to solve the above equation at equality for $\beta$. Call this solution $\beta_0$ (note that we only need to consider $\beta \ge 0$). Then, for all $\beta \ge \beta_0$, we know that $h(\beta)$ is increasing, so we just have to confirm the inequality for $\beta_0$. And, when $h(\beta)$ is decreasing, we have to confirm the inequality for $\beta=0$. The second part follows for free from \cite[Lemma 4.5]{akps19}.
+
+% It is straightforward to check that
+% \begin{align*}
+%     \beta_0^2 &= -\alpha^2 - \frac{1}{1-K_p^{\frac{2}{p-2}}}(2\alpha+1).
+% \end{align*}
+% The LHS of the target inequality is now
+% \begin{align*}
+%     \inparen{\inparen{1+\alpha}^2-\inparen{\alpha^2 + \frac{1}{1-K_p^{\frac{2}{p-2}}}(2\alpha+1)}}^{p/2} = \inparen{-(2\alpha+1)}^{p/2}\inparen{\frac{1}{1-K_p^{\frac{2}{p-2}}}-1}^{p/2}
+% \end{align*}
+% and the RHS is
+% \begin{align*}
+%     1+p\alpha+K_p\inparen{\frac{1}{1-K_p^{\frac{2}{p-2}}}}^{p/2}\inparen{-(2\alpha+1)}^{p/2}
+% \end{align*}
+% So, dividing both sides by $(-(2\alpha+1))^{p/2}$ (which is positive, owing to the range of $\alpha$), our goal is to show
+% \begin{align*}
+%     \underbrace{\frac{1+p\alpha}{(-(2\alpha+1))^{p/2}}}_{g(\alpha)} + K_p\inparen{\frac{1}{1-K_p^{\frac{2}{p-2}}}}^{p/2} \overset{?}{\le} \inparen{\frac{1}{1-K_p^{\frac{2}{p-2}}}-1}^{p/2}.
+% \end{align*}
+% Using \Cref{lemma:gp_sc_galpha}, we have that $g(\alpha)$ is decreasing in $\alpha$. Thus, it is enough to check the inequality at $\alpha=\frac{1}{-1+K_p^{\frac{1}{p-2}}}$. This is exactly equivalent to verifying
+% \begin{align*}
+%     \inparen{(1+\alpha)^2+\beta^2}^{p/2} \overset{?}{\ge} 1+p\alpha+K_p\inparen{\alpha^2+\beta^2}^{p/2}
+% \end{align*}
+% at $\alpha=\frac{1}{-1+K_p^{\frac{1}{p-2}}}$ and $\beta=\beta_0$. Next, we evaluate $\beta_0$.
+% \begin{align*}
+%     \beta_0^2 &= -\inparen{\frac{1}{-1+K_p^{\frac{1}{p-2}}}}^2-\frac{1}{1-K_p^{\frac{2}{p-2}}}\inparen{\frac{2}{-1+K_p^{\frac{1}{p-2}}}+1} \\
+%     &= -\inparen{\frac{1}{-1+K_p^{\frac{1}{p-2}}}}^2-\frac{1}{1-K_p^{\frac{2}{p-2}}}\inparen{\frac{1+K_p^{\frac{1}{p-2}}}{-1+K_p^{\frac{1}{p-2}}}} \\
+%     &= -\inparen{\frac{1}{-1+K_p^{\frac{1}{p-2}}}}^2+\frac{1}{\inparen{1-K_p^{\frac{1}{p-2}}}^2} = 0.
+% \end{align*}
+% Now, by the lemma we proved just now, we know that the above is true at $\alpha=\frac{1}{-1+K_p^{\frac{1}{p-2}}}$ and for all $\beta\ge0$, including $\beta=\beta_0 = 0$. This completes the proof of \Cref{lemma:gp_sc_alphasmall}.
+% \end{proof}
+
+\begin{lemma}\label{lemma:gp_sc_alphaall}
+    For any $\alpha\in \R$, $\beta\ge 0$, and $p \ge 2$, we have
+\begin{align*}
+    \inparen{(1+\alpha)^2+\beta^2}^{p/2} \ge 1+p\alpha + \frac{4}{2^p}\inparen{\alpha^2+\beta^2}^{p/2}\enspace.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_sc_alphaall}]
+    Let us study the difference of both sides of the inequality using the following function,
+    \begin{align*}
+        h(\alpha, \beta) \coloneqq \inparen{(1+\alpha)^2+\beta^2}^{p/2} - \left(1+p\alpha + \frac{4}{2^p}\inparen{\alpha^2+\beta^2}^{p/2}\right)\enspace.
+    \end{align*}
+    We want to show that for $\alpha\in \R$, $\beta\ge 0$, and $p \ge 2$, $h(\alpha, \beta) \geq 0$. We will break this proof into three cases: \textbf{A.} $\alpha \in \R$ and $\beta =0$; \textbf{B.} $\alpha \in (-\infty, -2]\cup[-2/3,\infty)$ and $\beta >0$; and \textbf{C.} $\alpha \in (-2, -2/3)$ and $\beta>0$. These cases together cover of the entire range of $\alpha\in \R$ and $\beta\geq 0$.
+    
+    \paragraph{\underline{Case A.}} When $\beta=0$, the proof simply follows from the statement of \Cref{lemma:adil_sc_lemma} by noting $|\alpha|^{p} = (\sqrt{\alpha^2})^{p} = (\alpha^2)^{p/2}$. 
+    
+    In the remaining two cases we will show that for any $\alpha\in \R$, increasing the value of $\beta$ still maintains $h(\alpha, \beta) \geq 0$. To see this, we first note that the derivative of $h(\alpha, \beta)$ w.r.t. $\beta$ is given by,
+    \begin{align*}
+        \nabla_\beta h(\alpha, \beta) &= p\beta\left(\inparen{(1+\alpha)^2+\beta^2}^{p/2-1} - \frac{4}{2^p}\inparen{\alpha^2+\beta^2}^{p/2-1}\right)\enspace.
+    \end{align*}
+    For $\beta > 0$, ensuring this derivative is positive is equivalent to the following,
+    \begin{align}
+        \nabla_\beta h(\alpha, \beta) > 0 &\equiv p\beta\inparen{(1+\alpha)^2+\beta^2}^{p/2-1} > p\beta \cdot \frac{4}{2^p}\inparen{\alpha^2+\beta^2}^{p/2-1}\enspace,\nonumber\\
+        &\equiv^{(p\beta > 0)} (1+\alpha)^2 + \beta^2  > \left(\frac{1}{2^{p-2}}\right)^{2/(p-2)}\cdot \left(\alpha^2 + \beta^2\right)\enspace,\nonumber\\
+        &\equiv (1+\alpha)^2 + \beta^2  > \frac{1}{4}\cdot \left(\alpha^2 + \beta^2\right)\enspace,\nonumber\\
+        &\equiv (3\alpha^2 + 8\alpha + 4) + 3\beta^2  > 0\enspace,\nonumber\\
+        &\equiv \beta^2 > -\left(\alpha^2 + \frac{8}{3}\alpha + \frac{4}{3}\right)\enspace.\label{eq:grad_pos_equiv}
+    \end{align}
+    
+    \paragraph{\underline{Case B.}} Note that the roots of the quadratic function $3\alpha^2 + 8\alpha + 4$ are given by $\alpha_1 = -2$ and $\alpha_2 = -2/3$. This means that for $\alpha \in (-\infty, -2]\cup[-2/3,\infty)$ we have $3\alpha^2 + 8\alpha + 4 \geq 0$ which is \textbf{sufficient} to ensure using \eqref{eq:grad_pos_equiv} that $\nabla_\beta h(\alpha, \beta) > 0$, and hence $h(\alpha, \beta) > 0$. This takes care of Case B. 
+    
+    \paragraph{\underline{Case C.}} Now we only need to consider the range $\alpha \in (-2,-2/3)$ with $\beta>0$. In this range, the recall the equivalence \eqref{eq:grad_pos_equiv}, 
+    \begin{align*}
+        \nabla_\beta h(\alpha, \beta) > 0 &\equiv \beta > \sqrt{-\left(\alpha^2 + \frac{8}{3}\alpha + \frac{4}{3}\right)} =: \beta_0(\alpha)\enspace.
+    \end{align*}
+    Thus for all $\beta > \beta_0(\alpha)$ we know that $h(\alpha, \beta)$ is increasing in $\beta$ and vice-versa. This allows us for any given $\alpha\in (-2,-2/3)$ to further break Case C into two sub-cases:
+    
+    \paragraph{\underline{Case C.I}} For $\beta \in [0, \beta_0)$, since $h(\alpha, \beta)$ is decreasing in $\beta$ its lowest value is attained at $\beta=0$ and we only need to verify that $h(\alpha, 0) \geq 0$. We get this directly from \Cref{lemma:adil_sc_lemma}.
+    
+    \paragraph{\underline{Case C.II}} For $\beta \in [\beta_0, \infty)$, since $h(\alpha, \beta)$ is increasing in $\beta$ its lowest value is attained at $\beta=\beta_0$ and we only need to verify that $h(\alpha, \beta_0(\alpha)) \geq 0$. We first simplify the expression for $h(\alpha, \beta_0(\alpha))$,
+    \begin{align*}
+        h(\alpha, \beta_0(\alpha)) &=  \inparen{(1+\alpha)^2+\beta_0^2}^{p/2} - \left(1+p\alpha + K_p\inparen{\alpha^2+\beta_0^2}^{p/2}\right)\enspace,\\
+        &= \inparen{-\frac{1}{3}-\frac{2}{3}\alpha}^{p/2} - \left(1+p\alpha + \frac{4}{2^p}\inparen{-\frac{8}{3}\alpha -\frac{4}{3}}^{p/2}\right)\enspace,\\
+        &= \inparen{-\frac{1}{3}-\frac{2}{3}\alpha}^{p/2} - \left(1+p\alpha + 4\inparen{-\frac{2}{3}\alpha -\frac{1}{3}}^{p/2}\right)\enspace,\\
+        &= -1 - p\alpha - 3\inparen{-\frac{2}{3}\alpha -\frac{1}{3}}^{p/2}\enspace,\\
+        &= -1 - p\alpha - \frac{1}{3^{p/2-1}}(-2\alpha -1)^{p/2}\enspace,\\
+        &= -(-2\alpha-1)^{p/2}\left(\frac{1+p\alpha}{(-2\alpha-1)^{p/2}} + \frac{1}{3^{p/2-1}}\right)\enspace. 
+    \end{align*}
+    Now since $\alpha\in (-2,-2/3)<-1/2$ we can use \Cref{lemma:gp_sc_galpha} to note that the first term is non-decreasing in $\alpha$ which means that its lowest value in this range can be lower bounded by its value at $\alpha = -2$, i.e., for $\alpha\in (-2,-2/3)$,
+    \begin{align*}
+        h(\alpha, \beta_0(\alpha)) &\geq h(-2, \beta_0(-2))\enspace,\\ 
+        &= -3^{p/2}\left(\frac{1-2p}{3^{p/2}} + \frac{1}{3^{p/2-1}}\right)\enspace,\\
+        &= 2p-1-3 = 2(p-2) > 0\enspace,
+    \end{align*}
+    which finishes the proof of Case C.II and also Case C. Together Cases A, B and C complete the proof of \Cref{lemma:gp_sc_alphaall}.  
+%     it is enough to check the value of $h(\alpha, \beta_0)$ and $h(\alpha, 0)$ and verify 
+%     $\nabla_\beta h(\alpha, \beta_0) = 0$ for $\beta_0 \coloneqq \sqrt{-\left(\alpha^2 + \frac{8}{3}\alpha + \frac{4}{3}\right)}$ 
+%     we have  where we must verify inequality \eqref{eq:required_target_sc}. For this range of $\alpha$ note that,
+% \begin{align*}
+%     \nabla_\beta h(\alpha, \beta) > 0 &\equiv (3\alpha^2 + 8\alpha + 4) + 3\beta^2  > 0\enspace,\\
+%     &\equiv 
+% \end{align*}
+% Let us again go back to comparing the growth (i.e., the derivative w.r.t. $\beta$) of the l.h.s. and r.h.s. in \eqref{eq:growth_comparison},
+% \begin{align*}
+%     &(1+\alpha)^2 + \beta^2  \overset{?}{\ge\le} \frac{1}{4}\cdot \left(\alpha^2 + \beta^2\right)\enspace,\\
+%     \equiv &1 + \frac{1 + 2\alpha}{\left(\alpha^2 + \beta^2\right)} \overset{?}{\ge\le} \frac{1}{4}\enspace. 
+% \end{align*}
+% Note that in the range $\alpha \in (-2, -2/3)$, we have $1 + 2\alpha < 0$ which means the l.h.s. above is an increasing function of $\beta$.
+\end{proof}
+
+
+We are now ready to prove \Cref{lemma:strong_convexity_component}.
+
+\begin{proof}[Proof of \Cref{lemma:strong_convexity_component}]
+First, assume that $\norm{\vv}_2=1$. We will later extend the result to all $\vv$.
+
+Since $\norm{\vv}_2=1$, we can write $\triangle = \alpha\vv+\beta\vw$ where $\ip{\vv,\vw} = 0$ and $\norm{\vw}_2=1$, so that we have $\norm{\triangle}_2^2=\alpha^2+\beta^2$. Without loss of generality, we have $\beta \ge 0$. Fixing $\vw$ and $\alpha$ for now, it is enough to show that for all $\beta \ge 0$, we have
+\begin{align*}
+    \norm{(1+\alpha)\vv+\beta\vw}_2^p = \inparen{(1+\alpha)^2+\beta^2}^{p/2} \overset{?}{\ge} 1+p\alpha + \frac{4}{2^p}\norm{\triangle}_2^p = 1+p\alpha + \frac{4}{2^p}\inparen{\alpha^2+\beta^2}^{p/2}.
+\end{align*}
+This follows immediately by \Cref{lemma:gp_sc_alphaall}.
+
+We now extend the result for all $\vv$. Let $\bar{\vv} \coloneqq \vv/\norm{\vv}_2$ and note that
+\begin{align*}
+    \norm{\vv+\triangle}_2^p = \norm{\vv}_2^p\norm{\bar{\vv}+\frac{\triangle}{\norm{\vv}_2}}_2^p &\ge \norm{\vv}_2^p\inparen{1+\ip{\bar{\vv},\frac{\triangle}{\norm{\vv}_2}}+\frac{4}{2^p}\norm{\frac{\triangle}{\norm{\vv}_2}}_2^p} \\
+    &= \norm{\vv}_2^p+p\norm{\vv}_2^{p-2}\ip{\vv,\triangle}+\frac{4}{2^p}\norm{\triangle}_2^p,
+\end{align*}
+completing the proof of \Cref{lemma:strong_convexity_component}.
+\end{proof}
+
+
+\subsubsection{Smoothness of the Objective}
+
+The main result of this subsection is \Cref{lemma:gp_smooth}.
+
+\begin{lemma}
+\label{lemma:gp_smooth}
+For all $\vx\in\R^d$, we have
+\begin{align*}
+    f(\vx)-f(\xstar) \le \frac{p(p-1)}{2}f(\vx)^{1-\frac{2}{p}}\gnorm{\mA(\vx-\xstar)}{p}^2.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_smooth}]
+By Taylor's/mean-value theorem, we can write for some $\vy$ on the line connecting $\xstar$ and $\vx$,
+\begin{align*}
+    f(\vx) &= f(\xstar) + \ip{\nabla f(\xstar), \vx-\xstar} + \frac{1}{2}(\vx-\xstar)^{\top}\nabla^2 f(\vy)(\vx-\xstar) \\
+    &\le^{\eqref{eq:f_quad_form}} f(\xstar) + \frac{p(p-1)}{2}\sum_{i=1}^m \norm{\mA_{S_i}\vy-\vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}(\vx-\xstar)}_2^2 \\
+    &\le f(\xstar) + \frac{p(p-1)}{2} \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vy-\vb_{S_i}}_2^{p}}^{\frac{p-2}{p}}\inparen{\sum_{i=1}^m \norm{\mA_{S_i}(\vx-\xstar)}_2^p}^{\frac{2}{p}} \\
+    &\le f(\xstar) + \frac{p(p-1)}{2}f(\vx)^{1-\frac{2}{p}}\gnorm{\mA(\vx-\xstar)}{p}^2,
+\end{align*}
+completing the proof of \Cref{lemma:gp_smooth}.
+\end{proof}
+
+\subsection{Facts about the Iterates}
+\label{sec:gp_iterate_facts}
+
+The main result of this section is \Cref{lemma:fq_bounded}. In words, \Cref{lemma:fq_bounded} tells us that each proximal query we make in \Cref{alg:optimal_ms_acceleration} (see Line \ref{line:optimal_ms_acceleration_query} of \Cref{alg:optimal_ms_acceleration}) has bounded objective value. We will need this later when we argue about the convergence rates for the algorithms used to solve the proximal subproblems.
+
+\begin{lemma}
+\label{lemma:fq_bounded}
+For all queries $\vq_t$, we have
+\begin{align*}
+    f(\vq_t) \le f(\vx_t) + \inparen{9p(p-1)}^{\frac{p}{2}}d^{\frac{p}{2}-1}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:fq_bounded}]
+% We bound each separately. First, we bound $f(\vx_t)$. By \Cref{thm:optimal_ms_acceleration}, using $s=p-1$ and rewriting $\eps$ in terms of $T=1$, we have
+% \begin{align*}
+%     f(\vx_t) \le \eps = \inparen{C_{\ref{thm:optimal_ms_acceleration}}(p-1)}^{\frac{3p-2}{2}}ep^{p+1}d^{\frac{p}{2}-1}.
+% \end{align*}
+% By \Cref{lemma:ms_acceleration_iterate_diameter}, we have
+% \begin{align*}
+%     \norm{\vv_t-\xstar}_{\mM} \le \sqrt{2}\norm{\vx_0-\xstar}_{\mM}.
+% \end{align*}
+% Then, by \Cref{lemma:gp_smooth} and \Cref{thm:blw_to_l2}, 
+We establish the following upper bound on $f(\vv_t) - f(\xstar)$ using the ingredients developed so far:
+\begin{align*}
+    f(\vv_t) - f(\xstar) &\le \frac{p(p-1)}{2}f(\vv_t)^{1-\frac{2}{p}}\gnorm{\mA(\vv_t-\xstar)}{p}^2 & \text{(\Cref{lemma:gp_smooth})} \\
+    &\le \frac{p(p-1)}{2}f(\vv_t)^{1-\frac{2}{p}}\norm{\vv_t-\xstar}_{\mM}^2 & \text{(\Cref{thm:gp_regression_blw_intro})} \\
+    &\le p(p-1)f(\vv_t)^{1-\frac{2}{p}}\norm{\vx_0-\xstar}_{\mM}^2 & \text{(\Cref{lemma:ms_acceleration_iterate_diameter})}\\
+    &\le p(p-1)f(\vv_t)^{1-\frac{2}{p}}2^2(2d)^{1-\frac{2}{p}} & \text{(\Cref{lemma:gp_regression_initialization})} \\
+    &\leq 8d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}}\enspace.
+\end{align*}
+Now, recall that we assume by rescaling that $f(\xstar)=1$. From this, it trivially follows that $1 \le d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}}$. Combining these and re-arranging the above inequality leads to the following  polynomial inequality in $f(\vv_t)$,
+\begin{align}
+    0 &\ge f(\vv_t)-8d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}} -1\enspace,\nonumber\\ 
+    &= f(\vv_t)-9d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}} +  d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}} -1\enspace,\nonumber\\
+    &\ge f(\vv_t)-9d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}}\enspace,\label{eq:gp_fq_upper}
+\end{align}
+where in the last inequality we used the fact that the optimal value $f(\vx^\star)=1$ (due to our rescaling), which implies that for $p\geq 2$,
+$$1 \leq f(\vv_t) \leq d^{1-\frac{2}{p}}p(p-1)f(\vv_t)^{1-\frac{2}{p}}\enspace.$$
+Solving for $f(\vv_t)$ in \eqref{eq:gp_fq_upper}, we get
+\begin{align*}
+    f(\vv_t) \le \inparen{9p(p-1)}^{\frac{p}{2}}d^{\frac{p}{2}-1}\enspace.
+\end{align*}
+Using the definition of $\vq_t$ from \Cref{alg:optimal_ms_acceleration} (Line \ref{line:optimal_ms_query}) along with the convexity of $f$ (Jensen's inequality), and using our bound on $f(\vv_t)$ we note that,
+\begin{align*}
+    f(\vq_t) &\le f(\vx_t) + f(\vv_t)\enspace,\\
+    &\leq f(\vx_t) + \inparen{9p(p-1)}^{\frac{p}{2}}d^{\frac{p}{2}-1}\enspace,
+\end{align*}
+% Adding gives
+% \begin{align*}
+%     f(\vq) \le f(\vx_t) + f(\vv_t) \le f(\vx_t) + \inparen{9p(p-1)}^{\frac{p}{2}}d^{\frac{p}{2}-1},
+% \end{align*} % d^{\frac{p}{2}-1}\inparen{\inparen{C_{\ref{thm:optimal_ms_acceleration}}(p-1)}^{\frac{3p-2}{2}}ep^{p+1}+\inparen{9p(p-1)}^{\frac{p}{2}}},
+which completes the proof of \Cref{lemma:fq_bounded}.
+\end{proof}
+
+\subsection{Proximal Subproblems -- Calculus, Algorithms, Proofs}
+\label{sec:gp_prox_solver}
+
+Let
+\begin{align*}
+    f_{\vq_t}(\xtilde) \coloneqq f(\xtilde)+ep^p\norm{\xtilde-\vq_t}_{\mM}^p\enspace.
+\end{align*}
+In this subsection, we design and analyze an algorithm (\Cref{alg:gp_prox_solver}) that approximately solves the subproblem
+\begin{align*}
+    \argmin{\xtilde\in\R^d} f_{\vq_t}(\xtilde).
+\end{align*} 
+Specifically, we will output $(\xtilde_{t+1},\lambda_{t+1})$ that satisfy the $\frac{1}{2}$-MS oracle condition (\Cref{defn:ms_oracle}) and an appropriate movement bound (\Cref{defn:movement_bound}).
+
+This subproblem is the workhorse of \Cref{alg:gp_regression_alg}, and once we implement and analyze the solver, it is very straightforward to plug this into \Cref{alg:optimal_ms_acceleration} and \Cref{thm:optimal_ms_acceleration} to get our final iteration complexity.
+
+\begin{algorithm}[H]
+\caption{\textsf{GpRegressionProxOracle}: Implements $\frac{1}{2}$-MS oracle for $\gnorm{\cdot}{p}$ regression (see \Cref{lemma:prox_subproblem_ms} and \Cref{alg:mirror_descent}.}
+\label{alg:gp_prox_solver}
+\begin{algorithmic}[1]
+\Require Query $\vq_t$, previous iterate $\vx_t$, intended parameter distance $\gamma$.
+\State Define \begin{equation*}
+    \begin{aligned}
+    f_{\vq_t}(\xtilde) &\coloneqq f(\xtilde) + ep^p\norm{\xtilde-\vq_t}_{\mM}^p \\
+    h_{\vq_t}(\xtilde) &\coloneqq \norm{\xtilde-\vq_t}_{\nabla^2 f(\vq_t)}^2 + ep^p\norm{\xtilde-\vq_t}_{\mM}^p \\
+    D_{h_{\vq_t}}(\vx,\vy) &\coloneqq h_{\vq_t}(\vx)-h_{\vq_t}(\vy) - \ip{\nabla h_{\vq_t}(\vy),\vx-\vy} \\
+    \xtilde_{\vq_t} &\coloneqq \argmin{\xtilde\in\R^d} f_{\vq_t}(\xtilde)
+    \end{aligned}.
+\end{equation*}
+\State Let $T \ge Cp^{O(1)}e\logv{dpeh_{\vq_t}(\xtilde_{\vq_t})\inparen{\frac{4}{p\gamma}}^p}$.
+\State Run \Cref{alg:mirror_descent} with input iteration count $T$, base function $f_{\vq_t}$, reference function $h_{\vq_t}$, and initialization $\vq_t$.
+\end{algorithmic}
+\end{algorithm}
+
+The goal of the rest of this section is to analyze \Cref{alg:gp_prox_solver}. The analysis follows several steps:
+\begin{enumerate}
+    \item We find a reference function $h_{\vq_t}$ that depends on the query point $\vq_t$ for which the proximal objective $f_{\vq_t}$ is relatively smooth and relatively strongly convex with $O(p^{O(1)})$ condition number (see \Cref{sec:mirror_descent} for a sense of why this is useful). The main result here is \Cref{lemma:gp_hessian_stable}.
+    \item We show that $f_{\vq_t}$ is strongly convex, following from \Cref{lemma:strong_convexity_component}. This will help us understand the argument suboptimality for any point that approximately optimizes $f_{\vq_t}$ in function value. We also show that the reference function $h_{\vq_t}$ is strongly convex, using the same tools, for the same reason.
+    \item We show a form of smoothness for $f_{\vq_t}$. This helps us bound the gradient of any point that approximately optimizes $f_{\vq_t}$. Combining these later will tell us that an approximate solution to $f_{\vq_t}$ in argument value is also an approximate stationary point, i.e., it satisfies the $\frac{1}{2}$-MS condition (\Cref{defn:ms_oracle}).
+    \item We solve the proximal subproblems. This solution itself follows a few steps:\begin{enumerate}
+        \item We apply \Cref{thm:gp_mirror_descent}. This tells us that as long as we can approximately solve the Bregman proximal problems (approximately implementing Line \ref{line:mirror_descent_exact} in \Cref{alg:mirror_descent}), we will be in good shape.
+        \item This means we have to figure out how to approximately solve problems of the form $\argmin{\vx\in\R^d} \ip{\vg,\vx} + Lh_{\vq_t}(\vx)$, where $L$ is the smoothness constant derived for $f_{\vq_t}$ with respect to $h_{\vq_t}$. We do this up to an accuracy that approximate mirror descent can handle (see \Cref{thm:gp_mirror_descent} for details on what we want this approximation to look like). For the approximation to work, we need to approximately solve this problem up to both argument accuracy and approximate stationarity. The main technical result of interest here is \Cref{lemma:gp_prox_relativesmoothsolve}.
+    \end{enumerate}
+    \item We use the smoothness and strong convexity guarantees to show that our solution from the previous step satisfies the $\frac{1}{2}$-MS oracle (\Cref{defn:ms_oracle}), which means we can plug-and-play into \Cref{thm:optimal_ms_acceleration}.
+\end{enumerate}
+
+\subsubsection{Hessian Stability}
+
+Throughout this section, we adopt the following notation:
+\begin{align*}
+    C_p &\coloneqq ep^{p} \\
+    f(\vx) &\coloneqq \sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p \\
+    f_{\vq}(\vx) &\coloneqq f(\vx) + C_p\norm{\vx-\vq}_{\mM}^p \\
+    h_{\vq}(\vx) &\coloneqq \norm{\vx-\vq}_{\nabla^2 f(\vq)}^2 + C_p\norm{\vx-\vq}_{\mM}^p
+\end{align*}
+We begin with proving our Hessian stability fact, which should also be equivalently viewed as showing that $f_{\vq_t}$ is relatively smooth and relatively strongly convex in $h_{\vq_t}$ with $O(p^{O(1)})$ condition number. Our main result is \Cref{lemma:gp_hessian_stable} which relies on analytical results \Cref{lem:small_lemma_for_hessian_stability_one} and \Cref{lem:small_lemma_for_hessian_stability_two} that we prove later.
+\begin{lemma}
+\label{lemma:gp_hessian_stable}
+    For all $\vx \in\R^d$ and $p\geq 2$, we have $$\frac{1}{2p\cdot e}\nabla^2h_{\vq}(\vx)\preceq \nabla^2f_{\vq}(\vx) \preceq p\cdot e\nabla^2 h_{\vq}(\vx)\enspace.$$
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_hessian_stable}]
+    % As a sanity check, note that when $p=2$, the above recovers the correct gradient and hessian. 
+    Using an arbitrary $\vz\in\mathbb{R}^d$ we can write the following quadratic form of the hessian of $f$,
+    \begin{align}
+        \vz^{\top}\nabla^2 f(\vx)\vz &\le^{\text{(a)}} p\cdot(p-1)\sum_{i=1}^m\norm{\mA_{S_i}\vx - \vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2\enspace,\nonumber\\
+        &= p\cdot(p-1)\sum_{i=1}^m\norm{\mA_{S_i}(\vx - \vq) + \mA_{S_i}\vq - \vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2\enspace,\nonumber\\
+        &\leq^{\text{(b)}}  p\cdot(p-1)\sum_{i=1}^m\left(\alpha_p^{p-2}\norm{\mA_{S_i}(\vx - \vq)}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2 + \beta_p^{p-2}\norm{\mA_{S_i}\vq - \vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2\right)\enspace,\nonumber\\
+        &\leq^{\text{(c)}}p\cdot(p-1)\cdot\alpha_p^{p-2}\sum_{i=1}^m\norm{\mA_{S_i}(\vx - \vq)}_2^{p-2}\norm{\mA_{S_i}\vz}_2^2 + (p-1)\cdot\beta_p^{p-2}\vz^{\top}\nabla^2f(\vq)\vz\enspace,\nonumber\\
+        &\leq^{\text{(d)}}p\cdot(p-1)\cdot\alpha_p^{p-2}\left(\norm{\vx-\vq}^p_{\mM}\right)^{(p-2)/p}\left(\norm{\vz}^p_{\mM}\right)^{2/p}+ (p-1)\cdot\beta_p^{p-2}\vz^{\top}\nabla^2f(\vq)\vz\enspace,\nonumber\\
+        &= p\cdot(p-1)\cdot\alpha_p^{p-2}\norm{\vx-\vq}^{p-2}_{\mM}\norm{\vz}^2_{\mM} + (p-1)\cdot\beta_p^{p-2}\vz^{\top}\nabla^2f(\vq)\vz\enspace,\nonumber\\
+        &\leq^{(e)} \frac{(p-1)\cdot \alpha_p^{p-2}}{C_p} \vz^{\top}\nabla^2g_{\vq}(\vx)\vz + (p-1)\cdot\beta_p^{p-2}\vz^{\top}\nabla^2f(\vq)\vz\enspace,\label{eq:quad_form_f_ub}
+    \end{align}
+    where in (a) we apply the upper bound from \Cref{lemma:gp_regression_hessian_upperbound}, in (b) we pick $\alpha_p,\beta_p\geq 1$ such that $1/\alpha_p + 1/\beta_p = 1$ (we will choose them later), in (c) we apply the lower bound from \Cref{lemma:gp_regression_hessian_upperbound}, in (d) we use the choice of our weights in designing $\mM$ and \Cref{thm:gp_regression_blw_intro}\todo{write something more explicit for justifying (d).} and finally in (e) we use the following calculations for the regularizer term for some $\vz\in\mathbb{R}^d$,
+    \begin{align*}
+        g_{\vq}(\vx) &\coloneqq C_p\norm{\vx-\vq}^p_{\mM}\enspace,\\    
+        \nabla g_{\vq}(\vx) &= pC_p\norm{\vx-\vq}_{\mM}^{p-2}{\mM}(\vx-\vq)\enspace,\\
+        \nabla^2 g_{\vq}(\vx) &= pC_p\norm{\vx-\vq}_{\mM}^{p-2}\mM + p(p-2)C_p\norm{\vx-\vq}_{\mM}^{p-4}\mM(\vx-\vq)(\vx-\vq)^{\top}\mM\enspace,\\
+        \vz^{\top}\nabla^2 g_{\vq}(\vx)\vz &= pC_p\norm{\vx-\vq}_{\mM}^{p-2}\norm{\vz}^2_{\mM}+ p(p-2)C_p\norm{\vx-\vq}_{\mM}^{p-4}\left((\vx-\vq)^{\top}\mM\vz\right)^2 \geq^{(p\geq 2)} 0\enspace.
+    \end{align*}
+    Combining \eqref{eq:quad_form_f_ub} with the definition of $f_{\vq}$ gives us,
+    \begin{align*}
+        \vz^{\top}\nabla^2f_{\vq}(\vx)\vz &= \vz^{\top}\nabla^2f(\vx)\vz + \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\leq^{\text{using }\eqref{eq:quad_form_f_ub}} (p-1)\cdot\beta_p^{p-2}\vz^{\top}\nabla^2f(\vq)\vz + \left(1+\frac{(p-1)\cdot \alpha_p^{p-2}}{C_p}\right) \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace.
+    \end{align*}
+    Thus, in order to finish the proof for the upper bound we need to pick $\alpha_p, \beta_p$. We split the analysis here into two cases: \textbf{A.} $p>2$ and \textbf{B.} $p=2$.
+    
+    \paragraph{\underline{Case A.} ($p>2$)} For simplicity we will just pick $\alpha_p = p-1$ and $\beta_p = \frac{p-1}{p-2}$ which implies,
+    \begin{align*}
+        \vz^{\top}\nabla^2f_{\vq}(\vx)\vz &\leq (p-1)\cdot\left(1 + \frac{1}{p-2}\right)^{p-2}\vz^{\top}\nabla^2f(\vq)\vz + \left(1+\frac{(p-1)\cdot (p-1)^{p-2}}{C_p}\right) \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\leq (p-1)\cdot e\vz^{\top}\nabla^2f(\vq)\vz + \left(1+\frac{(p-1)^{p-1}}{C_p}\right) \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &= \frac{(p-1)\cdot e}{2} \vz^{\top}\left(\nabla^2h_{\vq}(\vx) - \nabla^2g_{\vq}(\vx)\right)\vz + \left(1+\frac{(p-1)^{p-1}}{C_p}\right) \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\leq^{(p\geq 2)} p\cdot e \vz^{\top}\nabla^2h_{\vq}(\vx)\vz + \left(1+\frac{(p-1)^{p-1}}{C_p} - \frac{(p-1)\cdot e}{2}\right)\vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &= p\cdot e \vz^{\top}\nabla^2h_{\vq}(\vx)\vz + \left(1+\frac{(p-1)^{p-1}}{ep^p} - \frac{(p-1)\cdot e}{2}\right)\vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\leq^{\text{(\Cref{lem:small_lemma_for_hessian_stability_one})}} p\cdot e \vz^{\top}\nabla^2h_{\vq}(\vx)\vz\enspace,
+    \end{align*}
+    where in the final inequality we use \Cref{lem:small_lemma_for_hessian_stability_one} which tell us that for $p\geq 2$ the constant in front of $\vz^{\top}\nabla^2g_{\vq}(\vx)\vz$ is negative along with the fact that $\vz^{\top}\nabla^2g_{\vq}(\vx)\vz$ is non-negative. To get the lower bound we first exchange $\vx, \vq$ in \eqref{eq:quad_form_f_ub} (and use the values of $\alpha_p$ and $\beta_p$) to get,
+    \begin{align*}
+        &\vz^{\top}\nabla^2f(\vq)\vz \leq \frac{(p-1)\cdot(p-1){p-2}}{ep^p}\vz^{\top}\nabla^2g_{\vx}(\vq)\vz + (p-1)\left(1 + \frac{1}{p-2}\right)^{p-2}\vz^{\top}\nabla^2f(\vx)\vz\enspace,\\
+        &\Rightarrow \vz^{\top}\nabla^2f(\vq)\vz \leq \frac{(p-1)^{p-1}}{ep^p}\vz^{\top}\nabla^2g_{\vx}(\vq)\vz + (p-1)e\vz^{\top}\nabla^2f(\vx)\vz\enspace,\\
+        \Rightarrow &\frac{1}{(p-1)e}\vz^{\top}\nabla^2f(\vq)\vz - \frac{(p-1)^{p-2}}{e^2p^p}\vz^{\top}\nabla^2g_{\vx}(\vq)\vz \leq \vz^{\top}\nabla^2f(\vx)\vz\enspace.
+    \end{align*}
+    We can finally lower bound,
+    \begin{align*}
+        \vz^{\top}\nabla^2f_{\vq}(\vx)\vz &= \vz^{\top}\nabla^2f(\vx)\vz + \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\geq \frac{1}{(p-1)e}\vz^{\top}\nabla^2f(\vq)\vz - \frac{(p-1)^{p-2}}{e^2p^p}\vz^{\top}\nabla^2g_{\vx}(\vq)\vz + \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &= \frac{1}{2(p-1)e}\vz^{\top}\left(\nabla^2h_{\vq}(\vx)- \nabla^2g_{\vq}(\vx)\right)\vz - \frac{(p-1)^{p-2}}{e^2p^p}\vz^{\top}\nabla^2g_{\vx}(\vq)\vz + \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\geq^{(g_{\vq}(\vx) = g_{\vx}(\vq))} \frac{1}{2pe}\vz^{\top}\nabla^2h_{\vq}(\vx)\vz + \left(1 - \frac{1}{2(p-1)e}- \frac{(p-1)^{p-2}}{e^2p^p}\right)\vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &\geq^{\text{(\Cref{lem:small_lemma_for_hessian_stability_two})}}\frac{1}{2pe}\vz^{\top}\nabla^2h_{\vq}(\vx)\vz\enspace, 
+    \end{align*}
+    where in the final inequality we use \Cref{lem:small_lemma_for_hessian_stability_two} and the fact that $\vz^{\top}\nabla^2g_{\vq}(\vx)\vz$ is non-negative. This finishes the proof for Case A.
+
+    We finally consider the corner case with $p=2$. 
+
+    \paragraph{\underline{Case B.} ($p=2$)} In this case the proof is trivial, and follows from simply writing the quadratic forms for $f_{\vq}$ and $h_{\vq}$. We do so below,
+    \begin{align*}
+        \vz^{\top}\nabla^2f_{\vq}(\vx)\vz &= \vz^{\top}\nabla^2f(\vx)\vz + \vz^{\top}\nabla^2g_{\vq}(\vx)\vz\enspace,\\
+        &= \vz^{\top}\nabla^2f(\vx)\vz + 2C_2\norm{\vz}^2_{\mM}\enspace,\\
+        &\leq 2\vz^{\top}\nabla^2f(\vx)\vz + 2C_2\norm{\vz}^2_{\mM} = \vz^{\top}\nabla^2h_{\vq}(\vx)\vz\enspace,
+    \end{align*}
+    which shows the relative smoothness with a constant of $1$ which is smaller (and hence better) than the claimed constant (for $p=2$) of $2e$ in the lemma. Now for the relative strong convexity we do the same,
+    \begin{align*}
+        \vz^{\top}\nabla^2f_{\vq}(\vx)\vz &= \vz^{\top}\nabla^2f(\vx)\vz + 2C_2\norm{\vz}^2_{\mM}\enspace,\\
+        &\geq \frac{1}{2}\cdot\left(2\vz^{\top}\nabla^2f(\vx)\vz + 2C_2\norm{\vz}^2_{\mM}\right)\enspace,\\
+        &= \frac{1}{2}\vz^{\top}\nabla^2h_{\vq}(\vx)\vz\enspace,
+    \end{align*}
+    which shows relative strong-convexity with a constant of $\frac{1}{2}$ which is larger (and hence better) than the claimed constant (for $p=2$) of $\frac{1}{4e}$ in the lemma. This finishes the proof for Case B. 
+    
+    This completes the proof of \Cref{lemma:gp_hessian_stable}.
+    % \begin{align*}
+    %     &(p-1)\cdot\beta_p^{p-2} \leq 2u\quad\text{and}\quad 1+\frac{(p-1)\cdot \alpha_p^{p-2}}{C_p} \leq u\enspace,\\
+    %     \Rightarrow &\frac{p-1}{2}\left(\frac{\alpha_p}{\alpha_p-1}\right)^{p-2} \leq u\quad\text{and}\quad 1+\frac{(p-1)\cdot \alpha_p^{p-2}}{C_p} \leq u\enspace, 
+    % \end{align*}
+\end{proof}
+We prove two small technical lemmas that we used in the above proof now. 
+\begin{lemma}\label{lem:small_lemma_for_hessian_stability_one}
+    For all $p\geq 2$, $g(p) = 1+\frac{(p-1)^{p-1}}{ep^p} - \frac{(p-1)\cdot e}{2} \leq 0$.
+\end{lemma}
+\begin{proof}
+     First note that at $p=2$ the function takes a strictly negative value,
+     \begin{align*}
+         g(2) = 1+\frac{(1}{e2^2} - \frac{e}{2} = \frac{4e+ 1 - 2e^2}{4e} < 0\enspace. 
+     \end{align*}
+     We will now show that the function is increasing in $p$ for $p\geq 2$,
+     \begin{align*}
+         g'(p) &= -\frac{(p-1)^{p-1}p^p(\ln(p) + 1)}{p^2p} + \frac{(p-1)^{p-1}(\ln(p-1) + 1)}{p^p} - \frac{e}{2}\enspace,\\
+         &= -\frac{(p-1)^{p-1}\ln(p/(p-1))}{p^p} - \frac{e}{2} < 0\enspace. 
+     \end{align*}
+     Thus, the function attains its maximum value at $p=2$ in the range $p\geq 2$, implying it is strictly negative in that range.
+\end{proof}
+
+\begin{lemma}\label{lem:small_lemma_for_hessian_stability_two}
+    For all $p\geq 2$, $g(p) = 1-\frac{1}{2(p-1)e} - \frac{(p-1)^{p-2}}{e^2p^p} \geq 0$.
+\end{lemma}
+\begin{proof}
+    First note that at $p=2$ the function takes a strictly positive value,
+    \begin{align*}
+        g(2) = 1 - \frac{1}{2e} -\frac{1^0}{e^22^2} = 1 - \frac{1}{2e} - \frac{1}{4e^2} = \frac{4e^2 - 2e - 1}{4e^2} > 0\enspace.
+    \end{align*}
+    We will now show that the function is increasing in $p$ for $p\geq 2$,
+    \begin{align*}
+        g'(p) &= \frac{1}{2(p-1)^2e} + \frac{(p-1)^{p-2}p^p(\ln(p) + 1)}{e^2p^{2p}} - \frac{(p-1)^{p-2}(\ln(p-1) + (p-2)/(p-1))}{e^2p^p}\enspace,\\
+        &= \frac{1}{2(p-1)^2e} + \frac{(p-1)^{p-2}(\ln(p) + 1)}{e^2p^{p}} - \frac{(p-1)^{p-2}(\ln(p-1) + 1 - 1/(p-1))}{e^2p^p}\enspace,\\
+        &= \frac{1}{2(p-1)^2e} + \frac{(p-1)^{p-2}\left(\ln(p/(p-1)) + 1/(p-1)\right)}{e^2p^{p}} > 0\enspace.
+    \end{align*}
+    Thus, the function $g$ attains its minimum value at $p=2$ in the range $p\geq2$, implying that it is strictly positive in that range.
+\end{proof}
+
+\subsubsection{Strong Convexity of the Proximal Objective and Friends}
+
+We begin by showing that the proximal objective enjoys a form of strong convexity.
+\begin{lemma}
+\label{lemma:fq_strongly_convex}
+For all $\vx,\vd\in\R^d$, we have
+\begin{align*}
+    f_{\vq}(\vx+\vd) \ge f_{\vq}(\vx) + \ip{\nabla f_{\vq}(\vx), \vd} + \frac{4}{2^p}\inparen{\gnorm{\mA\vd}{p}^p + C_p\norm{\vd}_{\mM}^p}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:fq_strongly_convex}]
+Let $K_p \coloneqq \frac{4}{2^p}$.
+
+The plan is to apply \Cref{lemma:strong_convexity_component} to $f_{\vq}(\vx+\vd)$. We start with the regularizer. Notice that
+\begin{align}
+    \norm{\vx+\vd-\vq}_{\mM}^p &= \norm{\mM^{1/2}(\vx+\vd-\vq)}_2^p = \norm{\mM^{1/2}(\vx-\vq) + \mM^{1/2}\vd}_2^p\enspace,\nonumber \\
+    &\ge^{\text{(\Cref{lemma:strong_convexity_component})}} \norm{\mM^{1/2}(\vx-\vq)}_2^p \\
+    &\quad + \ip{p\norm{\mM^{1/2}(\vx-\vq)}_2^{p-2}\mM^{1/2}(\vx-\vq),\mM^{1/2}\vd} + K_p\norm{\mM^{1/2}\vd}_2^p\enspace,\nonumber\\
+    &= \norm{\vx-\vq}_{\mM}^p + \ip{p\norm{\vx-\vq}_{\mM}^{p-2}\mM(\vx-\vq), \vd} + K_p\norm{\vd}_{\mM}^p\enspace,\nonumber\\
+    &= \norm{\vx-\vq}_{\mM}^p + \ip{\nabla_{\vx} \inparen{\norm{\vx-\vq}_{\mM}^p}, \vd} + K_p\norm{\vd}_{\mM}^p\enspace.\label{eq:M_norm_sc}
+\end{align}
+% giving\todo{where did we show this strong convexity property for the M norm?}
+% \begin{align*}
+%     \norm{\vx+\vd-\vq}_{\mM}^p &\ge \norm{\vx-\vq}_{\mM}^p + \ip{p\norm{\vx-\vq}_{\mM}^{p-2}\mM^{1/2}(\vx-\vq), \mM^{1/2}\vd} + K_p\norm{\vd}_{\mM}^p \\
+%     &= \norm{\vx-\vq}_{\mM}^p + \ip{p\norm{\vx-\vq}_{\mM}^{p-2}\mM(\vx-\vq), \vd} + K_p\norm{\vd}_{\mM}^p \\
+%     &= \norm{\vx-\vq}_{\mM}^p + \ip{\nabla_{\vx} \inparen{\norm{\vx-\vq}_{\mM}^p}, \vd} + K_p\norm{\vd}_{\mM}^p.
+% \end{align*}
+We combine this with the conclusion of \Cref{lemma:strong_convexity_gp}, giving
+\begin{align*}
+    f_{\vq}(\vx+\vd) &= f(\vx+\vd) + C_p\|\vx+\vd - \vq\|_{\mM}^p\enspace,\\
+    &\geq^{\text{(\Cref{lemma:strong_convexity_gp})}} f(\vx) + \ip{\nabla f(\vx),\vd} + K_p\gnorm{\mA\vd}{p}^p+ C_p\|\vx+\vd - \vq\|_{\mM}^p\enspace,\\
+    &\geq^{\text{\eqref{eq:M_norm_sc}}} f(\vx) + \ip{\nabla f(\vx),\vd} + K_p\gnorm{\mA\vd}{p}^p + C_p\norm{\vx-\vq}_{\mM}^p\\ 
+    &\quad + C_p\ip{\nabla_{\vx} \inparen{\norm{\vx-\vq}_{\mM}^p}, \vd} + K_pC_p\norm{\vd}_{\mM}^p\enspace,\\
+    &= \textcolor{red}{f(\vx)}  + \textcolor{red}{C_p\norm{\vx-\vq}_{\mM}^p} + \ip{\textcolor{blue}{\nabla_{\vx} \left(f(\vx) + C_p\norm{\vx-\vq}_{\mM}^p\right)},\vd}\\
+    &\quad + K_p\gnorm{\mA\vd}{p}^p + K_pC_p\norm{\vd}_{\mM}^p\enspace,\\
+    &= \textcolor{red}{f_{\vq}(\vx)} + \ip{\textcolor{blue}{\nabla f_{\vq}(\vx)},\vd} + K_p\inparen{\gnorm{\mA\vd}{p}^p + C_p\norm{\vd}_{\mM}^p}\enspace.
+\end{align*}
+completing the proof of \Cref{lemma:fq_strongly_convex}.
+\end{proof}
+
+We also show that the subproblems we solve in Line \ref{line:mirror_descent_exact} of \Cref{alg:mirror_descent} are strongly convex.
+\begin{lemma}
+\label{lemma:gp_h_strongly_convex}
+Fix $\vz, \vq, \vd \in \R^d$ and let $L > 0$. Consider the function
+\begin{align*}
+    g(\vx) &\coloneqq \ip{\vz,\vx} + L\inparen{\norm{\vx-\vq}_{\nabla^2 f(\vq)}^2 + C_p\norm{\vx-\vq}_{\mM}^p}\enspace.
+\end{align*}
+Then,
+\begin{align*}
+    g(\vx+\vd) \ge g(\vx) + \ip{\nabla g(\vx),\vd} + L\inparen{\norm{\vd}_{\nabla^2 f(\vq)}^2 + \frac{4C_p}{2^p}\norm{\vd}_{\mM}^p}\enspace.
+\end{align*}
+In particular, if $\vz$ is the minimizer for $g$, then for any $\vd\in\R^d$, we have
+\begin{align*}
+    \norm{\vd}_{\mM} \le \frac{2}{p \cdot (4e)^{1/p}}\inparen{\frac{g(\vz+\vd) - g(\vz)}{L}}^{1/p}\enspace.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_h_strongly_convex}]
+This is pretty much the same proof as \Cref{lemma:fq_strongly_convex}. It is easy to check that
+\begin{align}
+    \norm{(\vx+\vd)-\vq}_{\nabla^2 f(\vq)}^2 = \norm{\vx-\vq}_{\nabla^2 f(\vq)}^2 + \ip{2\nabla^2 f(\vq)(\vx-\vq),\vd} + \norm{\vd}_{\nabla^2 f(\vq)}^2\enspace,\label{eq:f_norm_expansion}
+\end{align}
+and using \Cref{lemma:strong_convexity_component} in the same way as in the proof of \Cref{lemma:fq_strongly_convex}, we have
+\begin{align*}
+    \norm{(\vx+\vd)-\vq}_{\mM}^p \ge^{\text{\eqref{eq:M_norm_sc}}} \norm{\vx-\vq}_{\mM}^p + \ip{p\norm{\vx-\vq}_{\mM}^{p-2}\mM(\vx-\vq),\vd} + \frac{4}{2^p}\norm{\vd}_{\mM}^p\enspace.
+\end{align*}
+Combining this with the definition of $g$ gives the following,
+\begin{align*}
+    g(\vx+\vd) &= \ip{\vz,\vx + \vd} + L\inparen{\norm{\vx + \vd-\vq}_{\nabla^2 f(\vq)}^2 + C_p\norm{\vx + \vd -\vq}_{\mM}^p}\enspace,\\
+    &\geq^{\text{\eqref{eq:f_norm_expansion}, \eqref{eq:M_norm_sc}}} \textcolor{red}{\ip{\vz,\vx}} +  \ip{\vz,\vd} + \textcolor{red}{L\norm{\vx-\vq}_{\nabla^2 f(\vq)}^2} + L\ip{2\nabla^2 f(\vq)(\vx-\vq),\vd}\\
+    &\qquad + L\norm{\vd}_{\nabla^2 f(\vq)}^2 + LC_p\left(\textcolor{red}{\norm{\vx-\vq}_{\mM}^p} + \ip{p\norm{\vx-\vq}_{\mM}^{p-2}\mM(\vx-\vq),\vd} + \frac{4}{2^p}\norm{\vd}_{\mM}^p\right)\enspace,\\
+    &=  \textcolor{red}{g(\vx)}  + \ip{\textcolor{blue}{\vz} + \textcolor{blue}{2L\nabla^2 f(\vq)(\vx-\vq)} + \textcolor{blue}{LC_pp\norm{\vx-\vq}_{\mM}^{p-2}\mM(\vx-\vq)},\vd} \\
+    &\qquad  + L\left(\norm{\vd}_{\nabla^2 f(\vq)}^2 + \frac{4C_p}{2^p}\norm{\vd}_{\mM}^p\right)\enspace,\\
+    &= g(\vx) + \ip{\textcolor{blue}{\nabla g(\vx)},\vd} + L\left(\norm{\vd}_{\nabla^2 f(\vq)}^2 + \frac{4C_p}{2^p}\norm{\vd}_{\mM}^p\right)\enspace,
+\end{align*}
+which proves the first result of the lemma.
+
+To get the second result, we observe that $\nabla g(\vz) = 0$ by the optimality of $\vz$. Ignoring the $\norm{\vd}_{\nabla^2 f(\vq)}$ terms and rearranging gives the conclusion of \Cref{lemma:gp_h_strongly_convex}.
+\end{proof}
+
+\subsubsection{Smoothness of the Proximal Objective}
+
+We first bound the operator norm of a matrix related to the Hessian of the proximal objective.
+
+\begin{lemma}
+\label{lemma:gp_prox_hessian_opnorm}
+For all $\vq,\vy\in\R^d$, we have
+\begin{align*}
+    \opnorm{\mM^{-1/2}\inparen{\nabla^2 f_{\vq}(\vy)}\mM^{-1/2}} &\le ep^2(p-1)\inparen{2f(\vq)^{1-\frac{2}{p}}+C_p\norm{\vy-\vq}_{\mM}^{p-2}}\enspace.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_prox_hessian_opnorm}]
+Recall from the proof of \Cref{lemma:gp_hessian_stable} the definition of the regularization term $g_{\vq}(\vy) \coloneqq C_p\norm{\vy-\vq}_{\mM}^p$ for $C_p = ep^p$ as well as the following calculations,
+ \begin{align*}
+        g_{\vq}(\vy) &\coloneqq C_p\norm{\vy-\vq}^p_{\mM}\enspace,\\    
+        \nabla g_{\vq}(\vy) &= pC_p\norm{\vy-\vq}_{\mM}^{p-2}{\mM}(\vy-\vq)\enspace,\\
+        \nabla^2 g_{\vq}(\vy) &= pC_p\norm{\vy-\vq}_{\mM}^{p-2}\mM + p(p-2)C_p\norm{\vy-\vq}_{\mM}^{p-4}\mM(\vy-\vq)(\vy-\vq)^{\top}\mM\enspace.
+\end{align*}
+By \Cref{lemma:gp_hessian_stable}, we know that
+\begin{align*}
+    \nabla^2 f_{\vq}(\vy) \preceq ep\inparen{2\nabla^2 f(\vq) + \nabla^2 g_{\vq}(\vy)}.
+\end{align*}
+Observe that
+\begin{align*}
+    \quad \mM^{-1/2} \inparen{\nabla^2 g_{\vq}(\vy)} \mM^{-1/2} &= pC_p\inparen{\norm{\vy-\vq}_{\mM}^{p-2}+(p-2)\norm{\vy-\vq}_{\mM}^{p-4}\mM^{1/2}(\vy-\vq)(\vy-\vq)^{\top}\mM^{1/2}}\enspace,\\
+    &\preceq pC_p\norm{\vy-\vq}_{\mM}^{p-2}\mI + (p-2)\norm{\vy-\vq}_{\mM}^{p-4}\opnorm{\mM^{1/2}(\vy-\vq)(\vy-\vq)^{\top}\mM^{1/2}}\mI\enspace,\\
+    &\preceq pC_p\norm{\vy-\vq}_{\mM}^{p-2}\mI + (p-2)\norm{\vy-\vq}_{\mM}^{p-4}\norm{\mM^{1/2}(\vy-\vq)}_2^2\mI\enspace,\\ 
+    &\preceq p(p-1)C_p \norm{\vy-\vq}_{\mM}^{p-2}\mI\enspace,
+\end{align*}
+and, applying \Cref{lemma:gp_regression_hessian_upperbound} (with $\mM^{-1/2}\vz$ as the vectors in the quadratic form) and H\"older inequality with norms $\|\cdot\|_{p/(p-2)},\ \|\cdot\|_{p/2}$, for $\vz\in\R^d$ we have\todo{add a reference for the third inequality. I keep forgetting which result this is in the previous sections.}
+\begin{align*}
+    \vz^{\top}\mM^{-1/2}\inparen{\nabla^2 f(\vq)} \mM^{-1/2}\vz &\le p(p-1)\sum_{i=1}^m \norm{\mA_{S_i}\vq-\vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}\mM^{-1/2}\vz}_2^2 \\
+    &\le p(p-1)\inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vq-\vb_{S_i}}_2^p}^{\frac{p-2}{p}}\inparen{\sum_{i=1}^m \norm{\mA_{S_i}\mM^{-1/2}\vz}_2^p}^{\frac{2}{p}} \\
+    &\le p(p-1)f(\vq)^{1-\frac{2}{p}}\norm{\mM^{-1/2}\vz}_{\mM}^2 = p(p-1)f(\vq)^{1-\frac{2}{p}}\norm{\vz}_2^2.
+\end{align*}
+Combining gives
+\begin{align*}
+    \mM^{-1/2}\inparen{\nabla^2f_{\vq}(\vy)}\mM^{-1/2} &\preceq ep\mM^{-1/2}\inparen{2\nabla^2f(\vq) + \nabla^2g_{\vq(\vy)}}\mM^{-1/2}\enspace,\\    
+    &\preceq 2ep^2(p-1)f(\vq)^{1-\frac{2}{p}} + ep^2(p-1)C_p\norm{\vy-\vq}_{\mM}^{p-2}\enspace, \\
+    &\preceq ep^2(p-1)\inparen{2f(\vq)^{1-\frac{2}{p}}+C_p\norm{\vy-\vq}_{\mM}^{p-2}},
+\end{align*}
+completing the proof of \Cref{lemma:gp_prox_hessian_opnorm}.
+\end{proof}
+
+Next, we show a bound on the norm of the gradient of any solution $\vx$ that is approximately optimal for $f_{\vq}$.
+
+\begin{lemma}
+\label{lemma:self_gradient_norm_small}
+For all $\vq,\vx\in\R^d$, we have
+\begin{align*}
+    \norm{\mM^{-1}\nabla f_{\vq}(\vx)}_{\mM} &\le ep^2(p-1)\inparen{f(\vq)^{1-\frac{2}{p}}+C_p\max\inbraces{\norm{\vx-\vq}_{\mM},\norm{\vx_{\vq}-\vq}_{\mM}}^{p-2}}\norm{\vx-\vx_{\vq}}_{\mM}\enspace.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:self_gradient_norm_small}]
+We use a continuity argument. By Taylor's theorem, we know for some $\vy$ along the line connecting $\vx$ and $\vx_{\vq}$ (minimizer of $f_{\vq}$) that
+\begin{align*}
+    \nabla f_{\vq}(\vx) = \nabla f_{\vq}(\vx_{\vq}) + \nabla^2 f_{\vq}(\vy)(\vx-\vx_{\vq}) = \nabla^2 f_{\vq}(\vy)(\vx-\vx_{\vq})\enspace.
+\end{align*}
+Taking $\mM^{-1}$-norm of both sides gives,
+\begin{align*}
+    \norm{\nabla f_{\vq}(\vx)}_{\mM^{-1}} &= \norm{\mM^{-1/2}\nabla f_{\vq}(\vx)}_{2}\enspace,\\
+     &= \norm{\mM^{-1/2}\nabla^2 f_{\vq}(\vy)(\vx-\vx_{\vq})}_{2}\enspace,\\
+     &= \norm{\mM^{-1/2}\nabla^2 f_{\vq}(\vy)\mM^{-1/2}\mM^{1/2}(\vx-\vx_{\vq})}_{2}\enspace,\\
+    &\le \opnorm{\mM^{-1/2}\inparen{\nabla^2 f_{\vq}(\vy)}\mM^{-1/2}} \cdot \norm{\vx-\vx_{\vq}}_{\mM}\enspace.
+\end{align*}
+The rest of the proof involves bounding the operator norm term. This follows directly from \Cref{lemma:gp_prox_hessian_opnorm}, from which we get (using convexity of $\|\cdot\|_{\mM}$),
+\begin{align*}
+    \opnorm{\mM^{-1/2}\nabla^2 f_{\vq}(\vy)\mM^{-1/2}} &\le ep^2(p-1)\inparen{2f(\vq)^{1-\frac{2}{p}}+C_p\norm{\vy-\vq}_{\mM}^{p-2}} \\
+    &\le ep^2(p-1)\inparen{2f(\vq)^{1-\frac{2}{p}}+C_p\max\inbraces{\norm{\vx-\vq}_{\mM},\norm{\vx_{\vq}-\vq}_{\mM}}^{p-2}}.
+\end{align*}
+Putting everything together, we get
+\begin{align*}
+    \norm{\mM^{-1}\nabla f_{\vq}(\vx)}_{\mM}&= \norm{\nabla f_{\vq}(\vx)}_{\mM^{-1}}\enspace, \\
+    &\le ep^2(p-1)\inparen{2f(\vq)^{1-\frac{2}{p}}+C_p\max\inbraces{\norm{\vx-\vq}_{\mM},\norm{\vx_{\vq}-\vq}_{\mM}}^{p-2}}\norm{\vx-\vx_{\vq}}_{\mM},
+\end{align*}
+completing the proof of \Cref{lemma:self_gradient_norm_small}.
+\end{proof}
+
+\subsubsection{Solving the Proximal Subproblems}
+
+We begin by showing that the optimal solution to the proximal problem $\vx_{\vq_t}\coloneqq \argmin{\vx\in\R^d} f_{\vq_t}(\vx)$ is not too far from $\xstar$.
+
+\begin{lemma}
+\label{lemma:gp_regression_prox_diameter}
+For all proximal queries $\vq_t$, we have
+\begin{align*}
+    \norm{\vx_{\vq_t}-\xstar}_{\mM} \le d^{\frac{1}{2}-\frac{1}{p}}\inparen{2^{\frac{3}{2}}f(\vx_t)+4}.
+\end{align*}
+\end{lemma}
+\begin{proof}
+In the rest of this proof, we omit the subscript $t$ wherever it is clear which iterates we are working with. 
+
+We first show that
+\begin{align*}
+    \norm{\vx_{\vq}-\vq}_{\mM} \le \norm{\xstar-\vq}_{\mM}\enspace.
+\end{align*}
+To see this, suppose this is not the case. Then, we have
+\begin{align*}
+    f(\xstar) + C_p\norm{\xstar-\vq}_{\mM}^p < f(\vx_{\vq}) + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,
+\end{align*}
+which contradicts the optimality of $\vx_{\vq}$ for $f_{\vq}$.
+
+We now write
+\begin{align*}
+    \norm{\vx_{\vq_t}-\xstar}_{\mM} &\le \norm{\vx_{\vq_t}-\vq_t}_{\mM} + \norm{\xstar-\vq_t}_{\mM}\enspace, \\
+    &\le 2\norm{\xstar-\vq_t}_{\mM}\enspace,\\
+    &\le 2\inparen{\norm{\vx_t-\xstar}_{\mM}+\norm{\vv_t-\xstar}_{\mM}}\enspace,
+\end{align*}
+where in the last inequality, we used the definition of $\vq_t$ from Line 6 in \Cref{alg:optimal_ms_acceleration} and the convexity of $\|\cdot\|_{\mM}$. The required control on $\norm{\vv_t-\xstar}_{\mM}$ comes from \Cref{lemma:ms_acceleration_iterate_diameter} and \Cref{lemma:gp_regression_initialization} (along with re-scaling assumption to make the optimal value $1$) -- we have
+\begin{align*}
+    \norm{\vv_t-\xstar}_{\mM} \le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} \le 4d^{\frac{1}{2}-\frac{1}{p}}\enspace.
+\end{align*}
+For the other term, we apply \Cref{lemma:strong_convexity_gp} and get
+\begin{align*}
+    \norm{\vx_t-\xstar}_{\mM} \le 2^{\frac{3}{2}}d^{\frac{1}{2}-\frac{1}{p}}\inparen{f(\vx_t)-f(\xstar)}^{\frac{1}{p}} < 2^{\frac{3}{2}}d^{\frac{1}{2}-\frac{1}{p}}f(\vx_t)^{\frac{1}{p}}.
+\end{align*}
+Adding gives us the conclusion of \Cref{lemma:gp_regression_prox_diameter}.
+\end{proof}
+
+The next few lemmas are targeted at solving the proximal subproblems. We begin with a calculation that we will use in showing that the initial Bregman divergence between our initialization and the optimum is small.
+
+\begin{lemma}
+\label{lemma:initial_bregman_div}
+In the same setting as \Cref{lemma:gp_hessian_stable}, for all $\vx,\vy \in \R^d$, we have
+\begin{align*}
+    h_{\vq}(\vx_{\vq}) \le p(p-1)f(\vq)^{1-\frac{2}{p}}\norm{\vx_{\vq}-\vq}_{\mM}^2 + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p < f(\vq)+C_p\norm{\vx_{\vq}-\vq}_{\mM}^p \le 2f(\vq).
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:initial_bregman_div}]
+By optimality of $\vx_{\vq}$ for the subproblem, we have
+\begin{align*}
+    f(\vx_{\vq})+C_p\norm{\vx_{\vq}-\vq}_{\mM}^p \le f(\vq)+C_p\norm{\vq-\vq}_{\mM}^p=f(\vq).
+\end{align*}
+Rearranging gives,
+\begin{align}
+    \norm{\vx_{\vq}-\vq}_{\mM}^p \le \frac{f(\vq)-f(\vx_{\vq})}{C_p} \le \frac{f(\vq)}{C_p}\enspace.\label{eq:norm_M_ub_f}
+\end{align}
+We now use the definition of $h_{\vq}$ and \Cref{lemma:gp_regression_hessian_upperbound} to write
+\begin{align*}
+    h_{\vq}(\vx_{\vq}) &= \norm{\vx_{\vq}-\vq}_{\nabla^2 f(\vq)}^2 + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &\le^{\text{\Cref{lemma:gp_regression_hessian_upperbound}}} p(p-1)\sum_{i=1}^m \norm{\mA_{S_i}\vq-\vb_{S_i}}_2^{p-2}\norm{\mA_{S_i}(\vx_{\vq}-\vq)}_2^2 + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &\le^{\text{(a)}} p(p-1)\inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vq-\vb_{S_i}}_2^p}^{1-\frac{2}{p}}\inparen{\sum_{i=1}^m \norm{\mA_{S_i}(\vx_{\vq}-\vq)}_2^p}^{\frac{2}{p}}+ C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &\le^{\text{(b)}} p(p-1)f(\vq)^{1-\frac{2}{p}}\norm{\vx_{\vq}-\vq}_{\mM}^{2} + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &\le^{\text{\eqref{eq:norm_M_ub_f}}} p(p-1)f(\vq)^{1-\frac{2}{p}}\inparen{\frac{f(\vq)}{C_p}}^{\frac{2}{p}} + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &=^{\text{($C_p = ep^p$)}} \frac{(p-1)}{ep}f(\vq)+ C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &< f(\vq) + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p\enspace,\\
+    &<^{\text{\eqref{eq:norm_M_ub_f}}} 2f(\vq)\enspace,
+\end{align*}
+where in (a) we used H\"older inequality with norms $\|\cdot\|_{p/(p-2)},\ \|\cdot\|_{p/2}$ and in (b) we used \Cref{thm:gp_regression_blw_intro} \todo{again what's the reference for this one?}. 
+
+This completes the proof for the series of inequalities in \Cref{lemma:initial_bregman_div}.
+\end{proof}
+We now have the tools to show how to approximately solve problems in Line \ref{line:mirror_descent_exact} of \Cref{alg:mirror_descent} when applied in our setting. Although this and future complexity bounds depend on $f(\vx_t)$, we will later be able to use \Cref{thm:optimal_ms_acceleration} to ``bootstrap'' and get an unconditional upper bound below.
+\begin{lemma}
+\label{lemma:gp_prox_relativesmoothsolve}
+Let $\alpha \le 1/2$. In the context of \Cref{alg:gp_regression_alg}, there exists an algorithm that approximately solves subproblems of the form (for $p\geq 2$ and $L=pe$),
+\begin{align*}
+    \vz \coloneqq \argmin{\vx\in\R^d} \ip{\vg,\vx} + L\inparen{\norm{\vx-\vq}_{\nabla^2 f(\vq)}^2 + C_p\norm{\vx-\vq}_{\mM}^p}\enspace,
+\end{align*}
+in the sense that we output $\vx$ for which,
+\begin{equation*}
+    \begin{aligned}
+        \max\left\{\norm{\vx-\vz}_{\mM}, \norm{\mM^{-1}\vg + 2L\inparen{\mM^{-1}\nabla^2 f(\vq)(\vx-\vq) + C_p\norm{\vx-\vq}_{\mM}^{p-2}(\vx-\vq)}}_{\mM}\right\} \le \alpha
+    \end{aligned}\enspace.
+\end{equation*}
+The algorithm takes $p^{O(1)}\logv{\frac{pd \cdot f(\vq)}{\alpha}}$ linear-system-solves in matrices of the form $\mA^{\top}\mB\mA$ for block-diagonal $\mB$, where each block in $\mB$ has size $\abs{S_i} \times \abs{S_i}$.
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:gp_prox_relativesmoothsolve}]
+This proof is lengthy, and splitting it into lemmas would disrupt the intended reading flow. So we break it up into several key components here.
+
+\smallpar{Motivation for the lemma.} First, let us see why this lemma is even useful. In each iteration of \Cref{alg:gp_prox_solver}, which in turn calls \Cref{alg:mirror_descent}, the main primitive is computing\todo{I think this part should appear before the lemma because it leads to confusion within the proof about what sub-problem we are solving. If it is motivation, we don't need a separate lemma we can just put it before the lemma.}
+\begin{align*}
+    \xtilde_i &= \argmin{\xtilde \in \R^d} f_{\vq_t}(\xtilde_{i-1}) + \ip{\nabla f_{\vq_t}(\xtilde_{i-1}), \xtilde-\xtilde_{i-1}} + peD_{h_{\vq_t}}(\xtilde,\xtilde_{i-1})\enspace, \\
+    &= \argmin{\xtilde \in \R^d} f_{\vq_t}(\xtilde_{i-1}) + \ip{\nabla f_{\vq_t}(\xtilde_{i-1}), \xtilde-\xtilde_{i-1}} + pe \left(h_{\vq_t}(\xtilde) - h_{\vq_t}(\xtilde_{i-1}) - \ip{\nabla h_{\vq_t}(\xtilde_{i-1}), \xtilde - \xtilde_{i-1}}\right)\enspace, \\
+    &= \argmin{\xtilde \in \R^d} f_{\vq_t}(\xtilde_{i-1})-peh_{\vq_t}(\xtilde_{i-1}) + \ip{\nabla f_{\vq_t}(
+    \xtilde_{i-1})-pe\nabla h_{\vq_t}(\xtilde_{i-1}), \xtilde-\xtilde_{i-1}} + peh_{\vq_t}(\xtilde)\enspace, \\
+    &= \argmin{\xtilde\in\R^d} \ip{\nabla f_{\vq_t}(
+    \xtilde_{i-1})-pe\nabla h_{\vq_t}(\xtilde_{i-1}), \xtilde} + peh_{\vq_t}(\xtilde)\enspace.
+\end{align*}
+Observe that the subproblem is of the form
+\begin{align}
+    \vz &= \argmin{\vx\in\R^d} \ip{\vg, \vx} + peh_{\vq}(\vx)\enspace,\nonumber\\
+    &= \argmin{\vx\in\R^d} \ip{\vg,\vx}+pe\inparen{\norm{\vx-\vq}_{\nabla^2 f(\vq)}^2 + C_p\norm{\vx-\vq}_{\mM}^p}\enspace,\label{eq:equiv_prox_problem}
+\end{align}
+and so our goal is to show how to solve these types of problems.
+
+\smallpar{The general algorithm.} 
+% In the rest of this proof, let $L = pe$, which comes from \Cref{lemma:gp_hessian_stable}. 
+Consider solving the related subproblem (instead of \eqref{eq:equiv_prox_problem}),
+\begin{align*}
+    \argmin{\vx\in\R^d} \ip{\vg,\vx}+L\inparen{\norm{\vx-\vq}_{\nabla^2 f(\vq)}^2 + C_p\tau\norm{\vx-\vq}_{\mM}^2}
+\end{align*}
+for some fixed $\tau \ge 0$. This is a quadratic problem, and we can therefore solve it in $1$ linear-system-solve. It is easy to check that at optimality, we have
+\begin{align*}
+    \vg + 2pe\inparen{\nabla^2 f(\vq)(\vx-\vq) + C_p\tau\mM(\vx-\vq)} = 0\enspace,
+\end{align*}
+which rearranges to\footnote{Recall that $\nabla^2 f(\vq)=\mA^{\top}\mB_1\mA$ for block-diagonal $\mB_1$ and by construction, $\mM = \mA^{\top}\mW^{1-\frac{2}{p}}\mA$ where $\mW$ consists of the block Lewis weights on the diagonal. Thus, $\nabla^2 f(\vq) + C_p\tau\mM=\mA^{\top}\mB_2\mA$ for block-diagonal $\mB_2$.}
+\begin{align*}
+    \vx-\vq = -\frac{1}{2pe}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\vg\enspace.
+\end{align*}
+
+Note that at optimality for our original subproblem \eqref{eq:equiv_prox_problem}, we have $\tau^\star := \norm{\vz-\vq}_{\mM}^{p-2}$ where $\vz$ is the solution of subproblem \eqref{eq:equiv_prox_problem}. Also note that $\norm{\vx-\vq}_{\mM}$ is a decreasing function in $\tau$ because,
+\begin{align*}
+    \norm{\vx-\vq}_{\mM}^2 = \frac{1}{4p^2e^2}\|\vg\|^2_{\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\mM\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}}\enspace, 
+\end{align*}
+and for $\tau_1 \leq \tau_2$,
+\begin{align*}
+    \inparen{\nabla^2 f(\vq)+C_p\tau_1\mM}^{-1}\mM\inparen{\nabla^2 f(\vq)+C_p\tau_1\mM}^{-1} \succeq \inparen{\nabla^2 f(\vq)+C_p\tau_2\mM}^{-1}\mM\inparen{\nabla^2 f(\vq)+C_p\tau_2\mM}^{-1}\enspace.
+\end{align*}
+We therefore see that if $\tau > \norm{\vx-\vq}_{\mM}^{p-2}$ --- where $\vx$ is the optimal solution for a fixed $\tau$ --- then we are over-regularizing and need to decrease $\tau$ and vice-versa. 
+% Similarly, if $\tau < \norm{\vx-\vq}_{\mM}^{p-2}$, then we are under-regularizing and we need to increase $\tau$. 
+% \begin{align*}
+%      \frac{d\left(\norm{\vx-\vq}^2_{\mM}\right)}{d\tau} &= \left(2\mM\left(\vx-\vq\right)\right)^{\top}\frac{d(\vx-\vq)}{d\tau}\enspace,\\
+%      &= \left(2\mM\left(\vx-\vq\right)\right)^{\top} \inparen{\frac{-1}{2pe}\inparen{\frac{d}{d\tau}\inparen{\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}}}\vg}\enspace,\\
+%      &= 2\vw^{\top}\inparen{\frac{1}{2pe}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\inparen{\frac{d}{d\tau}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\vg}\enspace,\\
+%      &= 2\vw^{\top}\inparen{\frac{1}{2pe}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}C_p\mM\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\vg}\enspace,\\
+%     &= -2C_p\vw^{\top}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\inparen{\frac{-1}{2pe}\mM\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\vg}\enspace,\\
+%     &= -2C_p\vw^{\top}\inparen{\nabla^2 f(\vq)+C_p\tau\mM}^{-1}\vw \leq 0\enspace,
+% \end{align*}
+% where we defined $\vw := \mM\left(\vx-\vq\right)$ and used the fact that $\nabla^2 f(\vq)+C_p\tau\mM \succeq 0$\todo{what is the easiest way to see this, I suppose $\mM$ itself is PD?}.
+This means we can binary search for the appropriate value of $\tau$. To execute this, we first need to establish the accuracy up to which we have to identify $\tau$. 
+% Let $\tau^{\star} \coloneqq \norm{\vz-\vq}_{\mM}^{p-2}$ be the optimal value for the regularize. 
+ % Owing to the regularizer and \Cref{lemma:gp_regression_prox_diameter}, we get $\tau^{\star} \le \norm{\xstar-\vq}_{\mM}^{p-2} \ll d^p(1+f(\vq_t))$, which always gives us an upper bound on $\tau$. 
+ % It now remains to identify the accuracy we need to identify $\tau$ up to in both settings.
+
+\smallpar{Convergence in Argument.} 
+% We identify the accuracy we need to find $\tau$ up to in order to get a point $\vx$ that makes $\norm{\vx-\vz}_{\mM}$ small. 
+\todo{I can't follow this. I tried writing the function values, but it is certainly not obvious from looking at the expression; we need more steps and words here.}
+By \Cref{lemma:gp_h_strongly_convex} (setting $\vd = \vx-\vz$), recall that it is enough to solve sub-problem \eqref{eq:equiv_prox_problem} up to additive accuracy $(p/2)^pL\alpha^p$ to get $\norm{\vx-\vz}_{\mM} \le \alpha$. Suppose we find $\tau$ for which $\tau^{\star} \le \tau \le \tau^{\star} + \delta$. By writing the objectives and comparing, we see that the $\vx$ we find from using $\tau$ gives us at most a $\delta \cdot d$-suboptimal solution compared to $\vz$. Plugging this into the bound from \Cref{lemma:gp_h_strongly_convex} tells us that we should choose $\delta = (p/2)^pL\alpha^p/d$, and plugging this into the binary search over $\tau \in [0,d^p(1+f(\vq))]$ gives us $p^{O(1)}\logv{\frac{pd \cdot f(\vq)}{\alpha}}$ steps, as needed.\todo{There is a typo here, but I think we discussed we anyways want to make the statement of the lemma iterate dependent; should discuss.}
+% \begin{align*}
+%     \norm{\mM^{-1}\nabla^2 f(\vq)(\vx-\vz) + C_p\inparen{\norm{\vx-\vq}_{\mM}^{p-2}(\vx-\vq)-\norm{\vz-\vq}_{\mM}^{p-2}(\vz-\vq)}}_{\mM} \le \frac{\alpha}{L}.
+% \end{align*}
+
+\smallpar{First-order stationary point.} We first claim that it is enough to get
+\begin{align*}
+    \norm{\mM^{-1}\nabla h_{\vq}(\vx)-\mM^{-1}\nabla h_{\vq}(\vz)}_{\mM} \le \frac{\alpha}{L}.
+\end{align*}
+Indeed, let $\vz$ be the optimal solution for the subproblem. This means that it must satisfy the first order stationary condition, namely,
+\begin{align*}
+    \vg + L\nabla h_{\vq}(\vz) = 0.
+\end{align*}
+Multiplying both sides by $\mM^{-1}$, subtracting, and dividing both sides by $L$ gives us the expression we are interested in.
+
+Writing first order stationary conditions gives both
+\begin{equation*}
+    \begin{aligned}
+        \vg + 2L\inparen{\nabla^2 f(\vq)(\vx-\vq)+C_p\tau\mM(\vx-\vq)} &= 0 \\
+        \vg + 2L\inparen{\nabla^2 f(\vq)(\vz-\vq)+C_p\tau^{\star}\mM(\vz-\vq)} &= 0
+    \end{aligned}.
+\end{equation*}
+Multiplying both sides of both equalities by $\mM^{-1}$ and subtracting these gives
+\begin{align*}
+    2L\inparen{\mM^{-1}\nabla^2 f(\vq)(\vx-\vz) + C_p\inparen{\tau(\vx-\vq)-\tau^{\star}(\vz-\vq)}} = 0.
+\end{align*}
+Expanding out $L(\mM^{-1}\nabla h_{\vq}(\vx)-\mM^{-1}h_{\vq}(\vz))$ and subtracting the above gives the desired condition
+\begin{align*}
+    2L\abs{\tau-\norm{\vx-\vq}_{\mM}^{p-2}} \cdot \norm{\vx-\vq}_{\mM} \overset{?}{\le} \alpha.
+\end{align*}
+Next, let us run the binary search from above so that we get argument convergence, i.e. $\norm{\vx-\vz}_{\mM} \le \alpha^C \ll 0.1\alpha$ for some constant $C$. Using the fact that the approximate mirror descent step using $\vz$ decreases the objective value (\Cref{lemma:gp_md_descent}), observe that
+\begin{align*}
+    \norm{\vx-\vq}_{\mM} \le \norm{\vz-\vq}_{\mM} + \norm{\vx-\vz}_{\mM} \le \norm{\vq-\vz}_{\mM}+0.1\alpha \lesssim \sqrt{d}(1+f(\vq)). 
+\end{align*}
+It then follows that binary searching $\tau$ to additive accuracy $\alpha(\sqrt{d}(1+f(\vq)))^{-1}/L$ is sufficient. By the same argument as above, this takes $p^{O(1)}\logv{\frac{pd \cdot f(\vq_t)}{\alpha}}$ steps, completing the proof of \Cref{lemma:gp_prox_relativesmoothsolve}.
+\end{proof}
+We now combine \Cref{lemma:gp_prox_relativesmoothsolve} with \Cref{thm:gp_mirror_descent} and \Cref{alg:mirror_descent} to obtain approximate argument optimality for each proximal subproblem.
+\begin{lemma}
+\label{lemma:prox_subproblem_base}
+Let $\gamma > 0$ and $\vx_{\vq} \coloneqq \argmin{\vx\in\R^d} f_{\vq}(\vx)$. There exists an algorithm that returns $\vx$ for which
+\begin{align*}
+    \norm{\vx-\vx_{\vq}}_{\mM} &\le \gamma.
+\end{align*}
+The algorithm takes at most $O\inparen{p^{O(1)}\logv{ph_{\vq}(\vx_{\vq})\inparen{\frac{4}{p\gamma}}^{p}}}$ iterations of solving subproblems of the form $\argmin{\vx\in\R^d} \ip{\vg,\vx}+eph_{\vq}(\vx)$ for fixed vectors $\vg$ and $\vq$.
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:prox_subproblem_base}]
+This proof resembles \cite[Lemma 4.5]{jls21}, which uses an exact version of mirror descent arising from \citet{lfn18}. The main difference between our argument and that of \cite[Lemma 4.5]{jls21} is that we rigorously identify a concrete upper bound on the complexity needed to satisfy the MS condition and argue that the mirror descent algorithm can handle the inexact Bregman proximal problem solves.
+
+First, we use \Cref{lemma:fq_strongly_convex} on the approximate solution $\vx$ and true solution $\vx_{\vq}$ and get,
+\begin{align*}
+    f_{\vq}(\vx) &\ge f_{\vq}(\vx_{\vq}) + \frac{4}{2^p}\inparen{\gnorm{\mA(\vx-\vx_{\vq})}{p}^p+C_p\norm{\vx_{\vq}-\vx}_{\mM}^p}\enspace,\\
+    &\geq f_{\vq}(\vx) + \frac{4C_p}{2^p}\norm{\vx_{\vq}-\vx}_{\mM}^p\enspace.
+\end{align*}
+Rearranging, we get
+\begin{align*}
+    \norm{\vx_{\vq}-\vx}_{\mM} &\le \inparen{\frac{2^p}{4C_p}}^{1/p}\inparen{f_{\vq}(\vx)-f_{\vq}(\vx_{\vq})}^{1/p}\enspace,\\
+    &= \inparen{\frac{2^p}{4ep^p}}^{1/p}\inparen{f_{\vq}(\vx)-f_{\vq}(\vx_{\vq})}^{1/p}\enspace,\\
+    &< \frac{2}{p}\inparen{f_{\vq}(\vx)-f_{\vq}(\vx_{\vq})}^{1/p}\enspace.
+\end{align*}
+Using the notation from \cite{lfn18}, for convex $\myfunc{h}{\R^d}{\R}$, let
+\begin{align*}
+    D_h(\vx,\vy) \coloneqq h(\vx) - h(\vy) - \ip{\nabla h(\vy), \vx-\vy}.
+\end{align*}
+Recall the conclusion of \Cref{lemma:gp_hessian_stable} -- we have for $\mu = 1/(2pe)$ and $L = pe$ that
+\begin{align*}
+    \mu\nabla^2 h_{\vq}(\vx) \preceq \nabla^2 f_{\vq}(\vx) \preceq L\nabla^2 h_{\vq}(\vx).
+\end{align*}
+By \Cref{thm:gp_mirror_descent} and \Cref{lemma:gp_hessian_stable}, using the same notation from \Cref{lemma:gp_hessian_stable}, we have for all iterations $t$ of \Cref{alg:mirror_descent} (with $f = f_{\vq}$ and $h = h_{\vq}$) that,\todo{not sure about the second equality...}
+\begin{align*}
+    f_{\vq}(\vx_t) - f_{\vq}(\vx_{\vq}) &\le L\inparen{1-\frac{\mu}{L}}^tD_{h_{\vq}}(\vx_{\vq},\vq)+\max_{1\le i \le t} \ip{\triangle_i, \vx_t-\vx_{\vq}}\enspace,\\
+    &= 2L\inparen{1-\frac{\mu}{L}}^th_{\vq}(\vx_{\vq})+\max_{1\le i \le t} \ip{\triangle_i, \vx_t-\vx_{\vq}}\enspace.
+\end{align*}
+Hence, for $t \ge \frac{L}{\mu}\logv{Lh_{\vq}(\vx_{\vq})\inparen{\frac{4}{p\gamma}}^{p}}$, it is easy to check that for $p\geq 2$,
+\begin{align*}
+    f_{\vq}(\vx_t) - f_{\vq}(\vx_{\vq}) &\leq 2L\inparen{\frac{1}{e}}^{\logv{Lh_{\vq}(\vx_{\vq})\inparen{\frac{4}{p\gamma}}^{p}}}h_{\vq}(\vx_{\vq}) + \max_{1\le i \le t} \ip{\triangle_i, \vx_t-\vx_{\vq}}\enspace,\\
+    &= 2\inparen{\frac{p\gamma}{4}}^{p} + \max_{1\le i \le t} \ip{\triangle_i, \vx_t-\vx_{\vq}}\enspace,\\
+    &\leq \inparen{\frac{p\gamma}{2}}^{p} + \max_{1\le i \le t} \ip{\triangle_i, \vx_t-\vx_{\vq}}\enspace,
+\end{align*}
+and combining this with \Cref{lemma:gp_prox_relativesmoothsolve} to make the error term on the order of our accuracy, we get $\norm{\vx_{\vq}-\vx}_{\mM} \lesssim \gamma$. We thus conclude the proof of \Cref{lemma:prox_subproblem_base}. \todo{I am not sure what is happening in the last line....}
+\end{proof}
+
+The last step is to use our proximal problem solver to build a valid MS oracle.
+
+\begin{lemma}
+\label{lemma:prox_subproblem_ms}
+In the context of \Cref{alg:optimal_ms_acceleration}, there exists an algorithm $(\xtilde_{t+1},\lambda_{t+1})=\oprox(\vq_t)$ that approximately solves
+\begin{align*}
+    \argmin{\xtilde\in\R^d} f(\xtilde)+ep^p\norm{\xtilde-\vq_t}_{\mM}^p
+\end{align*}
+using $O\inparen{p^{O(1)}\logv{\frac{pd \cdot f(\vx_t)}{\eps}}}$ linear-system-solves in $\mA^{\top}\mB\mA$, in the sense that
+\begin{align*}
+    \norm{\frac{1}{ep^{p+1}\norm{\xtilde_{t+1}-\vq_t}_{\mM}^{p-2}}\mM^{-1}\nabla f(\xtilde_{t+1})+(\xtilde_{t+1}-\vq_t)}_{\mM} \le \frac{1}{2}\norm{\xtilde_{t+1}-\vq_t}_{\mM}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:prox_subproblem_ms}]
+The point of this proof is to give an analysis of \Cref{alg:gp_prox_solver}.
+
+For notational simplicity, let $\vx=\xtilde_{t+1}$ and $\lambda = \lambda_{t+1}$. We will reintroduce the indices when it is essential to clarify the iterations we are discussing.
+
+First, it is helpful to see why the stated notion of approximation is useful. Let $C_p \coloneqq ep^p$. Observe that at exact optimality, we have
+\begin{align}
+    \nabla f(\vx_{\vq}) + \underbrace{ep^{p+1}\norm{\vx_{\vq}-\vq}_{\mM}^{p-2}}_{\lambda^{\star}}\mM(\vx-\vq)=0\enspace.\label{eq:prox_problem_stationarity_condition}
+\end{align}
+This motivates the approximation in our lemma statement, with us asking for a $\frac{1}{2}$-approximate MS oracle (\Cref{defn:ms_oracle}) for $f$. This also tells us that at optimality in \eqref{eq:prox_problem_stationarity_condition}, we have,
+\begin{align*}
+    &\nabla f(\vx_{\vq}) + ep^{p+1}\norm{\vx_{\vq}-\vq}_{\mM}^{p-2}\mM(\vx-\vq)=0\enspace,\\
+    &\Leftrightarrow \mM^{-1/2}f(\vx_{\vq}) = -pC_p\norm{\vx_{\vq}-\vq}_{\mM}^{p-2}\mM^{1/2}(\vx-\vq)\enspace,\\
+    &\Rightarrow \norm{\mM^{-1/2}f(\vx_{\vq})}_{2} = pC_p\norm{\vx_{\vq}-\vq}_{\mM}^{p-2}\norm{\mM^{1/2}(\vx-\vq)}_2\enspace,\\
+    % &\Leftrightarrow \norm{\mM^{-1}f(\vx_{\vq})}_{\mM} = pC_p\norm{\vx_{\vq}-\vq}_{\mM}^{p-1}\enspace,\\
+    &\Leftrightarrow\norm{\vx_{\vq}-\vq}_{\mM} = \inparen{\frac{\norm{\mM^{-1}\nabla f(\vx_{\vq})}_{\mM}}{pC_p}}^{\frac{1}{p-1}}\enspace.
+\end{align*}
+We now break up our analysis into two cases. In the first, suppose that $\norm{\mM^{-1}\nabla f(\vx_{\vq})}_{\mM} \le \eps/\norm{\vx_{\vq}-\xstar}_{\mM}$. Then, by convexity, we have
+\begin{align*}
+    f(\vx_{\vq})-f(\xstar) \le \ip{\nabla f(\vx_{\vq}), \vx_{\vq}-\xstar} \le \norm{\mM^{-1}\nabla f(\vx_{\vq})}_{\mM}\norm{\vx_{\vq}-\xstar}_{\mM} \le \eps.   
+\end{align*}
+Hence, for the rest of the proof, assume that $\norm{\mM^{-1}\nabla f(\vx_{\vq})} \ge \eps/\norm{\vx_{\vq}-\xstar}_{\mM}$ (because if this is not the case, in the algorithm we can simply check whether the MS condition is satisfied -- if not, then we know this assumption was violated and we are done anyway)\todo{I am not sure I follow the statement in the parenthesis, maybe I need to discuss with you the hierarchy of the algorithms and see where specifically this termination condition comes in}. We run the algorithm implied by \Cref{lemma:prox_subproblem_base} and obtain an approximate solution $\vx$ for which
+\begin{align}
+    \norm{\vx-\vx_{\vq}}_{\mM} \le \alpha\norm{\vx_{\vq}-\vq}_{\mM} \text{ for } \alpha = \frac{1}{5}\min\inbraces{\frac{C_p}{ep(p-1)}\inparen{\frac{\norm{\vx_{\vq}-\vq}_{\mM}}{f(\vq)^{\frac{1}{p}}}}^{p-2}, 1}\enspace.\label{eq:lemma_D19_guarantee}
+\end{align}
+Since $\alpha < 1$ the guarantee in \eqref{eq:lemma_D19_guarantee} gives us,
+\begin{align}
+    \norm{\vx-\vx_{\vq}}_{\mM} \le \alpha\norm{\vx-\vq}_{\mM} \leq \frac{\alpha}{1-\alpha}
+    \norm{\vx-\vq}_{\mM}\enspace,\label{eq:xq_x_UB_1}
+\end{align}
+and further applying triangle inequality gives us
+\begin{align}
+    \norm{\vx_{\vq}-\vq}_{\mM} &\le \norm{\vx-\vq}_{\mM} +  \norm{\vx_{\vq}-\vx}_{\mM}\enspace,\nonumber\\ 
+    &\le \frac{1-\alpha}{1-\alpha}\norm{\vx-\vq}_{\mM} + \frac{\alpha}{1-\alpha}\norm{\vx-\vq}_{\mM}\enspace,\nonumber\\
+    &\le \frac{1}{1-\alpha}\norm{\vx-\vq}_{\mM}\enspace.\label{eq:xq_x_UB_2}
+\end{align}
+Hence, we get
+% \begin{align*}
+%     \norm{\vx-\vq}_{\mM} \ge (1-\alpha)\norm{\vx_{\vq}-\vq}_{\mM} \ge (1-\alpha)\inparen{\frac{\eps}{pC_p\norm{\vx_{\vq}-\xstar}_{\mM}}}^{\frac{1}{p-1}}
+% \end{align*}
+% and therefore
+\begin{align}
+    \frac{ep(p-1)f(\vq)^{1-\frac{2}{p}}}{C_p\norm{\vx-\vq}_{\mM}^{p-2}} \cdot \norm{\vx-\vx_{\vq}}_{\mM} &= \frac{ep(p-1)}{C_p} \cdot \inparen{\frac{f(\vq)^{\frac{1}{p}}}{\norm{\vx-\vq}_{\mM}}}^{p-2} \cdot \norm{\vx-\vx_{\vq}}_{\mM}\enspace,\nonumber\\
+    &\le^{\eqref{eq:lemma_D19_guarantee}} \frac{1}{5}\norm{\vx_{\vq}-\vq}_{\mM}\enspace,\nonumber\\ &\le^{\eqref{eq:xq_x_UB_2}} \frac{1}{5}\cdot\frac{1}{1-\alpha}\norm{\vx-\vq}_{\mM}\enspace,\nonumber\\
+    &\leq \frac{1}{4}\norm{\vx-\vq}_{\mM}\enspace,\label{eq:xq_x_UB_3}
+\end{align}
+where in the last inequality, we used that $\alpha \leq \frac{1}{5}$ due to our choice in \eqref{eq:lemma_D19_guarantee}. We now call \Cref{lemma:self_gradient_norm_small}, divide both sides by $\lambda$, and get\todo{I tried to make sense of the steps here, unclear how the first and last inequalities are working.}
+\begin{align*}
+    &\norm{\frac{1}{ep^{p+1}\norm{\vx-\vq}_{\mM}^{p-2}}\mM^{-1}\nabla f(\vx)+(\vx-\vq)}_{\mM} \\
+    &\le^{\text{(\Cref{lemma:self_gradient_norm_small})}} ep(p-1)\inparen{\frac{f(\vq)^{1-\frac{2}{p}}}{C_p\norm{\vx-\vq}_{\mM}^{p-2}}+\max\inbraces{1, \inparen{\frac{\norm{\vx_{\vq}-\vq}_{\mM}}{\norm{\vx-\vq}_{\mM}}}^{p-2}}}\norm{\vx-\vx_{\vq}}_{\mM}\enspace,\\
+    &\le^{\text{\eqref{eq:xq_x_UB_2}}} ep(p-1)\inparen{\frac{f(\vq)^{1-\frac{2}{p}}}{C_p\norm{\vx-\vq}_{\mM}^{p-2}}+\frac{1}{(1-\alpha)^{p-2}}}\norm{\vx-\vx_{\vq}}_{\mM}\enspace,\\
+    &\le^{\eqref{eq:xq_x_UB_1}} \frac{ep(p-1)f(\vq)^{1-\frac{2}{p}}}{C_p\norm{\vx-\vq}_{\mM}^{p-2}} \cdot \norm{\vx-\vx_{\vq}}_{\mM} + \frac{ep(p-1)\alpha}{(1-\alpha)^{p-1}}\norm{\vx-\vq}_{\mM}\enspace,\\ 
+    &\leq^{\eqref{eq:xq_x_UB_2},\ \eqref{eq:lemma_D19_guarantee}} \frac{1}{4}\norm{\vx-\vq}_{\mM} + \frac{ep(p-1)5^{p-2}}{4^{p-1}}\norm{\vx-\vq}_{\mM}\enspace,\\
+    &\le \frac{1}{2}\norm{\vx-\vq}_{\mM}\enspace,
+\end{align*}
+giving us the approximation guarantee.
+
+It remains to understand the complexity of solving the proximal subproblem to the accuracy required in \eqref{eq:lemma_D19_guarantee}. Plugging in $\gamma = \alpha\norm{\vx_{\vq}-\vq}_{\mM}$  into \Cref{lemma:prox_subproblem_base} and using our bound on $h_{\vq}(\vx_{\vq})$ from \Cref{lemma:initial_bregman_div} gives an iteration complexity of (ignoring the constant in front of the big-$O$)
+\begin{align*}
+    &\quad p^{O(1)}\logv{ph_{\vq}(\vx_{\vq})\inparen{\frac{2}{p\alpha\norm{\vx_{\vq}-\vq}_{\mM}}}^{p}} \\
+    &\le p^{O(1)}\logv{p\inparen{p(p-1)f(\vq)^{1-\frac{2}{p}}\norm{\vx_{\vq}-\vq}_{\mM}^2 + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p}\inparen{\frac{2}{p\alpha\norm{\vx_{\vq}-\vq}_{\mM}}}^{p}} \\
+    &= p^{O(1)}\logv{\inparen{\frac{2}{p}}^{p} p\inparen{\frac{p(p-1)f(\vq)^{1-\frac{2}{p}}\norm{\vx_{\vq}-\vq}_{\mM}^2 + C_p\norm{\vx_{\vq}-\vq}_{\mM}^p}{\alpha^p\norm{\vx_{\vq}-\vq}_{\mM}^p}}} \\
+    &= p^{O(1)}\logv{\inparen{\frac{2}{p}}^{p} p\inparen{\frac{p(p-1)f(\vq)^{1-\frac{2}{p}}}{\alpha^p\norm{\vx_{\vq}-\vq}_{\mM}^{p-2}} + \frac{C_p}{\alpha^p}}}
+\end{align*}
+We have two cases to analyze for the value of $\alpha$. In the first, suppose we get $\alpha = \frac{1}{5}$. By the definition of $\alpha$, this means we have
+\begin{align*}
+    \frac{C_p}{ep(p-1)}\inparen{\frac{\norm{\vx_{\vq}-\vq}_{\mM}}{f(\vq)^{\frac{1}{p}}}}^{p-2} \ge 1,
+\end{align*}
+which means the complexity we get is $p^{O(1)}\log p$. We now handle the other case, i.e., $\alpha=\frac{C_p}{5ep(p-1)}\inparen{\frac{\norm{\vx_{\vq}-\vq}_{\mM}}{f(\vq)^{\frac{1}{p}}}}^{p-2}$. Here, it will be useful to keep track of the timestep $t$ that we are working with. Recall that
+\begin{align}
+    \norm{\vx_{\vq_t}-\vq_t}_{\mM}^p = \inparen{\frac{\norm{\mM^{-1}\nabla f(\vx_{\vq_t})}_{\mM}}{pC_p}}^{\frac{p}{p-1}} \ge \inparen{\frac{\eps}{pC_p\norm{\vx_{\vq_t}-\xstar}_{\mM}}}^{\frac{p}{p-1}}\enspace,\label{eq:xq_lb}
+\end{align}
+so the complexity we want to control is given by
+\begin{align*}
+    &p^{O(1)}\logv{\inparen{\frac{2}{p}}^p p\inparen{\frac{2f(\vq_t)}{\alpha^p\norm{\vx_{\vq_t}-\vq_t}_{\mM}^{p}}}}\\ &\qquad\lesssim^{\eqref{eq:lemma_D19_guarantee}} p^{O(1)}\logv{\inparen{\frac{2}{p}}^p p\inparen{\frac{2\inparen{5ep(p-1)}^{p}f(\vq_t)^{p-1}}{C_p^p\norm{\vx_{\vq_t}-\vq_t}_{\mM}^{p(p-2)}\norm{\vx_{\vq_t}-\vq_t}_{\mM}^{p}}}}\enspace,\\
+    &\qquad\lesssim p^{O(1)}\logv{ p\inparen{\frac{2\inparen{10(p-1)}^{p}f(\vq_t)^{p-1}}{p^{p^2}\norm{\vx_{\vq_t}-\vq_t}_{\mM}^{p(p-1)}}}}\enspace,\\
+    &\qquad\lesssim^{\eqref{eq:xq_lb}} p^{O(1)}\logv{ p\inparen{\frac{2\inparen{10e(p-1)}^{p}p^{p(p+1)}f(\vq_t)^{p-1}}{p^{p^2}\epsilon^p}}\norm{\vx_{\vq_t}-\xstar}_{\mM}^p}\enspace,\\
+    &\qquad\lesssim^{\eqref{eq:xq_lb}} p^{O(1)}\logv{\inparen{\frac{2\inparen{10e(p-1)}^{p}p^{p+1}f(\vq_t)^{p-1}}{\epsilon^p}}\norm{\vx_{\vq_t}-\xstar}_{\mM}^p}\enspace,\\
+    &\qquad\lesssim p^{O(1)}\logv{\frac{pf(\vq_t)\norm{\vx_{\vq_t}-\xstar}_{\mM}}{\eps}}\enspace,\\
+    &\qquad\lesssim^{\text{(\Cref{lemma:gp_regression_prox_diameter})}} p^{O(1)}\logv{\frac{pf(\vq_t)df(\vx_t)}{\eps}}\enspace,\\
+    &\qquad\lesssim^{\text{(\Cref{lemma:fq_bounded})}} p^{O(1)}\logv{\frac{pf(\vx_t)}{\eps}}\enspace,
+\end{align*}
+completing the proof of \Cref{lemma:prox_subproblem_ms}.
+\end{proof}
+
+\subsection{The Algorithm}
+\label{sec:gp_interpolating_alg}
+
+We are now ready to combine the results from the previous two subsections to build our algorithm for $\cG_p$-regression and prove \Cref{mainthm:gp_regression_iteration_complexity}. The main algorithmic object here is \Cref{alg:gp_regression_alg}.
+
+\begin{algorithm}[H]
+\caption{\textsf{GpRegression}: Optimizes \eqref{eq:interpolation} up to $(1+\eps)$-multiplicative error}
+\label{alg:gp_regression_alg}
+\begin{algorithmic}[1]
+\Require Regression problems $(\mA_{S_1},\vb_{S_1}),\dots,(\mA_{S_m},\vb_{S_m})$, accuracy $\eps > 0$
+\State Using \cite[Algorithm 2]{mo23} with input $\insquare{\mA \vert \vb}$, find nonnegative diagonal $\mW$ such that for all $\vx\in\R^{d}$ and $c \in \R$,
+\begin{align*}
+    \gnorm{\mA\vx-c\vb}{\infty} \le \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx-c\mW^{1/2}\vb}_2 \le (2(d+1))^{\frac{1}{2}-\frac{1}{p}}\gnorm{\mA\vx-c\vb}{\infty}.
+\end{align*}
+\State Let $\vx_0 = \inparen{\mA^{\top}\mW^{1-\frac{2}{p}}\mA}^{-1}\mA^{\top}\mW^{1-\frac{2}{p}}\vb$. \Comment{$\vx_0 \coloneqq \argmin{\vx\in\R^d} \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\mA\vx-\mW^{\frac{1}{2}-\frac{1}{p}}\vb}_2$.}
+\State Using \Cref{alg:gp_prox_solver} and \Cref{lemma:prox_subproblem_ms}, implement a $\frac{1}{2}$-MS oracle for $f$ (\Cref{defn:ms_oracle})
+\State Run \Cref{alg:optimal_ms_acceleration} with the oracle from the previous line and with $\vx_0$ as the initialization for $O\inparen{\mathsf{poly}(p)\min\inbraces{\rank{\mA},m}^{\frac{p-2}{3p-2}}\logv{\frac{d}{\eps}}^3}$ iterations.
+\State \Return $\xhat$ the output of the previous step.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{proof}[Proof of \Cref{mainthm:gp_regression_iteration_complexity}]
+By writing the stationary condition of the proximal problem, it makes sense to choose $\lambda_{t+1} = ep^{p+1}\norm{\xtilde_{t+1}-\vq_t}_{\mM}^{p-2}$.
+
+It is easy to check that
+\begin{align*}
+    \norm{\xtilde_{t+1}-\vq_t}_{\mM} = \inparen{\frac{ep^{p+1}\norm{\xtilde_{t+1}-\vq_t}_{\mM}^{p-2}}{\inparen{(ep^{p+1})^{\frac{1}{p-1}}}^{p-1}}}^{\frac{1}{(p-1)-1}},
+\end{align*}
+and therefore the triple $(\xtilde_{t+1},\vq_t,ep^{p+1}\norm{\xtilde_{t+1}-\vq_t}_{\mM}^{p-2})$ always satisfies a $(p-1, (ep^{p+1})^{1/(p-1)})$-movement bound (\Cref{defn:movement_bound}).
+
+Next, we calculate the iteration complexity we need to reduce the error to half of what we started with. For an arbitrary initial iterate $\vx$, let $\delta = 0.5(f(\vx)-f(\xstar))$. By \Cref{lemma:strong_convexity_gp}, we have
+\begin{align*}
+    \norm{\vx-\xstar}_{\mM}^{s+1} = \norm{\vx-\xstar}_{\mM}^p \le 2^{3p/2}d^{p/2-1}(f(\vx)-f(\xstar)),
+\end{align*}
+so combining this along with the fact that $c^s=ep^{p+1}$ and applying \Cref{thm:optimal_ms_acceleration} with our proximal solver \Cref{lemma:prox_subproblem_ms} yields
+\begin{align*}
+    T_{\mathsf{min}} &= \frac{p-1}{3}\inparen{pC_p\cdot2^{3p/2+1}d^{p/2-1}}^{\frac{2}{3p-2}} \lesssim p^{5/3}d^{\frac{p-2}{3p-2}}.
+\end{align*}
+Next, we initialize $\vx_0 \coloneqq \inparen{\mA^{\top}\mW^{1-2/p}\mA}^{-1}\mA^{\top}\mW^{1-2/p}\vb$. Using \Cref{thm:blw_to_l2} and \Cref{thm:gp_regression_blw_alg}, we have
+\begin{align*}
+    f(\vx_0) \le (2d)^{p/2-1}f(\xstar),
+\end{align*}
+so reaching an iterate $\vx$ for which $f(\vx)-f(\xstar) \le \eps f(\xstar)$ takes $T_{\mathsf{min}} \cdot \logv{d^{p/2-1}/\eps} = p^{8/3}d^{\frac{p-2}{3p-2}}\logv{\frac{d}{\eps}}$ calls to $\oprox$.
+
+We now resolve the full iteration complexity, including the bootstrapping step to show that $f(\vx_t)$ is reasonably bounded so that we get an unconditional upper bound from \Cref{lemma:prox_subproblem_ms}. At the end of iteration $t$, from (loosely) inverting the bound in \Cref{thm:optimal_ms_acceleration}, we know that
+\begin{align*}
+    f(\vx_t)-f(\xstar)\le \frac{(Cp^3)^{\frac{3p-2}{2}}(2d)^{\frac{p}{2}-1}}{t^{\frac{3p-2}{2}}}.
+\end{align*}
+Since $\xtilde_{t+1}$ only depends on $\vq_t$, which in turn only depends on $\vx_t$ and $\vv_t$, it suffices to use the above bound for $f(\vx_t)$, which gives us an iteration complexity of $p^{O(1)}\logv{\frac{pd}{\eps}}$ to compute $\xtilde_{t+1}$ (which we get from plugging into \Cref{lemma:prox_subproblem_ms}).
+
+Combining this with the iteration complexity of $\oprox$ gives us the result of \Cref{mainthm:gp_regression_iteration_complexity}.
+\end{proof}

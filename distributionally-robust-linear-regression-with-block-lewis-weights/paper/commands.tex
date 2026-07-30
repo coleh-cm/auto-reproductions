@@ -1,0 +1,87 @@
+
+\usepackage{cleveref}
+
+% allows crossing out
+\usepackage{ulem}
+
+\normalem
+
+
+
+\newcommand{\conv}[1]{\mathsf{conv}\inparen{#1}}
+% \newcommand{\mPhi}{\bf{\Phi}}
+\newcommand{\mPhi}{\Phi}
+\newcommand{\xhat}{\widehat{\vx}}
+\newcommand{\xstar}{\vx^{\star}}
+\newcommand{\yhat}{\widehat{\vy}}
+\renewcommand{\vmu}{\bm{\mu}}
+\newcommand{\mutilde}{\widetilde{\vmu}}
+\newcommand{\dtwo}{d_2}
+\newcommand{\dinf}{d_{\infty}}
+\newcommand{\wtilde}{\widetilde{\vw}}
+\newcommand{\Wtilde}{\widetilde{\mW}}
+\newcommand{\phibar}{\overline{\phi}}
+\newcommand{\Gtilde}{\widetilde{G}}
+\newcommand{\gtilde}{\widetilde{g}}
+\newcommand{\Etilde}{\widetilde{E}}
+% \newcommand{\vbrho}{\eps^{-2}\max(p,2)^2\inparen{\log n}^2\logv{\nfrac{n}{\eps}}}
+\newcommand{\vbrho}{\eps^{-2}\inparen{\log n}^2\logv{\nfrac{n}{\eps}}}
+\newcommand{\vlambda}{\bm{\lambda}}
+\newcommand{\mLambda}{\mathbf{\Lambda}}
+\newcommand{\mSigma}{\mathbf{\Sigma}}
+\newcommand{\mRho}{\mathbf{\mathbf{\mathrm{P}}}}
+\newcommand{\zstar}{\vz^{\star}}
+\newcommand{\Fstar}{F^{\star}}
+\newcommand{\mtilde}{\widetilde{m}}
+\newcommand{\vnu}{\bm{\nu}}
+\newcommand{\vrho}{\bm{\rho}}
+\newcommand{\valpha}{\bm{\alpha}}
+\newcommand{\nustar}{\vnu_{\max}}
+\newcommand{\polynorm}[1]{\norm{#1}_{\cG,\rho,\infty, S}}
+\newcommand{\subgnorm}[1]{\norm{#1}_{\psi_2}}
+\newcommand{\gnorm}[2]{\norm{#1}_{\cG_{#2}}}
+\newcommand{\gnorml}[2]{\norm{#1}_{\cG_{#2}(\vlambda)}}
+\newcommand{\nnz}[1]{\mathsf{nnz}\inparen{#1}}
+\newcommand{\overlef}{\textsc{OverLev}}
+\newcommand{\lse}{\mathsf{lse}}
+\newcommand{\opt}{\mathsf{OPT}}
+\newcommand{\gi}[1]{g^{(#1)}}
+\newcommand{\lsetext}{\textsc{LogSumExp}}
+\newcommand{\ftilde}{\widetilde{f}}
+\newcommand{\xtilde}{\widetilde{\vx}}
+\newcommand{\fhat}{\widehat{f}}
+\newcommand{\oprox}{\cO_{\mathsf{prox}}}
+\newcommand{\oball}{\cO_{\mathsf{ball}}}
+\newcommand{\oms}{\cO_{\mathsf{MS}}}
+
+\definecolor{ForestGreen}{RGB}{34, 139, 34}
+\newcommand{\greenbox}[1]{
+    \vspace{0.15cm}
+    { \small
+    \begin{tcolorbox}[enhanced, colback=ForestGreen!12, parbox=false]
+    #1
+    \end{tcolorbox}
+    }
+}
+
+\newcommand{\edits}[1]{\textcolor{red}{#1}}
+
+
+\definecolor{forest}{RGB}{0,155,85}
+
+\newcommand{\fix}[1]{\textcolor{forest}{#1}}
+% from https://tex.stackexchange.com/questions/130623/crossing-out-using-different-colour 
+\newcommand{\fixout}{\bgroup\markoverwith{\textcolor{forest}{\rule[0.5ex]{2pt}{0.4pt}}}\ULon}
+
+\renewcommand{\phi}{\varphi}
+
+\newcommand{\smallpar}[1]{\textbf{#1\quad}}
+
+%% Notes
+\newif\ifnotes
+\makeatletter
+\newcommand{\nnote}[1]{\@bsphack\ifnotes{$\ll$\textsf{\color{blue} Naren: { #1}}$\gg$}\fi\@esphack}
+\newcommand{\knote}[1]{\@bsphack\ifnotes{$\ll$\textsf{\color{magenta} Kshitij: { #1}}$\gg$}\fi\@esphack}
+\makeatother
+\notesfalse
+\newcommand{\nonotes}{\notesfalse}

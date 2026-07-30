@@ -1,0 +1,307 @@
+\section{Optimal MS Acceleration under Custom Euclidean Geometry}
+\label{sec:optimal_ms_acceleration}
+
+In this section, we adapt the bisection-free Monteiro-Svaiter acceleration framework developed in \cite{chjjs22} to handle custom Euclidean geometries. The object of interest here is \Cref{alg:optimal_ms_acceleration}, which we will call with different choices of the oracle $\oms$ for our algorithms.
+
+\begin{algorithm}[H]
+\caption{\textsf{OptimalMSAcceleration}: optimizes function $f$ given MS oracle $\oms$.}
+\label{alg:optimal_ms_acceleration}
+\begin{algorithmic}[1]
+\Require Initial $\vx_0$, function $f$, oracle $\oms$, initial $\lambda_0'$, multiplicative adjustment factor $\alpha >1$, iteration count $T$
+\State Set $\vv_0 = \vx_0$, $A_0 = 0$, $A'_0 = 0$.
+\State Set $\xtilde_1, \lambda_1 = \cO(\vx_0; \lambda_0')$ and $\lambda_1' = \lambda_1$.
+\For{$t=0,\dots,T$}
+    \State $a_{t+1}' = \frac{1}{2\lambda_{t+1}'}\inparen{1+\sqrt{1+4\lambda'_{t+1}A_t}}$
+    \State $A_{t+1}' = A_t+a_{t+1}'$
+    \State $\vq_t = \frac{A_t}{A_{t+1}'}\vx_t + \frac{a_{t+1}'}{A_{t+1}'}\vv_t$\label{line:optimal_ms_query}
+    \If{$t > 0$} $\xtilde_{t+1},\lambda_{t+1}=\oms(\vq_t;\lambda_{t+1}')$ \label{line:optimal_ms_acceleration_query}\EndIf
+    \State $\gamma_{t+1} = \min\inbraces{1, \frac{\lambda_{t+1}'}{\lambda_{t+1}}}$
+    \State $a_{t+1} = \gamma_{t+1}a'_{t+1}$ and $A_{t+1} = A_{t} + a_{t+1}$ \Comment{$A_{t+1} = A_{t+1}'-(1-\gamma_{t+1})a'_{t+1}$}
+    \State $\vx_{t+1} = \frac{(1-\gamma_{t+1})A_{t}}{A_{t+1}}\vx_t + \frac{\gamma_{t+1}A_{t+1}'}{A_{t+1}}\xtilde_{t+1}$
+    \If{$\gamma_{t+1} = 1$}
+        \State $\lambda_{t+2}' = \frac{1}{\alpha}\lambda'_{t+1}$
+    \Else
+        \State $\lambda_{t+1}' = \alpha\lambda_{t+1}'$
+    \EndIf
+    % \If{$\lambda_{t+1} \le \lambda_{t+1}'$}
+    %     \State $a_{t+1} = a'_{t+1}$ and $A_{t+1} = A_{t+1}'$
+    %     \State $\vx_{t+1} = \xtilde_{t+1}$
+    %     \State $\lambda_{t+2}' = \frac{1}{\alpha}\lambda_{t+1}'$
+    % \Else
+    %     \State $\gamma_{t+1} = \frac{\lambda_{t+1}'}{\lambda_{t+1}}$
+    %     \State $a_{t+1} = \gamma_{t+1}a'_{t+1}$ and $A_{t+1} = A_{t} + a_{t+1}$
+    %     \State $\vx_{t+1} = \frac{(1-\gamma_{t+1})A_{t}}{A_{t+1}}\vx_t + \frac{\gamma_{t+1}A_{t+1}'}{A_{t+1}}\xtilde_{t+1}$
+    %     \State $\lambda_{t+2}' = \alpha\lambda_{t+1}'$
+    % \EndIf
+    \State $\vv_{t+1} = \vv_{t}-a_{t+1}\mM^{-1}\nabla f(\xtilde_{t+1})$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+In order to state the performance guarantee of \Cref{alg:optimal_ms_acceleration}, we require the notions of an \textit{MS oracle} and a \textit{movement bound}. See \Cref{defn:ms_oracle} and \Cref{defn:movement_bound}.
+
+\begin{definition}[MS oracle, generalization of {\cite[Definition 1]{chjjs22}}]
+\label{defn:ms_oracle}
+Let $\mM \in \R^{d\times d}$ be a positive semidefinite matrix. An oracle $\myfunc{\cO}{\R^d \times \R_{\ge 0}}{\R^d \times \R_{\ge 0}}$ is a $\sigma$-MS oracle for function $\myfunc{f}{\R^d}{\R}$ if for every $\vq\in\R^d$ and $\lambda' > 0$, the points $(\vx,\lambda)=\cO(\vq;\lambda')$ satisfy
+\begin{align*}
+    \norm{\vx-\vq+\frac{1}{\lambda}\mM^{-1}\nabla f(\vx)}_{\mM} \le \sigma\norm{\vx-\vq}_{\mM}.
+\end{align*}
+\end{definition}
+
+\begin{definition}[Movement bound {\cite[Definition 2]{chjjs22}}]
+\label{defn:movement_bound}
+For a norm $\norm{\cdot}_{\mM}$ induced by positive semidefinite $\mM\in\R^{d\times d}$, numbers $s \ge 1, c, \lambda > 0$, and $\vx,\vy\in\R^d$, we say that $(\vx,\vy,\lambda)$ satisfies a $(s,c)$-movement bound if
+\begin{align*}
+    \norm{\vx-\vy}_{\mM} \ge \begin{cases} \inparen{\frac{\lambda}{c^s}}^{\frac{1}{s-1}} & \text{ if } s < \infty \\ \frac{1}{c} & \text{ if } s = \infty \end{cases}.
+\end{align*}
+\end{definition}
+
+With these in hand, we are ready to state the convergence guarantee we get with \Cref{alg:optimal_ms_acceleration}. See \Cref{thm:optimal_ms_acceleration}.
+
+\begin{theorem}[Modification of {\cite[Theorem 1]{chjjs22}}]
+\label{thm:optimal_ms_acceleration}
+Let $\myfunc{f}{\R^d}{\R}$ be convex and differentiable. Consider running \Cref{alg:optimal_ms_acceleration} with parameters $\alpha = \expv{3-\frac{2}{s+1}}$ and a $\sigma$-MS oracle with $0 \le \sigma < 0.99$ (\Cref{defn:ms_oracle}). Let $s\ge1$ and $c>0$ and suppose that for all $t$ such that $\lambda_t>\lambda'_t$ or $t=1$, the iterates $(\xtilde_t,\vq_{t-1},\lambda_t)$ satisfy an $(s,c)$-movement bound (\Cref{defn:movement_bound}). Let $C$ be a universal constant. For any iteration count $T$ satisfying
+\begin{align*}
+    T \ge C\begin{cases} s\inparen{\frac{c^s\norm{\vx_0-\xstar}_{\mM}^{s+1}}{\eps}}^{\frac{2}{3s+1}} & \text{ if } s < \infty \\ \inparen{c\norm{\vx_0-\xstar}_{\mM}}^{2/3}\logv{\frac{\lambda_1\norm{\vx_0-\xstar}_{\mM}^2}{\eps}} & \text{ if } s = \infty \end{cases},
+\end{align*}
+we have
+\begin{align*}
+    f(\vx_T)-f(\xstar) \le \eps.
+\end{align*}
+\end{theorem}
+
+The proof of \Cref{thm:optimal_ms_acceleration} follows the same recipe as the proof of \cite[Theorem 1]{chjjs22}. The only modification needed is that stated in \Cref{lemma:ms_acceleration_potential}.
+
+\begin{lemma}[Replaces {\cite[Proposition 1]{chjjs22}}]
+\label{lemma:ms_acceleration_potential}
+In the context of \Cref{thm:optimal_ms_acceleration}, let $E_t \coloneqq f(\vx_t) - f(\xstar), D_t \coloneqq \frac{1}{2}\norm{\vv_t-\xstar}_{\mM}^2, N_{t+1} \coloneqq \frac{1}{2}\norm{\xtilde_{t+1}-\vq_t}_{\mM}^2$. Then, for all $t \ge 0$, we have
+\begin{align*}
+    A_{t+1}E_{t+1}+D_{t+1}+(1-\sigma^2)A_{t+1}'\min\inbraces{\lambda_{t+1},\lambda_{t+1}'}N_{t+1} \le A_tE_t+D_t.
+\end{align*}
+Consequently, for all $T\ge1, \sqrt{A_T}\ge\frac{1}{2}\sum_{t \in \cS_{T}^{\le}} \frac{1}{\sqrt{\lambda_t'}}$,
+\begin{align*}
+    E_{T} \le \frac{D_0}{A_T} \quad \text{ and } \quad (1-\sigma^2)\sum_{t \in \cS_{T}^{\ge}} A_t\lambda_t'N_t \le D_0 - A_TE_T.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:ms_acceleration_potential}]
+This proof is a straightforward modification of \cite[Proposition 1]{chjjs22}. We have
+\begin{align*}
+    D_{t+1} &= \frac{1}{2}\norm{\vv_{t+1}-\xstar}_{\mM}^2 = \frac{1}{2}\norm{\vv_t-a_{t+1}\mM^{-1}\nabla f(\xtilde_{t+1})-\xstar}_{\mM}^2 \\
+    &= D_t + a_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \xstar-\vv_t}_{\mM} + \frac{a_{t+1}^2}{2}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2.
+\end{align*}
+By definition of $\vq_t$ and $A_{t+1}' = A_t + a'_{t+1}$, we have
+\begin{align*}
+    a_{t+1}'\vv_t = A_{t+1}'\vq_t - A_t\vx_t = a_{t+1}'\xtilde_{t+1} + A'_{t+1}\inparen{\vq_t-\xtilde_{t+1}} - A_t\inparen{\vx_t-\xtilde_{t+1}}.
+\end{align*}
+Subtracting $a_{t+1}'\xstar$ and taking the inner product with $\mM^{-1}\nabla f(\xtilde_{t+1})$ gives
+\begin{align*}
+    &\quad a_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \xstar-\vv_t}_{\mM} \\
+    &= \ip{\mM^{-1}\nabla f(\xtilde_{t+1}),  a_{t+1}'(\xstar-\xtilde_{t+1}) + A'_{t+1}\inparen{\xtilde_{t+1}-\vq_t} + A_t\inparen{\vx_t-\xtilde_{t+1}}}_{\mM} \\
+    &\le a_{t+1}'\inparen{f(\xstar)-f(\xtilde_{t+1})}+A_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}),\xtilde_{t+1}-\vq_t}_{\mM} + A_t\inparen{f(\vx_t)-f(\xtilde_{t+1})} \\
+    &\le A_tE_t-A_{t+1}'\inparen{f(\xtilde_{t+1})-f(\xstar)}+A_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}),\xtilde_{t+1}-\vq_t}_{\mM}.
+\end{align*}
+Rearranging gives
+\begin{align*}
+    A_{t+1}'\inparen{f(\xtilde_{t+1})-f(\xstar)} &\le A_tE_t+a_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}\\
+    &\quad +A_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}),\xtilde_{t+1}-\vq_t}_{\mM}.
+\end{align*}
+Next, recall that by \Cref{defn:ms_oracle}, we have
+\begin{align*}
+    \norm{\mM^{-1}\nabla f(\xtilde_{t+1})+\lambda_{t+1}\inparen{\xtilde_{t+1}-\vq_t}}_{\mM}^2 \le \lambda_{t+1}^2\sigma^2\norm{\xtilde_{t+1}-\vq_t}_{\mM}^2.
+\end{align*}
+We use this to write
+\begin{align*}
+    &\quad \lambda_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}),\xtilde_{t+1}-\vq_t}_{\mM} \\
+    &= \frac{1}{2}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})+\lambda_{t+1}(\xtilde_{t+1}-\vq_t)}_{\mM}^2 - \frac{1}{2}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2-\frac{\lambda_{t+1}^2}{2}\norm{\xtilde_{t+1}-\vq_t}_{\mM}^2 \\
+    &\le -\lambda_{t+1}^2(1-\sigma^2)N_{t+1}-\frac{1}{2}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2,
+\end{align*}
+from which we conclude
+\begin{align*}
+    \ip{\mM^{-1}\nabla f(\xtilde_{t+1}),\xtilde_{t+1}-\vq_t}_{\mM} &\le -\lambda_{t+1}(1-\sigma^2)N_{t+1}-\frac{1}{2\lambda_{t+1}}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2.
+\end{align*}
+Substituting back gives
+\begin{align*}
+    A_{t+1}'\inparen{f(\xtilde_{t+1})-f(\xstar)} &\le A_tE_t+a_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}\\
+    &\quad +A_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}),\xtilde_{t+1}-\vq_t}_{\mM} \\
+    &\le A_tE_t+a_{t+1}'\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}\\
+    &\quad -A_{t+1}'\lambda_{t+1}(1-\sigma^2)N_{t+1}-\frac{A_{t+1}'}{2\lambda_{t+1}}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2.
+\end{align*}
+Next, recall that $\gamma_{t+1}a'_{t+1}=a_{t+1}$ and $\gamma_{t+1}\lambda_{t+1}=\min\inbraces{\lambda_{t+1},\lambda_{t+1}'}$, by construction. Let $\widehat{\lambda}_{t+1} \coloneqq \min\inbraces{\lambda_{t+1},\lambda_{t+1}'}$ We multiply both sides by $\gamma_{t+1}$ and conclude
+\begin{align*}
+    \gamma_{t+1}A_{t+1}'\inparen{f(\xtilde_{t+1})-f(\xstar)}&\le \gamma_{t+1}A_tE_t+a_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}\\
+    &\quad -A_{t+1}'\widehat{\lambda}_{t+1}(1-\sigma^2)N_{t+1}-\frac{\gamma_{t+1}A_{t+1}'}{2\lambda_{t+1}}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2. 
+\end{align*}
+Now, by convexity of $f$ and from the definition of $\vx_{t+1}$, we have
+\begin{align*}
+    f(\vx_{t+1})-f(\xstar) \le \frac{(1-\gamma_{t+1})A_t}{A_{t+1}}\inparen{f(\vx_{t})-f(\xstar)}+\frac{\gamma_{t+1}A_{t+1}'}{A_{t+1}}\inparen{f(\xtilde_{t+1})-f(\xstar)}.
+\end{align*}
+Recall the definition of $E_t$, multiply both sides by $A_{t+1}$, apply our bound on $\gamma_{t+1}A_{t+1}'\inparen{f(\xtilde_{t+1})-f(\xstar)}$, and we get
+\begin{align*}
+    A_{t+1}E_{t+1} &\le (1-\gamma_{t+1})A_tE_t + \gamma_{t+1}A_{t+1}'\inparen{f(\xtilde_{t+1})-f(\xstar)} \\
+    &\le A_tE_t + a_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}\\
+    &\quad -A_{t+1}'\widehat{\lambda}_{t+1}(1-\sigma^2)N_{t+1}-\frac{\gamma_{t+1}A_{t+1}'}{2\lambda_{t+1}}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2
+\end{align*}
+After shifting terms around, we see that it remains to show
+\begin{align*}
+    a_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}-\frac{\gamma_{t+1}A_{t+1}'}{2\lambda_{t+1}}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2 \overset{?}{\le} D_t-D_{t+1}.
+\end{align*}
+In fact, by the choice of $a'_{t+1}$ and the definition of $A_{t+1}'$, we have
+\begin{align*}
+    \lambda'_{t+1}(a'_{t+1})^2=a'_{t+1}+A_{t}=A_{t+1}'.
+\end{align*}
+Multiply both sides by $\gamma_{t+1}^2/(2\lambda'_{t+1})$ and we get
+\begin{align*}
+    \frac{a_{t+1}^2}{2}=\frac{\gamma_{t+1}^2A_{t+1}'}{2\lambda'_{t+1}} = \frac{\min\inbraces{1,\frac{\lambda_{t+1}'}{\lambda_{t+1}}}\gamma_{t+1}A_{t+1}'}{2\lambda'_{t+1}} \le \frac{\gamma_{t+1}A_{t+1}'}{2\lambda_{t+1}}.
+\end{align*}
+We recycle an earlier computation and know that
+\begin{align*}
+    D_t-D_{t+1} &= a_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM} - \frac{a_{t+1}^2}{2}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2 \\
+    &\ge a_{t+1}\ip{\mM^{-1}\nabla f(\xtilde_{t+1}), \vv_t-\xstar}_{\mM}-\frac{\gamma_{t+1}A_{t+1}'}{2\lambda_{t+1}}\norm{\mM^{-1}\nabla f(\xtilde_{t+1})}_{\mM}^2,
+\end{align*}
+which completes the proof of the potential decrease.
+
+The remaining statements follow as written in \cite[Proof of Proposition 1]{chjjs22}, and we conclude the proof of \Cref{lemma:ms_acceleration_potential}.
+\end{proof}
+
+Now that we have shown \Cref{lemma:ms_acceleration_potential}, we refer the reader to \cite[Appendix A]{chjjs22} for the proof of \Cref{thm:optimal_ms_acceleration}, as it now follows exactly as written there.
+
+We also give additional bounds on the movement of the iterates in $\norm{\cdot}_{\mM}$, which is a straightforward adaptation of \cite[Lemma 31]{msbacon} to the improved framework from \cite{chjjs22}.
+
+\begin{lemma}
+\label{lemma:ms_acceleration_iterate_diameter}
+For all $t\ge 1$, we have both
+\begin{equation*}
+    \begin{aligned}
+        \norm{\vv_t-\xstar}_{\mM} &\le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} \\
+        \norm{\vx_t-\xstar}_{\mM} &\le \inparen{\sqrt{2}+\max_{1 \le i \le t} \frac{\lambda_i'}{\lambda_i} \cdot \sqrt{\frac{2}{1-\sigma^2}}}\norm{\vx_0-\xstar}_{\mM}
+    \end{aligned}.
+\end{equation*}
+\end{lemma}
+
+In the statement of \Cref{lemma:ms_acceleration_iterate_diameter}, the cost of overshooting the guess $\lambda_i'$ becomes evident -- without an additional strong convexity guarantee, it is challenging to ensure that each iterate remains in a small ball around $\xstar$. This is the main reason we are unable to apply the framework of \cite{chjjs22} to the $p=\infty$ case.
+
+\begin{proof}[Proof of \Cref{lemma:ms_acceleration_iterate_diameter}]
+Using the same notation as in \Cref{lemma:ms_acceleration_potential} and in that proof, we define
+\begin{align*}
+    P_t &\coloneqq A_tE_t+D_t \\
+    \widehat{\lambda}_t &\coloneqq \min\inbraces{\lambda_t,\lambda_t'}.
+\end{align*}
+By induction on the conclusion of \Cref{lemma:ms_acceleration_potential}, for $t\ge 1$ we have
+\begin{align*}
+    \frac{1}{2}\norm{\vv_t-\xstar}_{\mM}^2 = D_t \le P_t + (1-\sigma^2)\sum_{k=1}^t A_k'\widehat{\lambda}_kN_k \le P_0 = \norm{\vx_0-\xstar}_{\mM}^2.
+\end{align*}
+Thus,
+\begin{align*}
+    \norm{\vv_t-\xstar}_{\mM} \le \sqrt{2}\norm{\vx_0-\xstar}_{\mM}.
+\end{align*}
+For the second conclusion, we introduce the following notation.
+\begin{align*}
+    \alpha_{t+1} &\coloneqq \frac{(1-\gamma_{t+1})A_t}{A_{t+1}} \\
+    \beta_{t+1} &\coloneqq \frac{A_t}{A_{t+1}'} \\
+    \delta_{t+1} &\coloneqq 1-(1-\alpha_{t+1})(1-\beta_{t+1}) = 1 - \frac{\gamma_{t+1}A'_{t+1}}{A_{t+1}} \cdot \frac{a'_{t+1}}{A'_{t+1}} = \frac{A_t}{A_{t+1}}
+\end{align*}
+We also establish for any $i$,
+\begin{align*}
+    \frac{\gamma_i A_i'}{\lambda_i a_i^2} = \frac{A_i'}{\lambda_i \gamma_i (a_i')^2} = \frac{1}{\gamma_i} \cdot \frac{\lambda_i'}{\lambda_i} = \max\inbraces{\frac{\lambda_i'}{\lambda_i}, 1},
+\end{align*}
+which implies
+\begin{align*}
+    \frac{\gamma_i A_i'}{\lambda_i} = a_i^2\max\inbraces{\frac{\lambda_i'}{\lambda_i}, 1}.
+\end{align*}
+Notice that
+\begin{align*}
+    \norm{\vx_{t+1}-\xstar}_{\mM} &\le \alpha_{t+1}\norm{\vx_t-\xstar}_{\mM} + (1-\alpha_{t+1})\norm{\xtilde_{t+1}-\xstar}_{\mM} \\
+    &\le \alpha_{t+1}\norm{\vx_t-\xstar}_{\mM} + (1-\alpha_{t+1})\inparen{\norm{\vq_t-\xstar}_{\mM}+\norm{\xtilde_{t+1}-\vq_t}_{\mM}} \\
+    &\le \alpha_{t+1}\norm{\vx_t-\xstar}_{\mM} \\
+    &\quad + (1-\alpha_{t+1})\inparen{\beta_{t+1}\norm{\vx_t-\xstar}_{\mM}+(1-\beta_{t+1})\norm{\vv_t-\xstar}_{\mM}+\norm{\xtilde_{t+1}-\vq_t}_{\mM}} \\
+    &= \inparen{\beta_{t+1}+\alpha_{t+1}-\alpha_{t+1}\beta_{t+1}}\norm{\vx_t-\xstar}_{\mM} \\
+    &\quad + \inparen{1-\alpha_{t+1}}\inparen{1-\beta_{t+1}}\norm{\vv_t-\xstar}_{\mM} + \inparen{1-\alpha_{t+1}}\norm{\xtilde_{t+1}-\vq_t}_{\mM} \\
+    &= \delta_{t+1}\norm{\vx_t-\xstar}_{\mM} + (1-\delta_{t+1})\norm{\vv_t-\xstar}_{\mM} + \inparen{1-\alpha_{t+1}}\norm{\xtilde_{t+1}-\vq_t}_{\mM} \\
+    &\le \prod_{i=0}^t \delta_{i+1}\norm{\vx_0-\xstar}_{\mM} + \inparen{1-\prod_{i=0}^t \delta_{i+1}}\norm{\vv_t-\xstar}_{\mM} \\
+    &\quad + \sum_{i=1}^{t+1} \prod_{j=i+1}^{t+1}\delta_{j}(1-\alpha_{i})\norm{\xtilde_{i}-\vq_{i-1}}_{\mM} \\
+    &\le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \sum_{i=1}^{t+1} \prod_{j=i+1}^{t+1}\delta_{j}(1-\alpha_{i})\norm{\xtilde_{i}-\vq_{i-1}}_{\mM} \\
+    &= \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \sum_{i=1}^{t+1} \frac{A_i}{A_{t+1}}(1-\alpha_{i})\norm{\xtilde_{i}-\vq_{i-1}}_{\mM} \\
+    &= \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \sum_{i=1}^{t+1} \frac{A_i}{A_{t+1}}\cdot\frac{\gamma_iA_i'}{A_i}\norm{\xtilde_{i}-\vq_{i-1}}_{\mM} \\
+    &= \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \frac{1}{A_{t+1}}\sum_{i=1}^{t+1} \sqrt{\frac{\gamma_iA_i'}{\lambda_i}} \cdot \sqrt{\lambda_i\gamma_iA_i'}\norm{\xtilde_{i}-\vq_{i-1}}_{\mM} \\
+    &\le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \frac{\inparen{\sum_{i=1}^{t+1} \frac{\gamma_iA_i'}{\lambda_i}}^{1/2}}{A_{t+1}} \cdot \inparen{\sum_{i=1}^{t+1} \lambda_i\gamma_iA_i'\norm{\xtilde_{i}-\vq_{i-1}}_{\mM}^2}^{1/2} \\
+    &\le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \frac{\inparen{\sum_{i=1}^{t+1} \frac{\gamma_iA_i'}{\lambda_i}}^{1/2}}{A_{t+1}} \cdot \sqrt{\frac{2}{1-\sigma^2}}\norm{\vx_0-\xstar}_{\mM} \\
+    &\le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \frac{\sum_{i=1}^{t+1} a_i\max\inbraces{1,\frac{\lambda_i'}{\lambda_i}}}{A_{t+1}} \cdot \sqrt{\frac{2}{1-\sigma^2}}\norm{\vx_0-\xstar}_{\mM} \\
+    &\le \sqrt{2}\norm{\vx_0-\xstar}_{\mM} + \max_{1 \le i \le t+1} \frac{\lambda_i'}{\lambda_i} \cdot \sqrt{\frac{2}{1-\sigma^2}}\norm{\vx_0-\xstar}_{\mM} \\
+    &= \inparen{\sqrt{2}+\max_{1 \le i \le t+1} \frac{\lambda_i'}{\lambda_i} \cdot \sqrt{\frac{2}{1-\sigma^2}}}\norm{\vx_0-\xstar}_{\mM},
+\end{align*}
+completing the proof of \Cref{lemma:ms_acceleration_iterate_diameter}.
+\end{proof}
+
+% \subsection{Implementing an MS oracle from a ball optimization oracle}
+
+% In this section, we show how to convert a ball optimization oracle into a $\frac{1}{2}$-MS oracle (\Cref{defn:ms_oracle}).
+
+% \begin{lemma}
+% \label{lemma:ball_to_ms}
+% Let $\mM$ be a positive semidefinite matrix. Let $g$ be a convex function with domain $\cX$ for which for all inputs $\vy,\vz$, we have
+% \begin{align*}
+%     \norm{\mM^{-1}\nabla g(\vy) - \mM^{-1}\nabla g(\vz)}_{\mM} \le L\norm{\vy-\vz}_{\mM}
+% \end{align*}
+% and
+% \begin{align*}
+%     \norm{\vy-\vz}_{\mM} \le D.
+% \end{align*}
+% Let $\vx = \oball(\vq; r; \gamma)$ be a routine that satisfies
+% \begin{align*}
+%     \norm{\vx-\argmin{\norm{\vx'-\vq}_{\mM}\le r} g(\vx')}_{\mM} \le \gamma.
+% \end{align*}
+% If $\gamma \le \min\inbraces{\frac{\eps}{5DL},\frac{r}{6}}$, then there exists an algorithm $(\vx,\lambda)=\cO_{\mathsf{MS}}(\vq)$ that calls $\oball$ as a subroutine such that at least one of
+% \begin{align*}
+%     \norm{\vx-\vq+\frac{1}{\lambda}\mM^{-1}\nabla g(\vx)}_{\mM} \le \frac{1}{2}\norm{\vx-\vq}_{\mM}
+% \end{align*}
+% and
+% \begin{align*}
+%     g(\vx) - \min_{\vx' \in \cX} g(\vx') \le \eps.
+% \end{align*}
+% holds. The algorithm calls $\oball(\vq)$ once and additionally evaluates $\norm{\mM^{-1}\nabla g(\vx)}_{\mM}$ once.
+% \end{lemma}
+% \begin{proof}[Proof of \Cref{lemma:ball_to_ms}]
+% Let
+% \begin{align*}
+%     \vx_{\vq} \coloneqq \argmin{\norm{\vx'-\vq}_{\mM} \le r} g(\vx').
+% \end{align*}
+% We consider two cases. First, suppose that $\norm{\mM^{-1}\nabla g(\vx)}_{\mM} \le \eps/D$. By convexity, we have
+% \begin{align*}
+%     g(\vx)-\min_{\vx'\in\cX} g(\vx') &\le \ip{\nabla g(\vx), \vx-\argmin{\vx'\in\cD} g(\vx')} \\
+%     &\le \norm{\mM^{-1}\nabla g(\vx)}_{\mM} \cdot \norm{\vx-\argmin{\vx'\in\cD} g(\vx')}_{\mM} \le \eps,
+% \end{align*}
+% and so we can just output $\vx$ and any $\lambda$.
+
+% We now consider the case where $\norm{\mM^{-1}\nabla g(\vx)}_{\mM}\ge\eps/D$. By gradient Lipschitzness, we get
+% \begin{align*}
+%     \norm{\mM^{-1}\nabla g(\vx_{\vq})}_{\mM} \ge \frac{\eps}{D} - L\gamma.
+% \end{align*}
+% The KKT conditions for the ball-constrained optimization problem imply that for some $\lambda^{\star}>0$, we have
+% \begin{align*}
+%     \vx_{\vq}-\vq=\frac{1}{\lambda^{\star}}\mM^{-1}\nabla g(\vx_{\vq}).
+% \end{align*}
+% In fact, notice that
+% \begin{align*}
+%     \frac{1}{\lambda^{\star}} = \frac{\norm{\vx_{\vq}-\vq}_{\mM}}{\norm{\mM^{-1}\nabla g(\vx_{\vq})}_{\mM}} \le \frac{r}{\frac{\eps}{D}-L\gamma}.
+% \end{align*}
+% Let $\lambda > 0$ be a free parameter that we will choose later. We write the LHS of \Cref{defn:ms_oracle} and observe that
+% \begin{align*}
+%     \norm{\vx-\vq+\frac{1}{\lambda}\mM^{-1}\nabla g(\vx)}_{\mM} &\le \norm{\vx_{\vq}-\vq+\frac{1}{\lambda}\mM^{-1}\nabla g(\vx_{\vq})}_{\mM} \\
+%     &\quad + \norm{\vx-\vx_{\vq}}_{\mM} + \frac{1}{\lambda}\norm{\mM^{-1}\nabla g(\vx)-\mM^{-1}\nabla g(\vx_{\vq})}_{\mM} \\
+%     &\le \abs{1-\frac{\lambda^{\star}}{\lambda}}r+\norm{\vx-\vx_{\vq}}_{\mM}+\frac{L\norm{\vx-\vx_{\vq}}_{\mM}}{\lambda} \\
+%     &= \norm{\vx-\vx_{\vq}}_{\mM}\inparen{1+\frac{L}{\lambda}}+\abs{1-\frac{\lambda^{\star}}{\lambda}}r.
+% \end{align*}
+% Using this, we show that choosing $\lambda = \lambda^{\star}$ gives us a $\frac{1}{2}$-MS oracle, which shows that it is feasible to construct the $\frac{1}{2}$-MS oracle from $\oball$. We have
+% \begin{align*}
+%     \norm{\vx-\vq+\frac{1}{\lambda}\mM^{-1}\nabla g(\vx)}_{\mM} \le \gamma+\frac{L\gamma}{\lambda} \le \frac{3\gamma}{2} + \frac{rL\gamma}{\frac{\eps}{D}-L\gamma} - \frac{\gamma}{2} \le \frac{r}{2} - \frac{\gamma}{2} \le \frac{1}{2}\norm{\vx-\vq}_{\mM}.
+% \end{align*}
+% Now that we know a feasible choice of $\lambda$ exists, we show how to find a $\lambda$ given $\vx$ and $\vq$ that gives a $\frac{1}{2}$-MS oracle. It is easy to see that this can be done by minimizing the LHS of \Cref{defn:ms_oracle} over $\lambda$, which is a convex quadratic problem in one variable and therefore has a closed form optimum. The optimal $\lambda$ is given by
+% \begin{align*}
+%     \lambda = -\frac{\ip{\mM^{-1}\nabla g(\vx),\mM^{-1}\nabla g(\vx)}_{\mM}}{\ip{\vx-\vq,\mM^{-1}\nabla g(\vx)}_{\mM}} = \frac{\norm{\mM^{-1}\nabla g(\vx)}_{\mM}}{\ip{\vq-\vx,\nabla g(\vx)}},
+% \end{align*}
+% and therefore outputting $(\vx,\lambda) = \oball(\vq;r;\gamma)$ gives
+% \begin{align*}
+%     \norm{\vx-\vq+\frac{1}{\lambda}\mM^{-1}\nabla g(\vx)}_{\mM} \le \frac{1}{2}\norm{\vx-\vq}_{\mM},
+% \end{align*}
+% completing the proof of \Cref{lemma:ball_to_ms}.
+% \end{proof}

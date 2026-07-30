@@ -1,0 +1,538 @@
+\let\openbox\relax
+%% Packages
+\usepackage{parskip}
+% \usepackage{lmodern}
+\usepackage{anyfontsize}
+
+\usepackage{hyperref}
+% \usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{thm-restate}
+\usepackage{mathtools}
+
+\usepackage{booktabs}   % For better table lines
+\usepackage{array}      % For better column formatting
+\usepackage{colortbl}   % For row colors
+\usepackage{makecell}   % For multi-line cells
+\usepackage{xcolor}     % For custom colors
+
+\usepackage{amsfonts}
+\usepackage{bm}
+\usepackage[inline]{enumitem}
+\usepackage{color}
+\usepackage{comment}
+\usepackage[capitalize]{cleveref}
+% \usepackage[table,xcdraw,dvipsnames]{xcolor}
+\usepackage{float}
+\usepackage[T1]{fontenc}
+\usepackage[textsize=tiny, textwidth=2.5cm, disable]{todonotes}
+\makeatletter 
+\@mparswitchfalse%
+\makeatother
+\normalmarginpar %for right-handed notes and lines, or 
+%\reversemarginpar %if you want them on the left of your twosided document. 
+
+\usepackage{asymptote}
+\usepackage{mdframed}
+\usepackage[most]{tcolorbox}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{framed}
+\usepackage{mdframed}
+% \usepackage{scrextend}
+\usepackage{bbm}
+% \usepackage[symbol]{footmisc}
+% \usepackage{tablefootnote}
+
+\usepackage{wrapfig}
+\usepackage{multicol}
+\usepackage{cutwin}
+
+\usepackage[capitalize]{cleveref}
+
+% Max: for script font
+\usepackage{mathrsfs}
+
+\let\svthefootnote\thefootnote
+\newcommand{\maxcmt}[1]{\def\thefootnote{\color{magenta}\svthefootnote}\footnote{\color{magenta}Max: #1}\def\thefootnote{\svthefootnote}}
+
+% Vinod's macros
+% \usepackage{beton}
+\usepackage[T1]{fontenc}
+
+\definecolor{asparagus}{rgb}{0.53, 0.66, 0.42}
+\definecolor{sacramentostategreen}{rgb}{0.0, 0.3, 0.15}
+\definecolor{teal}{rgb}{0.0, 0.5, 0.5}
+\definecolor{forestgreen}{rgb}{0.13, 0.6, 0.13}
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=sacramentostategreen,
+    filecolor=sacramentostategreen,
+    citecolor=teal,
+    urlcolor=teal,
+}
+% \usepackage[hyperpageref]{backref}
+
+%% Environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{mainthm}{Theorem}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{maindefn}{Definition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{maincor}{Corollary}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{assumption}[theorem]{Assumption}
+% \newtheorem{problem}[problem]{Problem}
+\newtheorem{problem}{Problem}
+\newtheorem*{problem*}{Problem}
+% \newtheorem{protocol}[theorem]{Protocol}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{notation}[theorem]{Notation}
+\theoremstyle{remark}
+
+\Crefname{theorem}{Theorem}{Theorems}
+\Crefname{claim}{Claim}{Claims}
+\Crefname{lemma}{Lemma}{Lemmas}
+\Crefname{proposition}{Proposition}{Propositions}\usepackage[symbol]{footmisc}
+\Crefname{corollary}{Corollary}{Corollaries}
+% \Crefname{protocol}{Protocol}{Protocols}
+\Crefname{definition}{Definition}{Definitions}
+
+% Codes 
+\newcommand{\ECC}{\mathsf{ECC}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\DEC}{\mathsf{DEC}}
+\newcommand{\supp}{\mathsf{supp}}
+\newcommand{\iECC}{\mathsf{iECC}}
+\newcommand{\start}{\mathsf{start}}
+\newcommand{\eend}{\mathsf{end}}
+\newcommand{\mi}{\mathsf{mid}}
+\newcommand{\srch}{\mathsf{search}}
+\newcommand{\error}{\mathsf{ERROR}}
+\newcommand{\bcert}{\mathsf{binary\_cert}}
+
+% Math
+\newcommand{\Mod}[1]{\ (\text{mod}\ #1)}
+
+% Word Shortcuts
+\newcommand{\speaker}{\mathsf{speaker}}
+\newcommand{\listener}{\mathsf{listener}}
+\newcommand{\passer}{\mathsf{passer}}
+\newcommand{\round}{\mathsf{round}}
+\newcommand{\last}{\mathsf{last}}
+\newcommand{\mes}{\mathsf{mes}}
+\newcommand{\true}{\mathsf{true}}
+\newcommand{\false}{\mathsf{false}}
+\newcommand{\sent}{\mathsf{cnfm}}
+\newcommand{\rec}{\mathsf{rec}}
+\newcommand{\adv}{\mathsf{adv}}
+\newcommand{\ind}{\mathsf{ind}}
+\newcommand{\cnt}{\mathsf{cnt}}
+\newcommand{\knt}{\mathsf{knt}}
+\newcommand{\ques}{\mathsf{ques}}
+\newcommand{\parity}{\mathsf{par}}
+\newcommand{\st}{\mathsf{st}}
+\newcommand{\received}{\mathsf{received}}
+\newcommand{\transition}{\mathsf{transition}}
+\newcommand{\counter}{\mathsf{counter}}
+\newcommand{\stg}{\mathsf{stg2}}
+\newcommand{\maj}{\text{maj}}
+\newcommand{\rnd}{\text{rnd}}
+\newcommand{\ct}{\mathsf{ct}}
+\newcommand{\nxt}{\mathsf{next}}
+\newcommand{\IGNORE}{\mathsf{IGNORE}}
+\newcommand{\ans}{\mathsf{ans1}}
+\newcommand{\no}{\mathsf{no}}
+
+% Character Shortcuts
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\D}{\mathbb{D}}
+% \newcommand{\E}{\mathbb{E}}
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\cI}{\mathcal{I}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\cK}{\mathcal{K}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cP}{\mathcal{P}}
+\newcommand{\cQ}{\mathcal{Q}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cT}{\mathcal{T}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cV}{\mathcal{V}}
+\newcommand{\cW}{\mathcal{W}}
+\newcommand{\cX}{\mathcal{X}}
+\newcommand{\cY}{\mathcal{Y}}
+\newcommand{\cZ}{\mathcal{Z}}
+
+%% matrices
+\newcommand{\matA}{\mathbf{A}}
+\newcommand{\matB}{\mathbf{B}}
+\newcommand{\matC}{\mathbf{C}}
+\newcommand{\matD}{\mathbf{D}}
+\newcommand{\matE}{\mathbf{E}}
+\newcommand{\matF}{\mathbf{F}}
+\newcommand{\matG}{\mathbf{G}}
+\newcommand{\matH}{\mathbf{H}}
+\newcommand{\matI}{\mathbf{I}}
+\newcommand{\matJ}{\mathbf{J}}
+\newcommand{\matK}{\mathbf{K}}
+\newcommand{\matL}{\mathbf{L}}
+\newcommand{\matM}{\mathbf{M}}
+\newcommand{\matN}{\mathbf{N}}
+\newcommand{\matO}{\mathbf{O}}
+\newcommand{\matP}{\mathbf{P}}
+\newcommand{\matQ}{\mathbf{Q}}
+\newcommand{\matR}{\mathbf{R}}
+\newcommand{\matS}{\mathbf{S}}
+\newcommand{\matT}{\mathbf{T}}
+\newcommand{\matU}{\mathbf{U}}
+\newcommand{\matV}{\mathbf{V}}
+\newcommand{\matW}{\mathbf{W}}
+\newcommand{\matX}{\mathbf{X}}
+\newcommand{\matY}{\mathbf{Y}}
+\newcommand{\matZ}{\mathbf{Z}}
+
+\newcommand{\mZero}{\mathbf{0}}
+\newcommand{\mA}{\mathbf{A}}
+\newcommand{\mB}{\mathbf{B}}
+\newcommand{\mC}{\mathbf{C}}
+\newcommand{\mD}{\mathbf{D}}
+\newcommand{\mE}{\mathbf{E}}
+\newcommand{\mF}{\mathbf{F}}
+\newcommand{\mG}{\mathbf{G}}
+\newcommand{\mH}{\mathbf{H}}
+\newcommand{\mI}{\mathbf{I}}
+\newcommand{\mJ}{\mathbf{J}}
+\newcommand{\mK}{\mathbf{K}}
+\newcommand{\mL}{\mathbf{L}}
+\newcommand{\mM}{\mathbf{M}}
+\newcommand{\mN}{\mathbf{N}}
+\newcommand{\mO}{\mathbf{O}}
+\newcommand{\mP}{\mathbf{P}}
+\newcommand{\mQ}{\mathbf{Q}}
+\newcommand{\mR}{\mathbf{R}}
+\newcommand{\mS}{\mathbf{S}}
+\newcommand{\mU}{\mathbf{U}}
+\newcommand{\mV}{\mathbf{V}}
+\newcommand{\mW}{\mathbf{W}}
+\newcommand{\mX}{\mathbf{X}}
+\newcommand{\mY}{\mathbf{Y}}
+\newcommand{\mZ}{\mathbf{Z}}
+
+%% vectors
+\newcommand{\vecA}{\mathbf{a}}
+\newcommand{\vecB}{\mathbf{b}}
+\newcommand{\vecC}{\mathbf{c}}
+\newcommand{\vecD}{\mathbf{d}}
+\newcommand{\vecE}{\mathbf{e}}
+\newcommand{\vecF}{\mathbf{f}}
+\newcommand{\vecG}{\mathbf{g}}
+\newcommand{\vecH}{\mathbf{h}}
+\newcommand{\vecI}{\mathbf{i}}
+\newcommand{\vecJ}{\mathbf{j}}
+\newcommand{\vecK}{\mathbf{k}}
+\newcommand{\vecL}{\mathbf{l}}
+\newcommand{\vecM}{\mathbf{m}}
+\newcommand{\vecN}{\mathbf{n}}
+\newcommand{\vecO}{\mathbf{o}}
+\newcommand{\vecP}{\mathbf{p}}
+\newcommand{\vecQ}{\mathbf{q}}
+\newcommand{\vecR}{\mathbf{r}}
+\newcommand{\vecS}{\mathbf{s}}
+\newcommand{\vecT}{\mathbf{t}}
+\newcommand{\vecU}{\mathbf{u}}
+\newcommand{\vecV}{\mathbf{v}}
+\newcommand{\vecW}{\mathbf{w}}
+\newcommand{\vecX}{\mathbf{x}}
+\newcommand{\vecY}{\mathbf{y}}
+\newcommand{\vecZ}{\mathbf{z}}
+
+\newcommand{\vzero}{\bm{0}}
+\newcommand{\vbeta}{\bm{\beta}}
+\newcommand{\vmu}{\bm{\mu}}
+\newcommand{\vsigma}{\bm{\sigma}}
+\newcommand{\vpsi}{\bm{\psi}}
+\newcommand{\va}{\bm{a}}
+\newcommand{\vb}{\bm{b}}
+\newcommand{\vc}{\bm{c}}
+\newcommand{\vd}{\bm{d}}
+\newcommand{\ve}{\bm{e}}
+\newcommand{\vf}{\bm{f}}
+\newcommand{\vg}{\bm{g}}
+\newcommand{\vh}{\bm{h}}
+\newcommand{\vl}{\bm{l}}
+\newcommand{\vm}{\bm{m}}
+\newcommand{\vn}{\bm{n}}
+\newcommand{\vo}{\bm{o}}
+\newcommand{\vp}{\bm{p}}
+\newcommand{\vq}{\bm{q}}
+\newcommand{\vr}{\bm{r}}
+\newcommand{\vs}{\bm{s}}
+\newcommand{\vt}{\bm{t}}
+\newcommand{\vu}{\bm{u}}
+\providecommand{\vv}{}
+\renewcommand{\vv}{\bm{v}}
+\newcommand{\vw}{\bm{w}}
+\newcommand{\vx}{\bm{x}}
+\newcommand{\vy}{\bm{y}}
+\newcommand{\vz}{\bm{z}}
+
+\newcommand{\sfT}{\mathsf{T}}
+
+%naren's macros
+%%%%%%%%%% Symbols and Fonts
+\def\from{:}
+\def\to{\rightarrow}
+\def\eps{\varepsilon}
+% \def\epsilon{\varepsilon}
+\def\e{\varepsilon}
+\def\eps{\varepsilon}
+\def\d{\delta}
+% \def\phi{\varphi}
+\def\cal{\mathcal}
+\def\xor{\oplus}
+\def\ra{\rightarrow}
+\def\implies{\Rightarrow}
+\def\psdgeq{\succeq} 
+\renewcommand{\bar}{\overline} 
+\newcommand{\ol}{\overline}
+
+% For algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocodex}
+
+\newcommand{\defeq}{\overset{\mathsf{\tiny def}}{=}}
+% \newcommand{\defeq}{\coloneqq}
+\newcommand{\onev}{\mathbbm{1}}
+\newcommand{\booland}{\wedge}
+\newcommand{\boolor}{\vee}
+\newcommand{\boolbigand}{\bigwedge}
+\newcommand{\boolbigor}{\bigvee}
+\newcommand{\argmin}[1]{\underset{#1}{\mathrm{argmin}}\ }
+
+\newcommand{\vspan}[1]{\mathsf{Span}\inparen{#1}}
+\newcommand{\defn}[1]{{\deffont {#1}}}
+\newcommand{\phileft}{\phi_{\mathrm{left}}}
+\newcommand{\kernel}[1]{\mathsf{Ker}\inparen{#1}}
+\newcommand{\image}{\mathsf{im}}
+\newcommand{\vdim}[1]{\mathsf{dim}\inparen{#1}}
+\newcommand{\vrank}[1]{\mathsf{rank}\inparen{#1}}
+
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calB}{\mathcal{C}}
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\calG}{\mathcal{G}}
+\newcommand{\calL}{\mathcal{L}}
+\newcommand{\calU}{\mathcal{U}}
+\newcommand{\calP}{\mathcal{P}}
+\newcommand{\poly}{{\mathrm{poly}}}
+\newcommand{\polylog}{{\mathrm{polylog}}}
+\newcommand{\loglog}{{\mathop{\mathrm{loglog}}}}
+\newcommand{\suchthat}{{\;\; : \;\;}}
+\newcommand{\getsr}{\mathbin{\stackrel{\mbox{\tiny R}}{\gets}}}
+%%%%%%%%%%%%%%%%%%%%%%%%% Enclosures
+\newcommand{\inparen}[1]{\left(#1\right)}             %\inparen{x+y}  is (x+y)
+\newcommand{\inbraces}[1]{\left\{#1\right\}}           %\inbrace{x+y}  is {x+y}
+\newcommand{\insquare}[1]{\left[#1\right]}             %\insquare{x+y}  is [x+y]
+\newcommand{\inangle}[1]{\left\langle#1\right\rangle} %\inangle{A}    is <A>
+\newcommand{\inmod}[1]{\inparen{\mathrm{mod}\ #1}}
+\newcommand{\B}{\inbraces{0,1}}
+\newcommand{\pmone}{\inbraces{\pm1}}
+\newcommand{\indicator}[1]{\mathbbm{1}\inbraces{#1}}
+
+\newcommand{\abs}[1]{\ensuremath{\left\lvert #1 \right\rvert}}
+\newcommand{\smallabs}[1]{\ensuremath{\lvert #1 \rvert}}
+%
+\newcommand{\norm}[1]{\ensuremath{\left\lVert #1 \right\rVert}}
+\newcommand{\opnorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{\mathrm{op}}}}
+\newcommand{\maxnorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{\infty}}}
+\newcommand{\fnorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{F}}}
+\newcommand{\lipnorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{\mathrm{Lip}}}}
+\newcommand{\onenorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{1}}}
+\newcommand{\zeronorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{0}}}
+\newcommand{\nuclearnorm}[1]{\ensuremath{\left\lVert #1 \right\rVert_{*}}}
+\newcommand{\smallnorm}[1]{\ensuremath{\lVert #1 \rVert}}
+%
+\newcommand{\mydot}[2]{\ensuremath{\left\langle #1, #2 \right\rangle}}
+\newcommand{\mysmalldot}[2]{\ensuremath{\langle #1, #2 \rangle}}
+\newcommand{\ip}[1]{\left\langle #1 \right\rangle}
+
+\newcommand{\myfunc}[3]{#1\colon#2\to#3}
+
+
+%%%%%%%%%%%% Fractions
+% commands for fractions 
+\usepackage{nicefrac}
+% poor man's fraction
+\newcommand{\flatfrac}[2]{#1/#2}
+\newcommand{\varflatfrac}[2]{#1\textfractionsolidus#2}
+
+\let\nfrac=\nicefrac
+\let\ffrac=\flatfrac
+
+%% Operators
+
+\renewcommand{\Pr}{\mathsf{Pr}}
+
+\newcommand{\exv}[1]{\E\insquare{#1}}
+\newcommand{\exvv}[2]{\underset{#1}{\E}\insquare{#2}}
+\newcommand{\expv}[1]{\mathrm{exp}\inparen{#1}}
+\newcommand{\prv}[1]{\Pr\insquare{#1}}
+\newcommand{\prvv}[2]{\underset{#1}{\Pr}\insquare{#2}}
+\newcommand{\varv}[2]{\underset{#1}{\mathsf{Var}}\insquare{#2}}
+\newcommand{\var}[1]{\mathsf{Var}\insquare{#1}}
+\newcommand{\cov}[1]{\mathsf{Cov}\insquare{#1}}
+\newcommand{\logv}[1]{\log\inparen{#1}}
+\newcommand{\lnv}[1]{\ln\inparen{#1}}
+\newcommand{\diag}[1]{\mathsf{diag}\inparen{#1}}
+\newcommand{\diam}[1]{\mathsf{diam}\inparen{#1}}
+\newcommand{\linf}{\ell_{\infty}}
+\newcommand{\costv}[1]{\cost\inparen{#1}}
+\newcommand{\err}[2]{\mathsf{err}_{#1}\inparen{#2}}
+\newcommand{\signv}[1]{\sign\inparen{#1}}
+\newcommand{\trv}[1]{\mathsf{Tr}\inparen{#1}}
+
+% custom label
+\makeatletter
+\newcommand{\customlabel}[2]{%
+   \protected@write \@auxout {}{\string \newlabel {#1}{{#2}{\thepage}{#2}{#1}{}} }%
+   \hypertarget{#1}{#2}
+}
+\makeatother
+
+% protocol environment
+\newcommand{\protocol}[3]{
+    \stepcounter{figure}
+    \vspace{0.15cm}
+    { \small
+    \begin{tcolorbox}[breakable, enhanced, colback=forestgreen!12]
+    \begin{center}
+    {\bf \underline{Algorithm~\customlabel{prot:#2}{\thefigure}: #1}}
+    \end{center}
+    
+    #3
+    \end{tcolorbox}
+    }
+}
+
+% equation manual numbering
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+
+% custom case
+\newcounter{casenum}
+\newenvironment{caseof}{\setcounter{casenum}{1}}{\vskip.5\baselineskip}
+\newcommand{\case}[2]{
+    \vskip.5\baselineskip\par\noindent 
+    {\bf Case \arabic{casenum}:} {\it #1} \vskip0.1\baselineskip
+    \begin{addmargin}[1.5em]{1em}
+    #2
+    \end{addmargin}
+    \addtocounter{casenum}{1}
+}
+
+% custom case
+\newcounter{subcasenum}
+\newenvironment{subcaseof}{\setcounter{subcasenum}{1}}{\vskip.5\baselineskip}
+\newcommand{\subcase}[2]{
+    \vskip.5\baselineskip\par\noindent 
+    {\bf Subcase \arabic{casenum}.\arabic{subcasenum}:} {\it #1} \vskip0.1\baselineskip
+    \begin{addmargin}[1.5em]{1em}
+    #2
+    \end{addmargin}
+    \addtocounter{subcasenum}{1}
+}
+  
+% custom case for proofs
+\newcounter{casenump}
+\newenvironment{caseofp}{\setcounter{casenump}{1}}{\vskip.5\baselineskip}
+\newcommand{\casep}[2]{
+    \ifthenelse{\equal{\value{casenump}}{0}}{
+    \vskip.5\baselineskip\par\noindent
+    }{}
+    {\it Case \arabic{casenump}:} {\it #1}
+    \vskip0.1\baselineskip
+    \begin{addmargin}[1.5em]{1em}
+    #2
+    \end{addmargin}
+    \addtocounter{casenump}{1}
+}
+
+% custom case
+\newcounter{subcasenump}
+\newenvironment{subcaseofp}{\setcounter{subcasenump}{1}}{\vskip.5\baselineskip}
+\newcommand{\subcasep}[2]{
+    \vskip.5\baselineskip\par\noindent 
+    {\it Subcase \arabic{casenump}.\arabic{subcasenump}:} {\it #1} \vskip0.1\baselineskip
+    \begin{addmargin}[1.5em]{1em}
+    #2
+    \end{addmargin}
+    \addtocounter{subcasenump}{1}
+}
+
+\newenvironment{subproof}[1][\proofname]{%
+  \renewcommand{\qedsymbol}{$\blacksquare$}%
+  \begin{proof}[#1]%
+}{%
+  \end{proof}%
+}
+
+% Antares's macros 
+
+\newcommand{\pr}{\textup{Pr}}
+\DeclareMathOperator*{\trace}{\mathsf{tr}}
+\newcommand{\spectral}{\textup{\textsf{spec}}}
+\newcommand{\reff}{\mathsf{Reff}}
+
+% usage: \lecture{TITLE}{SCRIBE}{DATE}{DOC NUMBER}
+\newcommand{\lecture}[4]{
+  \pagestyle{myheadings}
+  \thispagestyle{plain}
+  \newpage
+  \setcounter{page}{1}
+  \noindent
+  \begin{center}
+    \framebox{
+      \vbox{\vspace{2mm}
+      \hbox to 6.28in {{\bf Hypergraph Sparsification
+                          \hfill Note #4}}
+      \vspace{6mm}
+      \hbox to 6.28in {{\Large \hfill #1  \hfill }}
+      \vspace{5mm}
+      \hbox to 6.28in {{#2 \hfill #3}}
+      \vspace{2mm}}
+    }
+  \end{center}
+  \markboth{#1}{#1}
+  \vspace*{4mm}
+}
+
+\newcommand{\floor}[1]{\left\lfloor #1 \right\rfloor}
+\newcommand{\ceil}[1]{\left\lceil #1 \right\rceil}
+\newcommand{\rank}[1]{\mathsf{rank}\inparen{#1}}
+
+
+% \let\svthefootnote\thefootnote
+% \newcommand{\maxcmt}[1]{\def\thefootnote{\color{magenta}\svthefootnote}\footnote{\color{magenta}Max: #1}\def\thefootnote{\svthefootnote}}
+
+\usepackage{xfrac}

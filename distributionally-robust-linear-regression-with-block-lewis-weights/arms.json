@@ -1,0 +1,126 @@
+{
+ "paper": {
+  "title": "Distributionally Robust Linear Regression With Block Lewis Weights",
+  "arxiv": "2607.00252",
+  "paper_ref": "0a8cf406-bd9b-4ebe-8a3f-c9e3d62a2a94",
+  "project_id": "d7735ece-02c4-4228-985c-00834c92b8f3"
+ },
+ "n_arms": 8,
+ "primary_metric": {
+  "name": "iterations_to_1pct_rel_gap_acs",
+  "definition": "first natural outer iteration t with best-so-far gap (F(x_t) - OPT) / (F(x_0) - OPT) <= 0.01 on the ACS Income instance (m=51, d=10, 200/region warm-started at ERM); 'base=opt' variant recorded in parallel because the paper does not define the reference (SPEC section 6 item 4)",
+  "citation": "paper/experiments.tex:174-186"
+ },
+ "instances": {
+  "acs": {
+   "kind": "real",
+   "source": "folktables ACSIncome (year=2018, horizon=1-Year [reconstructed, SPEC 6.12])",
+   "m": 51,
+   "d": 10,
+   "per_group_n": 200,
+   "n_total": 10200,
+   "grouping": "region (50 states + Puerto Rico)",
+   "warm_start": "erm",
+   "citation": "paper/experiments.tex:148"
+  },
+  "synthetic": {
+   "kind": "reconstructed",
+   "m": 100,
+   "d": 10,
+   "n_adversarial": 5,
+   "condition_number_stacked_gram": 100000,
+   "note": "recipe reconstructed; only anchors are d, m, n_adversarial, condition number, visible ERM gap (SPEC section 6 item 1)",
+   "citation": "paper/experiments.tex:38"
+  }
+ },
+ "arms": [
+  {
+   "name": "reference_cvxpy",
+   "kind": "reference",
+   "solver": "gdr.solvers.reference_optimum",
+   "config": {"solver_name": null},
+   "claims": [
+    {"metric": "erm_average_mse", "claimed": 108.2, "citation": "paper/experiments.tex:189", "note": "depends on resolving target scale (SPEC 6.12)"},
+    {"metric": "erm_worst_mse", "claimed": 138.1, "claimed_worst_group": "California", "citation": "paper/experiments.tex:189"},
+    {"metric": "erm_group_std", "claimed": 11.8, "citation": "paper/experiments.tex:189"},
+    {"metric": "robust_max_over_mean", "claimed": 1.02, "baseline_erm": 1.28, "citation": "paper/experiments.tex:189"},
+    {"metric": "california_loss_decrease", "claimed": 24.3, "citation": "paper/experiments.tex:189"},
+    {"metric": "robust_loss_band", "claimed": [107.0, 114.0], "citation": "paper/experiments.tex:189"}
+   ]
+  },
+  {
+   "name": "subgradient",
+   "kind": "baseline",
+   "solver": "gdr.solvers.solve_subgradient",
+   "config": {"step": null, "schedule": ["fixed", "inv_sqrt"], "report": "best_variant"},
+   "citation": "paper/experiments.tex:57-58",
+   "claims": [
+    {"instance": "acs", "metric": "iterations_to_1pct_rel_gap", "claimed": "not_reached", "citation": "paper/experiments.tex:178"},
+    {"instance": "synthetic", "metric": "qualitative", "claimed": "improves briefly then plateaus", "citation": "paper/experiments.tex:107"}
+   ]
+  },
+  {
+   "name": "smoothed_gd",
+   "kind": "baseline",
+   "solver": "gdr.solvers.solve_smooth",
+   "config": {"method": "gd", "beta": null, "delta": null, "step": null},
+   "citation": "paper/experiments.tex:60-66",
+   "claims": [
+    {"instance": "synthetic", "metric": "qualitative", "claimed": "stalls far above optimum", "citation": "paper/experiments.tex:107"}
+   ]
+  },
+  {
+   "name": "smoothed_heavy_ball",
+   "kind": "baseline",
+   "solver": "gdr.solvers.solve_smooth",
+   "config": {"method": "heavy_ball", "beta": null, "delta": null, "step": null, "momentum": null},
+   "citation": "paper/experiments.tex:60-66",
+   "claims": [
+    {"instance": "acs", "metric": "iterations_to_1pct_rel_gap", "claimed": 47, "wall_s": 0.062, "citation": "paper/experiments.tex:179"}
+   ]
+  },
+  {
+   "name": "smoothed_nesterov",
+   "kind": "baseline",
+   "solver": "gdr.solvers.solve_smooth",
+   "config": {"method": "nesterov", "beta": null, "delta": null, "step": null},
+   "citation": "paper/experiments.tex:60-66",
+   "claims": [
+    {"instance": "synthetic", "metric": "qualitative", "claimed": "best-tuned smoothed variant stalls far above optimum", "citation": "paper/experiments.tex:107"}
+   ]
+  },
+  {
+   "name": "ipm",
+   "kind": "baseline",
+   "solver": "gdr.solvers.solve_ipm",
+   "config": {"barrier0": null, "growth": null, "inner_iters": null, "tol": null},
+   "citation": "paper/experiments.tex:68-69",
+   "claims": [
+    {"instance": "acs", "metric": "iterations_to_1pct_rel_gap", "claimed": 8, "wall_s": 0.066, "citation": "paper/experiments.tex:180"},
+    {"instance": "synthetic", "metric": "qualitative", "claimed": "converges rapidly; best final loss among methods", "citation": "paper/experiments.tex:107"}
+   ]
+  },
+  {
+   "name": "ball_oracle_euclidean",
+   "kind": "proposed",
+   "solver": "gdr.solvers.solve_ball_oracle",
+   "config": {"geometry": "naive", "radius0": null, "decay": null, "beta": null, "delta": null, "reg_on": null, "accelerated": false},
+   "citation": "paper/experiments.tex:71-78",
+   "claims": [
+    {"instance": "acs", "metric": "iterations_to_1pct_rel_gap", "claimed": 1, "wall_s": 0.019, "citation": "paper/experiments.tex:181"},
+    {"instance": "synthetic", "metric": "qualitative", "claimed": "steadily decreases worst-group loss across outer iterations", "citation": "paper/experiments.tex:107"}
+   ]
+  },
+  {
+   "name": "ball_oracle_lewis",
+   "kind": "proposed",
+   "solver": "gdr.solvers.solve_ball_oracle",
+   "config": {"geometry": "lewis", "lewis_p": null, "lewis_iters": null, "radius0": null, "decay": null, "beta": null, "delta": null, "reg_on": null, "accelerated": false},
+   "citation": "paper/experiments.tex:71-78 plus lewis routine paper/body.tex:169-176, paper/mo25_main.tex:1809-1823",
+   "claims": [
+    {"instance": "acs", "metric": "iterations_to_1pct_rel_gap", "claimed": 1, "wall_s": 0.019, "note": "marginally faster than euclidean", "citation": "paper/experiments.tex:182,152"},
+    {"instance": "synthetic", "metric": "qualitative", "claimed": "very slight benefit from Lewis geometry", "citation": "paper/experiments.tex:109"}
+   ]
+  }
+ ]
+}

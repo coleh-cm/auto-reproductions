@@ -1,0 +1,98 @@
+Machine learning algorithms and their training datasets have grown substantially in both size and complexity over the past decade. This increased model complexity has made it challenging to interpret and predict their behavior in unobserved scenarios. Hence, many applications that involve societal decisions still rely on simple, interpretable models like linear regression, often after feature engineering. Examples of such applications include predicting national housing prices, estimating wages across industries, forecasting loan amounts across banks, predicting life insurance premiums across groups, and projecting energy consumption across communities \citep{cohen2024fairness}. 
+
+A shared safety and sometimes legal concern across the above applications is the potential for wildly different model qualities for different distributions, i.e., outputting a notably worse model for some source data distributions~\citep{data2014seizing, barocas2016big,hardt2016equality,veale2018fairness,selbst2019fairness,berk2021fairness, corbett2023measure,chouldechova2016fair,kleinberg2018algorithmic, agarwal2019fair,cohen2024fairness,svwz24}. Specifically, consider fitting a linear model $\vx\in\R^d$ to make real predictions on some task over $m$ groups where group $i$'s dataset consists of $n_i$ entries and is denoted by $S_i=\{(\va_i^j, b_i^j)\}_{j\in [n_i]}$. The \textit{utilitarian} or the total-cost-minimizing objective minimizes the average squared prediction error across groups, i.e.,        
+\begin{align}
+    \min_{\vx\in\R^d}\frac{1}{m}\sum_{i\in[m]}\frac{1}{n_i}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2\enspace,\label{eq:utilitarian}
+\end{align}
+where $\mA_{S_i} \coloneqq [\va_i^1 \dots \va_i^{n_i}]^{\top}\in \R^{n_i \times d}$ is the feature matrix and $\vb_{S_i} \coloneqq [b_i^1 \dots b_i^{n_i}]^{\top} \in \R^{n_i}$ is the label vector for group $i\in[m]$. 
+
+Due to the inherent heterogeneity of the datasets, the model derived by optimizing the objective \eqref{eq:utilitarian} may be particularly detrimental to some groups, as the prediction error may be disproportionately higher for these groups. To overcome these limitations, the following \textit{egalitarian} or group Distributionally Robust Optimization (DRO) objective  has been considered in several recent works \citep{ben2013robust, duchi2016statistics, sagawa2019distributionally, levy2020large, soma2022optimal,aakmrz22,svwz24},
+\begin{align}
+    \min_{\vx\in\R^d} \max_{i\in[m]}\frac{1}{n_i}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2\enspace.\label{eq:main_objective}
+\end{align}
+Objective \ref{eq:main_objective} is the ``fairest'' objective among all objectives that balance utility and distributional robustness~\citep{kleinberg2018algorithmic,chouldechova2018frontiers,asadpour2022sequential,chen2022fair,rahmattalabi2019exploring,golrezaei2024online}. Since objective \ref{eq:main_objective} is a convex problem, it is natural to apply standard black-box optimization techniques to solve it. However, we identify several challenges in applying existing methods:
+    \paragraph{Efficient first-order algorithms have geometry-dependent rates.} To our knowledge, using an efficient first-order method (such as sub-gradient descent) will incur a geometry-dependent runtime. In particular, if the matrices $\mA_{S_i}$ or if the stacked matrix $\mA\coloneqq [\mA_{S_1}^{\top} \dots \mA_{S_M}^{\top}]^{\top}$ are poorly conditioned, then this will be reflected accordingly in the convergence rates. This is a drawback of the existing results by \citet{aakmrz22} and \citet{svwz24}.
+    \paragraph{Objective \eqref{eq:main_objective} is not smooth.} Since the objective is the pointwise maximum of several continuous functions, the derivative is not well-defined at the points at which the maximizing function changes. Thus, applying subgradient descent to this objective without a tailored analysis will yield a rather unimpressive $1/\eps^{2}$ dependence in the iteration complexity. 
+    \paragraph{Min-max optimization/regret minimization approaches have a $1/\eps^{2}$ dependence on iteration complexity.} Since problem \ref{eq:main_objective} is a min-max optimization objective, it is also natural to try to use game theory-inspired approaches that use some oracle (such as gradients) for each group as a black box. For instance, we can cast objective \ref{eq:main_objective} as a repeated game between a min player (equipped with a no-regret algorithm) and a max player (equipped with the best response oracle). The main shortcoming of this approach is that even though the function for each group is smooth, the iteration complexity (to get $\eps$ average regret) for smooth online convex optimization still has an unimpressive $1/\eps^2$ dependence (as opposed to $1/\eps$ for smooth convex optimization)~\citep{soma2022optimal, zhang2024stochastic}. Thus, this approach is no better than optimizing \eqref{eq:main_objective} using sub-gradient descent.
+    \paragraph{Interior point methods have a poor iteration complexity for large $m$.} Another natural approach (that can partially address the previous two issues), following the discussion by \citet[Section 6.4]{boyd2004convex}, is to rewrite problem \ref{eq:main_objective} in its epigraph form and use an interior point method (IPM) to solve the resulting problem (which, in this case, is a quadratically constrained linear program). Unfortunately, this will give an algorithm whose analysis is only known to yield an iteration complexity of $O(\sqrt{m})$, where each iteration solves a linear system in matrices of the form $\mA^{\top}\mB\mA$ for a block-diagonal $\mB$ (see \Cref{rem:linear_systems}).
+    A na\"ive implementation of this algorithm will thus have a superlinear runtime in the number of groups, which is undesirable when the number of groups is large. Alternately, consider an example in which we copy each group $k$ times in the objective. The new objective value does not change from the original objective value, but the iteration complexity from the IPM now blows up to $\sqrt{mk}$. This also signals to us that we should search for an algorithm whose iteration complexity is mostly independent from $m$. %Furthermore, note that \eqref{eq:main_objective} is not a linear program when at least one group $i$ is such that $n_i > 1$. So, we cannot immediately apply recent advances in linear programming that get iteration complexities independent of the number of constraints \citep{ls19}.
+
+Hence, designing an algorithm without these shortcomings requires novel ideas. 
+
+\subsection{Our Results}
+\label{sec:gp_our_results}
+
+In this paper, we present a new algorithm (\Cref{alg:fair_regression}) to approximately optimize objective \ref{eq:main_objective}, which addresses the aforementioned difficulties. We state the iteration complexity of our algorithm in the following theorem. 
+
+\begin{mainthm}[Robust regression]\label{mainthm:fair_regression_iteration_complexity}
+Let $\mA_{S_i} \in \R^{n_i \times d}$ and $\vb_{S_i} \in \R^{n_i}$ for all $i\in[m]$. Denote their concatenations by $\mA\coloneqq [\mA_{S_1}^{\top} \dots \mA_{S_M}^{\top}]^{\top}\in\R^{n\times d}$ and $\vb \coloneqq [\vb_{S_1}^{\top}\dots\vb_{S_M}^{\top}]^{\top}\in \R^n$ where $n:= \sum_{i\in[m]}n_i$. Let $\eps > 0$. Then \Cref{alg:fair_regression} returns $\xhat$ such that,
+\begin{align}
+    \max_{i\in[m]} \frac{1}{\sqrt{n_i}}\norm{\mA_{S_i}\xhat-\vb_{S_i}}_2 \le (1+\eps)\cdot\min_{\vx\in\R^d}\max_{i\in[m]} \frac{1}{\sqrt{n_i}}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2\enspace,\label{eq:objective_approx}
+\end{align}
+and it runs in
+\begin{align*}
+    O\inparen{\frac{\min\inbraces{\mathsf{rank}(\mA),m}^{1/3}\inparen{\logv{\frac{n\log m}{\eps}}^{14/3}+\logv{m}}}{\eps^{2/3}}}
+\end{align*}
+linear-system-solves in matrices of the form $\mA^{\top}\mB\mA$, where $\mB$ is a block-diagonal matrix for which block $i$ has size $n_i \times n_i$.
+\end{mainthm}
+We prove \Cref{mainthm:fair_regression_iteration_complexity} in \Cref{sec:gp_robust_proof}. We compare the guarantee of \Cref{mainthm:fair_regression_iteration_complexity} against the other baselines in \Cref{table:compare}. 
+
+\def\arraystretch{1.5}
+\begin{table}[h]
+\centering
+\begin{tabular}{l c c} 
+\toprule\toprule
+\textbf{Algorithm}                                                                                                     & \textbf{Iteration Complexity}                                                                              & \textbf{Each Iteration}                     \\ \midrule\midrule
+\makecell[l]{Subgradient descent}                                                                                           & \makecell[c]{$\frac{\norm{\xstar}_2 \max_{1 \le i \le m} \tfrac{1}{\sqrt{n_i}}\opnorm{\mA_{S_i}}}{\eps^{2}}$}                                   & \makecell[c]{Evaluate $\nabla f(\vx)$}                    \\ \midrule
+\makecell[l]{Nesterov acceleration\\ on smoothened objective}                                                                 & \makecell[c]{$\frac{\norm{\xstar}_2 \left(\max_{1 \le i \le m} \tfrac{1}{\sqrt{n_i}}\opnorm{\mA_{S_i}}\right)^{1/2}}{\eps}$}                      & \makecell[c]{Evaluate $\nabla \ftilde_{\beta,\delta}(\vx)$} \\ \midrule
+\makecell[l]{\cite{aakmrz22}}                                                                                               & \makecell[c]{$\frac{\norm{\xstar}_2 \max_{1 \le i \le m} \tfrac{1}{\sqrt{n_i}}\opnorm{\mA_{S_i}}}{\eps}$}                                       & \makecell[c]{Evaluate $\nabla \ftilde_{\beta,\delta}(\vx)$} \\ \midrule
+\makecell[l]{Interior point with log barrier\\ \citep{boyd2004convex}}                                                         & \makecell[c]{$m^{1/2} \log\left(\frac{1}{\eps}\right)$}                                                                    & \makecell[c]{Linear-system-solve\\ in $\mA^{\top}\mB\mA$}    \\ \midrule
+\makecell[l]{\textbf{This paper} \\ (na\"ive geometry)}                                                                                          & \makecell[c]{$\frac{m^{1/3}}{\eps^{2/3}}$}                                                                                & \makecell[c]{Linear-system-solve\\ in $\mA^{\top}\mB\mA$}    \\ \midrule
+\makecell[l]{$\ell_{\infty}$ regression with Lewis \\weights \citep{jls21}}                                                    & \makecell[c]{$\frac{\rank{\mA}^{1/3}}{\eps^{2/3}}$}                                                                       & \makecell[c]{Linear-system-solve\\ in $\mA^{\top}\mD\mA$}    \\ \midrule
+\makecell[l]{$\ell_{\infty}$ regression with IPM\\ \citep{ls19}}                                                               & \makecell[c]{$\rank{\mA}^{1/2} \log\left(\frac{1}{\eps}\right)$}                                                           & \makecell[c]{Linear-system-solve\\ in $\mA^{\top}\mD\mA$}    \\ \midrule
+\makecell[l]{\textbf{This paper (\Cref{mainthm:fair_regression_iteration_complexity})}}                                                                                                    & \makecell[c]{$\frac{\min\inbraces{\rank{\mA},m}^{1/3}}{\eps^{2/3}}$}                                                               & \makecell[c]{Linear-system-solve\\ in $\mA^{\top}\mB\mA$}    \\ \bottomrule\bottomrule
+\end{tabular}
+\caption{The complexities of algorithms for optimizing \eqref{eq:main_objective} or for the special case of $\ell_{\infty}$ regression, assuming $\opt=1$ (the first three guarantees are additive approximations) and ignoring $\mathrm{polylog}(n,m)$ terms. We write $\mD$ to be a diagonal matrix and $\mB$ to be a block-diagonal matrix where each block has size $(n_i + o(1)) \times (n_i + o(1))$. We remark that in the special case where $n_i=1$, our algorithm exactly recovers guarantees of \cite{jls21}. We stress that we include the references to $\ell_{\infty}$ regression only to show that our algorithm is no worse than that of \cite{jls21} in this special case of $n_i=1$ for all $i$, and none of their algorithms apply to our general setting.\label{table:compare}}
+\end{table}
+
+Unlike the aforementioned first-order methods, our algorithm has no geometry-dependent terms. Additionally, our algorithm improves over the standard log-barrier IPM when the desired accuracy $\eps \ge m^{-1/4}$ --- this improvement is more pronounced when $m \gg \rank{\mA}$, i.e. when the number of data sources is much larger than the dimension of the parameter vector $\vx$. Additionally, for $\eps \ge \rank{\mA}^{-1/4}$, our guarantee matches the best known guarantee for $\ell_{\infty}$ regression \citep{ls19,jls21}.
+
+\begin{remark}[Why use linear-system-solve complexity?]\label{rem:linear_systems}
+    We benchmark our algorithms using the number of linear-system-solves for a few reasons. First, this is typically how second-order algorithms are compared, such as interior point methods for linear programming \citep{ls19}. Second, the particular structure of the linear-system-solves presents the possibility of a faster amortized runtime for the systems over the algorithm's run. This observation, combined with an understanding of how the linear systems changed between iterations, was used recently used to achieve fast runtimes for linear programming \citep{ls19} and $\ell_{\infty}$ regression \citep{ajk24}.
+\end{remark}
+
+\paragraph{Interpolating between robust and nonrobust optimization.} We also study the following family of objectives that interpolate between objectives \ref{eq:utilitarian} and \ref{eq:main_objective} for different values of $p\geq 2$,
+\begin{align}
+    \min_{\vx\in\R^d}\frac{1}{m}\sum_{i\in[m]}\left(\frac{1}{n_i}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2\right)^{p/2}\enspace.\label{eq:interpolation}
+\end{align}
+In particular, note that choosing $p=2$ in the above objective gives us the average least-squares problem in objective \ref{eq:utilitarian}, while $p\to\infty$ recovers objective \ref{eq:main_objective}. Varying $p$ from $2$ to $\infty$ and minimizing gives solutions that interpolate between utilitarian and egalitarian approaches, allowing for a smooth trade-off between utility and robustness. To this end, we give \Cref{alg:gp_regression_alg} to approximately optimize objective \ref{eq:interpolation} and prove the following guarantee about its iteration complexity.
+
+\begin{mainthm}[Trading off utility and robustness]\label{mainthm:gp_regression_iteration_complexity}
+Let $\mA_{S_i} \in \R^{n_i \times d}$ and $\vb_{S_i} \in \R^{n_i}$ for all $i\in[m]$. Denote their concatenations by $\mA\coloneqq [\mA_{S_1}^{\top} \dots \mA_{S_M}^{\top}]^{\top}\in\R^{n\times d}$ and $\vb \coloneqq [\vb_{S_1}^{\top}\dots\vb_{S_M}^{\top}]^{\top}\in \R^n$ where $n \coloneqq \sum_{i\in[m]}n_i$. Let $p \ge 2$ and $\eps > 0$. Then \Cref{alg:gp_regression_alg} returns $\xhat$ such that,
+\begin{align}\label{eq:interpolation_approx}
+    \inparen{\sum_{i=1}^m \inparen{\frac{1}{\sqrt{n_i}}\norm{\mA_{S_i}\xhat-\vb_{S_i}}_2}^p}^{1/p} \le (1+\eps)\cdot\min_{\vx\in\R^d}\inparen{\sum_{i=1}^m \inparen{\frac{1}{\sqrt{n_i}}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2}^p}^{1/p}
+\end{align}
+and runs in
+\begin{align*}          
+    O\inparen{p^{O(1)}\min\inbraces{\rank{\mA},m}^{\frac{p-2}{3p-2}}\logv{\frac{pd}{\eps}}^3}
+\end{align*}
+linear-system-solves in matrices of the form $\mA^{\top}\mB\mA$, where $\mB$ is a block-diagonal matrix for which block $i$ has size $n_i \times n_i$.
+\end{mainthm}
+We prove \Cref{mainthm:gp_regression_iteration_complexity} in \Cref{sec:gp_interpolating_proof}.
+
+In the special case where $n_i=1$ for all $i$ (and therefore the problem is $\ell_p$ regression for $p \ge 2$), the complexity promised by \Cref{mainthm:gp_regression_iteration_complexity} is comparable to that promised by \citet{jls21} for $\ell_p$ regression. The main difference is that our iteration complexity is unconditionally polynomial in $p$. In contrast, the comparable result from \cite{jls21} seems to require mild assumptions on the problem parameters (see the ``Discussion on numerical stability'' by \citet[Section 4]{jls21}).
+
+\begin{remark}[Large values of $p$] 
+    Note that for values of $p$ larger than $\log(m)$, solving \eqref{eq:main_objective} is almost equivalent to solving \eqref{eq:interpolation}. To intuitively see this, first recall that for any vector $\vx\in\R^d$ and $p=\log_2(m)$ we have, $\|\vx\|_\infty \leq \|\vx\|_{p} \leq 2\cdot\|\vx\|_\infty$. This implies that for all $i\in[m]$ we have the following for objective \eqref{eq:interpolation} (for $p=\log_2(m)$) for any $\vx\in\R^d$,
+    \begin{align*}
+        \max_{i\in[m]}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2 \leq \left(\sum_{i\in[m]}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^{p}\right)^{1/p}\leq 2\cdot\max_{i\in[m]}\norm{\mA_{S_i}\vx-\vb_{S_i}}_2\enspace. 
+    \end{align*}
+    In particular, this means that minimizing the interpolating objective \eqref{eq:interpolation} also minimizes the robust objective \eqref{eq:main_objective} (up to numerical constants) and vice versa. Thus, for $p=\Omega\left(\log_2(m)\right)$, for our intended applications, it makes sense to minimize the robust objective instead. This is why, in \Cref{mainthm:gp_regression_iteration_complexity}, we do not care too much about the exponent on $p$ in the iteration complexity. Our main goal is to show that we can get a $O(\mathsf{poly}(p,\logv{\frac{1}{\eps}})\min\inbraces{\rank{\mA},m}^{1/3})$ iteration complexity.
+\end{remark}
+
+\subsection{Prior Results, Connections, and Open Problems}
+\input{related}
+
+\subsection{Paper Outline}
+
+In the remainder of this paper, we will outline the key details of our approach and provide a proof outline for our theoretical results. In \Cref{sec:gp_reg_overview}, we give proof sketches of our main results. In \Cref{sec:blw_to_l2}, we prove some background results that appear in the main body, particularly about block Lewis weights. In \Cref{sec:mirror_descent}, we give an analysis of mirror descent under inexact subproblem solves -- we will need this in the proof of \Cref{mainthm:gp_regression_iteration_complexity}. In \Cref{sec:optimal_ms_acceleration}, we modify an acceleration scheme due to \cite{chjjs22}, which we will use to iterate calls to the proximal subproblem solver \eqref{eq:gp_prox_intro_reg} for the proof of \Cref{mainthm:gp_regression_iteration_complexity}. In \Cref{sec:gp_robust_proof}, we prove \Cref{mainthm:fair_regression_iteration_complexity}. In \Cref{sec:gp_interpolating_proof}, we prove \Cref{mainthm:gp_regression_iteration_complexity}. Finally, in \Cref{app:exps} we include an empirical comparison of our proposed algorithms against the aforementioned baselines.

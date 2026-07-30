@@ -1,0 +1,619 @@
+\allowdisplaybreaks
+
+\maketitle
+
+\begin{abstract}%
+We present an algorithm for the group distributionally robust (GDR) least squares problem. Given $m$ groups, a parameter vector in $\mathbb{R}^d$, and stacked design matrices and responses $\mathbf{A}$ and $\bm{b}$, our algorithm obtains a $(1+\varepsilon)$-multiplicative optimal solution using $\widetilde{O}(\min\{\mathsf{rank}(\mathbf{A}),m\}^{1/3}\varepsilon^{-2/3})$ linear-system-solves of matrices of the form $\mathbf{A}^{\top}\mathbf{B}\mathbf{A}$ for block-diagonal $\mathbf{B}$. Our technical methods follow from a recent geometric construction, block Lewis weights, that relates the empirical GDR problem to a carefully chosen least squares problem and an application of accelerated proximal methods. Our algorithm improves over known interior point methods for moderate accuracy regimes and matches the state-of-the-art guarantees for the special case of $\ell_{\infty}$ regression. We also give algorithms that smoothly interpolate between minimizing the average least squares loss and the distributionally robust loss.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}\label{sec:gp_reg_intro}
+\input{intro}
+
+% \subsection{Our results}\label{sec:results}
+% \input{results}
+
+% \section{Related Work}\label{sec:related}
+% \input{related}
+
+\section{Technical Overview}\label{sec:gp_reg_overview}
+% \todo{Write the meta algorithm, and discuss specific instances of it.}
+% \subsection{General approach -- accelerated proximal methods with custom geometry}
+In this section, we sketch our proofs for \Cref{mainthm:fair_regression_iteration_complexity} and \Cref{mainthm:gp_regression_iteration_complexity}. 
+
+\paragraph{Notation.} Here and in the rest of the paper, we ignore the dataset size normalization factors $1/\sqrt{n_i}$ as we can fold this into $\mA_{S_i}$ and $\vb_{S_i}$. Additionally, let $f(\vx) \coloneqq \sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p$ if $2 \le p < \infty$ and let $f(\vx) \coloneqq \max_{1 \le i \le m} \norm{\mA_{S_i}\vx-\vb_{S_i}}_2$ if $p=\infty$. Note that in the $2 \le p < \infty$ case, we let $f(\vx)$ be the $p$th power of the objective written in \Cref{mainthm:gp_regression_iteration_complexity}; this is to make future calculations easier and makes a difference of only polynomial factors in $p$ in the iteration complexity. Without loss of generality (by rescaling), let $\opt = 1$, where $\opt \coloneqq f(\xstar)$. So, it is enough to get an $\eps$-additive optimal solution $\xhat$. Also without loss of generality, let $\mA$ be such that $\rank{\mA}=d$. For a positive semidefinite $\mM\in\R^{d\times d}$, denote $\norm{\vx}_{\mM} \coloneqq \sqrt{\vx^{\top}\mM\vx}$. As shorthand, for $\vy\in\R^n$, we will often refer to the norm $\gnorm{\vy}{p} \coloneqq \inparen{\sum_{i=1}^m \norm{\vy_{S_i}}_2^p}^{1/p}$ for $p \ge 1$, where with a slight abuse of notation $\vy_{S_i}$ denotes the coordinates of $\vy$ indexed by $S_i$. Finally, in an abuse of notation, for symmetric matrices $\mM$, let $\mM^{-1}$ denote the pseudoinverse of $\mM$.
+
+Recall that many iterative methods for convex optimization can be seen as decomposing a complex problem into a series of simpler subproblems \citep{nw06}. Our algorithms for distributionally robust linear regression follow this pattern, where the simple subproblem resembles
+\begin{align}
+    \cO(\vq) \coloneqq \min_{\norm{\vx-\vq}_{\mM} \le r_{\vq}}\quad f(\vx)\enspace,\label{eq:gp_prox_intro}
+\end{align}
+for some positive semidefinite $\mM$ and for some ball radius $r_{\vq}$ which may depend on the query $\vq$. Sub-routines like \eqref{eq:gp_prox_intro} are central to many trust-region methods~\citep{conn2000trust, nw06}, and, importantly when $f$ is the sum of a linear function and a self-concordant barrier, interior point methods derived from the self-concordant barrier framework \footnote{In this case, the matrix $\mM$ is given by the Hessian of the barrier function evaluated at the subproblem's solution.} \citep{nn94}.
+
+With such a subproblem structure in hand, three questions arise. \begin{enumerate*}[label={(\arabic*)}] \item How do we solve the subproblems efficiently? \item How do we combine our subproblem solutions to arrive at our final answer?  \item How do we choose the ``local geometry'' $\mM$ to optimize the iteration complexity we get from the previous two parts? \end{enumerate*} We address these concerns in order in the following discussion.
+
+\subsection{Solving Proximal Subproblems}
+
+For this discussion, let $\mM$ be any positive semidefinite matrix, as the arguments apply for any geometry $\mM$. It will be helpful to assume that $\norm{\cdot}_{\mM}$ is a good approximation to our objective function in the sense that for some \textit{distortion} $\triangle$ that is as close to $1$ as possible, we have
+\begin{align*}
+    \text{for all } \vx \in \R^d:\quad\quad \norm{\vx - \vb}_{\mM} \le \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p}^{\frac{1}{p}} \le \triangle\norm{\vx -\vb}_{\mM}\enspace.
+\end{align*}
+Here, we discuss how to solve problems of the form \eqref{eq:gp_prox_intro} for a fixed query $\vq$. Our strategy follows two general steps. First, we establish some form of local stability for $\nabla^2 f(\vx)$ within the ball we are solving in, i.e., we want $\nabla^2 f(\vx)$ to not change too much inside the ball $\inbraces{\vx\in\R^d \suchthat \norm{\vx-\vq}_{\mM} \le r_{\vq}}$. Second, we use this to demonstrate that an appropriate second-order algorithm exhibits a favorable convergence rate to an approximate solution for our subproblem. We handle the $p=\infty$ and $2 \le p < \infty$ cases separately below.
+
+\subsubsection{The Robust Case \texorpdfstring{($p=\infty$)}{(p=infinity)}.}
+\label{sec:gp_reg_overview_robust_hessian}
+
+Unfortunately, since $f$ is not even differentiable (it is the pointwise maximum of Euclidean norms, each of which is also not differentiable), we cannot directly argue about the stability of $\nabla^2 f(\vx)$. We therefore first need to find some surrogate objective $\ftilde$ so that:
+\begin{enumerate}
+    \item The approximation error $\maxnorm{\ftilde -f}$ is small;
+    \item The surrogate objective $\ftilde$ is smooth in $\norm{\cdot}_{\mM}$ in such a way that we can solve the proximal subproblems fast.
+\end{enumerate}
+To smoothen $f(\vx)$, we use the family of objectives parameterized by $\beta,\delta$
+\begin{align}
+    \ftilde_{\beta,\delta}(\vx) \coloneqq \beta\logv{\sum_{i=1}^m \expv{\frac{\sqrt{\delta^2 + \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}-\delta}{\beta}}}\enspace.\label{eq:intro_smooth_fair_objective}
+\end{align}
+This can be seen as composing the softmax function with temperature $\beta$ with ``inner functions'' $\sqrt{\delta^2 + \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2} - \delta$. It is straightforward to show that for all $\vx\in\R^d$, $\abs{\ftilde_{\beta,\delta}(\vx) - f(\vx)} \le \beta\log m + \delta$. So, setting $\beta = \eps/4\log m$ and $\delta = \eps/4$, it is sufficient to optimize $\ftilde_{\beta,\delta}$ up to $\eps/2$ additive error to get an $\eps$-additive suboptimal solution to our original objective. Furthermore, we prove that $\ftilde_{\beta,\delta}$ is $O(1/\beta+1/\delta)$-smooth in the norm $\gnorm{\mA\vx}{\infty} \coloneqq \max_{1 \le i \le m} \norm{\mA\vx}_2$. Thus, if $\norm{\cdot}_{\mM}$ is a good approximation to $\gnorm{\mA\vx}{\infty}$, we will get that $\ftilde_{\beta,\delta}$ is also smooth in the norm $\norm{\vx}_{\mM}$.
+
+Next, \citet{msbacon} show that if $\ftilde_{\beta,\delta}$ satisfies a higher-order smoothness condition called \textit{quasi-self-concordance} with respect to the norm $\norm{\cdot}_{\mM}$, then we can get the required Hessian stability for a \textit{fixed} $r_{\vq} = \Theta(1/\eps)$ (in particular, $r_{\vq}$ does not depend on $\vq$ here). To clarify, we define quasi-self-concordance as follows.
+\begin{definition}[Quasi-self-concordance, adapted from {\cite[Appendix A]{ksj18}}]
+\label{defn:qsc}
+Let $\myfunc{f}{\R^k}{\R}$. We say that $f$ is $\nu$-quasi-self-concordant in the norm $\norm{\cdot}$ if for all vectors $\vy\in\R^k$, directions $\vd\in\R^k$, and $t\in\R$, we have
+\begin{align*}
+    \abs{\inparen{\frac{d}{dt}}^3 f(\vy+t\vd)} \le \nu\norm{\vd}\inparen{\frac{d}{dt}}^2 f(\vy+t\vd)\enspace.
+\end{align*}
+\end{definition}
+Then, \cite{msbacon} shows how to leverage this Hessian stability to implement \eqref{eq:gp_prox_intro} with low linear-system-solve iteration complexity. However, previously, it was only shown that the composition of the softmax function with linear functions is quasi-self-concordant. So, it was unknown whether composing softmax with other functions could also be quasi-self-concordant. 
+
+To resolve this, we prove a much more general composition result, which to the best of our knowledge was not known prior to this work and may be of independent interest. It essentially states that if we compose the softmax function with any combination of ``inner'' functions that are quasi-self-concordant, the resulting function is also quasi-self-concordant. For a more formal statement, see \Cref{lemma:composed_qsc}. 
+
+\begin{restatable*}[Composing softmax with quasi-self-concordant functions]{lemma}{composedqsc}
+\label{lemma:composed_qsc}
+Let $\norm{\cdot}$ be an arbitrary norm and $h_1,\dots,h_m$ be such that $\myfunc{h_i}{\R^d}{\R}$. Let $h$ be the vector formed by concatenating the results of $h_1, \dots, h_m$. Additionally, let $h_1, \dots, h_m$ be such that for all $1 \le i \le m$ and for all $\vy,\vd\in\R^m$ and $t\in\R$,
+\begin{align*}
+    &\inparen{\frac{d}{dt}} h_i(\vy + t\vd) \le \norm{\vd} & \text{(Lipschitzness)}\\
+    &\abs{\inparen{\frac{d}{dt}}^3 h_i(\vy + t\vd)} \le \nu\norm{\vd}\inparen{\frac{d}{dt}}^2 h_i(\vy + t\vd) & \text{(quasi-self-concordance)}.
+\end{align*}
+Then, for all $\vy,\vd\in\R^m$ and all $t\in\R$, we have
+\begin{align*}
+    \abs{\inparen{\frac{d}{dt}}^3 \beta\logv{\sum_{i=1}^m \expv{\frac{h_i(\vy+t\vd)}{\beta}}}} \le \inparen{\frac{16}{\beta}+\nu}\norm{\vd}\inparen{\frac{d}{dt}}^2 \lse_{\beta}(h(\vy + t\vd)).
+\end{align*}
+\end{restatable*}
+
+Hence, to show the requisite Hessian stability, we use the following steps. We show that the ``inner'' functions for \eqref{eq:intro_smooth_fair_objective}, $\sqrt{\delta^2+\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}-\delta$, are each $O(1/\delta)$-quasi-self-concordant in the norm $\norm{\mA_{S_i}\vx}_2$. So, we can apply our composition result \Cref{lemma:composed_qsc} to prove that $\ftilde_{\beta,\delta}$ is $O(1/\beta + 1/\delta)$-quasi-self-concordant in the norm $\max_{i\in[m]}\norm{\mA_{S_i}\vx}_2$. Again, assuming that $\norm{\cdot}_{\mM}$ is a good approximation to $\gnorm{\cdot}{\infty}$, we will get that $\ftilde_{\beta,\delta}$ is quasi-self-concordant in $\norm{\vx}_{\mM}$ as well. 
+
+With these analytic inequalities in hand, we can finally apply the recipe given in \cite{msbacon} and get our subproblem solver for the $p=\infty$ case.
+
+\subsubsection{The Interpolating Case (\texorpdfstring{$2 \le p < \infty$}{2 <= p < infinity}).}
+
+Instead of explicitly constraining $r_{\vq}$ like in the $p=\infty$ case, we regularize our movement from $\vq$ in the norm $\norm{\cdot}_{\mM}$. Specifically, the subproblem we solve for any query $\vq$ is
+\begin{align}
+    \argmin{\vx\in\R^d} f(\vx) + ep^p\norm{\vx-\vq}_{\mM}^p\enspace.\label{eq:gp_prox_intro_reg}
+\end{align}
+This is the natural generalization of the proximal problem that \cite{jls21} use to get their results for $\ell_p$ regression, and the outline of our solver for these subproblems is similar to what \cite{jls21} use for this special case (see their Section 4).
+
+However, we go a step further and show how to obtain approximate stationary points to \eqref{eq:gp_prox_intro_reg} instead of just getting a small objective value. This is because the acceleration scheme we use to iterate subproblem solutions to get our final answer $\xhat$ requires us to obtain an approximate stationary point for \eqref{eq:gp_prox_intro_reg}. The main new technical tool we develop for this purpose is a form of strong convexity for functions of the form $\norm{\vy}_2^p$ for $\vy\in\R^k$ for any $k\ge 1$. See \Cref{lemma:strong_convexity_component}.
+
+\begin{restatable*}[Strong convexity of $\norm{\vy}_2^p$]{lemma}{lemmastrongconvexitycomponent}
+\label{lemma:strong_convexity_component}
+Let $\vv \in \R^k$ for $k\ge 1$. For any $\triangle \in \R^k$, we have
+\begin{align*}
+    \norm{\vv+\triangle}_2^p \ge \norm{\vv}_2^p + p\norm{\vv}_2^{p-2}\ip{\vv,\triangle}+\frac{4}{2^p}\norm{\triangle}_2^p\enspace.
+\end{align*}
+\end{restatable*}
+
+With \Cref{lemma:strong_convexity_component}, we can argue about the strong convexity of $\norm{\vx-\vq}_{\mM}^p$, which means that we can convert an approximately optimal solution to \eqref{eq:gp_prox_intro_reg} in function value to one that is approximately optimal in parameter space as well. We combine this with a local gradient Lipschitzness property of the objective \eqref{eq:gp_prox_intro_reg} to get our approximate stationary point, which is enough for our purposes. The local gradient Lipschitzness property itself follows from a form of Hessian stability that we show for the objective \eqref{eq:gp_prox_intro_reg}. See \Cref{lemma:gp_hessian_stable}.
+
+Finally, to obtain an approximately optimal solution to \eqref{eq:gp_prox_intro_reg} in function value, we again apply the Hessian stability property to conclude that \eqref{eq:gp_prox_intro_reg} is relatively smooth and relatively strongly convex in a simpler reference function. We show how to solve optimization problems in this reference function up to an approximate optimality that is sufficient for the rest of our applications -- this requires a mild modification of the standard mirror descent analysis, and we do this in \Cref{sec:mirror_descent}. Combining all of these building blocks gives us our subproblem solver for the $2 \le p < \infty$ case.
+
+\subsection{Iterating Proximal Calls}\label{sec:iter_prox_calls}
+
+We now discuss the second item. Recall that we think of $\cO(\vq)$ as answering a proximal problem for the query $\vq$. It is not hard to show that under reasonable conditions on $f$ and on the structure of the subproblems, we can iterate calls to $\cO(\vq)$ to optimize $f$ (see, e.g., \cite[Appendix A]{msbacon}). This conceptually simple approach will already give us guarantees of the form ${\norm{\vx_0-\xstar}_{\mM}}/{\eps}$ for the problems we study.
+
+But we can do better. An acceleration framework originally due to \citet{ms13} and generalized/refined in subsequent works \citep{bjlls19,msbacon,chjjs22} gives a recipe to iterate calls of $\cO(\vq)$ to optimize the original function $f$. From these, the iteration complexity we need for an $\eps$-additive solution with an initialization $\vx_0$ and optimum $\xstar$ is roughly $\inparen{{\norm{\vx_0-\xstar}_{\mM}}/{\eps}}^{2/3}$ (see \Cref{thm:optimal_ms_acceleration} for a more formal statement). This cosmetically resembles the rate we get in \Cref{mainthm:fair_regression_iteration_complexity}. To get something that looks like our rate for \Cref{mainthm:gp_regression_iteration_complexity}, we use our new strong convexity lemma  (\Cref{lemma:strong_convexity_component}). With this, we can demonstrate that after a sufficient number of iterations, we have $\norm{\vx_t-\xstar}_{\mM} \le 0.5\norm{\vx_0-\xstar}_{\mM}$. Therefore, repeating this argument yields a high-accuracy solution, as required. 
+
+Interestingly, our algorithm for the $2 \le p < \infty$ case employs a form of the accelerated scheme developed in \cite{chjjs22}, which does not require solving an implicit equation for the query point, thereby improving upon the results from \cite{jls21} for $\ell_p$ regression. It would be practically relevant to obtain this for the $p=\infty$ case (in \Cref{sec:optimal_ms_acceleration}, we discuss a technical challenge in obtaining this).
+
+\subsection{The Geometry of the Proximal Subproblems and Block Lewis Weights}
+\label{sec:gp_reg_overview_blw}
+
+At this point, we have the tools we need to get rates of the form $O\inparen{\inparen{{\norm{\vx_0-\xstar}_{\mM}}/{\eps}}^{2/3}}$ for the robust objective (\Cref{mainthm:fair_regression_iteration_complexity}) and of the form $O\inparen{{\norm{\vx_0-\xstar}_{\mM}}^{(p-2)/(3p-2)}}$ for the interpolating objective (\Cref{mainthm:gp_regression_iteration_complexity}). From this, we see that the rates depend on the geometry $\mM$ that we impose on our problem. Our goal in this section is to choose this geometry $\mM$.
+
+Observe that when we solve \eqref{eq:gp_prox_intro}, we are solving an optimization problem over the sublevel sets $\inbraces{\vx\suchthat \norm{\vx}_{\mM}\le r_{\vq}}$ -- these are ellipsoids. Now, consider choosing the $\ell_2$ geometry that best approximates our loss function. Specifically, recall that earlier in the section, we stated that for some distortion $\triangle \ge 1$ that is as close to $1$ as possible, we want
+\begin{align*}
+    \text{for all } \vx \in \R^d:\quad\quad \norm{\vx - \vb}_{\mM} \le \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p}^{\frac{1}{p}} \le \triangle\norm{\vx -\vb}_{\mM}\enspace.
+\end{align*}
+To see what kinds of distortion guarantees we can hope for, let us see what happens when we choose the most ``obvious'' geometry. By relating $\ell_2^m$ to $\ell_p^m$, we get
+\begin{align*}
+    \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}^{\frac{1}{2}} \le \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^p}^{\frac{1}{p}} \le m^{\frac{1}{2}-\frac{1}{p}}\inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}^{\frac{1}{2}},
+\end{align*}
+and notice that $\inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}^2 = \norm{\mA\vx-\vb}_2$. Thus, setting $\mM = \mA^{\top}\mA$ (which is what we call the na\"ive geometry in \Cref{table:compare}) gives us our basic rate of $m^{1/3}\eps^{-2/3}$ in the setting of \Cref{mainthm:fair_regression_iteration_complexity} and $m^{(p-2)/(3p-2)}$ in the setting of \Cref{mainthm:gp_regression_iteration_complexity}.
+
+But, there exists an improvement over above na\"ive geometry. Note our loss function is a norm on $\R^d$ -- in particular, we can check that for $\vy\in\R^n$, the functions $\gnorm{\vy}{p}=\inparen{\sum_{i=1}^m \norm{\vy_{S_i}}_2^p}^{1/p}$ for $1 \le p \le \infty$ are norms. Now, recall John's theorem, a fundamental result in high-dimensional convex geometry.
+\begin{theorem}[John's theorem, \cite{john1948}]
+For any symmetric convex body $K \subset \R^d$, let $\cE(K)$ denote the ellipsoid of maximum volume contained within $K$. Then, we have
+\begin{align*}
+    \cE(K) \subseteq K \subseteq \sqrt{d}\cdot \cE(K)\enspace.
+\end{align*}
+Moreover, the $\sqrt{d}$ is worst-case optimal (e.g. let $K$ be the unit $\ell_{\infty}$ ball).
+\end{theorem}
+It is easy to see that sublevel sets of norms, i.e., sets of the form $\inbraces{\vx\in\R^d\suchthat \norm{\vx}\le 1}$, are symmetric convex bodies. Hence, using John's theorem, we see that for our normed losses, there exists $\mM$ that achieves distortion $\triangle\le\sqrt{d}$. From this, it is easy to see that there exists $\mM$ for which we can guarantee $\norm{\vx_0-\xstar}_{\mM} \lesssim \sqrt{d}$. Plugging this into the guarantees from the previous subsections, we get that if we choose the $\mM$ from John's theorem, and then switch based on whether $m \le d$, we get exactly the rates quoted in \Cref{mainthm:fair_regression_iteration_complexity} and  \Cref{mainthm:gp_regression_iteration_complexity}.
+
+However, as written, this is only an existence result. To make this useful for us and actually find $\mM$, we need an algorithm to calculate John's ellipsoid for the level sets of our losses (or some other ellipsoid that gets an even better approximation factor). To this end, a result of \citet{mo23} gives us an efficient algorithm to find this $\ell_2$ geometry for the loss families we consider.
+
+\begin{theorem}[Combining Lemmas 5.6, 5.8, Equation (1.8) from {\cite{mo23}}]
+\label{thm:gp_regression_blw_intro}
+Let $p\ge 2$. There exists an algorithm that finds a positive diagonal matrix $\mW \in \R^{n \times n}$ such that for all $\vx\in\R^d$ and all $c\in\R$, we have
+\begin{align*}
+    \frac{\norm{\mW^{\frac{1}{2}-\frac{1}{p}}\inparen{\mA\vx-c\vb}}_2}{(2(\rank{\mA}+1))^{\frac{1}{2}-\frac{1}{p}}} \le \inparen{\sum_{i=1}^m \norm{\mA_{S_i}\vx-c\vb_{S_i}}_2^p}^{\frac{1}{p}} \le \norm{\mW^{\frac{1}{2}-\frac{1}{p}}\inparen{\mA\vx-c\vb}}_2\enspace.
+\end{align*}
+The algorithm runs in $O(\log m)$ linear-system-solves in matrices of the form $\mA^{\top}\mD\mA$ for positive diagonal matrices $\mD$.%\todo{add paper citation and theorem number in the theorem name.}
+\end{theorem}
+
+The diagonal entries of matrix $\mW$ are called \textit{block Lewis weights}. This is a generalization of Lewis weights, and both objects have been used previously for various matrix approximation problems \citep{blm89,mmwy21,jls22,jlls23,mo23}. Furthermore, Lewis weights are central to improvements in the iteration complexities for linear programming and vanilla $\ell_p$ regression \citep{ls19,jls21}. We go into greater detail about block Lewis weights in \Cref{sec:blw_to_l2}. 
+
+Additionally, notice that the distortion of $O(\rank{\mA}^{1/2-1/p})$ guaranteed by \Cref{thm:gp_regression_blw_intro} is optimal. To see this, let $\mA \in \R^{n \times d}$ be such that for $i\in[d]$, row $\va_i=\ve_i$, where $\ve_i$ is the $i$th standard basis vector. Then, for all $d+1 \le i \le n$, let $\va_i=0$. In words, $\mA$ is the $d$-dimensional identity matrix atop a large matrix of all $0$s. It is easy to see that for any $p$, we have $\norm{\mA\vx}_p = \norm{\vx}_p$, and the best distortion we can get for relating $\norm{\vx}_p$ to any $d$-dimensional $\ell_2$ norm is $d^{\abs{1/2-1/p}}$.
+
+With \Cref{thm:gp_regression_blw_intro} and its near optimality in hand, we choose $\mM = \mA^{\top}\mW^{1-\frac{2}{p}}\mA$ if $\rank{\mA} \le m$ and $\mM = \mA^{\top}\mA$ if $\rank{\mA} \ge m$ (recall that in the latter case, we get a $\sqrt{m}$ distortion for free from relating $\ell_2^m$ to $\ell_{\infty}^m$). Combining this with the results from the previous two subsections gives us \Cref{mainthm:fair_regression_iteration_complexity} and \Cref{mainthm:gp_regression_iteration_complexity}.
+
+\subsection{Algorithm for Distributionally Robust Regression}
+
+In \Cref{alg:fair_regression}, we present pseudocode for the algorithm that yields the guarantee in \Cref{mainthm:fair_regression_iteration_complexity}. We compare the empirical performance of this algorithm against other baselines mentioned in \Cref{sec:gp_reg_intro} and examine the effect of Lewis weights in \Cref{app:exps}.
+
+\begin{algorithm}[H]
+\caption{\textsf{MinMaxRegression}: optimizes \eqref{eq:main_objective} to $(1+\eps)$-multiplicative error}
+\label{alg:fair_regression}
+\begin{algorithmic}[1]
+\Require Regression problems $(\mA_{S_1},\vb_{S_1}),\dots,(\mA_{S_m},\vb_{S_m})$, accuracy $\eps > 0$
+\State Using \cite[Algorithm 2]{mo23} with input $\insquare{\mA \vert \vb}$, find nonnegative diagonal $\mW$ and weights $w_1,\dots,w_m$ such that for all $j \in S_i$, $\mW[j][j] = w_i$ and for all $\vx\in\R^{d}$ and $c \in \R$,
+\begin{align*}
+    \gnorm{\mA\vx-c\vb}{\infty} \le \norm{\mW^{1/2}\mA\vx-c\mW^{1/2}\vb}_2 \le \sqrt{2(\rank{\mA    }+1)}\gnorm{\mA\vx-c\vb}{\infty}.
+\end{align*}\label{line:blw}
+\If{$\sum_{i=1}^m w_i \ge m$} \Comment{$\rank{\mA}+1\le\sum_{i=1}^m w_i \le 2(\rank{\mA}+1)$}
+    \State Reset $\mW = \mI_n$.
+\EndIf
+\State Let $\vx_0 = \inparen{\mA^{\top}\mW\mA}^{-1}\mA^{\top}\mW\vb$. \Comment{$\vx_0 \coloneqq \argmin{\vx\in\R^d} \norm{\mW^{1/2}\mA\vx-\mW^{1/2}\vb}_2$.}
+\State Let
+\begin{align*}
+    \ftilde_{\beta,\delta}(\vx) \coloneqq \beta\logv{\sum_{i=1}^m \expv{\frac{\sqrt{\delta^2 + \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}-\delta}{\beta}}}
+\end{align*}
+where $\beta = \frac{\eps}{4\log m}$ and $\delta = \frac{\eps}{4}$. \Comment{A family of smoothenings of the objective.}
+\State Let $\fhat(\vx) \coloneqq \ftilde_{\eps/4\log m, \eps/4}(\vx) + \frac{\eps}{1000\min\inbraces{\rank{\mA},m}}\norm{\mW^{1/2}\mA(\vx-\vx_0)}_2^2$.
+\State Using \cite[Algorithm 3]{msbacon}, implement a $\inparen{\frac{C}{\min\inbraces{\rank{\mA},m}},\frac{C}{\eps}}$-ball optimization oracle for $\fhat$, where $C$ is a universal constant. \Comment{Iteration complexity guaranteed by \Cref{lemma:obj_smooth_qsc}}
+\State Using \cite[Algorithm 2]{msbacon}, implement a $\frac{1}{2}$-MS oracle for $\fhat$.
+\State Run \cite[Algorithm 1]{msbacon} for $\widetilde{O}\inparen{\frac{\min\inbraces{\rank{\mA},m}^{1/3}\logv{\frac{d}{\eps}}}{\eps^{2/3}}}$ iterations using the MS oracle from the previous line and with initial point $\vx_0$ and final point $\xhat$.
+\State \Return $\xhat$
+\end{algorithmic}
+\end{algorithm}
+
+
+
+
+% \printbibliography
+
+% \bibliography{iclr2026/iclr2026_conference}
+% \bibliographystyle{iclr2026/iclr2026_conference}
+
+% \newpage
+% \appendix
+
+\input{other_proofs}
+
+\input{mirror_descent}
+
+\input{improved_ms}
+
+\section{Minimizing the Distributionally Robust Loss}\label{sec:gp_robust_proof}
+
+The goal of this section is to prove \Cref{mainthm:fair_regression_iteration_complexity}. We break up the proof into parts as described in \Cref{sec:gp_reg_overview}. We structure the section as follows. In the remainder of this subsection, we present \Cref{alg:fair_regression}, our algorithm for minimizing the distributionally robust loss. In \Cref{sec:gp_robust_approx}, we introduce our smooth approximation for the objective \eqref{eq:main_objective} and show that it is a good additive approximation (this is a standard argument, but we include it as it provides crucial intuition). 
+
+As the main difficulty of the proof in \Cref{mainthm:fair_regression_iteration_complexity} is to establish a Hessian stability for our surrogate loss, we devote the bulk of this section to proving this. Recall that in \Cref{sec:gp_reg_overview_robust_hessian}, we claimed that a higher-order smoothness condition called \textit{quasi-self-concordance} gives us the needed Hessian stability -- in fact, this follows from \cite[Lemma 11]{msbacon}. In light of this, it suffices to demonstrate that our surrogate loss is quasi-self-concordant. 
+
+In \Cref{sec:lse_calculus}, we work out some calculus facts related to the softmax function. In particular, it is in \Cref{sec:lse_calculus} that we prove the general composition result \Cref{lemma:composed_qsc} that states that if we take the softmax of several quasi-self-concordant functions, then the resulting function is also quasi-self-concordant. In \Cref{sec:lse_calculus_special}, we apply this composition fact to prove that our surrogate objective is quasi-self-concordant. Finally, in \Cref{sec:gp_robust_analysis_combining}, we combine these building blocks with the acceleration framework in \cite{msbacon} and complete the proof of \Cref{mainthm:fair_regression_iteration_complexity}.
+
+\subsection{Smoothly Approximating the Objective}
+\label{sec:gp_robust_approx}
+
+Recall that for $\vy\in\R^n$, let $\gnorm{\vy}{\infty} \coloneqq \max_{1 \le i \le m} \norm{\vy_{S_i}}_2$, where for $\vy\in\R^n$ we let $\vy_{S_i}$ refer to the vector in $\R^{n_i}$ indexed by the indices in $S_i$. Also, for $\vy\in\R^m$, let $\lse_{\beta}(\vy)$ refer to the function
+\begin{align*}
+    \lse_{\beta}(\vy) \coloneqq \beta\logv{\sum_{i=1}^m \expv{\frac{y_i}{\beta}}}.
+\end{align*}
+At a high level, our algorithm will minimize the function
+\begin{align*}
+    \ftilde_{\beta,\delta}(\vx) \coloneqq \beta\logv{\sum_{i=1}^m \expv{\frac{\sqrt{\delta^2 + \norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}-\delta}{\beta}}}
+\end{align*}
+for appropriate choices of the parameters $\beta$ and $\delta$. This choice of smoothening is natural because of the following approximation statement -- see \Cref{lemma:smooth_approx}.
+\begin{lemma}
+\label{lemma:smooth_approx}
+For all $\vx \in\R^d$, we have
+\begin{align*}
+    \abs{\ftilde_{\beta,\delta}(\vx)-\gnorm{\mA\vx-\vb}{\infty}} \le \beta\log m + \delta.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:smooth_approx}]
+These guarantees are well-known, but we prove them anyway for the sake of self-containment. We first prove that for any $\vv\in\R^m$, we have 
+\begin{align*}
+    \max_{1 \le i \le m} v_i \le \lse_{\beta}(\vv) \le \max_{1 \le i \le m} v_i +\beta\log m.
+\end{align*}
+In one direction, we have
+\begin{align*}
+    \lse_{\beta}(\vv) \le \beta\logv{\sum_{i=1}^m \expv{\frac{\max_{1\le i \le m} v_i}{\beta}}} = \beta\log m + \max_{1 \le i \le m} v_i,
+\end{align*}
+and in the other, we have
+\begin{align*}
+    \lse_{\beta}(\vv) \ge \beta\logv{\expv{\frac{\max_{1 \le i \le m} v_i}{\beta}}} = \max_{1 \le i \le m} v_i.
+\end{align*}
+Next, for $\vv \in \R^m$, we will show that
+\begin{align*}
+    \norm{\vv}_2 - \delta \le \sqrt{\delta^2+\norm{\vv}_2^2} - \delta \le \norm{\vv}_2.
+\end{align*}
+Indeed, we have
+\begin{align*}
+    \sqrt{\delta^2+\norm{\vv}_2^2} - \delta \le \sqrt{\delta^2} + \sqrt{\norm{\vv}_2^2} - \delta = \norm{\vv}_2,
+\end{align*}
+and
+\begin{align*}
+    \sqrt{\delta^2+\norm{\vv}_2^2} - \delta \ge \sqrt{\norm{\vv}_2^2} - \delta = \norm{\vv}_2 - \delta.
+\end{align*}
+From this, we get
+\begin{align*}
+    \ftilde_{\beta,\delta}(\vx) \le \max_{1 \le i \le m} \inparen{\sqrt{\delta^2+\norm{\mA_{S_i}\vx-\vb_{S_i}}_2^2}-\delta} + \beta\log m \le \gnorm{\mA\vx-\vb}{\infty} + \beta\log m
+\end{align*}
+and
+\begin{align*}
+    \ftilde_{\beta,\delta}(\vx) \ge \beta\logv{\sum_{i=1}^m \expv{\frac{\norm{\mA_{S_i}\vx-\vb_{S_i}}_2-\delta}{\beta}}} \ge \gnorm{\mA\vx-\vb}{\infty}-\delta.
+\end{align*}
+Putting these together gives
+\begin{align*}
+    \abs{\ftilde_{\beta,\delta}(\vx)-\gnorm{\mA\vx-\vb}{\infty}} \le \max\inparen{\beta\log m, \delta} \le \beta\log m + \delta,
+\end{align*}
+completing the proof of \Cref{lemma:smooth_approx}.
+\end{proof}
+Eventually, we will choose $\beta = \eps/(4\log m)$ and $\delta = \eps/4$ and then minimize $\ftilde_{\beta,\delta}$ to $\eps/2$ additive error. In light of \Cref{lemma:smooth_approx}, this will be enough to get an $\eps$-additive approximation to the optimum for $\gnorm{\mA\vx-\vb}{\infty}$.
+
+% The rest of this section is organized as follows. In \Cref{sec:lse_calculus}, we derive the smoothness results we need regarding a family of objectives that generalizes $\ftilde_{\beta,\delta}$. In \Cref{sec:lse_calculus_special}, we specialize these results to $\ftilde_{\beta,\delta}$. Finally, in \Cref{sec:gp_robust_analysis_combining}, we combine these results with the framework from \cite{msbacon} to complete the proof of \Cref{mainthm:fair_regression_iteration_complexity}.
+
+\subsection{Calculus for \lsetext}
+\label{sec:lse_calculus}
+
+We investigate certain properties of $\lse_{\beta}(\vy)$ when each entry $[\vy]_i$ is a function $h_i(t)$ for $t \in \R$ for all $i\in[m]$. Let $h(t) \in \R^m$ denote the vector where its $i$th entry is given by $h_i(t)$. We treat each $h_i$ as a one-dimensional restriction of a function $\myfunc{g_i}{\R^m}{\R}$, so $h_i(t) = g_i(\vy+t\vd)$ for center $\vy$ and direction $\vd$ (we omit the parameters $\vy,\vd$ in the notation $h_i$ as it will be clear from context). Finally, recall the definition of quasi-self-concordance (\Cref{defn:qsc}).
+
+We begin with calculating the first two derivatives of $\lse_{\beta}(h(t))$ with respect to $t$ in \Cref{lemma:lse_first_two}.
+\begin{lemma}
+\label{lemma:lse_first_two}
+Let $\lambda_i(t) \coloneqq \expv{h_i(t)/\beta}$. Then, we have
+\begin{align*}
+    \inparen{\frac{d}{dt}}\lse_{\beta}(h(t)) &= \frac{\sum_{i=1}^m \inparen{\lambda_i(t) \cdot h_i'(t)}}{\sum_{i=1}^m \lambda_i(t)} \\
+    \inparen{\frac{d}{dt}}^2\lse_{\beta}(h(t)) &= \frac{1}{\beta}\inparen{\frac{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2}{\sum_{i=1}^m \lambda_i(t)} - \inparen{\frac{\sum_{i=1}^m \lambda_i(t)h_i'(t)}{\sum_{i=1}^m \lambda_i(t)}}^2} + \frac{\sum_{i=1}^m \lambda_i(t)h_i''(t)}{\sum_{i=1}^m \lambda_i(t)}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:lse_first_two}]
+The first derivative follows from the chain rule. Indeed, we have
+\begin{align*}
+    \lse_{\beta}'(h(t)) &= \beta \cdot \frac{\sum_{i=1}^m \lambda_i'(t)}{\sum_{i=1}^m \lambda_i(t)} = \beta \cdot \frac{\sum_{i=1}^m \inparen{\lambda_i(t) \cdot \frac{h_i'(t)}{\beta}}}{\sum_{i=1}^m \lambda_i(t)} = \frac{\sum_{i=1}^m \inparen{\lambda_i(t) \cdot h_i'(t)}}{\sum_{i=1}^m \lambda_i(t)} \le \max_{i} h_i'(t).
+\end{align*}
+For the second derivative, we use the differentiation rule for multiplication and division and the chain rule, giving
+\begin{align*}
+    \lse_{\beta}''(h(t)) &= \frac{\left[\inparen{\sum_{i=1}^m \lambda_i'(t)h_i'(t)+\lambda_i(t)h_i''(t)}\inparen{\sum_{i=1}^m \lambda_i(t)}\right] - \frac{1}{\beta}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}^2}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2} \\
+    &= \frac{\left[\frac{1}{\beta}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2+\beta\lambda_i(t)h_i''(t)}\inparen{\sum_{i=1}^m \lambda_i(t)}\right] - \frac{1}{\beta}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}^2}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2} \\
+    &= \frac{1}{\beta}\inparen{\frac{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2}{\sum_{i=1}^m \lambda_i(t)} - \frac{\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}^2}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2}} + \frac{\sum_{i=1}^m \lambda_i(t)h_i''(t)}{\sum_{i=1}^m \lambda_i(t)}\enspace.
+\end{align*}
+This completes the proof of \Cref{lemma:lse_first_two}.
+\end{proof}
+Next, we prove a general fact regarding composing $\lse$ with a vector formed by functions that are themselves quasi self concordant. See \Cref{lemma:composed_qsc}.
+\composedqsc
+As far as we are aware, this type of composition result was not previously known and may be of independent interest.
+
+To prove \Cref{lemma:composed_qsc}, we need \Cref{lemma:variance_rv_bound}.
+\begin{lemma}
+\label{lemma:variance_rv_bound}
+For any two random variables $X, Y$, we have
+\begin{align*}
+    \var{XY} \le 2\maxnorm{Y}^2\var{X}+2\maxnorm{X}^2\var{Y}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:variance_rv_bound}]
+The proof follows that of \cite{var_stackexchange}, but we reproduce it here for completeness. First, notice that for random variables $U, V$, we have
+\begin{align*}
+    2\var{U}+2\var{V} - \var{U+V} = \var{U}+\var{V}-2\cov{U,V} = \var{U-V} \ge 0.
+\end{align*}
+Let $U=(X-\exv{X})Y$ and $V=\exv{X}Y$. Then, $U+V=XY$, and we have
+\begin{align*}
+    \var{XY} \le 2\var{(X-\exv{X})Y}+2\var{\exv{X}Y}=2\var{(X-\exv{X})Y}+2\exv{X}^2\var{Y}.
+\end{align*}
+It remains to bound $\var{(X-\exv{X})Y}$. By H\"older's inequality, we have
+\begin{align*}
+    \var{(X-\exv{X})Y} \le \exv{((X-\exv{X})Y)^2} \le \exv{(X-\exv{X})^2}\maxnorm{Y}^2=\var{X}\maxnorm{Y}^2.
+\end{align*}
+Combining everything gives us the conclusion of \Cref{lemma:variance_rv_bound}.
+\end{proof}
+We are now ready to prove \Cref{lemma:composed_qsc}.
+\begin{proof}[Proof of \Cref{lemma:composed_qsc}]
+Let $\lambda_i(t) \coloneqq \expv{h_i(t)/\beta}$.
+
+In this proof, we will encounter many weighted averages of vectors $\vz \in \R^m$ of the form
+\begin{align*}
+    \frac{\sum_{i=1}^m \lambda_i(t)z_i}{\sum_{i=1}^m \lambda_i(t)}.
+\end{align*}
+Let $\cD$ be the distribution over $[m]$ whose entries are given by $\cD_j = \lambda_j(t)/\sum_{i=1}^m \lambda_i(t)$. In the rest of this proof, all expected values, variances, and covariances will be taken with respect to this distribution. In an abuse of notation, let $h(t)$ denote the ``random'' variable that is $h_i(t)$ with probability $\cD_i$. Define $h'(t), h''(t), h'''(t)$ analogously.
+
+To find the third derivative of $\lse_{\beta}(h(t))$, we start with its second derivative. By \Cref{lemma:lse_first_two}, it is given by
+\begin{align*}
+    \lse_{\beta}''(h(t)) &= \underbrace{\frac{1}{\beta}\inparen{\frac{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2}{\sum_{i=1}^m \lambda_i(t)} - \inparen{\frac{\sum_{i=1}^m \lambda_i(t)h_i'(t)}{\sum_{i=1}^m \lambda_i(t)}}^2}}_{T_1} + \underbrace{\frac{\sum_{i=1}^m \lambda_i(t)h_i''(t)}{\sum_{i=1}^m \lambda_i(t)}}_{T_2} \\
+    &= \frac{1}{\beta}\var{h'(t)}+\exv{h''(t)}.
+\end{align*}
+We now differentiate the above term by term. First, we have
+\begin{align*}
+    T_2'(t) &= \frac{\sum_{i=1}^m \lambda_i(t)\inparen{\inparen{\frac{h_i'(t)h_i''(t)}{\beta}}+h_i'''(t)}}{\sum_{i=1}^m \lambda_i(t)} - \frac{1}{\beta}\cdot\frac{\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}\inparen{\sum_{i=1}^m \lambda_i(t)h_i''(t)}}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2} \\
+    &= \frac{1}{\beta}\inparen{\frac{\sum_{i=1}^m \lambda_i(t)h_i'(t)h_i''(t)}{\sum_{i=1}^m \lambda_i(t)} - \frac{\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}\inparen{\sum_{i=1}^m \lambda_i(t)h_i''(t)}}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2}} + \frac{\sum_{i=1}^m \lambda_i(t)h_i'''(t)}{\sum_{i=1}^m \lambda_i(t)} \\
+    &= \frac{1}{\beta}\cov{h'(t),h''(t)} + \exv{h'''(t)}.
+\end{align*}
+Next, we have
+\begin{align*}
+    \frac{d}{dt}\exv{h'(t)}^2 = 2\exv{h'(t)} \cdot \frac{d}{dt}\exv{h'(t)} = 2\exv{h'(t)}\inparen{\frac{1}{\beta}\var{h'(t)} + \exv{h''(t)}}
+\end{align*}
+and
+\begin{align*}
+    &\quad \frac{d}{dt}\exv{h'(t)^2}\\
+    &= \frac{\inparen{\sum_{i=1}^m \lambda_i'(t)h_i'(t)^2 + 2h_i'(t)h_i''(t)\lambda_i(t)}\inparen{\sum_{i=1}^m \lambda_i(t)} - \frac{1}{\beta}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2}}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2} \\
+    &= \frac{\inparen{\sum_{i=1}^m \lambda_i'(t)h_i'(t)^2 + 2h_i'(t)h_i''(t)\lambda_i(t)}}{\sum_{i=1}^m \lambda_i(t)} - \frac{1}{\beta}\cdot\frac{\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2}}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2} \\
+    &= \frac{\sum_{i=1}^m \lambda_i(t)\inparen{\frac{h_i'(t)^3}{\beta} + 2h_i'(t)h_i''(t)}}{\sum_{i=1}^m \lambda_i(t)} - \frac{1}{\beta}\cdot\frac{\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)}\inparen{\sum_{i=1}^m \lambda_i(t)h_i'(t)^2}}{\inparen{\sum_{i=1}^m \lambda_i(t)}^2} \\
+    &= \frac{1}{\beta}\cov{h'(t), h'(t)^2} + 2\exv{h'(t)h''(t)}.
+\end{align*}
+Combining everything gives us
+\begin{align*}
+    &\quad \lse_{\beta}'''(h(t)) \\
+    &= \frac{1}{\beta}\inparen{\frac{1}{\beta}\cov{h'(t), h'(t)^2} + 2\exv{h'(t)h''(t)} - 2\exv{h'(t)}\inparen{\frac{1}{\beta}\var{h'(t)} + \exv{h''(t)}}}\\
+    &\quad + \frac{1}{\beta}\cov{h'(t),h''(t)} + \exv{h'''(t)} \\
+    &= \frac{1}{\beta^2}\cov{h'(t),h'(t)^2} - \frac{2}{\beta^2}\exv{h'(t)}\var{h'(t)} + \frac{3}{\beta}\cov{h'(t),h''(t)} + \exv{h'''(t)}.
+\end{align*}
+We first analyze the terms that only depend on $h'(t)$. To do so, we use \Cref{lemma:variance_rv_bound} to write
+\begin{align*}
+    \abs{\cov{h'(t),h'(t)^2}} \le \sqrt{\var{h'(t)}}\sqrt{\var{h'(t)^2}} \le 2\norm{\vd}\var{h'(t)}.
+\end{align*}
+Now, we have
+\begin{align*}
+    &\quad \frac{1}{\beta^2}\abs{\cov{h'(t),h'(t)^2} - 2\exv{h'(t)}\var{h'(t)}} \\
+    &\le \frac{1}{\beta^2}\abs{\cov{h'(t),h'(t)^2}} + \frac{2}{\beta^2}\abs{\exv{h'(t)}\var{h'(t)}} \\
+    &\le \frac{4}{\beta^2}\norm{\vd}\var{h'(t)} \le \frac{4}{\beta}\norm{\vd}\lse_{\beta}''(h(t)).
+\end{align*}
+Next, we take care of the remaining terms. We have
+\begin{align*}
+    \frac{3}{\beta}\abs{\cov{h'(t),h''(t)}} + \abs{\exv{h'''(t)}} &\le \frac{6}{\beta}\inparen{\max_{i} h_i'(t)}\exv{\abs{h''(t)-\exv{h''(t)}}} + \abs{\exv{h'''(t)}} \\
+    &\le \frac{12}{\beta}\norm{\vd}\lse_{\beta}''(h(t)) + \exv{\abs{h'''(t)}} \\
+    &\le \frac{12}{\beta}\norm{\vd}\lse_{\beta}''(h(t)) + \nu\norm{\vd}\exv{h''(t)} \\
+    &\le \inparen{\frac{12}{\beta}+\nu}\norm{\vd}\lse_{\beta}''(h(t)),
+\end{align*}
+where the penultimate line follows from \Cref{lemma:hi_qsc}. Combining these conclusions yields
+\begin{align*}
+    \abs{\lse_{\beta}'''(h(t))} \le \inparen{\frac{16}{\beta}+\nu}\norm{\vd}\lse_{\beta}''(h(t)),
+\end{align*}
+completing the proof of \Cref{lemma:composed_qsc}.
+\end{proof}
+
+\subsection{Smoothness and Quasi-self-concordance of the Modified Objective}
+\label{sec:lse_calculus_special}
+
+The main result of this subsection is \Cref{lemma:obj_smooth_qsc}.
+
+\begin{lemma}
+\label{lemma:obj_smooth_qsc}
+Let $\mW$ be such that for all $\vz \in \R^d$, we have $\gnorm{\mA\vz}{\infty} \le \norm{\mW^{1/2}\mA\vz}_2$. For all $\vx, \vz \in \R^d$ and $t\in\R$, we have
+\begin{align*}
+    \inparen{\frac{d}{dt}}^2 \ftilde_{\beta,\delta}(\vx+t\vz) &\le \inparen{\frac{1}{\delta}+\frac{1}{\beta}}\norm{\mW^{1/2}\mA\vz}_2^2 & \text{(smoothness)} \\
+    \abs{\inparen{\frac{d}{dt}}^3 \ftilde_{\beta,\delta}(\vx+t\vz)} &\le \inparen{\frac{16}{\delta}+\frac{3}{\beta}}\norm{\mW^{1/2}\mA\vz}_2\inparen{\frac{d}{dt}}^2 \ftilde_{\beta,\delta}(\vx+t\vz) & \text{(quasi-self-concordance)}.
+\end{align*}
+\end{lemma}
+
+Our goal in the rest of this section is to prove \Cref{lemma:obj_smooth_qsc}.
+
+We begin with defining $h_i(t)$ as (absorb the $\delta,\vy,\vd$ parameters into the definition of $h_i$)
+\begin{align*}
+    h_i(t) \coloneqq \sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}.
+\end{align*}
+Let $h(t)$ denote the vector whose $i$th entry is $h_i(t)$. Then, observe that
+\begin{align*}
+    \lse_{\beta}(h(t)) = \beta\logv{\sum_{i=1}^m \expv{\frac{h_i(t)}{\beta}}} = \beta\logv{\sum_{i=1}^m \expv{\frac{\sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}}{\beta}}}.
+\end{align*}
+It is easy to see that every one-dimensional restriction of $\ftilde_{\beta,\delta}$ can be obtained by an affine transformation of $\lse_{\beta}(h(t))$ after appropriate choices of $\vy,\vd\in\R^m$. Hence, we first analyze $\lse_{\beta}(h(t))$ for all $\vy,\vd\in\R^m$. 
+
+We begin with proving the smoothness of $\lse_{\beta}(h(t))$ with respect to $\gnorm{\cdot}{\infty}$.
+\begin{lemma}
+\label{lemma:base_smooth}
+For all $\vy,\vd\in\R^m$ and all $t \in \R$, we have
+\begin{align*}
+    \inparen{\frac{d}{dt}}^2 \lse_{\beta}(h(t)) \le \inparen{\frac{1}{\delta}+\frac{1}{\beta}}\gnorm{\vd}{\infty}^2.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:base_smooth}]
+By direct calculation, it is easy to see that
+\begin{equation}\label{eq:hi_derivatives}
+    \begin{aligned}
+         h_i'(t) &= \frac{\ip{\vy_{S_i}+t\vd_{S_i},\vd_{S_i}}}{h_i(t)} \\
+         h_i''(t) &= \frac{\norm{\vd_{S_i}}_2^2 h_i(t) - h_i'(t)^2h_i(t)}{h_i(t)^2} = \frac{\norm{\vd_{S_i}}_2^2-h_i'(t)^2}{h_i(t)}.
+    \end{aligned}
+\end{equation}
+We plug this into the result of \Cref{lemma:lse_first_two} and get
+\begin{align*}
+    \lse_{\beta}''(h(t)) &\le \frac{1}{\beta}\max_i h_i'(t)^2 + \max_i h_i''(t) \\
+    &= \frac{1}{\beta} \max_{i}\inparen{\frac{\ip{\vy_{S_i}+t\vd_{S_i},\vd_{S_i}}}{\sqrt{\delta^2 + \norm{\vy_{S_i}+t\vd_{S_i}}_2^2}}}^2 + \max_{i} \frac{\norm{\vd_{S_i}}_2^2 - h_i'(t)^2}{\sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}} \\
+    &\le \frac{1}{\beta}\max_{i} \norm{\vd_{S_i}}_2^2 + \frac{1}{\delta}\max_{i}\norm{\vd_{S_i}}_2^2 = \inparen{\frac{1}{\beta}+\frac{1}{\delta}}\gnorm{\vd}{\infty}^2,
+\end{align*}
+completing the proof of \Cref{lemma:base_smooth}.
+\end{proof}
+Our next task is to show that $\lse_{\beta}(h(t))$ is $O(1/\beta + 1/\delta)$-quasi-self-concordant in $\gnorm{\cdot}{\infty}$. To do so, we will appeal to \Cref{lemma:composed_qsc}. To be able to do this, we first have to prove the quasi-self-concordance of each component function in $\lse_{\beta}(h(t))$.
+\begin{lemma}
+\label{lemma:hi_qsc}
+For all $\vy,\vd\in\R^m$ and all $t\in\R$, we have
+\begin{align*}
+    \abs{\inparen{\frac{d}{dt}}^3 \sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}} \le \frac{3}{\delta}\norm{\vd_{S_i}}_2\inparen{\inparen{\frac{d}{dt}}^2\sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}}.
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:hi_qsc}]
+Although a similar fact appears in \cite[Section 2.1.2]{ob18}, it is not in the exact form we need. So, we prove the required statement here.
+
+Recycling the computation from \eqref{eq:hi_derivatives}, recall
+\begin{align*}
+    h_i''(t) = \frac{\norm{\vd_{S_i}}_2^2 - h_i'(t)^2}{h_i(t)},
+\end{align*}
+which gives
+\begin{align*}
+    h_i'''(t) = \frac{-2h_i'(t)h_i''(t)h_i(t) - h_i'(t)(h_i(t)h_i''(t))}{h_i(t)^2} = -\frac{3h_i'(t)h_i''(t)}{h_i(t)}.
+\end{align*}
+Finally, again recalling \eqref{eq:hi_derivatives}, notice that
+\begin{align*}
+    \abs{\frac{h_i'(t)}{h_i(t)}} = \abs{\frac{\ip{\vy_{S_i}+t\vd_{S_i},\vd_{S_i}}}{h_i(t)^2}} = \abs{\ip{\frac{\vy_{S_i}+t\vd_{S_i}}{\sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}}, \frac{\vd_{S_i}}{\sqrt{\delta^2+\norm{\vy_{S_i}+t\vd_{S_i}}_2^2}}}} \le \frac{\norm{\vd_{S_i}}_2}{\delta}.
+\end{align*}
+Combining everything completes the proof of \Cref{lemma:hi_qsc}.
+\end{proof}
+We are now ready to prove the quasi-self-concordance of $\lse_{\beta}(h(t))$ in $\gnorm{\cdot}{\infty}$.
+\begin{lemma}
+\label{lemma:base_qsc}
+For all $\vy, \vd \in \R^m$ and $t\in\R$, we have
+\begin{align*}
+    \abs{\inparen{\frac{d}{dt}}^3 \lse_{\beta}(h(t))} \le \inparen{\frac{16}{\beta}+\frac{3}{\delta}}\gnorm{\vd}{\infty}\inparen{\frac{d}{dt}}^2 \lse_{\beta}(h(t)).
+\end{align*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:base_qsc}]
+In the statement of \Cref{lemma:composed_qsc}, let $\norm{\cdot} = \gnorm{\cdot}{\infty}$. By the definition of $\gnorm{\cdot}{\infty}$ and $h_i$, we have for all $i$ and $t$ that $h_i'(t) \le \gnorm{\vd}{\infty}$. Additionally, from \Cref{lemma:hi_qsc}, we have that the $h_i(t)$ are $3/\delta$-quasi-self-concordant in the norm $\gnorm{\vd}{\infty}$ for all $i$. \Cref{lemma:base_qsc} now follows immediately from \Cref{lemma:composed_qsc}.
+\end{proof}
+Finally, we can prove \Cref{lemma:obj_smooth_qsc}.
+\begin{proof}[Proof of \Cref{lemma:obj_smooth_qsc}]
+By the conclusion of \Cref{lemma:base_smooth}, we know that for all $\vy, \vd \in \R^m$ and $t\in\R$ that
+\begin{align*}
+    \inparen{\frac{d}{dt}}^2 \lse_{\beta}(h(t)) \le \inparen{\frac{1}{\delta}+\frac{1}{\beta}}\gnorm{\vz}{\infty}^2.
+\end{align*}
+Let $\vy = \mA\vx - \vb$ for some $\vx$ and $\vd = \mA\vz$ for some $\vz$. Let
+\begin{align*}
+    g(\vy) \coloneqq \beta\logv{\sum_{i=1}^m \expv{\frac{\sqrt{\delta^2+\norm{\vy_{S_i}}_2^2}-\delta}{\beta}}}.
+\end{align*}
+Then,
+\begin{align*}
+    \inparen{\frac{d}{dt}}^2 \ftilde_{\beta,\delta}(\vx+t\vz) = \inparen{\frac{d}{dt}}^2 g(\mA\vx - \vb + t\mA\vz) \le \inparen{\frac{1}{\delta}+\frac{1}{\beta}}\gnorm{\mA\vz}{\infty}^2.
+\end{align*}
+With the exact same reasoning applied to the conclusion of \Cref{lemma:base_qsc}, we also see that
+\begin{align*}
+    \abs{\inparen{\frac{d}{dt}}^3 \ftilde_{\beta,\delta}(\vx+t\vz)} \le \inparen{\frac{16}{\delta}+\frac{3}{\beta}}\gnorm{\mA\vz}{\infty}\inparen{\frac{d}{dt}}^2 \ftilde_{\beta,\delta}(\vx+t\vz).
+\end{align*}
+The conclusion of \Cref{lemma:obj_smooth_qsc} then follows from remembering that we have $\mW$ such that for all $\vz\in\R^d$, $\gnorm{\mA\vz}{\infty} \le \norm{\mW^{1/2}\mA\vz}_2$ (following from \Cref{thm:gp_regression_blw_intro}).
+\end{proof}
+
+\subsection{Analysis of \texorpdfstring{\Cref{alg:fair_regression}}{Algorithm 1}}
+\label{sec:gp_robust_analysis_combining}
+
+In this subsection, we use the calculus facts from the previous two subsections to analyze \Cref{alg:fair_regression}. The outline of this proof follows that of \cite[Theorem 2]{jls21}, which in turn builds up to using the proof used in \cite[Corollary 12]{msbacon}. The main idea is to define the algorithm based on the norm given by a good choice of positive semidefinite $\mM$, given by \Cref{thm:gp_regression_blw_intro}.
+
+In the rest of this section, let $\mW$ be factor-$2$ block Lewis weight overestimates for $\insquare{\mA \vert \vb}$. As in Line \ref{line:blw} of \Cref{alg:fair_regression} and from the corresponding guarantee given in \cite[Lemmas 5.6, 5.8]{mo23}, this means that within $2\log m$ linear-system-solves in $\mA^{\top}\mD\mA$ for diagonal $\mD$, we can find $\mW$ such that for all $\vx\in\R^d$ and $c\in\R$ we have
+\begin{align*}
+    \gnorm{\mA\vx-c\vb}{\infty} \le \norm{\mW^{1/2}\mA\vx-c\mW^{1/2}\vb}_2 \le \sqrt{2(\rank{\mA}+1)}\gnorm{\mA\vx-c\vb}{\infty}.
+\end{align*}
+Note that choosing $c=1$ yields our original objective on either side of the above inequality. Motivated by the above, it is natural to use the norm given by $\mM \coloneqq \mA^{\top}\mW\mA$ to give the geometry for the ball optimization oracle and for the analysis. Additionally, without loss of generality and for the sake of the analysis, let us rescale the problem so that
+\begin{align*}
+    1 = \opt \coloneqq \gnorm{\mA\xstar-\vb}{\infty}.
+\end{align*}
+Also, as mentioned earlier, assume without loss of generality that $\rank{\mA} = d$.
+
+We begin with \Cref{lemma:initialization}, which bounds our initial suboptimality in $\ftilde$ and in $\norm{\cdot}_{\mM}$.
+\begin{lemma}
+\label{lemma:initialization}
+Let $\xtilde_{\beta,\delta} \coloneqq \argmin{\vx\in\R^d} \ftilde_{\beta,\delta}(\vx)$. Then,
+\begin{equation*}
+    \begin{aligned}
+        \norm{\xtilde_{\beta,\delta} - \vx_0}_{\mM} &\le (2+2(\beta\log m + \delta))\sqrt{2(d+1)} \\
+        \ftilde_{\beta,\delta}(\vx_0) - \ftilde_{\beta,\delta}(\xtilde_{\beta,\delta}) &\le \sqrt{2(d+1)} - 1+2(\beta\log m + \delta)
+    \end{aligned}.
+\end{equation*}
+\end{lemma}
+\begin{proof}[Proof of \Cref{lemma:initialization}]
+It is easy to check that
+\begin{align*}
+    \vx_0 \coloneqq \inparen{\mA^{\top}\mW\mA}^{-1}\mA^{\top}\mW\vb = \argmin{\vx \in \R^d} \norm{\mW^{1/2}\mA\vx-\mW^{1/2}\vb}_2.
+\end{align*}
+By \Cref{lemma:smooth_approx}, for all $\vx\in\R^d$,
+\begin{align*}
+    \abs{\ftilde_{\beta,\delta}(\vx)-\gnorm{\mA\vx-\vb}{\infty}} \le \beta\log m+\delta,
+\end{align*}
+implying
+\begin{align*}
+    \abs{\gnorm{\mA\xstar-\vb}{\infty} - \ftilde_{\beta,\delta}(\xtilde_{\beta,\delta})} \le \beta\log m+\delta.
+\end{align*}
+Combining this with \Cref{thm:blw_to_l2}, we get
+\begin{align*}
+    1 \le \gnorm{\mA\xstar-\vb}{\infty} \le \gnorm{\mA\vx_0-\vb}{\infty} \le \norm{\mW^{1/2}\mA\vx_0 - \mW^{1/2}\vb}_2
+\end{align*}
+and
+\begin{align*}
+    \frac{\norm{\mW^{1/2}\mA\vx_0 - \mW^{1/2}\vb}_2}{\sqrt{2(d+1)}} \le \frac{\norm{\mW^{1/2}\mA\xstar-\mW^{1/2}\vb}_2}{\sqrt{2(d+1)}} \le \gnorm{\mA\xstar-\vb}{\infty} = 1.
+\end{align*}
+Combining these gives
+\begin{align*}
+    1 \le \norm{\mW^{1/2}\mA\vx_0 - \mW^{1/2}\vb}_2 \le \sqrt{2(d+1)}.
+\end{align*}
+Additionally,
+\begin{align*}
+     \norm{\mW^{1/2}\mA\xtilde_{\beta,\delta}-\mW^{1/2}\vb}_2 &\le \sqrt{2(d+1)}\gnorm{\mA\xtilde_{\beta,\delta}-\vb}{\infty} \\
+     &\le \sqrt{2(d+1)}\inparen{\ftilde_{\beta,\delta}(\xtilde_{\beta,\delta})+\beta\log m+\delta} \\
+     &\le \sqrt{2(d+1)}\inparen{\gnorm{\mA\xstar-\vb}{\infty}+2(\beta\log m + \delta)} \\
+     &= \sqrt{2(d+1)}(1+2(\beta\log m + \delta)).
+\end{align*}
+Then,
+\begin{align*}
+    \norm{\xtilde-\vx_0}_{\mM} &= \norm{\inparen{\mW^{1/2}\mA\xtilde_{\beta,\delta}-\mW^{1/2}\vb} - \inparen{\mW^{1/2}\mA\vx_0-\mW^{1/2}\vb}}_2 \\
+    &\le\norm{\mW^{1/2}\mA\xtilde_{\beta,\delta}-\mW^{1/2}\vb}_2 +\norm{\mW^{1/2}\mA\vx_0-\mW^{1/2}\vb}_2 \\
+    &\le (2+2(\beta\log m + \delta))\sqrt{2(d+1)},
+\end{align*}
+and
+\begin{align*}
+    \ftilde_{\beta,\delta}(\vx_0) - \ftilde_{\beta,\delta}(\xtilde_{\beta,\delta}) &\le \gnorm{\mA\vx_0-\vb}{\infty} - \gnorm{\mA\xstar-\vb}{\infty}+2(\beta\log m + \delta) \\
+    &\le \norm{\mW^{1/2}\mA\vx_0 - \mW^{1/2}\vb}_2 - \opt+2(\beta\log m + \delta) \\
+    &\le \sqrt{2(d+1)}-1+2(\beta\log m + \delta).
+\end{align*}
+This completes the proof of \Cref{lemma:initialization}.
+\end{proof}
+
+We are now ready to prove \Cref{mainthm:fair_regression_iteration_complexity}.
+
+\begin{proof}[Proof of \Cref{mainthm:fair_regression_iteration_complexity}]
+\Cref{alg:fair_regression} optimizes the regularization of $\ftilde$ given by
+\begin{align*}
+    \fhat(\vx) \coloneqq \ftilde_{\beta,\delta}(\vx) + \frac{\eps}{110R^2}\norm{\mW^{1/2}\mA(\vx-\vx_0)}_2^2,
+\end{align*}
+where $R$ is such that $\norm{\vx_0 - \xtilde_{\beta,\delta}}_{\mM} \le R$. Let $ \xhat \coloneqq \argmin{\vx\in\R^d} \fhat(\vx)$. Using \cite[Proof of Corollary 12]{msbacon}, we know that for every iterate $\vx$ of \Cref{alg:fair_regression},
+\begin{align*}
+    \abs{\fhat(\vx)-\ftilde_{\beta,\delta}(\vx)} \le \frac{\eps}{4}.
+\end{align*}
+We now choose $\beta = \eps/(4\log m)$ and $\delta = \eps/4$, so that $\ftilde_{\beta,\delta}$ approximates $f$ up to error $\eps/2$ on every point. Using \Cref{lemma:initialization}, this gives $R = (2+\eps)\sqrt{2(d+1)}$. It is therefore sufficient to optimize $\fhat$ up to $\eps/4$ additive error.
+
+Next, using \Cref{lemma:obj_smooth_qsc} and \cite[Lemmas 11, 43]{msbacon}, we have that $\fhat$ is $(1/\nu, e)$-Hessian stable in $\norm{\cdot}_{\mM}$ for $\nu = \Omega(1/(\eps\log m))$. We now invoke \cite[Theorem 9]{msbacon}, which tells us that we can implement a $(C/\sqrt{d}, C/\eps)$-ball optimization oracle for $f$ with $O\inparen{\logv{\frac{d}{\eps}}^2}$ linear-system-solves. 
+
+The next step is to turn the ball optimization oracle into a $\frac{1}{2}$-MS oracle (\Cref{defn:ms_oracle}). Using \cite[Proposition 5]{msbacon}, we get a ball oracle complexity of $O\inparen{\logv{\frac{d}{\eps}}}$ to implement the MS oracle. In total, our linear-system-solve complexity for implementing the MS oracle for iteration $t$ is $O\inparen{\logv{\frac{d}{\eps}}^3}$.
+
+Finally, using \cite[Theorem 6]{msbacon}, we get that \Cref{alg:fair_regression} has a Newton iteration complexity of
+\begin{align*}
+    &\quad O\inparen{\inparen{\frac{(1+\eps)\sqrt{d}\log m}{\eps}}^{2/3}\logv{\frac{\sqrt{d}+\eps}{\eps}}\inparen{\logv{\frac{(\log m/\eps)d(1+(1+\eps)\sqrt{d}\log m/\eps)}{\eps}}}^3} \\
+    &= O\inparen{\frac{d^{1/3}}{\eps^{2/3}}\logv{\frac{d\log m}{\eps}}^{14/3}},
+\end{align*}
+as promised.
+
+Next, we analyze what happens if we fall in the case where $\mW=\mI_m$. Here, by using the $\sqrt{m}$ distortion from approximating $\ell_{\infty}^m$ with $\ell_{2}^m$, we have for all $\vx\in\R^d$,
+\begin{align*}
+    \frac{\norm{\mA\vx-\vb}_2}{\sqrt{m}} \le \gnorm{\mA\vx-\vb}{\infty} \le \norm{\mA\vx-\vb}_2.
+\end{align*}
+Using this and repeating the previous analysis with this choice of $\mM$ gives us a rate of
+\begin{align*}
+    O\inparen{\frac{m^{1/3}}{\eps^{2/3}}\logv{\frac{m\log m}{\eps}}^{14/3}},
+\end{align*}
+as required.
+
+It remains to determine the form of the Newton steps. For this, it is sufficient to understand the Hessian of $\fhat$. A straightforward calculation shows that it is of the form $\mA^{\top}\mB\mA$ where $\mB$ is a block-diagonal matrix where each block has size $\abs{S_i} \times \abs{S_i}$. Thus, each Newton step solves a linear system of the form $\mA^{\top}\mB\mA\vz = \vv$.
+
+Combining this with the iteration complexity guarantee to find $\mW$ (see \Cref{thm:gp_regression_blw_intro}) completes the proof of \Cref{mainthm:fair_regression_iteration_complexity}.
+\end{proof}
+
+\input{interpolation}
+
+\input{experiments}
+
+\subsubsection*{Acknowledgments}
+We thank Aaron Sidford for useful comments during the early stage of the project. We also thank the anonymous reviewers at ICLR'26 and NeurIPS'25 for their significant contributions to improving the paper. The authors used ChatGPT 5.3 and Claude Opus 4.6 to implement the algorithms in this paper. Most of this work was done when NSM and KKP were graduate students at Toyota Technological Institute, Chicago (TTIC). KKP and NSM were supported through the NSF TRIPOD Institute on Data, Economics, Algorithms and Learning (IDEAL) and other awards from DARPA and NSF. NSM thanks Citadel LLC for sponsoring the conference travel and attendance for the presentation of this work.
