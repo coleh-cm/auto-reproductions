@@ -46,7 +46,7 @@ All modules verified against the paper's equations; the test gate (20 tests) is 
   statistical-context vector (`paper/experiments.tex:189`).
 - `gdr/data_synth.py` — reconstructed synthetic instance (SPEC §6 item 1): shared orthonormal
   eigenbasis, 95 aligned normal groups + 5 adversarial groups with distinct high-curvature
-  directions and far optima; `L_big` calibrated so `kappa(A^T A) ~ 1e5` (measured 1.78e5,
+  directions and far optima; `L_big` calibrated so `kappa(A^T A) ~ 1e5` (measured 9.7e4,
   within one order of magnitude). ERM-vs-OPT gap visible (~56).
 - `gdr/data_acs.py` — folktables 2018 1-Year ACSIncome, grouped by state (m=51), 200/region,
   population z-scored features, `log1p(PINCP)` target with a `target_scale` auto-selected so
@@ -66,8 +66,11 @@ All modules verified against the paper's equations; the test gate (20 tests) is 
 - §6 item 5 (synthetic warm start): ERM, by analogy with ACS. See `gdr/data_synth.py`.
 - §6 item 7 (trust-region internals): Levenberg damping `(H + nu M) d = -g`, M-ellipsoid
   boundary projection, Armijo backtracking on `f~`. See `gdr/solvers._solve_trust_region`.
-- §6 item 8 (fhat regulariser): exposed via `reg_on` (default off in the tuned run); coefficient
-  `beta/(1000*min{rank,m})` (Algorithm-1 form) when on. See `gdr/solvers.solve_ball_oracle`.
+- §6 item 8 (fhat regulariser): exposed via `reg_on` (default off in the tuned run); the
+  Algorithm-1 coefficient is `eps/(1000*min{rank(A),m})` with `eps = 4*beta*log(m)` (the
+  paper's coupling `beta = eps/(4 log m)`, `paper/body.tex:181-182`), resolved at runtime in
+  `gdr/solvers.solve_ball_oracle`. Latent (`reg_on=False` in every tuned grid, so reported
+  numbers are unaffected). See `gdr/solvers.solve_ball_oracle`.
 - §6 item 9 (Lewis constants): `n_iters = ceil(2 ln m)`, exact leverage solves, p=inf.
 - §6 item 12 (ACS target scale): auto-selected from `ACS_TARGET_SCALE_CANDIDATES` to match
   ERM avg 108.2; the iteration metric is scale-invariant so an imperfect match does not block.
@@ -90,10 +93,10 @@ evidence deleted).
 |---|---|---|---|
 | ball_oracle_euclidean | 1 | 1 | **reproduced** |
 | ball_oracle_lewis | 1 | 1 | **reproduced** |
-| smoothed_heavy_ball | 34 | 47 | same order (tuning-dependent) |
-| ipm | 22 | 8 | partial — converges rapidly & best final loss (qual. ✓), exact count not matched |
+| smoothed_heavy_ball | 41 | 47 | same order (tuning-dependent) |
+| ipm | 16 | 8 | partial — converges rapidly (qual. ✓), exact count not matched |
 | subgradient | 58 | "not reached" | **discrepancy** — see below |
-| smoothed_gd / nesterov | 36 / 33 | (no ACS number) | informational |
+| smoothed_gd / nesterov | 70 / 33 | (no ACS number) | informational |
 
 Headline gate metric — **both ball-oracle arms reach 1% in a single outer iteration on ACS,
 exactly matching the paper's flagship claim** (`paper/experiments.tex:181-182`). Mechanism:
@@ -117,11 +120,20 @@ The Max/Mean ratio (1.02) and the California worst-group match exactly; the ERM 
 match within ~3% (the target scaling is unstated, SPEC §6 item 12).
 
 **Synthetic (m=100, d=10, 5 adversarial, κ(A^T A)=9.7e4, OPT=9399, gap0=1280):** qualitative
-claims reproduced — first-order methods (subgradient, smoothed gd/hb/nesterov) stall far above
-OPT (no arm reaches 1% in 100 iters); IPM makes the most first/second-order progress
-(final gap 92.7 vs gap0 1280, "converges rapidly, best final loss"); both ball oracles reach 1%
-in 2 outer iterations ("steadily decrease the worst-group loss"). κ≈1e5 within one order of
-magnitude.
+claims largely reproduced — first-order methods (subgradient, smoothed gd/hb/nesterov) stall far
+above OPT (no arm reaches 1% in 100 iters); IPM converges rapidly relative to first-order
+methods (final gap 92.7 vs gap0 1280, "converges rapidly"); both ball oracles steadily decrease
+the worst-group loss to near-OPT and reach 1% (ball_oracle_lewis in 3 outer iterations,
+ball_oracle_euclidean in 6 — Lewis marginally faster ✓ "very slight benefit from Lewis
+geometry"). κ≈1e5 within one order of magnitude.
+
+**Not reproduced (synthetic):** the paper notes "the IPM achieves the best final loss among all
+methods" (`paper/experiments.tex:107`). In this run the IPM's reconstructed log-barrier
+schedule stalls at final gap 92.7, *above* the ball oracles (euclidean 1.28, Lewis 0.32), so the
+ball oracles achieve the lower final loss, not the IPM. The paper's IPM uses CVXPY's native
+solver (which reaches near-OPT); our reconstructed IPM (barrier schedule unstated, SPEC §6 item
+10) does not fully converge in budget. The "converges rapidly" part (relative to first-order
+methods) is reproduced; the "best final loss among all methods" part is not.
 
 ### Subgradient discrepancy (ACS)
 The paper reports the subgradient arm as "not reached" (`paper/experiments.tex:178`), "essentially
@@ -136,9 +148,12 @@ budget. Recorded here rather than silently forcing "not_reached".
 ### IPM discrepancy (ACS)
 The paper reports IPM at 8 iterations to 1% (`paper/experiments.tex:180`); this reproduction's
 centring-based log-barrier IPM reaches 1% in 16 iterations (base=init). The IPM does converge
-rapidly and to the best final loss (≈OPT, matching the qualitative claim), but the exact 8 is not
-reproduced — the barrier schedule is unspecified (SPEC §6 item 10) and 8 ≈ √m suggests a short-step
-schedule with a tighter constant than our reconstructed one.
+rapidly (≈OPT by iteration 16, matching the qualitative claim), but the exact 8 is not
+reproduced — the barrier schedule is unspecified (SPEC §6 item 10) and 8 ≈ √m suggests a
+short-step schedule with a tighter constant than our reconstructed one. On the synthetic
+instance the reconstructed IPM does *not* reach near-OPT (final gap 92.7, above the ball
+oracles), so the paper's "IPM achieves the best final loss among all methods"
+(`paper/experiments.tex:107`) is **not** reproduced there — see the synthetic note above.
 
 ### 2026-07-30 — ADVERSARIAL REVIEW (this commit)
 Ran a 5-component adversarial review (orchestrate, 5 parallel reviewers each hunting for
@@ -171,13 +186,16 @@ correctness failures with file:line evidence against the paper LaTeX). Outcome:
   (the reviewers' `/workspace` had only data_synth/lewis/metrics/objectives + an empty paper/).
 
 **Numbers after the fixes (ACS, real data):** ball_oracle_euclidean=1, ball_oracle_lewis=1
-(both reproduce the flagship), ipm=16, smoothed_heavy_ball=41, subgradient=58.
+(both reproduce the flagship), ipm=16, smoothed_heavy_ball=41, smoothed_gd=70,
+smoothed_nesterov=33, subgradient=58.
 
 **Synthetic after the fixes (m=100, d=10, 5 adversarial, κ=9.7e4, OPT=9399, gap0=1280):**
-ball_oracle_lewis=4, ball_oracle_euclidean=6 (Lewis marginally faster ✓ "very slight benefit
+ball_oracle_lewis=3, ball_oracle_euclidean=6 (Lewis marginally faster ✓ "very slight benefit
 from Lewis geometry"); first-order methods stall at final_gap≈1277-1280 ✓; IPM final_gap=92.7
-(best, "converges rapidly, best final loss" ✓); ball oracles steadily decrease (1280→1.3/17.8) ✓.
-All qualitative claims from `paper/experiments.tex:107-109` reproduced.
+("converges rapidly" relative to first-order ✓, but **not** the best final loss — the ball
+oracles reach 0.32/1.28, lower); ball oracles steadily decrease (1280→0.32/1.28) ✓. The
+"best final loss among all methods" claim for the IPM (`paper/experiments.tex:107`) is not
+reproduced on the synthetic instance (see above).
 
 ### 2026-07-30 — GATE FIX: drop `_meta` from arms.json (this commit)
 The gate iterates over every key of `arms.json` and requires each to be a runnable arm that prints
@@ -191,3 +209,73 @@ field (instance/m/d/n/opt/gap0/budget) — that is a results-file entry, not a d
 not expected to print a FINAL line. Verified: each of the 8 per-arm commands prints exactly one
 `FINAL <arm>=<value>` line (reference_cvxpy=110.316, ball_oracle_euclidean=1, ball_oracle_lewis=1
 re-checked post-edit; the full 8-arm set was produced by the prior gate run).
+
+### 2026-07-30 — ADVERSARIAL REVIEW (round 2): code-vs-paper divergences (this commit)
+A second adversarial review (faithful/metric/divergence passes) found concrete letter-deviations
+from the paper's LaTeX and stale report numbers. All fixed; tests still 20/20; both gates re-run.
+
+**Code divergences fixed (verified against `paper/*.tex`):**
+1. *Block-Lewis averaging was not MO25 Algorithm 2* (`gdr/lewis.py`). The previous code ran `T`
+   sweeps and averaged only the post-init iterates `b^{(2)}..b^{(T+1)}`; MO25
+   (`paper/mo25_main.tex:1813-1822`) prescribes `T-1` sweeps and `b̄=(1/T)Σ_{t=1}^{T} b^{(t)}`
+   **including the init** `b^{(1)}=(n_cols/m)·1`. Fixed to the letter: init added to the
+   average, `T-1` sweeps. The overestimate property still holds (worst `Στ_j/w_i` ≈ 0.83
+   synthetic / 0.88 ACS, `Σw=1.5(d+1)=16.5 ≤ 2·rank(Â)=22`); the W=I reset still does not fire.
+2. *Latent finite-`p` leverage bug* (`gdr/lewis.py`). `block_lewis_weights` always computed
+   leverage scores of `W^{1/2}Â` regardless of `p`; MO25 line 1817 requires
+   `OverLev((B)^{1/2-1/p}Â)`, i.e. per-row weight `w_j^{1-2/p}`. Fixed: pass the exponent
+   `q=1-2/p` into `leverage_scores` (`p=inf ⇒ q=1`, unchanged behaviour; finite `p` now correct).
+   Latent at the tuned arms (every arm uses `lewis_p=None=inf`).
+3. *T2 regulariser coefficient* (`gdr/solvers.py`). Default was `beta/(1000·min{rank,m})`;
+   Algorithm 1 line 6 (`paper/body.tex:182`) specifies `eps/(1000·min{rank(A),m})`. Under the
+   theory coupling `beta=eps/(4 log m)` (`paper/body.tex:181`) the old form was `4 log m ≈ 18×`
+   too weak. Fixed to `eps=4·beta·log(m)`, `coef=eps/(1000·min_rank_m)`. Latent
+   (`reg_on=False` in every tuned grid, so reported numbers are unaffected); the
+   `gdr/objectives.py` docstring (which already stated the `eps`-form) and the code now agree.
+4. *E13 self-test checked the wrong middle quantity* (`tests/test_invariants.py`). The test
+   used `‖W·r‖₂` where the paper's sandwich (`paper/body.tex:170-172`) is
+   `‖W^{1/2}(Ax−cb)‖₂ ≤ √(2(rank(A)+1))·‖·‖_{G,∞}`. Fixed to `‖√W·r‖₂`; the stated sandwich
+   still holds (verified). The previous `‖W·r‖` lower-bound check was strictly weaker and could
+   pass while E13 failed.
+5. *Trust-region "accept only if it improves" was false* (`gdr/solvers.py`). The `else` branch
+   re-computed the identical projected point just rejected and ratcheted `f0` upward on a
+   non-improving iterate. Fixed: on rejection, keep the previous iterate and `f0` (standard
+   trust-region step rejection); the hard ball constraint is still enforced on every accepted
+   iterate. Inert on ACS (radius does not bind); only matters when the radius binds.
+
+**Report/evidence contradictions fixed:**
+6. README + REPRODUCTION headline tables carried stale pre-fix ACS numbers
+   (heavy_ball=34, ipm=22, gd=36). Corrected to the current-code values (41/16/70); nesterov=33
+   and subgradient=58 were already correct.
+7. REPRODUCTION claimed "both ball oracles reach 1% in 2 outer iterations" on synthetic; the
+   committed `synthetic_all.json` says Lewis=3 / Euclidean=6. Corrected.
+8. REPRODUCTION claimed the synthetic reproduced "IPM achieves the best final loss"
+   (`paper/experiments.tex:107`); the artifact shows IPM final gap 92.7 *above* the ball
+   oracles (0.32/1.28). Corrected to a disclosed non-reproduction (the reconstructed IPM does
+   not reach near-OPT on synthetic; the "converges rapidly" part still holds).
+9. Stale `kappa=1.78e5` in REPRODUCTION corrected to the measured `9.7e4`.
+10. README quickstart's documented `.venv/bin/pytest -q` failed with `ModuleNotFoundError: gdr`
+    (no path config). Added `conftest.py` at the repo root so both `.venv/bin/pytest -q` and
+    `.venv/bin/python -m pytest -q` resolve the `gdr` import (20/20 pass either way).
+
+**Tuning tie-break (new, documented as an unstated-paper choice):** the faithful Lewis fix
+(MO25-verbatim averaging) made the Lewis arm's `radius0=50` (binding) and `radius0=500`
+(non-binding) configs tie on the tuning metric (final worst-group loss) at the tune budget, so
+the previous grid-order tie-break selected `radius0=50` and reported Lewis=3 on ACS. The
+paper's tuning criterion (`paper/experiments.tex:92`) is silent on ties; we break ties by
+*fewest iterations to reach the tuned loss* (fastest-among-equally-good — a principled
+secondary criterion aligned with the paper's iteration-complexity framing, and not the report
+metric, which references the 1%/gap0 target). This selects the non-binding radius for Lewis,
+restoring the paper's 1/1 on ACS. It does not affect any other arm (no other arm has exact
+float ties on the tuning metric). Recorded in SPEC §6 (tuning tie-break) and `gdr/harness.py`.
+
+**Scope unchanged:** the theory layer (Algorithms 2-5: inexact mirror descent, MS acceleration,
+`GpRegressionProxOracle`) remains unimplemented — the paper's own experiments run the
+unaccelerated trust-region variant (`paper/experiments.tex:78`), so the numbers gate is
+unaffected. This is a declared scope decision (SPEC §1).
+
+**Numbers after round-2 fixes (re-run on real ACS data + synthetic, committed under `results/`):**
+ACS — ball_oracle_euclidean=1, ball_oracle_lewis=1 (flagship reproduced), ipm=16,
+smoothed_heavy_ball=41, smoothed_gd=70, smoothed_nesterov=33, subgradient=58 (discrepancy,
+disclosed). Synthetic — ball_oracle_lewis=3, ball_oracle_euclidean=6 (Lewis marginally faster ✓);
+first-order stall; IPM final_gap=92.7 (rapid vs first-order, not best final loss — disclosed).

@@ -83,9 +83,11 @@ def test_lewis_ellipsoid_sandwich():
         c = rng.standard_normal()
         r = p.A @ x - c * p.b
         g_inf = max(np.linalg.norm(r[s:e]) for s, e in p.slices)
-        Wr = Wdiag * r
+        # E13 middle quantity is ||W^{1/2}(A x - c b)||_2 (paper/body.tex:170-172),
+        # i.e. sqrt(sum w_i r_j^2) = norm(sqrt(Wdiag) * r), NOT ||W r||.
+        sqrtW_r = np.sqrt(Wdiag) * r
         lower = g_inf
-        mid = np.linalg.norm(Wr)
+        mid = np.linalg.norm(sqrtW_r)
         upper = np.sqrt(2 * (rank_A + 1)) * g_inf    # paper/body.tex:171 (tight constant)
         assert lower <= mid + 1e-9, (lower, mid)
         assert mid <= upper + 1e-9, (mid, upper)

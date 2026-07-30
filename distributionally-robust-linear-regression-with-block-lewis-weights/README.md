@@ -75,9 +75,9 @@ The value is the arm's iterations to 1% relative worst-group gap
 SPEC §6 item 4); the CVXPY reference arm prints OPT.
 
 ```bash
-.venv/bin/bash run_all_arms.sh     # ACS, all 8 arms (downloads data on first use)
-.venv/bin/bash smoke.sh           # tiny self-contained problem, one FINAL line
-.venv/bin/pytest -q               # 20 tests: degeneracy, invariants, grader
+bash run_all_arms.sh        # ACS, all 8 arms (downloads data on first use)
+bash smoke.sh               # tiny self-contained problem, one FINAL line
+.venv/bin/pytest -q         # 20 tests: degeneracy, invariants, grader
 ```
 
 `smoke.sh` proves the code path runs end to end; its number is **not** evidence
@@ -92,17 +92,20 @@ ACS, matching the paper's flagship claim** (`paper/experiments.tex:181-182`):
 |---|---|
 | ball_oracle_euclidean | 1 / 1 ✓ |
 | ball_oracle_lewis | 1 / 1 ✓ |
-| smoothed_heavy_ball | 34 / 47 (same order) |
-| ipm | 22 / 8 (qual. ✓, exact count not matched) |
+| smoothed_heavy_ball | 41 / 47 (same order) |
+| ipm | 16 / 8 (qual. ✓, exact count not matched) |
 | subgradient | 58 / "not reached" (discrepancy — see REPRODUCTION.md) |
+| smoothed_gd / nesterov | 70 / 33 (no ACS number in paper) |
 
 Statistical context (`paper/experiments.tex:189`): ERM avg 104.9 / σ 11.6 /
 worst 135.1 (California); Max/Mean 1.29→1.02 (paper 1.28→1.02); California
 loss decrease −26.2 (paper −24.3). The synthetic instance (κ(A^T A)=9.7e4,
 5 adversarial groups) reproduces the qualitative picture: first-order methods
-stall far above OPT, IPM converges rapidly to the best final loss, both ball
-oracles decrease steadily to near-OPT. See `REPRODUCTION.md` for the full
-numbers, discrepancies, and the unstated-parameters register.
+stall far above OPT, IPM converges rapidly relative to first-order methods
+(though not to the best final loss — the ball oracles reach lower), and both
+ball oracles decrease steadily to near-OPT (Lewis marginally faster, 3 vs 6
+iters). See `REPRODUCTION.md` for the full numbers, discrepancies, and the
+unstated-parameters register.
 
 ## Layout
 

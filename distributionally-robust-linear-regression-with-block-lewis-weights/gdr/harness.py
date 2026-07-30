@@ -127,7 +127,19 @@ def _build_instance(name: str) -> GroupProblem:
 
 def _tune_and_run(arm: str, problem: GroupProblem, x0: np.ndarray, budget: int,
                   tune_budget: int | None = None) -> tuple[dict, solvers.History]:
-    """Grid-search the arm, return (best_cfg, history at the reported budget)."""
+    """Grid-search the arm, return (best_cfg, history at the reported budget).
+
+    Selection criterion (``paper/experiments.tex:92``): "the configuration that
+    achieves the lowest worst-group loss within this budget" -- we take this to
+    be the worst-group loss at the end of the fixed-budget run (the final iterate).
+    The paper is silent on ties; we break them by *fewest iterations to reach the
+    tuned loss* (fastest-among-equally-good), a principled secondary criterion
+    aligned with the paper's iteration-complexity framing.  This is not the
+    report metric (it references the tuned loss value, not the 1% / gap0 target):
+    it only decides which of two equally-good configs is "best", and it prevents a
+    grid-order artifact from selecting a binding-radius config that merely ties a
+    non-binding one on final loss while taking more iterations to converge.
+    """
     grids = GRIDS[arm]
     solver = ARM_SOLVER[arm]
     if tune_budget is None:
@@ -138,11 +150,16 @@ def _tune_and_run(arm: str, problem: GroupProblem, x0: np.ndarray, budget: int,
             h = solver(problem, x0, cfg, tune_budget)
         except Exception:
             continue
-        final = problem.worst_loss(h.x[-1])
+        worst = h.worst_losses(problem)
+        final = float(worst[-1])
         if not np.isfinite(final):
             continue
-        if best is None or final < best[0]:
-            best = (final, cfg)
+        # tie-break key: (final loss, first iterate reaching final loss + tol)
+        tol = 1e-9 * max(1.0, abs(final))
+        iters_to_final = int(np.argmax(worst <= final + tol))
+        key = (final, iters_to_final)
+        if best is None or key < best[0]:
+            best = (key, cfg)
     if best is None:
         raise RuntimeError(f"arm {arm!r}: every grid config failed -- refusing to report OK on no fit")
     cfg = best[1]

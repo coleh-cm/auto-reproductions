@@ -79,19 +79,34 @@ def block_lewis_weights(
     p: float | None = None,
     n_iters: int | None = None,
 ) -> np.ndarray:
-    """Block-Lewis overestimates ``w [m]`` (E12).
+    """Block-Lewis overestimates ``w [m]`` (E12), MO25 Algorithm 2 verbatim.
+
+    Follows ``paper/mo25_main.tex:1813-1822`` (their input matrix is the augmented
+    ``Â=[A|b]`` whose column count ``n_cols = d+1`` plays the role of MO25's ``n``;
+    SPEC section 3.5):
+
+      1. ``b^{(1)} = (n_cols / m) * 1_m``                       (line 1814, init)
+      2. for ``t = 1, ..., T-1``:                               (line 1815)
+           ``B^{(t)}_jj = b^{(t)}_i`` for ``j in S_i``
+           ``tilde_tau^{(t)} = OverLev((B^{(t)})^{1/2 - 1/p} Â)``  (line 1817)
+           ``b^{(t+1)}_i = sum_{j in S_i} tilde_tau_j``           (line 1818)
+      3. ``b_bar = (1/T) sum_{t=1}^{T} b^{(t)}``               (line 1820, **includes
+         the init** ``b^{(1)}`` and the ``T-1`` computed iterates ``b^{(2)}..b^{(T)}``)
+      4. return ``w = (3/2) * b_bar``                            (line 1821)
 
     Parameters
     ----------
     problem : GroupProblem
     p : float | None
         ``None`` means ``p = inf`` (the max objective, Algorithm 1 line 1).  For
-        finite p the algorithm is the same; only the downstream geometry exponent
-        1-2/p changes (handled in :func:`geometry_matrix`).
+        finite ``p`` the leverage exponent ``1/2 - 1/p`` (line 1817) is applied --
+        the per-row weighting inside ``OverLev`` is ``w_j^{1-2/p}``, *not* the
+        ``w_j`` of the ``p = inf`` specialisation.  Downstream geometry uses the
+        same exponent (handled in :func:`geometry_matrix`).
     n_iters : int | None
         ``T = O(log m)`` (``paper/mo25_main.tex:1890-1891``).  ``None`` ->
-        ``ceil(2 ln m)`` (SPEC section 6 item 9).  The averaging in MO25 line
-        1820-1821 (``w = (3/2)(1/T) sum_t w^{(t)}``) is applied over ``T`` sweeps.
+        ``ceil(2 ln m)`` (SPEC section 6 item 9).  Exactly ``T-1`` sweeps are run
+        (line 1815) and the average spans ``T`` iterates (line 1820).
 
     Returns
     -------
@@ -101,27 +116,39 @@ def block_lewis_weights(
     Ahat = problem.augmented()                       # [n, d+1]
     m = problem.m
     if n_iters is None:
-        n_iters = max(1, int(np.ceil(2.0 * np.log(max(m, np.e)))))
-    T = max(1, int(n_iters))
+        n_iters = max(2, int(np.ceil(2.0 * np.log(max(m, np.e)))))
+    T = max(2, int(n_iters))     # need T-1 >= 1 sweep and T >= 2 terms to average
 
-    # w^(0) = ((d+1)/m) * 1_m   (MO25 line 1814: their n is the COLUMN count of the
-    # algorithm input; for the augmented matrix Â=[A|b] that is d+1.  SPEC section 3.5.)
+    # exponent for the per-row weighting inside OverLev (MO25 line 1817):
+    # OverLev((B)^{1/2-1/p} A) returns leverage scores of (B^{1/2-1/p} A), i.e.
+    #   tau_j = w_j^{1-2/p} * a_j^T (A^T W^{1-2/p} A)^{-1} a_j .
+    # p = inf  -> 1-2/p = 1  -> plain W^{1/2} A leverage scores.
+    if p is None:
+        q = 1.0
+    else:
+        if p <= 0:
+            raise ValueError(f"p must be > 0 (or None=inf), got {p}")
+        q = 1.0 - 2.0 / float(p)
+
+    # b^{(1)} = (n_cols / m) * 1_m   (MO25 line 1814; n_cols = column count of Â)
     n_cols = Ahat.shape[1]                  # = problem.d + 1
     w = np.full(m, n_cols / float(m), dtype=np.float64)
-    acc = np.zeros(m, dtype=np.float64)
+    # the MO25 average (line 1820) INCLUDES the init b^{(1)}
+    acc = w.copy()
     slices = problem.slices
-    for t in range(T):
-        # W_jj = w_i for j in S_i
+    for _ in range(T - 1):                   # line 1815: t = 1, ..., T-1
+        # W_jj = w_i for j in S_i  (line 1816)
         Wdiag = np.repeat(w, problem.sizes.astype(np.int64))
-        # leverage scores of W^{1/2} Ahat  (mo25_main.tex:1817, exact-solve OverLev)
-        tau = leverage_scores(Ahat, Wdiag)
-        # w_i^{(t+1)} = sum_{j in S_i} tau_j   (mo25_main.tex:1818)
+        # OverLev((B)^{1/2-1/p} Â)  (line 1817, exact solve): leverage scores of
+        # W^{1/2-1/p} Â  ==  leverage_scores(Â, Wdiag**q)  (see leverage_scores)
+        tau = leverage_scores(Ahat, Wdiag ** q)
+        # b^{(t+1)}_i = sum_{j in S_i} tilde_tau_j   (line 1818)
         w_new = np.empty(m, dtype=np.float64)
         for i, (s, e) in enumerate(slices):
             w_new[i] = float(np.sum(tau[s:e]))
-        acc += w_new
+        acc += w_new                          # average spans b^{(2)} .. b^{(T)}
         w = w_new
-    # w = (3/2) * (1/T) * sum_t w^{(t)}   (mo25_main.tex:1820-1821)
+    # w = (3/2) * (1/T) * sum_{t=1}^{T} b^{(t)}   (MO25 line 1820-1821)
     w = 1.5 * (acc / float(T))
     w = np.clip(w, 0.0, None)
     return w

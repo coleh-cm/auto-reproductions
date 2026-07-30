@@ -372,16 +372,16 @@ def _solve_trust_region(
             break                      # no progress -> subproblem converged
         x_new = project_to_ball(x + a * dstep)
         f_new = sm.value(x_new)
-        # accept only if it improves (projection can only help: it stays in the
-        # ball and moves less, so re-evaluate the accepted objective)
+        # accept only if the projected iterate improves the objective; otherwise
+        # reject the step and keep the previous iterate (standard trust-region
+        # step rejection).  The hard ball constraint is enforced on every accepted
+        # iterate via project_to_ball.  Crucially, on rejection we do NOT move and
+        # do NOT ratchet f0 -- accepting a non-improving point would silently
+        # inflate the reference objective and corrupt the line search.
         if np.isfinite(f_new) and f_new <= f0 + 1e-12:
             x = x_new
             f0 = f_new
-        else:
-            # projection broke descent; fall back to the unprojected Armijo point
-            # but still enforce the ball (project it).
-            x = project_to_ball(x + a * dstep)
-            f0 = sm.value(x)
+        # else: projected point does not improve -> reject, keep x and f0 unchanged
     return x
 
 
@@ -425,7 +425,14 @@ def solve_ball_oracle(problem: GroupProblem, x0: np.ndarray, cfg: dict, budget: 
         min_rank_m = min(int(np.linalg.matrix_rank(problem.A)), problem.m)
         if min_rank_m <= 0:
             raise ValueError("rank(A)=0; cannot form the T2 regulariser")
-        coef = float(cfg.get("reg_coef", beta / (1000.0 * min_rank_m)))
+        # Algorithm 1 line 6 (paper/body.tex:182): reg = eps/(1000*min{rank(A),m}).
+        # The arms tune beta directly; the paper couples beta = eps/(4 log m)
+        # (paper/body.tex:181), so the faithful Algorithm-1 coefficient given a
+        # tuned beta is eps = 4*beta*log(m) -> coef = 4*beta*log(m)/(1000*min_rank_m).
+        # (Latent: reg_on is False in every tuned grid, so reported numbers are
+        # unaffected; this only matters if the regulariser is turned on.)
+        eps = float(cfg.get("eps", 4.0 * beta * np.log(problem.m)))
+        coef = float(cfg.get("reg_coef", eps / (1000.0 * min_rank_m)))
         sm = make_regularized(problem, beta, delta, sqrt_w, x0, coef)
     else:
         sm = make_smoothed(problem, beta, delta)
