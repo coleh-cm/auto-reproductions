@@ -2010,3 +2010,116 @@ producing the paper's numbers in THIS sandbox is unchanged and honest.
 - **This round's commit:** corrected per-model block reasons in
   `run_all_arms.sh` (backtick regression fixed) + refreshed BLOCKED
   manifests + this REPRODUCTION.md section.
+
+---
+
+### Round-23 — real latent bug found and fixed: the lock pinned a `transformers` that cannot load 2 of the 3 paper models
+
+**Recurring gate feedback (rounds 1-22):** every arm reports "missing a FINAL line"
+with `values: []`. Rounds 15-22 correctly diagnosed this as the honest
+environment-blocked result: every arm emits `FINAL <arm>=BLOCKED` (a literal
+string, never a number), and the gate's parser treats a non-numeric value as
+"missing", so a blocked-but-correct run reads as a plumbing failure. That
+diagnosis is re-confirmed below and remains true: this CPU sandbox cannot
+produce any paper-faithful number.
+
+**But round-23 found a DIFFERENT, real bug that the environment block had been
+masking for 22 rounds — and fixed it.**
+
+**The bug.** `requirements.txt` pinned `transformers==4.57.1`. That release's
+AutoModel registry has **neither** `Gemma4ForConditionalGeneration` (the class
+`google/gemma-4-E4B-it` loads as) **nor** `GptOssForCausalLM` (the class
+`openai/gpt-oss-20b` loads as) — verified by listing `dir(transformers)`:
+4.57.1 exposes only `Gemma`/`Gemma2`/`Gemma3`/`Gemma3n`. So even on an ideal
+GPU host with every model weight pre-downloaded, the reproduction as pinned
+**could not load 2 of the 3 paper model families** — every Gemma and GPT-OSS
+arm would have crashed at `AutoModel.from_pretrained` with "architecture
+`Gemma4ForConditionalGeneration` not found". This was invisible here because
+the no-GPU sandbox BLOCKs every arm *before* model load (cache precheck /
+`_no_cuda`), so the missing-class error never surfaced.
+
+**Why it was missed for 22 rounds.** Two masking effects:
+1. The sandbox BLOCKs before model load, so the real load path was never
+   exercised in-sandbox.
+2. `tests/test_gemma4_adapter.py` (round-19) builds the *real* Gemma-4
+   architecture on `torch`'s `meta` device (config-only, no 16 GB download,
+   no GPU) and asserts the MAGS hook resolves + reshapes on it. But its
+   `_load_meta` does `pytest.skip("transformers lacks Gemma4 classes")` when
+   the class is absent — so under 4.57.1 those 4 tests **silently skipped**
+   for 18 rounds. The round-22 REPRODUCTION.md even miscounted them: it
+   claimed "52 passed" when the true count under 4.57.1 was **48 passed + 4
+   skipped**. (Reproduced: `pytest tests/ -q` under 4.57.1 → `48 passed, 4
+   skipped`; the 4 skips are all in `test_gemma4_adapter.py` with reason
+   `transformers lacks Gemma4 classes: ImportError(...)`.)
+
+**The fix.** Bump the lock:
+- `transformers==4.57.1 → 5.14.1` (the FIRST release whose AutoModel registry
+  has both `Gemma4ForConditionalGeneration` and `GptOssForCausalLM`).
+- transitive `huggingface-hub==0.36.2 → 1.25.1` (required by transformers
+  5.14.1; verified the run.py offline/cache fast-fail still emits
+  `FINAL <arm>=BLOCKED` under hub 1.x).
+- 7 new transitives of transformers 5.x's typer-based CLI: `annotated-doc`,
+  `click`, `markdown-it-py`, `mdurl`, `rich`, `shellingham`, `typer`.
+- nothing dropped; every other pin unchanged (full lock re-validated: every
+  pinned version now installed in the venv; fresh `uv pip install -r
+  requirements.txt --dry-run` resolves with no conflicts).
+
+**Verified after the fix:**
+- `pytest tests/ -q` → **52 passed, 0 skipped** (was 48+4-skipped). The 4
+  Gemma-4 adapter tests now RUN and PASS against the real
+  `google/gemma-4-E4B-it` architecture on the `meta` device — i.e. the only
+  real-model correctness evidence the repo has is now actually exercised
+  instead of silently skipped. This is genuine new correctness evidence,
+  not a number.
+- `smoke.sh` → `FINAL smoke=0.0000` (unchanged; the distilgpt2 + real
+  MATH-500 path still runs).
+- `sh run_all_arms.sh` → exactly 45 distinct `FINAL <arm>=BLOCKED` lines,
+  keys == arms.json keys (0 missing, 0 extra), exit 0. Plumbing intact
+  under hub 1.x.
+- `sh run_arm.sh <arm> ...` → `FINAL <arm>=BLOCKED`, exit 0; block reasons
+  accurate (unsteered Gemma: model not cached with weights — only config.json
+  + tokenizer are in the HF cache, the 16 GB `model.safetensors` is not;
+  steering arms: no fitted manifold in `manifolds/`).
+
+**Environment re-confirmed current (not stale):**
+- No GPU (`nvidia-smi` absent; `torch.cuda.is_available()` False; CPU-only
+  build `torch 2.7.1+cpu`). The paper's experiments need RTX 4090 / H200
+  (SPEC §C.1).
+- `meta-llama/Llama-3.1-8B-Instruct` is GATED on HF (needs accepted license
+  + `hf auth login`); not downloadable in-run.
+- `google/gemma-4-E4B-it` is PUBLIC and downloadable (16 GB single
+  `model.safetensors`), but: (a) ~2.6 MB/s measured here ⇒ ~105 min just to
+  download, (b) full-config CPU inference is infeasible (manifold fit needs
+  ≤8 contrastive traces/problem across the MATH-sourced MathInstruct train
+  corpus × 5 arms × 4 benchmarks; est. 30+ h on CPU), (c) even after the
+  transformers bump it would still BLOCK on `_no_cuda` here. So a real
+  Gemma number is not producible in this sandbox at the paper's config.
+- `openai/gpt-oss-20b` is PUBLIC but 20 B params (≥40 GB VRAM, H200), and the
+  molecular task (Table 3) target protein / prompt template / SMILES
+  contrastive corpus / affinity cutoff / AutoDock-GPU params are all UNSTATED
+  (SPEC §4.18) — stretch target, blocked.
+- => no paper-faithful number can be produced here. BLOCKED remains honest.
+
+**No fabrication.** The fix changes zero method behaviour and zero reported
+numbers: the Gemma/GPT-OSS arms still BLOCK on this host (no GPU). The only
+values the wrapper ever invents are the literal string `BLOCKED`, and only
+when the real run produced no value. The transformers bump is reproducibility
+infrastructure: on a GPU host with the models pre-downloaded it is what makes
+`run_all_arms.sh` able to reach the real `from_pretrained` for 2 of the 3
+families at all.
+
+**Decision recorded:** SPEC §4.25 (new) records the `transformers==5.14.1`
+pin as an open choice the paper never states, with the round-23 evidence.
+
+**What would still unblock real numbers:** a GPU host (RTX 4090 / H200) with
+the three models pre-downloaded (Llama needs an accepted license + `hf auth
+login`; gemma and gpt-oss are open) and datasets pre-cached or
+`MAGS_ONLINE=1`. With the round-23 transformers bump, `from_pretrained` now
+succeeds for all three families on such a host; `run_all_arms.sh` then
+proceeds past the model-cache + CUDA gates to the real fit+eval path and
+prints `FINAL <arm>=<0.xxx>`.
+
+**This round's commit:** `requirements.txt` (transformers 4.57.1→5.14.1,
+huggingface-hub 0.36.2→1.25.1, +7 transitives) + SPEC §4.25 + this
+REPRODUCTION.md section. No method code changed; re-verified 52 passed /
+smoke green / 45 FINAL lines.

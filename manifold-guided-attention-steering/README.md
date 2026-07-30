@@ -76,6 +76,14 @@ What DOES run and is committed:
   orthonormality, token-count-weighted means/centroid, Eq.(9)==Eq.(10) at α=1,
   complement preservation, centring correctness, per-token threshold pooling,
   top-K head selection by held-out AUROC, drift-detection AUROC > chance.
+- **Real-architecture Gemma-4 adapter test** (`tests/test_gemma4_adapter.py`):
+  builds the *real* `google/gemma-4-E4B-it` on `torch`'s `meta` device
+  (config-only — no 16 GB weight download, no GPU) and asserts the MAGS hook
+  resolves `W_O` and reshapes per-layer on the actual multimodal
+  `Gemma4ForConditionalGeneration` text stack (incl. its heterogeneous
+  head_dim: sliding layers 8×256, full-attention layers 8×512). Needs
+  `transformers>=5.14` (which has the `Gemma4ForConditionalGeneration` class;
+  the prior pin `4.57.1` had no such class and these tests silently skipped).
 - **Grading tests** (`tests/test_grading.py`): the math/code graders (math_verify
   boxed/numeric, MBPP subprocess execution, HumanEval harness).
 - **`smoke.sh`**: the same fit→steer→grade code path at smoke size on `distilgpt2`
