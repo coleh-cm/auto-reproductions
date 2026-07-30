@@ -12,9 +12,10 @@ __pycache__/
 build/
 dist/
 
-# runtime data / outputs
+# runtime data: ACS PUMS csv files are downloaded by folktables (regenerable),
+# so the raw census dumps stay out of git.  RESULTS are committed (a number
+# whose evidence file is gitignored is a claim with its evidence deleted).
 data/
-results/
 *.csv
 *.parquet
 
