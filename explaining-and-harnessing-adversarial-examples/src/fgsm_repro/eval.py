@@ -88,6 +88,8 @@ def _eval_from_probs_pred(
     Denominator for error_rate is ALL n evaluated examples.
     """
     n = int(pred.numel())
+    if n == 0:
+        raise ValueError("_eval_from_probs_pred: empty input set; a grader must raise, not return a vacuous verdict")
     wrong = pred != y
     error_rate = wrong.float().mean().item()
     if wrong.sum() > 0:
@@ -108,6 +110,8 @@ def eval_clean(model: Classifier, x: torch.Tensor, y: torch.Tensor) -> float:
     column would always yield 0 and never match {-1,+1} labels, so the binary
     case is special-cased here.
     """
+    if int(x.shape[0]) == 0:
+        raise ValueError("eval_clean: empty input set; a grader must raise, not return a vacuous verdict")
     model.eval()
     with torch.no_grad():
         logits = model.logits(x)

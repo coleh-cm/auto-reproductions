@@ -1236,3 +1236,89 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
   ]
 }
 ```
+
+## 11. Constructed truth
+
+This section states, for each constructed-truth category the reproduction
+contract names, whether it applies here and — where it does — the exact test
+node that enforces it. A wrong implementation is caught by these oracles in
+seconds, without a paper-scale run; a reader can verify them without trusting
+the measured numbers.
+
+- **Degeneracy (the method at its no-op reproduces the baseline EXACTLY).**
+  APPLIES. The FGSM adversarial-training cost (E7, tex:486-488) has a no-op at
+  `eps=0`: `x + 0*sign(grad) == x` exactly, so `J~ = alpha*J + (1-alpha)*J = J`.
+  At eps=0 the method must reproduce clean training bit-for-bit (dropout OFF).
+  Enforced by `tests/test_degeneracy.py` at three levels — cost
+  (`test_cost_degeneracy_eps0_equals_clean`), training
+  (`test_train_degeneracy_eps0_equals_baseline_bitidentical`), and CLI
+  (`test_run_experiment_cli_degeneracy`, `run_experiment.py --lambda 0` vs
+  `--baseline` print identical accuracy values). This is the cheapest real
+  correctness evidence and the one most often skipped.
+
+- **Brute force at toy scale against a closed form claiming a maximum /
+  minimum / worst case.** APPLIES. E6 (tex:410-412) is the closed-form *worst-
+  case* adversarial logistic loss in the L-inf box of radius eps. The
+  brute-force oracle `tests/test_constructed_truth.py::test_brute_force_e6_is_the_maxnorm_worst_case`
+  draws 200 random perturbations within the box and asserts NONE exceeds E6 —
+  a direct test that the closed form really is the maximum it claims.
+
+- **The same quantity derived two ways (the paper hands this to us for free).**
+  APPLIES. E6 (closed form) vs the empirical FGSM loss on logistic regression:
+  `tests/test_instruments.py::test_e6_positive_matches_empirical_fgsm_positive_class`
+  asserts the closed form equals the loss on `x + eps*sign(-w)` for y=+1 (the
+  case where the paper's displayed equation is exact, tex:407-412; the y=-1
+  divergence is the paper's imprecision, recorded in §8 Finding E6). Also
+  `tests/test_constructed_truth.py::test_naive_per_example_fgsm_equals_autograd_sign`
+  (naive analytic input-gradient sign == autograd sign).
+
+- **Planting a known structure in synthetic input and requiring the pipeline to
+  recover it.** APPLIES. Plant a logistic regression with known `w` and require
+  the FGSM perturbation to be the analytically-known direction
+  `eta = -eps*y*sign(w)` with `||eta||_inf == eps`:
+  `tests/test_constructed_truth.py::test_plant_known_linear_structure_fgsm_direction`.
+
+- **A slow exact or convex reference solver.** APPLIES (same instrument as
+  above). E6 is the convex (closed-form) reference for the FGSM attack on
+  logistic regression; the brute-force search is the slow reference for the
+  general case. Both used as oracles in `test_constructed_truth.py`.
+
+- **The method's limiting cases.** APPLIES. eps=0 is the identity
+  (`tests/test_invariants.py::test_fgsm_eps0_is_identity`,
+  `test_eval_fgsm_eps0_equals_clean_error`); large eps drives a fitted linear
+  model's error toward 1.0
+  (`tests/test_constructed_truth.py::test_limiting_case_large_eps_drives_linear_model_to_all_wrong`).
+
+- **The naive implementation agreeing with the fast one.** APPLIES. The
+  per-element analytic input-gradient sign for the logistic cost equals the
+  autograd-computed sign used by the fast FGSM path
+  (`test_naive_per_example_fgsm_equals_autograd_sign`), and the closed-form E6
+  equals the empirical FGSM loss (`test_e6_positive_matches_empirical_fgsm_positive_class`).
+
+- **The paper's standard baseline, whose value is common knowledge and therefore
+  an oracle you already have.** PARTIALLY APPLIES. MNIST maxout clean test
+  error ~0.94% (tex:492) and the majority-class error 88.65% are common-
+  knowledge oracles: the clean baseline arms (m3, m4 baseline, m5 baseline)
+  must land in the ~1-2% error regime (far below 88.65%), and a collapsed
+  adversarial arm (mean error ~88.65%) is flagged as not-trained
+  (`experiments/m5_large_advtrain.py` `adv_arm_trained` guard). The exact 0.94%
+  / 0.782% magnitudes require the paper's full scale (1600 units / patience 100
+  / 5 seeds) and are rated `compute_invariance=low` in claims.json — they are
+  NOT treated as oracles here, only the regime/direction is.
+
+- **Equivalence / grader oracles (anything that decides whether an output is
+  correct).** Every grader is exercised on one known-correct and one known-wrong
+  input in `tests/test_instruments.py` (eval_clean, eval_fgsm error/confidence,
+  eval_transfer, class_agreement, RBF confidence, rubbish sampling, fooling
+  sign step, E6) plus the data-loader fingerprint
+  (`tests/test_data_fingerprint.py`). A grader fed an EMPTY input must raise,
+  not return a vacuous 0.0 (`test_eval_clean_raises_on_empty`). The full
+  instrument registry with positive/negative tests is `instruments.json`.
+
+Categories NOT applicable here (stated for honesty): there is no claim of a
+global *minimum* to brute-force (FGSM is a one-step attack, not an optimizer
+with a minimum); no generative-model likelihood to cross-check (the MP-DBM
+generative-resistance test, tex:827-833, is in `not_tested` — we do not
+implement MP-DBM inference); and no CIFAR-10 arm (the CIFAR-10 numbers, tex:341,
+tex:911-912, are in `not_tested` — the dataset/preprocessing is excluded by the
+scope fixed in §1).
