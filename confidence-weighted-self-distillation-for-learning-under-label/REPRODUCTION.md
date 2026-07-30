@@ -212,3 +212,28 @@ exercised here; the from-scratch environment was instead verified via a fresh
   0.9611 vs 0.9620 (Δ −0.0009). No tolerance asserted; the reader judges whether
   this reproduces the paper.
 
+- 2026-07-30: Setup step executed for a new reproduction pass (same paper_ref
+  `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id
+  `d7735ece-02c4-4228-985c-00834c92b8f3`). Cloned the reproductions repository
+  into `$HOME` over HTTPS (token-credentialed): direct `git clone` failed
+  repeatedly on flaky TLS/HTTP2 (`RPC failed ... early EOF`), so the repo was
+  fetched via the GitHub tarball API, extracted, `git init`-ed, and synced to
+  `origin/main` (`7d0819c`) with `git fetch --depth 1` + `git reset --hard` —
+  working tree clean, content identical to the remote tip. Found the slug
+  folder already present from the prior passes (kept, per the running-log
+  convention). Re-asserted `/root/.repro_dir` with the absolute folder path
+  (87 bytes, no trailing newline; verified with `wc -c` + `od -c`). Verified
+  `paper/paper.md` against this pass's provided paper text via an independent
+  fresh transcription: the whitespace-stripped content streams are
+  byte-identical (4020/4020 non-whitespace chars, `cmp` clean); the only raw
+  `diff` line is the Eq. (3) line-break placement of `˜p,` (line 193) — the
+  same whitespace-only class as the filler lines adjudicated in the prior
+  passes (`83`, `126`, `143`, `145`, `192`). The file was kept as previously
+  adjudicated so the SPEC.md line citations (Eq. (1) 96–108 … output contract
+  466–470) continue to resolve. `arxiv_id` is `unknown` in this pass's
+  objective, so the arXiv LaTeX source (https://arxiv.org/e-print/<id>) cannot
+  be fetched; per protocol this is recorded here and the PDF-extracted text in
+  `paper/paper.md` remains the reference — its maths must be treated as
+  potentially lossy. Header (title, date, Status section) confirmed; this entry
+  is this pass's setup record.
+
