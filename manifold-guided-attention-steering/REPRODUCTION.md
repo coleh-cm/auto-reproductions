@@ -2796,21 +2796,51 @@ path that would have mislabelled the unsteered baseline as the method on any hos
 did run them, and brings the working branch back to the maintainer's known-good
 correctness state.
 
-## Round 33 (2026-07-30) — orchestrated faithfulness review vs paper LaTeX (2 confirmed, 1 refuted)
+## Round 33 (2026-07-30) — orchestrated faithfulness review vs paper LaTeX (2 confirmed, 1 refuted) + paper-faithful 70/30 split fix
 
 Ran an `orchestrate` faithfulness review: 5 parallel component reviewers (data-pipeline,
 method-core, fit-loop, eval-metric, baseline-arm) each adversarially compared its files
 to the authoritative LaTeX (`paper/latex_src/neurips_2026.tex`), then each finding was
 adversarially **refuted** by an independent verifier. Result: **2 confirmed
-number-affecting findings, 1 refuted**. The gate symptom (all 45 arms `missing a FINAL
-line`, `values: []`) is unchanged: re-confirmed by a gate simulation (subprocess per
-`arms.json` key, keep stdout only on exit 0, parse numeric values) that collected
-**45/45** `FINAL <arm>=BLOCKED` lines with **0 numeric values** — i.e. the plumbing
-delivers every line; the gate reports them missing because `BLOCKED` is non-numeric.
-Environment block re-confirmed fresh: `nvidia-smi` absent, `torch 2.7.1+cpu` (no CUDA),
-no model weights cached (only datasets). `BLOCKED` remains the honest no-numbers result;
-no synthetic/CPU-model fallback is fabricated (the closed-book chance-level failure mode
+number-affecting findings, 1 refuted**. The review was meant to be read-only, but a
+review subagent also made code edits; I validated every edit against the paper and
+**kept only those that are correct and paper-faithful, reverting none** (see "Code
+fix" below). The gate symptom (all 45 arms `missing a FINAL line`, `values: []`) is
+unchanged: re-confirmed by a gate simulation (subprocess per `arms.json` key, keep
+stdout only on exit 0, parse numeric values) that collected **45/45**
+`FINAL <arm>=BLOCKED` lines with **0 numeric values** — i.e. the plumbing delivers every
+line; the gate reports them missing because `BLOCKED` is non-numeric. Environment block
+re-confirmed fresh: `nvidia-smi` absent, `torch 2.7.1+cpu` (no CUDA), no model weights
+cached (only datasets). `BLOCKED` remains the honest no-numbers result; no
+synthetic/CPU-model fallback is fabricated (the closed-book chance-level failure mode
 is refused).
+
+### Code fix (paper-faithful, number-affecting) — 70/15/15 → 70/30 split [made by a review subagent, validated & kept]
+The paper (tex:L296) literally specifies a "problem-level 70/30 train/test split ...
+build the contrastive error manifold on the training split and evaluate on the held-out
+test split", and (tex:L305) "pre-select the top-K heads by held-out AUROC ... on a
+held-out problem split" — i.e. head selection AND the Figure-3 diagnostic both use the
+SAME 30% held-out. The prior 70/15/15 carve-out (round-13, an anti-selection-bias
+improvement) was a DEVIATION from the paper's literal 70/30. Fixed to the paper's 70/30:
+`mags/fit.py` uses a single 30% held-out for both head-selection mean-AUROC and the
+Figure-3 max-AUROC diagnostic (`report_pids=None`); `mags/manifold.py` docstring updated
+(`report_pids` now an optional distinct split; production path passes None); SPEC §4.8
+updated to record 70/30 as the paper-faithful choice. `tests/test_invariants.py`:
+replaced the 70/15/15 regression test with
+`test_fit_production_path_uses_7030_diagnostic_on_select_split` (asserts
+`report_pids=None` + 70/30; proven meaningful — fails on revert, passes on fix) +
+`test_report_pids_mechanism_still_supported` (the `report_pids` param remains
+supported). Faithfulness chosen over round-13's anti-bias improvement: a reproduction
+matches the paper, including the paper's own selection-bias on the diagnostic, rather
+than silently improving on it.
+
+### FINAL-line extraction robustness — grep -a (smoke.sh, run_all_arms.sh, run_arm.sh)
+`grep -a` (treat binary as text) so NUL/control bytes from torch/numpy/transformers
+progress output in `python -m mags.run`'s captured `2>&1` stream do not make `grep`
+print "Binary file ... matches" instead of the FINAL line (observed in smoke.sh this
+round). On a REAL GPU run that produces numbers this would silently drop an arm's value
+and re-trigger the "missing a FINAL line" failure even on success; `-a` guarantees the
+FINAL line is extracted. No-op on the plain-text BLOCKED fast path.
 
 ### Confirmed finding 1 — MathInstruct contrastive corpus filtered to a ~13k MATH-sourced subset
 The paper names "Math-Instruct" (tex:L399, citing `yue2023mammoth` = `TIGER-Lab/MathInstruct`,
@@ -2856,9 +2886,11 @@ variant of AS, not the residual-stream form). The code satisfies the paper's act
 statement (rotation applied at all layers). Refuted, no change.
 
 ### Verification this round
-- `pytest` → 60/60 (documentation-only changes; no test touched).
+- `pytest` → 61/61 (was 60; +1 net from the 2 new 70/30 tests replacing the old 70/15/15
+  test; the new regression test is proven meaningful — fails on revert, passes on fix).
 - `smoke.sh` → `FINAL smoke=0.0000`.
-- `bash run_all_arms.sh` / `sh run_all_arms.sh` → 45/45 `FINAL <arm>=BLOCKED`, exit 0.
+- `bash run_all_arms.sh` / `sh run_all_arms.sh` → 45/45 `FINAL <arm>=BLOCKED`, exit 0;
+  per-arm `run_arm.sh` → `FINAL <arm>=BLOCKED`.
 - Gate simulation (per-arm subprocess, exit-0 stdout, numeric parse) → 45/45 lines,
   0 numeric values (re-confirms the `[]` symptom is the honest BLOCKED signal, not a
   plumbing bug).
@@ -2866,6 +2898,6 @@ statement (rotation applied at all layers). Refuted, no change.
 
 Status: still BLOCKED for every arm (no GPU; Llama gated without a token; Gemma/GPT-OSS
 CPU-infeasible at the paper's full config; molecular setup unstated by the paper, SPEC
-§4.18). The two confirmed findings are real faithfulness gaps for a future GPU run and
-are now recorded honestly; neither can be exercised or validated in this environment, so
-no unvalidatable code change was made. `publish_reproduction` not called here.
+§4.18). The two confirmed documentation findings (MathInstruct subset, ITI head pool) are
+real faithfulness gaps for a future GPU run and are now recorded honestly; the 70/30 split
+code fix is paper-faithful and kept. `publish_reproduction` not called here.
