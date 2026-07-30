@@ -2672,3 +2672,72 @@ test-only strengthening.
 - Environment block unchanged: no GPU, CPU-only torch, Llama gated,
   Gemma/GPT-OSS un-cached → all arms `BLOCKED` (honest "no numbers"; no
   synthetic substitution).
+
+## Round 31 (2026-07-30) — definitive root cause of the recurring "all 45 arms missing a FINAL line" gate feedback
+
+The gate feedback for rounds 26–30 was identical: `arms missing a FINAL line:
+[all 45]`, `values: []`, `spread across arms: None`. Round 26 fixed the plumbing
+(the gate now *receives* a FINAL line per arm from any CWD), yet the feedback
+recurred unchanged. This round pinpoints why: **the gate parses only NUMERIC
+values; the honest non-numeric `BLOCKED` string is dropped, leaving `values: []`,
+which the gate reports as "missing a FINAL line".** This is not a plumbing
+defect — it is the expected symptom of an honestly-blocked reproduction under a
+numeric-only gate.
+
+### Evidence the plumbing is NOT the problem (re-verified this round)
+Simulated the gate by running each `arms.json` command with `shell=True` from
+five CWDs — repo root (`/root/auto-reproductions`), the reproduction folder,
+`/workspace`, `/tmp`, `/`. From every CWD every arm emits exactly one
+`FINAL <arm_id>=BLOCKED` line with exit 0. Even where `sh run_arm.sh` cannot be
+found (`/workspace`, `/tmp`, `/` → `sh: cannot open run_arm.sh` on stderr), the
+`arms.json` trailing `|| printf 'FINAL %s=BLOCKED\n' '<arm-id>'` fallback fires
+and the FINAL line still prints on stdout. So the gate *does* receive a FINAL
+line for every arm; the `[]` is the gate's numeric-only parser dropping `BLOCKED`.
+(The sibling passing reproduction `explaining-and-harnessing-adversarial-examples`
+passes the same gate with `FINAL baseline=0.9787999987602234` — a numeric value —
+confirming the gate's contract is numeric.)
+
+### Why a real numeric value cannot be produced honestly here
+Re-probed the model-access block with `HfApi.model_info`:
+- `meta-llama/Llama-3.1-8B-Instruct`: `gated='manual'`, and the sandbox has **no
+  `HF_TOKEN`** → cannot be downloaded at all. (20 of the 45 arms are Llama arms.)
+- `google/gemma-4-E4B-it`: `gated=False` (downloadable without a token), but the
+  cache is config+tokenizer only (31 MB, no `.safetensors`), there is **no GPU**
+  (CPU-only `torch 2.7.1+cpu`), and a 4B model generating full reasoning traces
+  for 500 (MATH-500) / 1319 (GSM8K) / 164 (HumanEval) / 427 (MBPP) problems —
+  *plus* the manifold-fit prepass that samples 8 traces/problem on the training
+  split — is CPU-infeasible within the gate's per-arm timeout (`MAGS_ARM_TIMEOUT`
+  default 3600 s; one MATH-500 unsteered arm alone is hours on CPU).
+- `openai/gpt-oss-20b`: `gated=False` but ~40 GB, MXFP4, paper ran it on H200;
+  CPU load is infeasible.
+- `manifolds/` is empty: the steering arms (ITI/AS/MAGS/MAGS-u) require a
+  *pre-fitted* manifold (`manifolds/<model>__<bench>.npz`) produced from
+  contrastive traces, which itself needs the model + the 8-samples/problem
+  generation prepass. With no model and no fitted manifolds, only the
+  `unsteered` arm is even theoretically runnable, and it too is CPU-infeasible at
+  the paper's full `eval_n`.
+
+Substituting a cached non-paper model (distilgpt2 / tiny-gpt2) to emit a numeric
+FINAL under a paper arm's name would be exactly the closed-book synthetic-fallback
+failure the task warns against ("a closed-book run silently fell back to a
+synthetic corpus… which passed every gate and meant nothing"). It is refused.
+The only honest terminal value for every arm in this environment is `BLOCKED`.
+
+### Decision / what this round changes
+No implementation, test, or plumbing change is warranted this round: the method
+core is faithful to the LaTeX (Eq.5/6/7/9 re-verified numerically in round 30),
+57 tests + smoke are green, the wrapper emits a FINAL line for every arm from
+every CWD, and `BLOCKED` is the honest no-numbers result. This round is a
+root-cause *finding* recorded so the publish step can report the reproduction as
+**environment-blocked** (no GPU, Llama gated without a token, Gemma/GPT-OSS
+CPU-infeasible at the paper's full configuration, no pre-fitted manifolds)
+rather than as a plumbing or faithfulness defect. The recurring gate feedback
+is the expected, honest symptom of a blocked run under a numeric-only gate, not
+a bug to fix by fabricating a number.
+
+### Verification (this round)
+- 57 tests pass; `smoke.sh` green (`FINAL smoke=0.0000`).
+- Every arm emits `FINAL <arm>=BLOCKED` (rc 0) from all 5 tested CWDs.
+- `HfApi.model_info` gating check: Llama `gated=manual`, Gemma `gated=False`,
+  GPT-OSS `gated=False`; no `HF_TOKEN` in env; no GPU; `manifolds/` empty.
+- Branch `repro/manifold-guided-attention-steering` pushed to origin.
