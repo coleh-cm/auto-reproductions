@@ -2617,3 +2617,58 @@ no-fence passthrough, and multi-fence-last-block.
   Gemma/GPT-OSS un-cached → all arms `BLOCKED` (the honest "no numbers" result;
   no synthetic substitution). The two fixes are latent in this sandbox and take
   effect on a GPU host with cached models + fitted manifolds.
+
+## Round 30 (2026-07-30) — adversarial faithfulness review (orchestrate, 5 components) + active-path test gap closed
+
+### Review
+Ran an orchestrated 5-component adversarial faithfulness review (manifold-core,
+steering-inference, baselines, data-split, eval-grading) against the
+authoritative LaTeX (paper/latex_src/neurips_2026.tex), each finding then
+adversarially refuted by a separate verifier. Result: **0 number-affecting
+findings** across all 5 components.
+
+### Independent verification (not trusting the clean review)
+The clean "0 findings" result is a red flag, so I verified the highest-risk
+areas directly rather than trust it:
+
+1. **Core equations, numerically** (mags/manifold.py): built a tiny orthonormal
+   B (k=2, d_h=4) + mu_c and confirmed `HeadManifold.proximity` == Eq.7
+   `(a-mu_c)^T B^T B (a-mu_c)`, `HeadManifold.correct` == Eq.9
+   `a - alpha B^T B (a-mu_c)`, the alpha=1 Eq.10 equivalence
+   `mu_c + (I - B^T B)(a-mu_c)`, and Proposition 1 information preservation
+   (for v in null(B), `<a_tilde, v> == <a, v>`). All match to 1e-5.
+
+2. **Hook plumbing, integration**: confirmed the W_O pre-hook return value IS
+   consumed (a controller that zeros the head input diverges from baseline) and
+   that a force-triggered MAGS correction with non-trivial magnitude changes the
+   generated tokens. The active path (Eq.9 → W_O) is wired up correctly.
+
+### Test-completeness gap found and closed (the one real issue this round)
+The degeneracy tests (test_degeneracy.py) prove the no-op path is clean, but
+they pass **even if the W_O pre-hook silently ignored the controller's return
+value**: both no-op settings (alpha=0, threshold=+inf) return `None`
+regardless, so token-identity with the baseline holds whether or not the hook
+is actually wired up. This is a real gap — it would not catch a silent
+hook-ignored regression (e.g. the registry failing to feed the returned tensor
+back into W_O, breaking Algorithm 1 line 9).
+
+**Fix:** added two tests to tests/test_degeneracy.py:
+- `test_hook_return_value_is_consumed` — a controller that zeros every head's
+  W_O input MUST change generation vs the unsteered baseline; fails if the hook
+  return value is ignored.
+- `test_active_correction_changes_tokens` — a force-triggered MAGS correction
+  with a large (a-mu_c) MUST change generation; fails if the active Eq.9
+  correction never reaches W_O.
+
+These exercise the active path, not just the no-op path, so a future
+hook-ignored regression is now caught by the test suite. No implementation code
+changed; the implementation was already correct (verified above). This is a
+test-only strengthening.
+
+### Verification
+- 57 tests pass (was 55; +2 active-path tests).
+- `smoke.sh` green (`FINAL smoke=0.0000`).
+- `sh run_all_arms.sh` emits all 45 `FINAL <arm>=BLOCKED` lines in <1s.
+- Environment block unchanged: no GPU, CPU-only torch, Llama gated,
+  Gemma/GPT-OSS un-cached → all arms `BLOCKED` (honest "no numbers"; no
+  synthetic substitution).

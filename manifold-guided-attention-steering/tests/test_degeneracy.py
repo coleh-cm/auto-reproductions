@@ -183,3 +183,67 @@ def test_prefill_not_steered():
     # first generated token comes from prefill (seq>1) forward -> controller passed through
     assert ids_base.tolist()[0] == ids_mag.tolist()[0], \
         "prefill was steered; controller must pass-through seq>1 (SPEC §4.9)"
+
+
+def test_hook_return_value_is_consumed():
+    """The degeneracy tests above pass even if the W_O pre-hook silently ignored the
+    controller's return value (both no-op settings return None regardless), so they
+    do NOT by themselves prove the active path is wired up. This test does: a
+    controller that returns a clearly-modified tensor (zeros) MUST change the
+    generated tokens vs the unsteered baseline. A silent hook-ignored bug (e.g. the
+    registry not feeding the returned tensor back into W_O) would leave tokens
+    identical and fail here. This is the invariant the paper's Algorithm 1 line 9
+    ("Replace a_t with a_tilde in the input to W_O") implies: the correction must
+    actually reach W_O."""
+    model, tok = _load()
+    model._mags_tokenizer = tok
+    import torch
+    from mags.generation import generate
+    from mags.steering import NoOpController
+
+    class GarbageController:
+        """Returns a zeroed head tensor on every decode step. If the hook return
+        value is consumed, this corrupts generation and diverges from baseline."""
+        hook_layers = None
+
+        def __call__(self, layer, x_heads):
+            if x_heads.shape[1] != 1:
+                return None  # prefill pass-through
+            return torch.zeros_like(x_heads)
+
+    p = "Once upon a time there was a"
+    _, ids_base, _ = generate(model, tok, p, NoOpController(), max_new_tokens=16)
+    _, ids_garb, _ = generate(model, tok, p, GarbageController(), max_new_tokens=16)
+    assert ids_base.tolist() != ids_garb.tolist(), (
+        "A controller that zeros every head's W_O input did NOT change generation; "
+        "the W_O pre-hook return value is being ignored (Algorithm 1 line 9 broken)."
+    )
+
+
+def test_active_correction_changes_tokens():
+    """A force-triggered MAGS correction with a non-trivial magnitude must change
+    the generated tokens vs the unsteered baseline. This proves the ACTIVE path
+    (Eq.9 correction actually applied), not just the no-op path, is exercised end
+    to end. Without this, a manifold that computes the right B/mu_c but whose
+    correction never reaches W_O would pass the degeneracy tests and still be a
+    no-op in practice. We make the correction non-trivial by pushing mu_c away from
+    the activations so the centered vector v = a - mu_c is large (Eq.9 scales
+    alpha * B^T B v)."""
+    model, tok = _load()
+    model._mags_tokenizer = tok
+    import numpy as np
+    bank = _make_bank(model, SMOKE_MODEL)
+    from mags.steering import MAGSController, NoOpController
+    from mags.generation import generate
+    # force-trigger every selected head and push mu_c far so the correction is large
+    for h in bank.selected_heads:
+        bank.heads[tuple(h)].threshold = float("-inf")
+        bank.heads[tuple(h)].mu_c = (bank.heads[tuple(h)].mu_c + 50.0).astype(np.float32)
+    p = "Once upon a time there was a"
+    _, ids_base, _ = generate(model, tok, p, NoOpController(), max_new_tokens=16)
+    _, ids_mag, _ = generate(model, tok, p, MAGSController(bank, alpha=1.0),
+                             max_new_tokens=16)
+    assert ids_base.tolist() != ids_mag.tolist(), (
+        "A force-triggered MAGS correction with a large (a-mu_c) did not change "
+        "generation; the active correction (Eq.9) is not reaching W_O."
+    )
