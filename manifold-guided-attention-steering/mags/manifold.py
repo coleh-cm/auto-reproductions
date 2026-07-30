@@ -66,6 +66,23 @@ class ManifoldBank:
     def selected_manifolds(self) -> list:
         return [self.heads[tuple(h)] for h in self.selected_heads]
 
+    def require_usable(self) -> "ManifoldBank":
+        """Raise unless the bank can actually steer. Returns self so callers can chain.
+
+        Every head's fit returns None when no problem has both a correct and an
+        incorrect trace -- exactly what a grader reporting everything incorrect
+        produces. Steering with zero selected heads is indistinguishable from the
+        unsteered arm, so a bank this empty must not be reported as a successful fit.
+        """
+        if not self.selected_heads:
+            raise RuntimeError(
+                f"fit produced no usable heads ({self.n_problems_fit} fit / "
+                f"{self.n_problems_select} select problems, {len(self.heads)} monitored): "
+                "no problem had both a correct and an incorrect trace, so every head was "
+                "degenerate. Check the grader before trusting any arm -- steering with an "
+                "empty bank is indistinguishable from the unsteered baseline.")
+        return self
+
     # -- persistence --
     def save(self, path_npz: str, path_manifest: str | None = None):
         arrays = {}

@@ -2741,3 +2741,57 @@ a bug to fix by fabricating a number.
 - `HfApi.model_info` gating check: Llama `gated=manual`, Gemma `gated=False`,
   GPT-OSS `gated=False`; no `HF_TOKEN` in env; no GPU; `manifolds/` empty.
 - Branch `repro/manifold-guided-attention-steering` pushed to origin.
+
+## Round 32 (2026-07-30) — bring in the maintainer's grader-fix (lost from this lineage)
+
+The recurring gate feedback ("all 45 arms missing a FINAL line, values: []") was
+re-diagnosed last round as the expected symptom of an honestly-BLOCKED run under a
+numeric-only gate (no GPU; Llama gated without a token; Gemma/GPT-OSS CPU-infeasible
+at the paper's full config). That diagnosis stands and is re-confirmed this round:
+`nvidia-smi` absent, `torch 2.13.0+cpu` (no CUDA), no `HF_TOKEN`, `manifolds/` empty.
+The honest terminal value for every arm remains `BLOCKED`; no number is fabricated
+(the closed-book synthetic-fallback failure mode is refused).
+
+This round found and fixed a **real, number-affecting correctness bug that the
+round-19..31 working lineage had lost**: the maintainer authored a grader fix on a
+side branch `fix/mags-grader-silent-zero` (commit `91f5b30`, "graders must not report
+'cannot run' as 'answer wrong'"), branched off round-18 and never merged forward.
+That fix is independent of the gate's numeric-only symptom but is a genuine defect:
+on a host with `python3` but no bare `python` (Debian default, macOS without a shim),
+`grade_apps` and `_run_subprocess_ok` shelled out to `["python", ...]` inside a broad
+`except Exception: return False`, so the `FileNotFoundError` was reported as *the
+solution is wrong*. APPS grading labels the contrastive traces, so all-incorrect
+labels emptied the correct class, made every head's fit degenerate, and let
+`mags.fit` print `OK ... 0 heads selected` and exit 0 — a method that never ran,
+reported as a successful fit. An empty bank steers nothing, so the `mags` arm would
+have reproduced the unsteered numbers under the method's name (a silent zero).
+
+Changes brought forward from `91f5b30`:
+1. `mags/grading.py`: both subprocess graders now invoke `sys.executable` (not bare
+   `python`); `subprocess.TimeoutExpired` still returns False (a hanging solution has
+   failed), but `OSError` now raises (a grader that cannot run has no opinion about
+   correctness). `import subprocess, sys` moved to module top.
+2. `mags/manifold.py`: `ManifoldBank.require_usable()` raises on a bank with zero
+   selected heads (steering with an empty bank == the unsteered arm).
+3. `mags/fit.py`: calls `bank.require_usable()` before `bank.save(...)` so an empty
+   fit is a hard failure, not a silent `OK ... 0 heads selected`.
+4. `tests/test_grading.py`: `test_grader_runs_without_python_on_path` (PATH emptied;
+   one correct + one incorrect MBPP solution graded) and
+   `test_unrunnable_interpreter_raises_rather_than_failing_the_solution`.
+5. `tests/test_invariants.py`: `test_a_bank_with_no_selected_heads_is_not_a_fit`.
+
+Verification:
+- 60 tests pass (was 57; +3 regression tests).
+- The 3 new tests were **proven meaningful**: reverting the `sys.executable` fix
+  makes both grading tests FAIL (`DID NOT RAISE RuntimeError` / runtime error); the
+  empty-bank test fails without `require_usable`. Restoring the fix makes all 3 pass.
+- `smoke.sh` green (`FINAL smoke=0.0000`).
+- `bash run_all_arms.sh` emits all 45 `FINAL <arm>=BLOCKED` lines (rc 0).
+- Environment block unchanged (no GPU, no token, Llama gated, Gemma/GPT-OSS
+  CPU-infeasible); the gate's numeric-only `[]` is still the expected BLOCKED symptom.
+
+This does not unblock the arms (the maintainer's commit message agrees: "The 45 arms
+remain BLOCKED — no GPU... This changes nothing about that"). It removes a silent-zero
+path that would have mislabelled the unsteered baseline as the method on any host that
+did run them, and brings the working branch back to the maintainer's known-good
+correctness state.

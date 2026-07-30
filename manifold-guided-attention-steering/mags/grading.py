@@ -14,6 +14,8 @@ from __future__ import annotations
 import multiprocessing
 import os
 import signal
+import subprocess
+import sys
 import tempfile
 
 
@@ -176,22 +178,25 @@ def grade_apps(completion: str, problem) -> bool:
         f.write(starter + "\n" + completion)
         path = f.name
     try:
-        import subprocess
         for inp, exp in zip(inputs, outputs):
+            # sys.executable, and OSError raises: see _run_subprocess_ok. This grader
+            # labels the contrastive traces, so a swallowed launch failure here does not
+            # merely score zero -- it empties the correct class and no manifold is fit.
             try:
                 proc = subprocess.run(
-                    ["python", path], input=inp, capture_output=True, text=True,
+                    [sys.executable, path], input=inp, capture_output=True, text=True,
                     timeout=20 / max(len(inputs), 1), env={**os.environ},
                 )
-            except Exception:
+            except subprocess.TimeoutExpired:
                 return False
+            except OSError as exc:
+                raise RuntimeError(
+                    f"grader could not execute {sys.executable!r}: {exc!r}") from exc
             if proc.returncode != 0:
                 return False
             if (proc.stdout or "").rstrip() != str(exp).rstrip():
                 return False
         return True
-    except Exception:
-        return False
     finally:
         try:
             os.unlink(path)
@@ -200,24 +205,37 @@ def grade_apps(completion: str, problem) -> bool:
 
 
 def _run_subprocess_ok(code: str, timeout: int = 10) -> bool:
-    """Run ``code`` in an isolated subprocess; success iff it prints OK within timeout."""
+    """Run ``code`` in an isolated subprocess; success iff it prints OK within timeout.
+
+    Uses ``sys.executable``, not ``"python"``: an environment with only ``python3`` on
+    PATH -- the default on Debian, and on macOS without a shim -- raises
+    FileNotFoundError, and returning False for that reports every generated solution as
+    wrong. That silence propagates: APPS grading labels the contrastive traces, so
+    all-incorrect labels leave no problem with both classes, every head's fit is
+    degenerate, and the fit step reports 0 heads selected while exiting 0.
+
+    A timeout IS a verdict (a solution that hangs has failed). A missing or broken
+    interpreter is not: it raises, because a grader that cannot run has no opinion
+    about correctness.
+    """
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
         f.write(code)
         path = f.name
     try:
-        import subprocess
         proc = subprocess.run(
-            ["python", path], capture_output=True, text=True, timeout=timeout,
+            [sys.executable, path], capture_output=True, text=True, timeout=timeout,
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         )
-        return proc.returncode == 0 and "OK" in (proc.stdout or "")
-    except Exception:
+    except subprocess.TimeoutExpired:
         return False
+    except OSError as exc:
+        raise RuntimeError(f"grader could not execute {sys.executable!r}: {exc!r}") from exc
     finally:
         try:
             os.unlink(path)
         except OSError:
             pass
+    return proc.returncode == 0 and "OK" in (proc.stdout or "")
 
 
 # ---------------------------------------------------------------------------

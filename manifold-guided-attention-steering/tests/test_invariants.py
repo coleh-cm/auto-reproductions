@@ -257,3 +257,24 @@ def test_fit_uses_report_split_for_diagnostic_auroc():
                              k=2, q=90, K=2, alpha=1.0, layers_monitored=[0, 1],
                              split_seed=42)
     assert len(bank2.selected_heads) == 2
+
+
+def test_a_bank_with_no_selected_heads_is_not_a_fit():
+    """Steering with an empty bank is byte-identical to not steering at all.
+
+    `fit_head` returns None for every head when no problem has both a correct and an
+    incorrect trace, which is what a grader reporting everything incorrect produces.
+    The fit step used to print `OK ... 0 heads selected` and exit 0 for that.
+    """
+    from mags.manifold import ManifoldBank
+
+    empty = ManifoldBank(model_id="m", benchmark="MBPP", k=8, q=95.0, K=24, alpha=1.0,
+                         layers_monitored=[8], selected_heads=[], n_problems_fit=0,
+                         n_problems_select=0, split_seed=0, heads={})
+    with pytest.raises(RuntimeError, match="no usable heads"):
+        empty.require_usable()
+
+    usable = ManifoldBank(model_id="m", benchmark="MBPP", k=8, q=95.0, K=24, alpha=1.0,
+                          layers_monitored=[8], selected_heads=[[8, 0]], n_problems_fit=3,
+                          n_problems_select=2, split_seed=0, heads={})
+    assert usable.require_usable() is usable

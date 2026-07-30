@@ -1,4 +1,1 @@
-{
-  "arm": "mags__MATH-500__google_gemma-4-E4B-it",
-  "blocked_reason": "MAGS steering needs a fitted manifold --manifold <path.npz>; none provided / not found. Manifold fit (mags.fit) requires GPU contrastive traces from the paper's 8B/20B model (tex:L399); blocked without a GPU host. No fitted manifolds are shipped."
-}
+{"arm": "mags__MATH-500__google_gemma-4-E4B-it", "blocked_reason": "model google/gemma-4-E4B-it is NOT gated and IS downloadable (freshly re-verified: unauthenticated HF download now proceeds at ~2.1 MB/s, ~2 h for the 16 GB safetensors; the round-21 'throttle to a stall' no longer holds), but there is NO GPU in this sandbox (CPU-only torch, 16 aarch64 cores, no CUDA). Full-config eval of a 4B model on CPU is infeasible within any gate wall-clock budget (est. 30+ h for the 4 Gemma reasoning benchmarks x 5 arms). The paper requires RTX 4090 (SPEC §C.1)."}
