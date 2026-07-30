@@ -362,10 +362,30 @@
      retrain protocol as the adversarial arm (the paper ties the 60k retrain
      only to the adversarial-valid criterion, tex:505-506) — a symmetric-
      protocol choice that biases the baseline, if anything, upward.
-   Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
-   `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
-   error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
-   47/47 tests pass.
+    Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
+    `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
+    error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
+    47/47 tests pass.
+
+- 2026-07-30: **Setup pass for a new workflow run.** Re-cloned
+  `coleh-cm/auto-reproductions` shallow+blobless (`--depth 1 --filter=blob:none`,
+  clone healthy, no tarball fallback needed) to `~/auto-reproductions` and continued
+  the existing remote branch `repro/explaining-and-harnessing-adversarial-examples`
+  (prior run's tip; its content is already merged to `main`, so no fresh folder was
+  created and nothing from the prior run was discarded). `$HOME/.repro_dir` =
+  `/root/auto-reproductions/explaining-and-harnessing-adversarial-examples` (no
+  trailing newline) and `$HOME/.repro_branch` =
+  `repro/explaining-and-harnessing-adversarial-examples` written. arXiv e-print
+  re-fetched from `https://arxiv.org/e-print/1412.6572` and the committed
+  `paper/source/iclr2015.tex` / `.bbl` / `.sty` verified byte-identical to the
+  fresh download — no fetch failure to record; the LaTeX remains the authoritative
+  reference for every equation, table and number. `paper/paper.md` refreshed to the
+  exact PDF-extracted paper text of this run's objective. Housekeeping per current
+  setup rules: the unpacked-source figure/style files (10 `.png`, `eps_curve.pdf`,
+  `fancyhdr.sty`, `natbib.sty`, `iclr2015.sty/.bst` — 856K total) are now untracked
+  and `paper/source/*` is gitignored with `!` re-includes for `*.tex`/`*.bbl`/`*.bib`;
+  the files themselves remain unpacked on disk. Only the LaTeX + bibliography
+  sources are committed, since figures are not what this reproduction is built from.
 
 ## Measured numbers vs paper claims
 
