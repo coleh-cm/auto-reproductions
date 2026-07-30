@@ -57,16 +57,72 @@
 
 ## Measured results vs paper claims (ACS Income, m=51, the headline instance)
 
-| arm | measured (iters to 1% gap, base=init) | paper claim | match |
-|---|---|---|---|
-| ball_oracle_euclidean | 1 | 1 (`experiments.tex:181`) | ✓ exact |
-| ball_oracle_lewis | 1 | 1 (`experiments.tex:182`) | ✓ exact (flagship) |
-| smoothed_heavy_ball | 41 | 47 (`experiments.tex:179`) | ~ close |
-| ipm | 16 | 8 (`experiments.tex:180`) | 2× off |
-| subgradient | 58 (reached) | not reached (`experiments.tex:178`) | ✗ discrepancy |
-| smoothed_gd | 70 | (not in table) | — |
-| smoothed_nesterov | 33 | (not in table) | — |
-| reference_cvxpy OPT | 110.3 | band 107-114 (`experiments.tex:189`) | ✓ |
+### Within-noise caveat — read this first
+
+The two flagship arms, `ball_oracle_euclidean` and `ball_oracle_lewis`, come out
+**identical within floating-point noise**: both reach the 1% target in exactly 1
+outer iteration, and their best-so-far gap curves coincide to 12 decimal places
+(`final_gap` = 0.04593018017129**68** vs 0.04593018017133**52** — a difference at
+the 13th digit). A measurement that cannot tell the two geometries apart has
+**not tested** the paper's claim that "the Lewis-weight geometry is marginally
+faster than the Euclidean ball" (`experiments.tex:139,172`). We reproduce the
+weaker claim — *each* ball oracle reaches 1% in a single iteration — but the
+Euclidean-vs-Lewis comparison itself is not resolved by these numbers; it is
+within noise, not decided. (The single-iteration result is not a warm-start
+artifact: the initial gap is `gap0 = F(x0) − OPT = 24.759`, the 1%-of-init
+threshold is 0.2476, and one trust-region Newton step drops the gap to 0.0459,
+i.e. it closes 99.8% of the gap in one step.)
+
+### Iteration-count comparison (the metric in Table `tab:acs_runtime`)
+
+The exact command per arm is `arms.json`; each is
+`.venv/bin/python -m gdr.harness arm --arm <ARM> --instance acs` (no `--budget`
+flag, so the harness default applies: 100 for the first-order/IPM arms, 15 for
+the ball-oracle arms). The whole gate is reproduced by `bash run_all_arms.sh acs`,
+which prints one `FINAL <arm>=<value>` line per arm and writes `results/acs_all.json`.
+
+| arm | exact command | measured (iters to 1% gap, base=init) | paper claim | match |
+|---|---|---|---|---|
+| reference_cvxpy | `.venv/bin/python -m gdr.harness arm --arm reference_cvxpy --instance acs` | OPT = 110.316 | band 107-114 (`experiments.tex:189`) | ✓ |
+| ball_oracle_euclidean | `.venv/bin/python -m gdr.harness arm --arm ball_oracle_euclidean --instance acs` | 1 | 1 (`experiments.tex:181`) | ✓ exact |
+| ball_oracle_lewis | `.venv/bin/python -m gdr.harness arm --arm ball_oracle_lewis --instance acs` | 1 | 1 (`experiments.tex:182`) | ✓ exact (flagship) |
+| smoothed_heavy_ball | `.venv/bin/python -m gdr.harness arm --arm smoothed_heavy_ball --instance acs` | 41 | 47 (`experiments.tex:179`) | ~ close |
+| ipm | `.venv/bin/python -m gdr.harness arm --arm ipm --instance acs` | 16 | 8 (`experiments.tex:180`) | 2× off |
+| subgradient | `.venv/bin/python -m gdr.harness arm --arm subgradient --instance acs` | 58 (reached) | not reached (`experiments.tex:178`) | ✗ discrepancy |
+| smoothed_gd | `.venv/bin/python -m gdr.harness arm --arm smoothed_gd --instance acs` | 70 | (not in table) | — |
+| smoothed_nesterov | `.venv/bin/python -m gdr.harness arm --arm smoothed_nesterov --instance acs` | 33 | (not in table) | — |
+
+Re-running `bash run_all_arms.sh acs` reproduces these `FINAL` lines
+**byte-for-byte** (deterministic, seed 0): the re-run was diffed against
+`/tmp/arms.log` and is identical. `OPT = 110.316` sits inside the paper's
+107-114 robust band; `F(x0) = 135.075` (paper ERM worst 138.1, California).
+
+### Wall-clock comparison (the other column of Table `tab:acs_runtime`)
+
+The paper also reports wall-clock and claims the ball-oracle methods are fastest
+on **both** axes (0.019 s, "roughly 3× faster than IPM and Heavy-Ball"). Our
+wall-clock does **not** reproduce that: each ball-oracle outer step solves a
+damped-Newton trust-region subproblem, so one iteration is expensive.
+
+| arm | measured wall (s) | paper wall (s) |
+|---|---|---|
+| ball_oracle_euclidean | 0.813 | 0.019 |
+| ball_oracle_lewis | 0.801 | 0.019 |
+| ipm | 0.084 | 0.066 |
+| smoothed_heavy_ball | 0.048 | 0.062 |
+| smoothed_nesterov | 0.048 | — |
+| smoothed_gd | 0.047 | — |
+| subgradient | 0.007 | — |
+
+So in our run the ball-oracle arms are fastest **in iteration count** (1) but
+**slowest in wall-clock** (≈0.8 s). The paper's iteration-count claim is
+reproduced; the paper's wall-clock-speed claim is not. We did not optimise the
+Newton sub-solve (the paper notes it did not either, `experiments.tex:130`), but
+the gap is large enough that this is a genuine divergence, not noise. (Wall-clock
+varies a few % run-to-run — only the `wall_final` fields of `results/acs_all.json`
+differ between the committed run and a re-run; every iteration count, `final_gap`,
+and `OPT` is bit-identical. The headline metric is deterministic; wall-clock is
+not, and is reported as measured, not as a reproducible constant.)
 
 **Statistical context** (ACS, seed 0): ERM avg 104.9 / std 11.6 / worst 135.1 (California);
 robust Max/Mean 1.287→1.022 (paper 1.28→1.02 ✓); worst-ERM-group (California) loss
@@ -98,6 +154,39 @@ decrease 26.2 (paper 24.3 ✓).
    converges rapidly". Ball-oracle beats IPM on synthetic in our run; the paper says IPM is
    best — our basic IPM stops early (a known limitation of a hand-rolled barrier method vs
    CVXPY's production solver).
+
+## Research-readiness gates
+
+Verdict recorded 2026-07-30 by re-running the checks in this checkout.
+
+| # | gate | verdict | evidence |
+|---|---|---|---|
+| 1 | Builds from scratch | **partial** | `Dockerfile` is a clean `python:3.13-slim` build from the full lock `requirements.txt` with a build-time import + CVXPY smoke test. No Docker daemon in this sandbox, so `docker build` was not executed here; the env was built with `uv pip install -r requirements.txt` instead and works. |
+| 2 | README is accurate | **pass** | The README quickstart (`uv venv --python 3.13 .venv && uv pip install --python .venv -r requirements.txt` then `bash run_all_arms.sh acs`) was followed; `.venv` builds, the gate runs, and the table matches `results/acs_all.json`. |
+| 3 | Packages are clear | **pass** | `requirements.txt` is a 71-line full lock (every dep pinned, transitive conic solvers included). Install resolves and every method import + CVXPY solve loads. |
+| 4 | Entrypoint is obvious | **pass** | One command, flag-driven: `bash run_all_arms.sh [acs\|synthetic]`; per-arm via `arms.json`. No source edits needed. |
+| 5 | Fast path | **pass** | `bash smoke.sh` runs the full code path (surrogate → Lewis → trust-region Newton → gap) in seconds, printing `FINAL smoke=0.0845631`. |
+| 6 | Deterministic / noise quantified | **pass** | `bash run_all_arms.sh acs` re-run diffed byte-for-byte identical to the recorded `/tmp/arms.log` for the headline iteration-count metric (seed 0). Wall-clock is non-deterministic (±a few % run-to-run) and is reported as measured, not as a constant. |
+| 7 | Degeneracy test in repo | **pass** | `tests/test_degeneracy.py` (3 no-op=baseline cases) + `tests/test_invariants.py` + `tests/test_grader.py`; `pytest -q` → 20 passed. |
+| 8 | Data provenance stated | **pass** | ACS PUMS downloaded on demand by `folktables` from census.gov (2018 1-Year), cached under `data/` (gitignored, regenerable). README + `gdr/data_acs.py` state it. |
+| 9 | Recorded number reproducible | **pass** | The exact command (`bash run_all_arms.sh acs`) re-run produces the recorded `FINAL` lines and `results/acs_all.json` identically. |
+| 10 | Nothing depends on hidden local state | **pass** | Fresh-clone-runnable: `.venv/` and `data/` are gitignored and regenerable; source, `SPEC.md`, `arms.json`, `results/`, `paper/` are committed. |
+
+## Budget / gate-status markers
+
+- `$HOME/.build_attempts = 2` — the environment was built (2 attempts) and works:
+  `pytest -q` → 20 passed, `smoke.sh` runs, the 8-arm ACS gate runs and reproduces.
+  The build gate is not failing; the only unbuilt artifact is the Docker image
+  (gate 1, partial — no daemon in sandbox), which does not affect the numbers.
+- `$HOME/.env_attempts` — not present; no environment-assembly budget was spent
+  on a still-failing gate.
+- `$HOME/.review_rounds = 1` — review budget was used. The commit log records
+  that round-1 and round-2 adversarial-review findings were fixed (`700ecc1`,
+  `68296e9`, `ea1ef8c`); the final tree is clean, 20 tests pass, and the gate is
+  deterministic. No outstanding objection is recorded in the persisted
+  artifacts, so we report the review as resolved rather than budget-exhausted —
+  but we cannot certify from the artifacts alone that the reviewers went quiet,
+  only that every finding we can see was addressed.
 
 ## What runs
 
