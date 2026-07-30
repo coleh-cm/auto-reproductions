@@ -61,8 +61,7 @@ running log and target numbers.
 
 ## Environment
 
-- Python 3.12+ (this sandbox: CPython 3.12.13; the Dockerfile builds on `python:3.13-slim` — the
-  pinned wheels resolve identically on both)
+- Python 3.13 (this sandbox: CPython 3.13.5; the Dockerfile builds on `python:3.13-slim`)
 - torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2
 - CPU-only; no GPU required
 
@@ -73,13 +72,13 @@ running log and target numbers.
 ```bash
 # from this reproduction folder (.venv/ is gitignored — recreate it in every fresh sandbox,
 # otherwise `.venv/bin/python` does not exist)
-uv venv .venv
-uv pip install --python .venv/bin/python -r requirements.txt
+uv venv --python 3.13 .venv
+uv pip install --python .venv -r requirements.txt
 
 # verify the environment imports and the FGSM invariant holds
 .venv/bin/python -c "import torch,numpy,pytest; print('env OK', torch.__version__, numpy.__version__, pytest.__version__)"
 
-# run the tests (once the implementation step has added tests/)
+# run the tests
 .venv/bin/python -m pytest -q
 
 # run the gate (both arms of the paper's headline M4 comparison; ~1-2 min)
@@ -92,7 +91,7 @@ uv pip install --python .venv/bin/python -r requirements.txt
 .venv/bin/python experiments/m1_softmax.py
 ```
 
-### With plain pip + a system Python 3.12+
+### With plain pip + a system Python 3.13+
 
 ```bash
 python3 -m venv .venv
