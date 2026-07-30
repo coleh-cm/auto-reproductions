@@ -34,6 +34,97 @@
 
 ## Log
 
+### 2026-07-30 — Round 26: orchestrated adversarial faithfulness review (6 components vs paper LaTeX); method core confirmed faithful; environment block re-confirmed
+
+- **Gate feedback (unchanged since round 1):** all 45 arms reported
+  "missing a FINAL line", `values: []`, `spread across arms: None`. This is the
+  numbers gate correctly surfacing an environment block — see the round-16/11
+  definitive diagnosis and the sentinel decision below.
+- **Orchestrated adversarial faithfulness review (`orchestrate`,
+  `mags-faithfulness-review`, 19 subagents).** Per the task instruction to
+  review each component against the paper, I ran a 6-component pipeline against
+  the authoritative LaTeX `paper/latex_src/neurips_2026.tex`, each component
+  reviewed by a subagent and then every finding adversarially verified by a
+  *separate* refute-pass subagent (a finding is kept only if a skeptic who
+  read the actual code confirmed the deviation is real). Components and the
+  equations each was checked against:
+  1. `manifold-fit` — Eq.2,3,4,5,6 (token-count-weighted per-class means,
+     `δ=μ_e−μ_c`, `D∈R^{N×d_h}` rows=problems, compact SVD `B=Vh[:k]` rows
+     orthonormal, global `μ_c` token-count-weighted).
+  2. `proximity-threshold` — Eq.7,8 (`d_t=‖B(a_t−μ_c)‖²`, `τ`=q-th percentile
+     over pooled per-token CORRECT-trace scores, strict `>`).
+  3. `steering-correction` — Eq.9,10 + Algorithm 1 (in-place
+     `ã=a−α BᵀB(a−μ_c)` before `W_O`, decode-only, prefill not steered).
+  4. `head-selection-auroc` — §4 top-K by held-out AUROC with MEAN trajectory
+     score (production), 70/15/15 problem-level split, MAGS-u union.
+  5. `baselines` — ITI / Angular Steering (fixed-offset) / Contrastive Decoding
+     adaptation mechanics vs SPEC §4.15/4.16/4.17.
+  6. `capture-hook` — Eq.1 + Alg.1 line 4 (per-head `AV` before `W_O`, via
+     pre-hook on `o_proj`, decode-only / generated-tokens only, per-layer
+     head_dim for Gemma-4).
+  - **Result:** 4 components faithful (`manifold-fit`, `proximity-threshold`,
+    `steering-correction`, `capture-hook`). 1 confirmed **minor** deviation,
+    0 blockers, 0 majors. The baselines component was rated faithful (its
+    reviewer raised no surviving issue after the refute pass).
+  - **The 1 confirmed minor finding (dead/unreachable code, no number
+    produced):** the `mags-u` branch at `mags/run.py:376-387` is byte-identical
+    to the `mags` arm (loads ONE `ManifoldBank`, builds ONE
+    `MAGSController`). It does not (a) load two per-objective manifolds
+    (validity + affinity), (b) run per-objective top-K head selection, (c)
+    form the union of head sets, or (d) implement the SPEC §4.12 collision
+    rule (each physical head steered once; higher held-out AUROC owns it). The
+    paper (tex:L378-379, L550) specifies MAGS-u extracts a dedicated manifold
+    per objective and steers the union. **Why this is minor, not major:** the
+    `mags-u` arm is scheduled ONLY on `SMILES-molecular-generation`
+    (`arms.json` last key), and that benchmark unconditionally `_blocked()`s
+    at `run.py:250-255` because the molecular task's target protein, prompt
+    template, SMILES contrastive corpus, affinity cutoff, and AutoDock-GPU
+    params are **all UNSTATED by the paper** (SPEC §4.18) — the controller-
+    construction block at line 376 is never reached. It is explicitly
+    documented as dead code (`run.py:377-383`). Unreachability is a mitigation,
+    not correctness; fixing MAGS-u properly requires the unstated molecular
+    setup, which the paper never provides, so no code change is warranted
+    this round. The single-objective MAGS path that DOES produce numbers is
+    faithful: mean-aggregation head selection at `manifold.py:326,345-347`,
+    problem-level 70/15/15 split at `fit.py:133-140` with `_split_heads`
+    keeping all traces of one problem in one split (`manifold.py:356-369`),
+    anti-bias 0.5 guard on an empty held-out split (`manifold.py:318-328`),
+    max-aggregation used ONLY for the §3.4 diagnostic (`manifold.py:340`).
+- **Decision on the gate sentinel (preserved, not changed):** the honest
+  terminal value for an arm that did not run remains the literal string
+  `BLOCKED` (non-numeric). Evidence that non-numeric is the correct
+  "didn't-run" signal and NOT a defect to fix: the only confirmed-passing
+  sibling (`explaining-and-harnessing-adversarial-examples`, on `origin/main`)
+  emits numeric `FINAL <arm>=<float>`; the sibling that emits the non-numeric
+  string `"NR"` for not-reached arms (`block-lewis-gdr`) is **not** on main
+  (not published) — i.e. a non-numeric sentinel correctly fails a numbers
+  gate, which is the truthful report of an environment block. Switching to a
+  numeric sentinel (`nan`) would make the gate believe every arm RAN but got
+  wrong numbers — a *worse* misrepresentation than "didn't run", since the
+  truth is no arm ran (no GPU / no gated/cached 8B-4B-20B weights). Per the
+  task's strongest warning ("a closed-book run silently fell back to a
+  synthetic corpus and produced seven arms at chance level … which passed
+  every gate and meant nothing"), I do not fabricate a number or substitute a
+  non-paper model to satisfy the gate. The `publish` step reports
+  `rung=environment` for this block.
+- **Re-verified this round:**
+  - `pytest tests/ -q` → **52 passed** (degeneracy, Eq.2-10 + Prop.1 invariants,
+    grading, Gemma-4 adapter, round-20 prefill-leak fix).
+  - `sh smoke.sh` → `FINAL smoke=0.0000` (synthetic distilgpt2 fixture; path
+    runs, not evidence about the paper).
+  - `sh run_all_arms.sh` → exactly 45 distinct `FINAL <arm>=BLOCKED` lines,
+    exit 0.
+  - `sh run_arm.sh <…>` from a foreign CWD (`/tmp`) → `FINAL <arm>=BLOCKED`,
+    exit 0 (the per-arm form the gate invokes).
+- **Environment block (re-confirmed, freshly measured):** no GPU
+  (`torch.cuda.is_available()==False`, no `nvidia-smi`, `torch 2.7.1+cpu`);
+  no HF token; HF cache holds the datasets + `distilgpt2`/`tiny-gpt2` +
+  `google/gemma-4-E4B-it` **config-only** (no weight files for any paper
+  model); 63 GB RAM, 927 GB disk. The paper's 8B/4B/20B models require GPU
+  (RTX 4090 / H200, Appendix C.1); full-config CPU eval is infeasible. No
+  code change this round — the method core is faithful; the block is
+  environmental.
+
 ### 2026-07-30 — Round 24: fresh env re-probe corrects a stale block claim; block re-confirmed; plumbing re-verified (45/45 FINAL, 52 tests, smoke green)
 
 - **Gate feedback (unchanged since round 1):** all 45 arms reported
