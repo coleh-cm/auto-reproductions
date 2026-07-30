@@ -625,3 +625,23 @@ these artifacts launched but returned 0 reviewers (all subagents stalled);
 the verification was done inline instead — every instrument/mutation/constructed-
 truth node was confirmed to exist, and every mutation was confirmed to break
 its test and pass on clean code.
+
+**Gate-crash fix (measured.json scalar contract).** The numbers gate formats
+every metric value as a scalar; a list value aborted it with
+`TypeError: unsupported format string passed to list.__format__`. The only
+list-valued metric was `m5_maxout1600_advtrain.per_seed_test_errors`, whose
+`arms.adversarial.per_seed[*].test_error` pointer indexed a per-seed result
+file whose `per_seed` array holds exactly one element (the seed that run
+trained under), yielding `[x]`. `make_measured.py::_metrics_for_arm` now
+collapses a one-element `[*]` list to its scalar (this seed's test error, so
+the gate's cross-seed gather is the flat `[x0,x1,x2]` that `mean`/`max`/`min`
+in c12/c13 reduce as the paper's five-run spread intends); a multi-element
+`[*]` list is BLOCKED rather than silently flattened. `measured.json` was
+reassembled from the committed per-seed result files (`--assemble-only`); it
+now contains zero list values (guarded by
+`tests/test_measured_resolver.py::test_measured_json_has_no_list_values`).
+Test count rose 72 -> 76. The crash had been masking the honest c13 verdict:
+at sub-scale (240 units / 3 seeds) the per-seed spread is ~0.0010, above the
+paper's 0.0006 (tex:506-512, measured at 1600 units / 5 seeds), so c13 does
+not reproduce at sub-scale — a verdict the gate can now render instead of
+aborting.

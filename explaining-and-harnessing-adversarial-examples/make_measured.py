@@ -160,14 +160,38 @@ def _run_one(cmd_template: str, seed: int, out_file: Path, env: dict) -> tuple[b
 
 
 def _metrics_for_arm(blob: dict, metrics: dict[str, str]) -> dict[str, object]:
-    """Resolve every metric pointer for one arm from one result blob."""
+    """Resolve every metric pointer for one arm from one result blob.
+
+    A metric value stored in ``measured.json`` must be a scalar the gate can
+    format (``f"{v:.4f}"``) and aggregate across seeds; a list value crashes the
+    gate's evaluator with ``unsupported format string passed to list.__format__``.
+    The one pointer that uses ``[*]`` — ``arms.adversarial.per_seed[*].test_error``
+    (metric ``per_seed_test_errors``) — indexes a per-seed result file, where the
+    ``per_seed`` array contains exactly ONE element (the seed this run trained
+    under). So the ``[*]`` resolution yields a one-element list ``[x]``. We
+    collapse it to the scalar ``x``: that scalar is THIS seed's test error, and
+    when the gate gathers the metric across seeds it gets a flat list of scalars
+    (``[x0, x1, x2]``), which ``mean(...)`` / ``max(...)`` / ``min(...)`` in
+    claims c12/c13 operate on as the paper intends (the spread across the
+    per-seed training runs). A multi-element list would be a genuine ambiguity
+    we cannot resolve to one number, so it is left as BLOCKED rather than
+    silently flattened.
+    """
     out: dict[str, object] = {}
     for metric, pointer in metrics.items():
         _file, _, json_path = pointer.partition(":")
         try:
-            out[metric] = _resolve_pointer(blob, json_path)
+            val = _resolve_pointer(blob, json_path)
         except (KeyError, TypeError, IndexError):
             out[metric] = BLOCKED
+            continue
+        if isinstance(val, list):
+            if len(val) == 1:
+                out[metric] = val[0]
+            else:
+                out[metric] = BLOCKED
+        else:
+            out[metric] = val
     return out
 
 

@@ -613,6 +613,27 @@ headline M5 number (tex:506-512, mean 0.782%). **Fix:** `TrainResult` now expose
 bug cannot silently return. (Found by an adversarial review of `train.py`; the verifier confirmed
 it by reading the code.)
 
+### Finding: measured.json must hold scalars only (gate-crash fix)
+The numbers-gate evaluator formats every metric value in `measured.json` as a scalar
+(`f"{v:.4f}"`-style). A list value crashes it with
+`TypeError: unsupported format string passed to list.__format__`. The one pointer that resolved
+to a list was `arms.adversarial.per_seed[*].test_error` (metric `per_seed_test_errors` on
+`m5_maxout1600_advtrain`, claims c12/c13): `make_measured.py` runs each seed as a separate
+process writing its own result file, so each file's `per_seed` array holds exactly ONE element
+(the seed that run trained under) and `[*]` yielded a one-element list `[x]`. The gate's
+cross-seed gather then built `[[x0],[x1],[x2]]`, and any format of that list crashed before a
+verdict could be rendered. **Fix:** `_metrics_for_arm` collapses a one-element list from a `[*]`
+pointer to its scalar (THIS seed's test error, so the cross-seed gather becomes the flat
+`[x0,x1,x2]` that `mean`/`max`/`min` in c12/c13 operate on, as the paper's five-run spread
+intends); a multi-element `[*]` list is a genuine ambiguity and is BLOCKED rather than silently
+flattened. Regression tests `tests/test_measured_resolver.py` (single-element collapse,
+multi-element BLOCK, scalar passthrough, and `test_measured_json_has_no_list_values` asserting
+the shipped `measured.json` contains only scalars or `BLOCKED`) guard the property. The crash
+was masking the honest c13 verdict: at sub-scale (240 units / 3 seeds) the per-seed spread is
+~0.0010 > the paper's 0.0006 (tex:506-512, measured at 1600 units / 5 seeds), so c13 does NOT
+reproduce at sub-scale — an honest "blocked-by-scale" result the gate can now render instead of
+aborting.
+
 ---
 
 ## 10. claims.json — the numbers-gate contract
@@ -1312,8 +1333,11 @@ the measured numbers.
   eval_transfer, class_agreement, RBF confidence, rubbish sampling, fooling
   sign step, E6) plus the data-loader fingerprint
   (`tests/test_data_fingerprint.py`). A grader fed an EMPTY input must raise,
-  not return a vacuous 0.0 (`test_eval_clean_raises_on_empty`). The full
-  instrument registry with positive/negative tests is `instruments.json`.
+not return a vacuous 0.0 (`test_eval_clean_raises_on_empty`). The full
+instrument registry with positive/negative tests is `instruments.json`.
+The `measured.json` scalar contract (the gate formats every value as a scalar;
+a list value crashes the evaluator) is guarded by
+`tests/test_measured_resolver.py::test_measured_json_has_no_list_values`.
 
 Categories NOT applicable here (stated for honesty): there is no claim of a
 global *minimum* to brute-force (FGSM is a one-step attack, not an optimizer

@@ -111,21 +111,15 @@
   "m5_maxout1600_advtrain": {
     "0": {
       "mean_test_error": 0.014400005340576172,
-      "per_seed_test_errors": [
-        0.014400005340576172
-      ]
+      "per_seed_test_errors": 0.014400005340576172
     },
     "1": {
       "mean_test_error": 0.014999985694885254,
-      "per_seed_test_errors": [
-        0.014999985694885254
-      ]
+      "per_seed_test_errors": 0.014999985694885254
     },
     "2": {
       "mean_test_error": 0.0153999924659729,
-      "per_seed_test_errors": [
-        0.0153999924659729
-      ]
+      "per_seed_test_errors": 0.0153999924659729
     }
   },
   "m5_maxout1600_clean": {
