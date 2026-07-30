@@ -1,0 +1,22 @@
+# virtual environments
+.venv/
+venv/
+env/
+
+# python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# runtime data / outputs
+data/
+results/
+*.csv
+*.parquet
+
+# figures are regenerated from results JSON
+*.png

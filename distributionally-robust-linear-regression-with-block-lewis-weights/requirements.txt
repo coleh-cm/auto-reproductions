@@ -1,0 +1,71 @@
+# Reproduction environment for:
+# "Distributionally Robust Linear Regression With Block Lewis Weights"
+# (Manoj & Patel, 2026; arXiv 2607.00252)
+#
+# Python 3.13.  Every package is pinned to an exact version so the environment
+# rebuilds deterministically from this file alone (it is a full lock, not just
+# the direct deps).  Verified to import-resolve on linux/aarch64.
+#
+# Direct method dependencies (SPEC section 9):
+#   numpy      linear algebra core (group losses, leverage scores, Lewis weights)
+#   scipy      linear-system solves / sparse linear algebra
+#   cvxpy      reference robust optimum via epigraph QCQP (SPEC E4), IPM arm
+#   pandas     data handling for the ACS Income instance
+#   folktables ACS Income data access (paper experiments.tex:148)
+#   matplotlib figures (suboptimality vs iteration / wall-clock)
+# Plus pytest for the test gate.
+#
+# The conic solvers shipped with cvxpy (clarabel, scs, osqp, highs, qdldl) are
+# pinned as transitive deps so the reference optimum solve is reproducible
+# without any extra install step.
+
+# --- core numerics ---
+numpy==2.5.1
+scipy==1.18.0
+pandas==3.0.5
+
+# --- convex optimization (reference optimum + IPM arm) ---
+cvxpy==1.9.2
+clarabel==0.11.1
+scs==3.2.11
+osqp==1.1.3
+highspy==1.15.1
+qdldl==0.1.9.post1
+sparsediffpy==0.3.0
+jinja2==3.1.6
+markupsafe==3.0.3
+joblib==1.5.3
+setuptools==83.0.0
+
+# --- ACS Income real-world instance ---
+folktables==0.0.12
+scikit-learn==1.9.0
+requests==2.34.2
+certifi==2026.7.22
+charset-normalizer==3.4.9
+idna==3.18
+urllib3==2.7.0
+narwhals==2.24.0
+threadpoolctl==3.6.0
+
+# --- figures ---
+matplotlib==3.11.1
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.63.0
+kiwisolver==1.5.0
+pillow==12.3.0
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+six==1.17.0
+pygments==2.20.0
+packaging==26.2
+
+# --- testing ---
+pytest==9.1.1
+iniconfig==2.3.0
+pluggy==1.6.0
+
+# --- build/runtime support pulled in transitively ---
+cffi==2.1.0
+pycparser==3.0
