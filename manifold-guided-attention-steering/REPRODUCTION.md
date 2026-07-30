@@ -34,6 +34,67 @@
 
 ## Log
 
+### 2026-07-30 — Round 36: fresh re-verification re-confirms the no-GPU block; plumbing proven from a neutral CWD; no code change warranted
+
+The gate feedback for this round is again `arms missing a FINAL line: [all 45]`,
+`values: []`, `spread across arms: None`. This is the expected, honest
+manifestation of a no-GPU blocked reproduction: every arm's command emits
+exactly one `FINAL <arm>=BLOCKED` line on stdout, and the numbers gate collects
+zero *numeric* values because `float("BLOCKED")` raises — so it reports each arm
+as "missing a FINAL [numeric] line". Re-verified empirically this round rather
+than trusting prior rounds' prose:
+
+- **GPU block re-confirmed.** `nvidia-smi` absent; `torch.cuda.is_available()` is
+  `False`, `device_count()` 0 (CPU-only sandbox: 16 aarch64 cores, ~63 GB RAM,
+  no CUDA). The paper's models (Llama-3.1-8B-Instruct, Gemma-4-E4B-it,
+  GPT-OSS-20B) require GPU (RTX 4090 / H200, SPEC §C.1) and cannot run a
+  full-config eval (MATH-500 N=500×8, GSM8K N=1319×8, HumanEval N=164, MBPP
+  N=427, all with long CoT) on CPU within any gate wall-clock budget (est.
+  days-to-weeks per arm even for the 4B Gemma).
+
+- **Datasets ARE obtainable (the block is compute, not data).** `smoke.sh` ran
+  the full capture→fit→steer→grade path end-to-end on the **real, cached**
+  MATH-500 dataset (`HuggingFaceH4/MATH-500`) with distilgpt2 and produced a
+  genuine `FINAL smoke=0.0000` (distilgpt2 cannot solve MATH-500; the smoke
+  number is NOT paper evidence, by design — it only proves the code path
+  runs on real data). This rules out the "closed-book fell back to a synthetic
+  corpus" failure mode the task warns about: the eval data loaded is the real
+  paper dataset, not a synthetic fixture (synthetic is `smoke.sh`-only).
+
+- **Plumbing proven from a neutral CWD.** Ran one arm's `arms.json` command
+  verbatim from `/tmp/gatetest` (worst case: neither repo root nor its parent)
+  and from `/root/auto-reproductions` (parent): both print
+  `FINAL <arm>=BLOCKED`, exit 0, in <1 s. `bash run_all_arms.sh` (and `sh`
+  variant) emit 45/45 `FINAL <arm>=BLOCKED` in ~0.1 s (Tier-1 cache fast-path:
+  no torch, no network). The `run_arm.sh` wrapper + the `|| printf` fallback in
+  `arms.json` guarantee one FINAL line per arm from any CWD with any interpreter.
+
+- **Correctness evidence re-confirmed (the real evidence we CAN ship).**
+  `pytest tests/` → 61 passed. `tests/test_degeneracy.py` (5) asserts MAGS at
+  its no-op settings (α=0 and τ=+∞) is **token-identical** to the unsteered
+  baseline (`ids_base.tolist() == ids_mag.tolist()`) — the cheapest real
+  correctness evidence, shippable so a reader can verify without trusting us.
+  `tests/test_invariants.py` (15) checks every paper equation: Eq.2/3/4/5/6
+  (means, difference matrix, SVD basis, global centroid), Eq.7 (proximity =
+  ‖B(a−μ_c)‖²), Eq.9/10 (correction equality at α=1), Prop.1 (complement
+  preservation), Eq.8 (per-token-pooled threshold percentile), head selection
+  by held-out mean-AUROC on a 70/30 problem-level split. No fabrication, no
+  synthetic-result substitution.
+
+- **No code change warranted.** The implementation, tests, smoke, arms.json
+  (45 paper arms: unsteered / ITI / AS / CD / MAGS / MAGS^u × {MATH-500, GSM8K,
+  HumanEval, MBPP} × {Llama, Gemma} + molecular × GPT-OSS-20B), run_all_arms.sh,
+  and committed runs/ evidence are all in place and green. The sole blocker
+  (no GPU) is environmental and fundamental; the only honest FINAL value is the
+  non-numeric `BLOCKED` sentinel, which the gate's numeric parser rejects. No
+  plumbing change can produce a numeric value here without fabricating one,
+  which the task explicitly forbids ("Real data, or no numbers"; a synthetic
+  substitution that "passed every gate and meant nothing" is the named
+  anti-pattern). Highest rung reached: **correctness/review** (implementation
+  complete + faithful + 61 tests green); **numbers** unreached (blocked on
+  GPU). `publish_reproduction` NOT called here — only the workflow's `publish`
+  step is entitled to. Branch pushed for survivability.
+
 ### 2026-07-30 — Round 35: definitive committed evidence that the recurring 'all arms missing a FINAL line / values: []' gate feedback is numeric rejection of the honest BLOCKED signal, NOT a plumbing bug
 
 The gate feedback has been identical for rounds 19-34: all 45 arms report
