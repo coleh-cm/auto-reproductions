@@ -135,10 +135,43 @@ budget. Recorded here rather than silently forcing "not_reached".
 
 ### IPM discrepancy (ACS)
 The paper reports IPM at 8 iterations to 1% (`paper/experiments.tex:180`); this reproduction's
-centring-based log-barrier IPM reaches 1% in 22 iterations (base=init) / 19 (base=opt). The IPM
-does converge rapidly and to the best final loss (≈OPT, matching the qualitative claim), but the
-exact 8 is not reproduced — the barrier schedule is unspecified (SPEC §6 item 10) and 8 ≈ √m
-suggests a short-step schedule with a tighter constant than our reconstructed one.
+centring-based log-barrier IPM reaches 1% in 16 iterations (base=init). The IPM does converge
+rapidly and to the best final loss (≈OPT, matching the qualitative claim), but the exact 8 is not
+reproduced — the barrier schedule is unspecified (SPEC §6 item 10) and 8 ≈ √m suggests a short-step
+schedule with a tighter constant than our reconstructed one.
+
+### 2026-07-30 — ADVERSARIAL REVIEW (this commit)
+Ran a 5-component adversarial review (orchestrate, 5 parallel reviewers each hunting for
+correctness failures with file:line evidence against the paper LaTeX). Outcome:
+
+**4 valid findings, all fixed:**
+1. *Trust-region ball not enforced* (solvers.py) — the inner solver only capped each Newton
+   step's M-norm, so over 30 inner steps the iterate drifted outside `||x-q||_M ≤ r`. Fixed:
+   `project_to_ball` now hard-projects every iterate onto the M-ellipsoid ball, so the
+   subproblem actually solved is SPEC E9 `min_{||x-q||_M≤r} f~(x)`. (With a non-binding radius
+   both ball oracles still reach 1% in 1 outer iteration; with a binding small radius they take
+   more, correctly.)
+2. *IPM counted non-Newton iterations* (solvers.py) — tau-growth/centring/restore branches
+   appended the same x and counted as iterations, inflating the count vs the paper's "one
+   iteration = one outer Newton step" (`paper/experiments.tex:100`). Fixed: only accepted
+   Newton steps advance the curve. (IPM 22 → 16 honest Newton steps to 1%.)
+3. *Lewis init constant* (lewis.py) — used `rank(Â)/m`; SPEC/paper use `(d+1)/m` (the column
+   count of Â). Fixed to `n_cols/m`. (Production weights were already a valid overestimate; the
+   reviewer re-verified E13 holds across 12000 trials.)
+4. *E13 self-test constant* (tests) — used `sqrt(2(d+1))`; paper uses `sqrt(2(rank(A)+1))`.
+   Fixed to `rank(A)+1` (coincides under the paper's wlog `rank(A)=d`, robust to rank-deficiency).
+
+**4 false findings — the reviewers inspected `/workspace/gdr/`, a separate partial checkout
+(only 4 files, no harness/data_acs/paper), not this repo.** Verified against the actual code:
+- "1/sqrt(n_i) folding never applied" — FALSE: `gdr/objectives.py:102-106` folds
+  (`self.A = problem.A * (1/sqrt(n_i))`; `_inner` uses the folded `_Folded.residuals`).
+- "E8 test compares against raw norm" — FALSE: `tests/test_invariants.py:59` uses
+  `sqrt(p.worst_loss(x)) = sqrt(F)`.
+- "harness.py / data_acs.py missing, paper/ empty" — FALSE: all present in this repo
+  (the reviewers' `/workspace` had only data_synth/lewis/metrics/objectives + an empty paper/).
+
+**Numbers after the fixes (ACS, real data):** ball_oracle_euclidean=1, ball_oracle_lewis=1
+(both reproduce the flagship), ipm=16, smoothed_heavy_ball=41, subgradient=58.
 
 ### 2026-07-30 — GATE FIX: drop `_meta` from arms.json (this commit)
 The gate iterates over every key of `arms.json` and requires each to be a runnable arm that prints

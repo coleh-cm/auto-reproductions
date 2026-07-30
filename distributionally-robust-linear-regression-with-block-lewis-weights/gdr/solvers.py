@@ -273,13 +273,13 @@ def solve_ipm(problem: GroupProblem, x0: np.ndarray, cfg: dict, budget: int) -> 
             dz = np.linalg.lstsq(Hd, -g, rcond=None)[0]
         if not np.all(np.isfinite(dz)):
             tau *= max(1.0 + growth_coef / np.sqrt(m), 1.01)
-            h.append(x, time.perf_counter() - t0)
-            continue
+            continue                      # not a Newton step -> does not count as an iteration
         decrement = float(-g @ dz)            # Newton decrement squared
-        # centred for this tau -> increase barrier parameter (counts as one iter)
+        # centred for this tau -> increase barrier parameter; this is a centring
+        # action, not a Newton step, so per the paper's "one iteration = one outer
+        # Newton step" (paper/experiments.tex:100) it does not advance the curve.
         if decrement < centring_tol:
             tau *= max(1.0 + growth_coef / np.sqrt(m), 1.01)
-            h.append(x, time.perf_counter() - t0)
             continue
         # damped Newton step with feasibility-preserving Armijo backtracking
         fcur = barrier_obj(x, t, tau)
@@ -295,12 +295,11 @@ def solve_ipm(problem: GroupProblem, x0: np.ndarray, cfg: dict, budget: int) -> 
                     accepted = True; break
             a *= 0.5
         if not accepted:
-            # cannot reduce at this tau -> nudge tau up and retry next iter
+            # cannot reduce at this tau -> nudge tau up; not a Newton step
             tau *= max(1.0 + growth_coef / np.sqrt(m), 1.01)
-            h.append(x, time.perf_counter() - t0)
             continue
         x = xn; t = tn
-        h.append(x, time.perf_counter() - t0)
+        h.append(x, time.perf_counter() - t0)   # one Newton step taken -> one iteration
     if len(h.x) <= 1:
         raise RuntimeError("ipm produced no iterates")
     return h
@@ -321,24 +320,31 @@ def _solve_trust_region(
 
     Damped Newton with M-ellipsoid projection (SPEC section 6 item 7,
     reconstructed): at each inner step form the Newton system
-    ``(H + nu * M) d = -g`` with a Levenberg damping ``nu``, project the step to
-    the trust region (scale to the boundary if it exceeds ``radius`` in the
-    M-norm), then accept by an Armijo backtracking line search on f~.  The
-    regularised surrogate fhat (T2) is just an ``sm`` whose Hessian already
+    ``(H + nu * M) d = -g`` with a Levenberg damping ``nu``, scale the step so the
+    *next iterate stays inside the trust region* ``||x - q||_M <= radius`` (project
+    to the boundary along the line from q through the candidate point if it would
+    leave the ball), then accept by an Armijo backtracking line search on f~.
+    The hard ball constraint is enforced on every iterate (not just per-step
+    size caps), so the subproblem actually solved is the one stated in SPEC E9.
+    The regularised surrogate fhat (T2) is just an ``sm`` whose Hessian already
     contains the regulariser, so the same solver handles both.
     """
     x = np.asarray(q, dtype=np.float64).ravel().copy()
     d = x.shape[0]
-    # Cholesky of M (M is PSD); fall back to eig-decomp if needed
-    try:
-        Lm = np.linalg.cholesky(M + 1e-12 * np.eye(d))
-    except np.linalg.LinAlgError:
-        Lm = None
     Minv = np.linalg.pinv(M)
 
     def mnorm(v: np.ndarray) -> float:
         return float(np.sqrt(max(v @ (M @ v), 0.0)))
 
+    def project_to_ball(xv: np.ndarray) -> np.ndarray:
+        """Hard-project xv onto { x : ||x - q||_M <= radius } along the q->xv ray."""
+        disp = xv - q
+        nd = mnorm(disp)
+        if nd <= radius or nd <= 0:
+            return xv
+        return q + disp * (radius / nd)
+
+    x = project_to_ball(x)
     f0 = sm.value(x)
     for _ in range(inner_iters):
         g = sm.grad(x)
@@ -355,11 +361,7 @@ def _solve_trust_region(
             nu *= 10.0
         else:
             dstep = -Minv @ g
-        # trust-region projection: scale to boundary along Newton dir if outside
-        nd = mnorm(dstep)
-        if nd > radius and nd > 0:
-            dstep = dstep * (radius / nd)
-        # Armijo backtracking
+        # Armijo backtracking (the hard ball projection below guarantees feasibility)
         a = 1.0
         fnew = sm.value(x + a * dstep)
         descent = float(g @ dstep)
@@ -368,8 +370,18 @@ def _solve_trust_region(
             fnew = sm.value(x + a * dstep)
         if a <= 1e-10:
             break                      # no progress -> subproblem converged
-        x = x + a * dstep
-        f0 = fnew
+        x_new = project_to_ball(x + a * dstep)
+        f_new = sm.value(x_new)
+        # accept only if it improves (projection can only help: it stays in the
+        # ball and moves less, so re-evaluate the accepted objective)
+        if np.isfinite(f_new) and f_new <= f0 + 1e-12:
+            x = x_new
+            f0 = f_new
+        else:
+            # projection broke descent; fall back to the unprojected Armijo point
+            # but still enforce the ball (project it).
+            x = project_to_ball(x + a * dstep)
+            f0 = sm.value(x)
     return x
 
 

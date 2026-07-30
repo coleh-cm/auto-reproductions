@@ -77,6 +77,7 @@ def test_lewis_ellipsoid_sandwich():
     w = lewis.block_lewis_weights(p, p=None)
     Wdiag = lewis.expand_weights(w, p)
     rng = np.random.default_rng(8)
+    rank_A = int(np.linalg.matrix_rank(p.A))     # paper E13 uses rank(A), not d
     for _ in range(15):
         x = rng.standard_normal(p.d) * 2
         c = rng.standard_normal()
@@ -85,7 +86,7 @@ def test_lewis_ellipsoid_sandwich():
         Wr = Wdiag * r
         lower = g_inf
         mid = np.linalg.norm(Wr)
-        upper = np.sqrt(2 * (p.d + 1)) * g_inf
+        upper = np.sqrt(2 * (rank_A + 1)) * g_inf    # paper/body.tex:171 (tight constant)
         assert lower <= mid + 1e-9, (lower, mid)
         assert mid <= upper + 1e-9, (mid, upper)
 

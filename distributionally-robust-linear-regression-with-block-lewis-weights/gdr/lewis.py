@@ -98,16 +98,16 @@ def block_lewis_weights(
     w : np.ndarray, shape [m], >= 0.  By construction an overestimate whose sum is
         <= 2 rank(Ahat) (``paper/other_proofs.tex`` Lemma 5.6 / Theorem 3.4).
     """
-    # augmented matrix Ahat = [A | b]  (``paper/other_proofs.tex:53``)
     Ahat = problem.augmented()                       # [n, d+1]
     m = problem.m
-    rank = int(np.linalg.matrix_rank(Ahat))
     if n_iters is None:
         n_iters = max(1, int(np.ceil(2.0 * np.log(max(m, np.e)))))
     T = max(1, int(n_iters))
 
-    # w^(0) = ((rank(Ahat))/m) * 1_m   (their n = our rank(Ahat) <= d+1; mo25_main.tex:1814)
-    w = np.full(m, rank / float(m), dtype=np.float64)
+    # w^(0) = ((d+1)/m) * 1_m   (MO25 line 1814: their n is the COLUMN count of the
+    # algorithm input; for the augmented matrix Â=[A|b] that is d+1.  SPEC section 3.5.)
+    n_cols = Ahat.shape[1]                  # = problem.d + 1
+    w = np.full(m, n_cols / float(m), dtype=np.float64)
     acc = np.zeros(m, dtype=np.float64)
     slices = problem.slices
     for t in range(T):

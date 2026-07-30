@@ -110,8 +110,8 @@ REPORT_BUDGETS = {
     "smoothed_heavy_ball": 100,
     "smoothed_nesterov": 100,
     "ipm": 100,
-    "ball_oracle_euclidean": 5,
-    "ball_oracle_lewis": 5,
+    "ball_oracle_euclidean": 15,
+    "ball_oracle_lewis": 15,
 }
 
 
@@ -157,6 +157,7 @@ def run_arm(arm: str, problem: GroupProblem, x0: np.ndarray, opt: float,
         xstar, opt_v = solvers.reference_optimum(problem)
         return {"arm": arm, "opt": opt_v, "xstar": xstar.tolist()}
     budget = REPORT_BUDGETS.get(arm, budget)
+    tune_budget = TUNE_BUDGETS.get(arm, tune_budget)
     cfg, h = _tune_and_run(arm, problem, x0, budget, tune_budget)
     worst = h.worst_losses(problem)
     curve = metrics.gap_curve(worst, opt)
