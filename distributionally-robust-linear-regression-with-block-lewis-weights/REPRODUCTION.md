@@ -173,6 +173,12 @@ correctness failures with file:line evidence against the paper LaTeX). Outcome:
 **Numbers after the fixes (ACS, real data):** ball_oracle_euclidean=1, ball_oracle_lewis=1
 (both reproduce the flagship), ipm=16, smoothed_heavy_ball=41, subgradient=58.
 
+**Synthetic after the fixes (m=100, d=10, 5 adversarial, κ=9.7e4, OPT=9399, gap0=1280):**
+ball_oracle_lewis=4, ball_oracle_euclidean=6 (Lewis marginally faster ✓ "very slight benefit
+from Lewis geometry"); first-order methods stall at final_gap≈1277-1280 ✓; IPM final_gap=92.7
+(best, "converges rapidly, best final loss" ✓); ball oracles steadily decrease (1280→1.3/17.8) ✓.
+All qualitative claims from `paper/experiments.tex:107-109` reproduced.
+
 ### 2026-07-30 — GATE FIX: drop `_meta` from arms.json (this commit)
 The gate iterates over every key of `arms.json` and requires each to be a runnable arm that prints
 exactly one `FINAL <arm>=<value>` line. The previous `arms.json` carried a `_meta` object (paper
