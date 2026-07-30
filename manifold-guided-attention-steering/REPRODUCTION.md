@@ -2901,3 +2901,90 @@ CPU-infeasible at the paper's full config; molecular setup unstated by the paper
 §4.18). The two confirmed documentation findings (MathInstruct subset, ITI head pool) are
 real faithfulness gaps for a future GPU run and are now recorded honestly; the 70/30 split
 code fix is paper-faithful and kept. `publish_reproduction` not called here.
+
+## Round 34 — fresh empirical re-probe of the environment block (rules out a stale block)
+
+The gate feedback this round is identical to rounds 19–33: all 45 arms report
+`FINAL <arm>=BLOCKED` and the numbers gate collects `values: []`. Rather than
+re-assert the block from prior rounds, this round re-probed every required
+resource *empirically* (online, `HF_HUB_OFFLINE=0`) to confirm the block is still
+fundamental and not a stale assumption:
+
+- **Eval datasets — ALL obtainable** (not the blocker):
+  - `openai/gsm8k` (main, train) -> OK.
+  - `HuggingFaceH4/MATH-500` (test) -> OK (500 problems; `problem/solution/answer/subject/level/unique_id`).
+  - `google-research-datasets/mbpp` (train/test/validation/prompt) -> OK.
+  - `openai/openai_humaneval` (test) -> OK.
+- **Training / contrastive datasets — obtainable** (not the blocker):
+  - `TIGER-Lab/MathInstruct` (train) -> OK (MATH-500 & GSM8K manifold source, tex:L397).
+  - `codeparrot/apps` direct (script) -> FAIL (datasets>=3 dropped script support),
+    BUT `load_apps` already uses the auto-converted parquet branch
+    `hf://datasets/codeparrot/apps@refs/convert/parquet/all/train/0000.parquet`,
+    which loads 5000 rows with the expected `problem_id/question/solutions/
+    input_output/difficulty/starter_code` fields. So APPS (HumanEval & MBPP
+    manifold source, tex:L398) is in fact obtainable; the loader is correct.
+- **Models** (`HfApi.model_info`):
+  - `meta-llama/Llama-3.1-8B-Instruct` -> **gated=manual** (license approval +
+    HF token required); not downloadable in this unauthenticated sandbox.
+  - `google/gemma-4-E4B-it` -> **gated=False**, has `model.safetensors` (~16 GB);
+    downloadable in principle (prior rounds found unauthenticated download
+    rate-limited/stalled, but it is *not* access-gated).
+  - `openai/gpt-oss-20b` -> **gated=False** (~13.7 GB MXFP4); downloadable.
+- **Compute**: `torch.cuda.is_available()` -> **False**, 0 devices (no NVIDIA GPU;
+  `nvidia-smi` absent). 63 GB RAM, CPU-only torch 2.7.1+cpu.
+
+**Conclusion (re-confirmed, not assumed):** the SOLE fundamental blocker is **no
+GPU**. Datasets are obtainable; Gemma-4-E4B-it and GPT-OSS-20b are not gated
+(downloadable); only Llama-3.1-8B-Instruct is access-gated. Even if a
+downloadable model were pre-cached here, `mags/run.py:_no_cuda()` (line 328)
+blocks before any model load — the paper's 8B/4B/20B models cannot do the
+paper-scale eval (MATH-500 N=500 ×8 samples, GSM8K N=1319 ×8, HumanEval N=164,
+MBPP N=427, all × long CoT) on CPU within any feasible wall-clock budget
+(estimated days-to-weeks for a single 4B arm). The molecular arm (Table 3) is
+additionally blocked on the paper's UNSTATED task parameters (target protein,
+prompt template, SMILES contrastive corpus, affinity cutoff, AutoDock-GPU
+config; SPEC §4.18) and needs ≥40 GB VRAM.
+
+**This is the honest `BLOCKED` outcome the task requires** ("Real data, or no
+numbers. If the paper's dataset cannot be obtained, that is a blocked result to
+report, not a cue to substitute synthetic data"). The datasets CAN be obtained,
+so this is a *compute* block (no GPU), not a *data* block. The gate's
+`values: []` is the correct, expected manifestation of a no-GPU blocked
+reproduction: every arm prints `FINAL <arm>=BLOCKED` (a literal string, never a
+fabricated number), and the numbers gate collects zero numeric values to
+compare against the paper's claimed Table 1/2/3 figures. Fabricating numbers
+would be the exact anti-pattern warned against (a closed-book run that "passed
+every gate and meant nothing"). No number is fabricated; BLOCKED is reported.
+
+**Plumbing re-verified this round (the `[]` is NOT a plumbing bug):**
+- `bash run_all_arms.sh` / `sh run_all_arms.sh` -> exactly 45 distinct
+  `FINAL <arm>=BLOCKED` lines (keys == arms.json keys; 0 missing, 0 extra),
+  exit 0, in <1 s.
+- Gate simulation: iterate every arms.json key, run its command as a subprocess
+  (shell=True) from a *parent* directory (the gate clones into a parent and
+  the arm command begins `cd manifold-guided-attention-steering 2>/dev/null ||
+  true;`) -> **45/45 produce a `FINAL <arm>=BLOCKED` line on stdout, 0 missing**,
+  each in <0.1 s. The leading `cd ... || true` and the trailing
+  `|| printf 'FINAL %s=BLOCKED\n'` fallback mean a FINAL line prints from any
+  CWD, with or without the venv, with or without python. So the gate *does*
+  receive 45 FINAL lines; it reports them "missing" only because `BLOCKED` is
+  non-numeric and the numbers gate has no value to parse -> `values: []`.
+- `smoke.sh` -> `FINAL smoke=0.0000` reliably (the round-33 `grep -a` fix removes
+  the binary-file flakiness where a NUL/control byte in the captured log made
+  `grep` print "Binary file … matches" instead of the FINAL line). Re-run 3×:
+  `FINAL smoke=0.0000` each time. Uses **real MATH-500** + distilgpt2, proving
+  the full MAGS path (capture → fit → steer → grade) runs end-to-end on real
+  data — not evidence about the paper, just evidence the path runs.
+- `pytest tests/` -> **61 passed** (degeneracy: MAGS no-op α=0 reproduces
+  unsteered EXACTLY; invariants: Proposition-1 information preservation,
+  projection idempotence, orthogonal-complement, 70/30 split regression, etc.).
+
+**No code change was warranted this round** — the round-33 state (paper-faithful
+70/30 split fix + `grep -a` robustness) is correct and already pushed, the
+block reasons are accurate, and the APPS loader already works via the parquet
+branch. The block is fundamental and honestly reported. This round's only
+artifact is the fresh empirical re-verification above, recorded so the block
+status is current evidence (not a carried-forward claim) for the publish step.
+
+`publish_reproduction` not called here (per the workflow: only the final
+`publish` step is entitled to). Branch pushed for survivability.
