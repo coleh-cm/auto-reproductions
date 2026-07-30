@@ -17,31 +17,46 @@ A :class:`gdr.types.GroupProblem` with
   codes** (no one-hot), standardized per-feature with a **population z-score**
   (mean 0, std 1) computed over the full filtered population *before* the
   per-region subsample (SPEC section 6 item 12 [reconstructed]),
-* target ``b = target_scale * z(log1p(PINCP))`` where ``z(.)`` is the population
-  z-score of ``log1p(PINCP)``.  We deliberately do **not** use
+* target ``b = target_scale * log1p(PINCP)`` (the RAW log-income target -- see
+  the empirical resolution below).  We deliberately do **not** use
   ``ACSIncome.target_transform`` (which binarizes income); the paper predicts
   *log personal income* (`paper/experiments.tex:148`).
 
 Target-scale resolution (SPEC section 6 item 12)
 ------------------------------------------------
 The paper reports ERM average MSE ``108.2``, worst ``138.1`` (California),
-spread ``sigma = 11.8`` (`paper/experiments.tex:189`).  These numbers are
-inconsistent with the *unscaled* standardized-log-income MSE (which is
-``~ 1 - R^2 ~ 0.6-0.7`` for this regression), so a scalar ``target_scale`` is
-applied to the standardized target.  Because every group loss is a squared
-residual, ``MSE(target_scale) = target_scale**2 * MSE(1)`` exactly (the ERM
-argmin scales linearly with the target).  We therefore compute the ERM average
-MSE once at ``target_scale = 1`` and, for each candidate in
+spread ``sigma = 11.8`` (`paper/experiments.tex:189`).  The SPEC/prompt
+anticipated that the raw log-income MSE would be ``~0.6-0.7`` and so would need
+a scalar ``target_scale`` (with the target population-z-scored) to reach ~108.
+
+Empirically, under the *frozen* no-intercept ``d=10`` contract, the RAW
+(unstandardized) ``log1p(PINCP)`` target already reproduces the paper's
+statistics almost exactly: the global mean of log-income (~10.6) cannot be fit
+by a no-intercept model on centered features, so the ERM MSE is dominated by
+that squared constant offset (~112) and the worst-hit groups are exactly the
+high-income states the paper names.  Standardizing the target instead removes
+that offset and makes *Puerto Rico* the worst group (ratio worst/avg 1.51 vs
+the paper's 1.276), which does not match.  We therefore do **not** standardize
+the target; ``target_scale`` is applied to the raw log-income target.
+
+Because every group loss is a squared residual, ``MSE(s) = s**2 * MSE(1)``
+exactly (the ERM argmin scales linearly with the target).  We compute the ERM
+average MSE once at ``target_scale = 1`` and, for each candidate in
 ``ACS_TARGET_SCALE_CANDIDATES`` (which includes {1, 10, 13, 100, ...}),
 evaluate ``scale**2 * base_avg`` and pick the value whose ERM average MSE is
 closest to ``108.2``.  The headline iteration metric (iterations to 1 %
-relative gap) is scale-invariant, so an imperfect match does not block the run;
-the chosen value and the achieved ERM avg/worst/std are recorded here and
-returned in the loader ``notes``.
+relative gap) is scale-invariant, so an imperfect match does not block the run.
 
-Empirical result on the 2018 1-Year ACS (this run, seed=0):
-    [populated by the self-test / first real run -- see ``make_acs`` notes
-     returned at call time and the ``__main__`` block output.]
+Empirical result on the 2018 1-Year ACS (this run, seed=0, per_group=200):
+    target_scale        = 1           (auto; raw log-income needs no scaling)
+    ERM avg MSE         = 104.9       (paper 108.2;  ~3% low -- subsample-seed
+                                       noise, paper's seed unreported)
+    ERM worst MSE       = 135.1       (paper 138.1; worst group = California)
+    ERM group-loss std  = 11.6        (paper 11.8)
+    worst-hit states    = CA, HI, FL, NJ, NY, NV  (paper: "California; New
+                                       York, Hawaii, Nevada, Florida, New
+                                       Jersey", `paper/experiments.tex:189`)
+    worst/avg ratio     = 1.29        (paper 138.1/108.2 = 1.276)
 
 All methods are warm-started at the ERM on ACS (`paper/experiments.tex:148`).
 """
@@ -50,7 +65,6 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any
 
 # When run as a script (`.venv/bin/python gdr/data_acs.py`) the repo root is not
 # on sys.path; insert it so the sibling `from gdr.types import ...` resolves.
@@ -301,14 +315,15 @@ def make_acs(
     Returns
     -------
     GroupProblem with A [n=per_group*51, d=10] standardized features, b the
-    scaled standardized-log-income target, group_id 0..50.
+    (optionally scaled) raw-log-income target, group_id 0..50.
 
     Notes
     -----
     The chosen ``target_scale`` and the achieved ERM avg/worst/std are attached
     to the returned object as ``problem.acs_meta`` (a dict) for the harness.
     Census data is downloaded by folktables on first use and cached under
-    ``cache_dir``.
+    ``cache_dir``.  See the module docstring for the empirical target-scale
+    resolution (raw log-income target, target_scale ~ 1).
     """
     rng = np.random.default_rng(seed)  # SPEC determinism contract
 
@@ -318,19 +333,39 @@ def make_acs(
 
     X_all, y_raw_all, group_id_all = _stack_population(frames)  # [N,10],[N],[N]
 
-    # Standardize features with the population z-score BEFORE subsample
-    # (SPEC section 6 item 12 [reconstructed]).
+    # Standardize FEATURES with the population z-score BEFORE subsample
+    # (SPEC section 6 item 12 [reconstructed]).  The GroupProblem contract is
+    # d=10 with NO intercept column, so the design matrix is the centered
+    # features alone.
     X_std, _feat_mean, _feat_std = _population_zscore(X_all)  # [N,10]
-    # Standardize the target (log1p PINCP) with the population z-score, then
-    # apply the scalar target_scale.  We do NOT use ACSIncome.target_transform
-    # (binarization); the paper predicts log personal income.
-    y_log = np.log1p(np.clip(y_raw_all, 0.0, None))  # [N], log1p(PINCP)
-    y_std, _t_mean, _t_std = _population_zscore(y_log[:, None])  # [N,1],[1],[1]
-    y_std = y_std[:, 0]  # [N]
+
+    # Target = log1p(PINCP) (the paper predicts *log personal income*,
+    # `paper/experiments.tex:148`).  We do NOT use ACSIncome.target_transform
+    # (which binarizes income).
+    #
+    # EMPIRICAL TARGET-STANDARDIZATION DECISION (SPEC section 6 item 12):
+    # The SPEC/prompt assumed the target would be population-z-scored and then
+    # rescaled by `target_scale` to lift the MSE from ~0.6-0.7 to ~108.  But
+    # under the *frozen* no-intercept d=10 contract, an UNSTANDARDIZED raw
+    # log-income target already reproduces the paper's reported statistics
+    # (`paper/experiments.tex:189`) almost exactly, because the global mean of
+    # log-income (~10.6) cannot be fit by a no-intercept model on centered
+    # features, so the ERM MSE is dominated by that constant offset (~112) and
+    # the worst-hit groups are the high-income states the paper names.  We
+    # verified empirically on the 2018 1-Year ACS:
+    #   * raw log-income, no-intercept  -> avg 104.9, worst 135.1 (California),
+    #     std 11.6; worst states {CA,HI,FL,NJ,NY,NV} -- matches the paper's
+    #     "California; New York, Hawaii, Nevada, Florida, New Jersey"
+    #     (`paper/experiments.tex:189`); target_scale ~ 1.
+    #   * standardized log-income      -> avg 0.51, worst 0.77 (Puerto Rico!),
+    #     std 0.088; does NOT match the paper (PR is worst, ratio 1.51 vs 1.276).
+    # We therefore do NOT standardize the target; `target_scale` is applied to
+    # the RAW log-income target and auto-selected to ~1.
+    y_target = np.log1p(np.clip(y_raw_all, 0.0, None))  # [N], raw log1p(PINCP)
 
     # Per-region subsample (deterministic via rng).
     Xs, ys, gids = _subsample_per_group(
-        X_std, y_std, group_id_all, per_group, rng
+        X_std, y_target, group_id_all, per_group, rng
     )  # [m*pg,10],[m*pg],[m*pg]
 
     # Build the problem at scale=1 to compute base ERM stats.

@@ -341,3 +341,28 @@ Synthetic-instance checks (qualitative, from `paper/experiments.tex:107-109`): s
 | ACS: robust-opt band 107–114, Max/Mean 1.28→1.02, CA −24.3 | — | `paper/experiments.tex:189` |
 | Synthetic: κ(stacked Gram) ≈ 1e5; d=10, m=100, 5 adversarial | — | `paper/experiments.tex:38` |
 | Synthetic qualitative: FO stall, ball oracles decrease, IPM fastest | — | `paper/experiments.tex:107-109` |
+
+## 11. Resolved open choices (what we picked)
+
+Each item from §6 that the implementation had to fix to a value, with the
+chosen value and where it lives in code. (See REPRODUCTION.md for the run
+outcomes and discrepancies.)
+
+| §6 item | choice | location |
+|---|---|---|
+| 1 synthetic recipe | shared-Q eigenbasis; 95 aligned normal groups (geometric eigen-spread, cond~50) + 5 adversarial (distinct sharp dir, L_big calibrated so κ(A^T A)≈1e5; measured 9.7e4); n_per_group=50 | `gdr/data_synth.py` |
+| 2 per-group n_i (synthetic) | 50 | `gdr/data_synth.py make_synth` |
+| 3 hyperparameter grids | wide geometric grids per arm (steps 1e-9..1e-2 subgradient, β 0.003..0.02 smoothed, β 0.005/0.02 ball); lowest-worst-loss config selected | `gdr/harness.py GRIDS` |
+| 4 1%-reference | base="init" (gap/gap0) for the FINAL line; base="opt" recorded in results JSON | `gdr/harness.py`/`gdr/metrics.py` |
+| 5 warm start (synthetic) | ERM | `gdr/harness.py` (x0=problem.erm()) |
+| 6 CVXPY solver | default (CLARABEL fallback to SCS/ECOS) | `gdr/solvers.reference_optimum` |
+| 7 trust-region internals | Levenberg damping (H+νM)d=-g, M-ellipsoid boundary projection, Armijo backtracking on f~ | `gdr/solvers._solve_trust_region` |
+| 8 fhat regulariser | exposed via reg_on (default off in tuned run); coef β/(1000·min{rank,m}) (Algorithm-1 form) when on | `gdr/solvers.solve_ball_oracle` |
+| 9 Lewis constants | n_iters=ceil(2 ln m), exact leverage solves, p=∞ | `gdr/lewis.block_lewis_weights` |
+| 10 IPM internals | centring-based log-barrier; Newton decrement<0.5 ⇒ τ←τ(1+growth/√m); barrier0,growth tuned | `gdr/solvers.solve_ipm` |
+| 11 ERM definition | group-averaged (E3) | `gdr/types.GroupProblem.erm` |
+| 12 ACS target scale | auto-selected so ERM avg MSE≈108.2 (achieved 104.9 with target_scale=1.0); iteration metric scale-invariant | `gdr/data_acs.py` |
+| 13 seeds | seed=0 for ACS subsample, seed=0 for synthetic; recorded in run config | `gdr/data_*.py` |
+| 16 ball-oracle radii constant | radius0 grid {50, 500}; does not bind (inner Newton converges) | `gdr/harness.py GRIDS` |
+| 17 empirical (β,δ) | decoupled from theory; β∈{0.005,0.02} ball, β∈{0.003..0.01} smoothed, δ=0.01 | `gdr/harness.py GRIDS` |
+| 18 argmax ties | lowest index | `gdr/solvers.solve_subgradient` |

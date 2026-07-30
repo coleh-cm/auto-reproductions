@@ -37,38 +37,54 @@ __all__ = ["main"]
 GRIDS = {
     "subgradient": [
         {"step": st, "schedule": sch}
-        for st in (1e-6, 1e-5, 1e-4, 1e-3) for sch in ("fixed", "inv_sqrt")
+        # wide range: the synthetic instance has loss scale ~1e4 and ACS ~1e2,
+        # so the effective step differs by orders of magnitude (SPEC section 6
+        # item 3 -- the paper's grid is unstated).  Small steps avoid divergence
+        # on the large-scale synthetic; large steps make progress on ACS.
+        for st in (1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2)
+        for sch in ("fixed", "inv_sqrt")
     ],
     "smoothed_gd": [
-        {"method": "gd", "beta": b, "delta": dl, "step": st}
-        for b in (0.5, 1.0, 5.0) for dl in (0.5, 1.0) for st in (1e-4, 1e-3, 1e-2)
+        {"method": "gd", "beta": b, "delta": 0.01, "step": st}
+        for b in (0.005, 0.01, 0.02) for st in (0.01, 0.05, 0.1, 0.2)
     ],
     "smoothed_heavy_ball": [
-        {"method": "heavy_ball", "beta": b, "delta": dl, "step": st, "momentum": mu}
-        for b in (0.5, 1.0, 5.0) for dl in (0.5, 1.0)
-        for st in (1e-4, 1e-3, 1e-2) for mu in (0.3, 0.5, 0.7, 0.9)
+        {"method": "heavy_ball", "beta": b, "delta": 0.01, "step": st, "momentum": mu}
+        for b in (0.003, 0.005, 0.007, 0.01)
+        for st in (0.05, 0.08, 0.12, 0.2) for mu in (0.85, 0.9, 0.93)
     ],
     "smoothed_nesterov": [
-        {"method": "nesterov", "beta": b, "delta": dl, "step": st}
-        for b in (0.5, 1.0, 5.0) for dl in (0.5, 1.0) for st in (1e-4, 1e-3, 1e-2)
+        {"method": "nesterov", "beta": b, "delta": 0.01, "step": st}
+        for b in (0.005, 0.01, 0.02) for st in (0.01, 0.05, 0.1, 0.2)
     ],
     "ipm": [
-        {"barrier0": b0, "growth": gr, "damping": 1e-6}
-        for b0 in (1.0, 10.0) for gr in (5.0, 10.0, 20.0)
+        {"barrier0": b0, "growth": gr, "damping": 1e-8}
+        for b0 in (1.0, 2.0, 5.0, 10.0) for gr in (1.0, 2.0, 5.0)
     ],
     "ball_oracle_euclidean": [
-        {"geometry": "naive", "radius0": r, "decay": 1.0, "beta": b, "delta": dl,
-         "reg_on": reg, "inner_iters": 50}
-        for r in (1.0, 5.0, 50.0, 1e3) for b in (0.05, 0.2, 1.0)
-        for dl in (0.05, 0.2) for reg in (False, True)
+        {"geometry": "naive", "radius0": r, "decay": 1.0, "beta": b, "delta": 0.01,
+         "reg_on": False, "inner_iters": 30}
+        for r in (50.0, 500.0) for b in (0.005, 0.02)
     ],
     "ball_oracle_lewis": [
         {"geometry": "lewis", "lewis_p": None, "lewis_iters": None,
-         "radius0": r, "decay": 1.0, "beta": b, "delta": dl,
-         "reg_on": reg, "inner_iters": 50}
-        for r in (1.0, 5.0, 50.0, 1e3) for b in (0.05, 0.2, 1.0)
-        for dl in (0.05, 0.2) for reg in (False, True)
+         "radius0": r, "decay": 1.0, "beta": b, "delta": 0.01,
+         "reg_on": False, "inner_iters": 30}
+        for r in (50.0, 500.0) for b in (0.005, 0.02)
     ],
+}
+
+# Per-arm tune budget (outer iterations used during grid search).  Ball-oracle
+# converges in one outer iteration (inner Newton converges), so a tiny tune
+# budget identifies the best config; first-order methods need the full budget.
+TUNE_BUDGETS = {
+    "subgradient": 100,
+    "smoothed_gd": 100,
+    "smoothed_heavy_ball": 100,
+    "smoothed_nesterov": 100,
+    "ipm": 30,
+    "ball_oracle_euclidean": 3,
+    "ball_oracle_lewis": 3,
 }
 
 ARM_SOLVER = {
@@ -84,22 +100,38 @@ ARM_SOLVER = {
 BUDGET = 100          # outer-iteration budget for the reported curve
 TUNE_BUDGET = 80      # budget used during the grid search
 
+# Per-arm reported budget (the paper's budget is unstated, SPEC section 6 item 5).
+# Ball-oracle converges in one outer iteration (the inner Newton solves the
+# smoothed surrogate), so a tiny budget both reproduces the "1 iteration" claim
+# and avoids 100x80 wasted Newton steps; first-order methods need the full budget.
+REPORT_BUDGETS = {
+    "subgradient": 100,
+    "smoothed_gd": 100,
+    "smoothed_heavy_ball": 100,
+    "smoothed_nesterov": 100,
+    "ipm": 100,
+    "ball_oracle_euclidean": 5,
+    "ball_oracle_lewis": 5,
+}
+
 
 def _build_instance(name: str) -> GroupProblem:
     if name == "synthetic":
-        from .data_synth import make_synthetic
-        return make_synthetic()
+        from .data_synth import make_synth
+        return make_synth()                 # m=100, d=10, 5 adversarial, cond~1e5
     if name == "acs":
         from .data_acs import make_acs
-        return make_acs()
+        return make_acs()                    # m=51, d=10, 200/region
     raise ValueError(f"unknown instance {name!r}")
 
 
 def _tune_and_run(arm: str, problem: GroupProblem, x0: np.ndarray, budget: int,
-                  tune_budget: int) -> tuple[dict, solvers.History]:
+                  tune_budget: int | None = None) -> tuple[dict, solvers.History]:
     """Grid-search the arm, return (best_cfg, history at the reported budget)."""
     grids = GRIDS[arm]
     solver = ARM_SOLVER[arm]
+    if tune_budget is None:
+        tune_budget = TUNE_BUDGETS.get(arm, budget)
     best = None
     for cfg in grids:
         try:
@@ -124,6 +156,7 @@ def run_arm(arm: str, problem: GroupProblem, x0: np.ndarray, opt: float,
     if arm == "reference_cvxpy":
         xstar, opt_v = solvers.reference_optimum(problem)
         return {"arm": arm, "opt": opt_v, "xstar": xstar.tolist()}
+    budget = REPORT_BUDGETS.get(arm, budget)
     cfg, h = _tune_and_run(arm, problem, x0, budget, tune_budget)
     worst = h.worst_losses(problem)
     curve = metrics.gap_curve(worst, opt)
@@ -174,12 +207,16 @@ def main(argv=None) -> int:
     os.makedirs(args.out, exist_ok=True)
 
     if args.command == "smoke":
-        # tiny synthetic, one ball-oracle arm, one FINAL line -- proves the path
-        # runs; NOT evidence about the paper (never report its number as a result).
-        from .data_synth import make_synthetic
-        cfg = {**__import__("gdr.data_synth", fromlist=["SYNTH_CONFIG"]).SYNTH_CONFIG,
-               "m": 6, "d": 3, "n_adversarial": 1, "n_per_group": 6}
-        problem = make_synthetic(cfg)
+        # tiny self-contained problem (no data-module dependency), one ball-oracle
+        # arm, one FINAL line.  Proves the path runs end to end (smoothed
+        # surrogate -> Lewis weights -> trust-region Newton -> gap metric).  Its
+        # number is NOT evidence about the paper -- never report it as a result.
+        rng = np.random.default_rng(0)
+        m, d, ni = 6, 3, 6
+        A = rng.standard_normal((m * ni, d))
+        b = rng.standard_normal(m * ni)
+        gid = np.repeat(np.arange(m, dtype=np.int32), ni)
+        problem = GroupProblem(A, b, gid)
         x0 = problem.erm()
         xstar, opt = solvers.reference_optimum(problem)
         h = solvers.solve_ball_oracle(

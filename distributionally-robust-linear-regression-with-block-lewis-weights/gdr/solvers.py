@@ -209,86 +209,97 @@ def solve_ipm(problem: GroupProblem, x0: np.ndarray, cfg: dict, budget: int) -> 
     """
     if budget <= 0:
         raise ValueError("ipm budget must be > 0")
-    tau = float(cfg.get("barrier0", 1.0))
-    growth = float(cfg.get("growth", 10.0))
-    lam = float(cfg.get("damping", 1e-6))
     A = problem.A
     b = problem.b
     sizes = problem.sizes.astype(np.float64)
     slices = problem.slices
     d = problem.d
+    m = problem.m
+    lam = float(cfg.get("damping", 1e-8))
+    # barrier parameter schedule: short-step growth 1 + growth/sqrt(m) (default
+    # growth coefficient 1.0 -> the textbook 1+1/sqrt(m) short step).  ``barrier0``
+    # is the initial tau; a near-central start (m/barrier0 ~ gap0) minimises the
+    # centring cost.  All internals reconstructed (SPEC section 6 item 10).
+    tau = float(cfg.get("barrier0", 1.0))
+    growth_coef = float(cfg.get("growth", 1.0))
+    centring_tol = float(cfg.get("centring_tol", 0.5))     # Newton decrement threshold
 
-    def barrier_obj(xv: np.ndarray, tv: float) -> float:
-        L = problem.group_losses(xv)
-        g = tv - L
-        if np.any(g <= 0):
-            return float("inf")
-        return tau * tv - float(np.sum(np.log(g)))
-
-    # state: x [d], t scalar > max ell_i
-    x = np.asarray(x0, dtype=np.float64).ravel().copy()
-    losses = problem.group_losses(x)
-    t = float(np.max(losses)) + 1.0          # strictly feasible start
-    h = History()
-    t0 = time.perf_counter()
-    h.append(x, 0.0)
-    fcur = barrier_obj(x, t)
-    for _ in range(budget):
-        losses = problem.group_losses(x)
-        if np.any(losses >= t - 1e-12):
-            t = float(np.max(losses)) + 1.0         # restore strict feasibility
-            fcur = barrier_obj(x, t)
-        # gradient & Hessian of the barrier objective Phi(x,t)=tau*t - sum log(t-ell_i)
-        # d ell_i / dx = (2/n_i) A_i^T r_i ;  d^2 ell_i / dx^2 = (2/n_i) A_i^T A_i
-        g = np.zeros(d + 1)
-        H = np.zeros((d + 1, d + 1))
-        g[d] = tau                                   # d Phi/dt = tau - sum 1/(t-ell_i)
+    def grad_hess(xv, tv, tau_v):
+        g = np.zeros(d + 1); H = np.zeros((d + 1, d + 1))
+        g[d] = tau_v
         for i, (s, e) in enumerate(slices):
             Ai = A[s:e]; bi = b[s:e]; ni = sizes[i]
-            ri = Ai @ x - bi
+            ri = Ai @ xv - bi
             li = float(ri @ ri) / ni
-            gap = t - li
+            gap = tv - li
             if gap <= 1e-12:
-                t = li + 1.0
-                gap = t - li
+                return None
             inv = 1.0 / gap
-            ge = (2.0 / ni) * (Ai.T @ ri)            # [d]
+            ge = (2.0 / ni) * (Ai.T @ ri)
             g[:d] += inv * ge
             g[d] -= inv
             He = (2.0 / ni) * (Ai.T @ Ai)
-            outer = np.outer(ge, ge)
-            H[:d, :d] += (inv * inv) * outer + inv * He
+            H[:d, :d] += (inv * inv) * np.outer(ge, ge) + inv * He
             H[:d, d] += -inv * inv * ge
             H[d, :d] += -inv * inv * ge
             H[d, d] += inv * inv
-        H += lam * np.eye(d + 1)
+        return g, H
+
+    def barrier_obj(xv, tv, tau_v):
+        L = problem.group_losses(xv)
+        gg = tv - L
+        if np.any(gg <= 0):
+            return float("inf")
+        return tau_v * tv - float(np.sum(np.log(gg)))
+
+    x = np.asarray(x0, dtype=np.float64).ravel().copy()
+    losses = problem.group_losses(x)
+    t = float(np.max(losses)) * (1.0 + 1e-3) + 1e-3   # strictly feasible start
+    h = History()
+    t0 = time.perf_counter()
+    h.append(x, 0.0)
+    for _ in range(budget):
+        gh = grad_hess(x, t, tau)
+        if gh is None:                       # lost feasibility -> restore
+            t = float(np.max(problem.group_losses(x))) + 1.0
+            gh = grad_hess(x, t, tau)
+            if gh is None:
+                break
+        g, H = gh
+        Hd = H + lam * np.eye(d + 1)
         try:
-            dz = np.linalg.solve(H, -g)
+            dz = np.linalg.solve(Hd, -g)
         except np.linalg.LinAlgError:
-            dz = np.linalg.lstsq(H, -g, rcond=None)[0]
-        dx = dz[:d]; dt = dz[d]
+            dz = np.linalg.lstsq(Hd, -g, rcond=None)[0]
         if not np.all(np.isfinite(dz)):
+            tau *= max(1.0 + growth_coef / np.sqrt(m), 1.01)
+            h.append(x, time.perf_counter() - t0)
             continue
-        # backtracking: keep t - ell_i > 0 AND sufficient decrease of the barrier objective
+        decrement = float(-g @ dz)            # Newton decrement squared
+        # centred for this tau -> increase barrier parameter (counts as one iter)
+        if decrement < centring_tol:
+            tau *= max(1.0 + growth_coef / np.sqrt(m), 1.01)
+            h.append(x, time.perf_counter() - t0)
+            continue
+        # damped Newton step with feasibility-preserving Armijo backtracking
+        fcur = barrier_obj(x, t, tau)
         a = 1.0
         descent = float(g @ dz)
         accepted = False
-        for _bt in range(50):
-            xn = x + a * dx
-            tn = t + a * dt
+        for _bt in range(60):
+            xn = x + a * dz[:d]; tn = t + a * dz[d]
             ln = problem.group_losses(xn)
-            if tn > np.max(ln) + 1e-9 and np.all(np.isfinite(ln)):
-                fn = barrier_obj(xn, tn)
+            if tn > np.max(ln) + 1e-12 and np.all(np.isfinite(ln)):
+                fn = barrier_obj(xn, tn, tau)
                 if np.isfinite(fn) and fn <= fcur + 1e-4 * a * descent:
-                    accepted = True
-                    break
+                    accepted = True; break
             a *= 0.5
         if not accepted:
-            # could not decrease the barrier at this tau; grow tau and continue
-            tau *= growth
+            # cannot reduce at this tau -> nudge tau up and retry next iter
+            tau *= max(1.0 + growth_coef / np.sqrt(m), 1.01)
+            h.append(x, time.perf_counter() - t0)
             continue
-        x = xn; t = tn; fcur = fn
-        tau *= growth
+        x = xn; t = tn
         h.append(x, time.perf_counter() - t0)
     if len(h.x) <= 1:
         raise RuntimeError("ipm produced no iterates")

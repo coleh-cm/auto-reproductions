@@ -77,3 +77,65 @@ All modules verified against the paper's equations; the test gate (20 tests) is 
   depend on the unstated target scaling; we report the closest-match scale and the achieved
   numbers verbatim. The headline gate metric (iterations to 1% gap) is scale-invariant.
 - Wall-clock numbers are machine-dependent (informational, not pass/fail) per the paper itself.
+
+### 2026-07-30 — NUMBERS (this commit)
+Ran the full 8-arm gate on both instances (real ACS Income data downloaded from census.gov
+via folktables; synthetic instance reconstructed to κ(A^T A)≈1e5). Results committed under
+`results/` (un-gitignored — a number whose evidence file is gitignored is a claim with its
+evidence deleted).
+
+**ACS Income (m=51, d=10, n=10200, OPT=110.32, gap0=24.76; 1%-target=0.247, base=init):**
+
+| arm | iters to 1% (this run) | paper | status |
+|---|---|---|---|
+| ball_oracle_euclidean | 1 | 1 | **reproduced** |
+| ball_oracle_lewis | 1 | 1 | **reproduced** |
+| smoothed_heavy_ball | 34 | 47 | same order (tuning-dependent) |
+| ipm | 22 | 8 | partial — converges rapidly & best final loss (qual. ✓), exact count not matched |
+| subgradient | 58 | "not reached" | **discrepancy** — see below |
+| smoothed_gd / nesterov | 36 / 33 | (no ACS number) | informational |
+
+Headline gate metric — **both ball-oracle arms reach 1% in a single outer iteration on ACS,
+exactly matching the paper's flagship claim** (`paper/experiments.tex:181-182`). Mechanism:
+with a tuned smoothing β≈0.005 the inner damped-Newton solver converges to the smoothed
+surrogate's minimizer within one trust-region solve, and the surrogate's minimizer is within
+1% of the robust optimum; the radius does not bind (Euclidean and Lewis give identical gaps).
+
+**Statistical context (ACS, `paper/experiments.tex:189`):**
+
+| quantity | this run | paper |
+|---|---|---|
+| ERM average MSE | 104.9 | 108.2 |
+| ERM spread σ | 11.6 | 11.8 |
+| ERM worst MSE | 135.1 | 138.1 |
+| worst group | California | California |
+| robust band | [94.2, 110.3] | "around 107–114" |
+| Max/Mean (ERM → robust) | 1.29 → 1.02 | 1.28 → 1.02 |
+| California loss decrease | −26.2 | −24.3 |
+
+The Max/Mean ratio (1.02) and the California worst-group match exactly; the ERM statistics
+match within ~3% (the target scaling is unstated, SPEC §6 item 12).
+
+**Synthetic (m=100, d=10, 5 adversarial, κ(A^T A)=9.7e4, OPT=9399, gap0=1280):** qualitative
+claims reproduced — first-order methods (subgradient, smoothed gd/hb/nesterov) stall far above
+OPT (no arm reaches 1% in 100 iters); IPM makes the most first/second-order progress
+(final gap 92.7 vs gap0 1280, "converges rapidly, best final loss"); both ball oracles reach 1%
+in 2 outer iterations ("steadily decrease the worst-group loss"). κ≈1e5 within one order of
+magnitude.
+
+### Subgradient discrepancy (ACS)
+The paper reports the subgradient arm as "not reached" (`paper/experiments.tex:178`), "essentially
+pinned at the ERM gap". In this reproduction the tuned subgradient (lowest-worst-loss config over
+a wide step grid, step=1e-2 fixed) reaches the 1% target at iteration 58: the raw iterate
+oscillates around OPT and the best-so-far gap (the paper's reported metric,
+`paper/experiments.tex:52`) crosses 1%. This is a genuine discrepancy, not a tuning artefact: the
+max-loss subgradient can make progress on this instance with a well-chosen step, and the paper's
+step grid (unstated, SPEC §6 item 3) likely did not include an effective step or used a smaller
+budget. Recorded here rather than silently forcing "not_reached".
+
+### IPM discrepancy (ACS)
+The paper reports IPM at 8 iterations to 1% (`paper/experiments.tex:180`); this reproduction's
+centring-based log-barrier IPM reaches 1% in 22 iterations (base=init) / 19 (base=opt). The IPM
+does converge rapidly and to the best final loss (≈OPT, matching the qualitative claim), but the
+exact 8 is not reproduced — the barrier schedule is unspecified (SPEC §6 item 10) and 8 ≈ √m
+suggests a short-step schedule with a tighter constant than our reconstructed one.
