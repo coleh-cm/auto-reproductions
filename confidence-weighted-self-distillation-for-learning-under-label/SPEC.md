@@ -186,6 +186,8 @@ python run_experiment.py --lambda FLOAT   # 0.0 = baseline, 1.0 = CWSD (paper §
                          [--init he] [--noise-mode uniform-all] [--noise-rate 0.2]
                          [--batch-mode epoch-permutation]
                          [--rng-layout init-first]   # init-first|spawned|noise-first (§4 item 7)
+# --steps must be >= 1: a zero-step run is indistinguishable from the method
+# never having been applied, so the CLI rejects it (exit 2, stderr, no stdout).
 ```
 
 Output contract: exactly one line on stdout at completion, `FINAL accuracy=<float>`

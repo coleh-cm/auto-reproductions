@@ -40,6 +40,18 @@ def test_cli_rejects_lambda_out_of_range():
     assert out.returncode == 2
 
 
+def test_cli_rejects_zero_steps():
+    """A zero-step run is indistinguishable from the method never having been
+    applied; the CLI must fail loudly (non-zero, stderr message, NO stdout
+    contract line) rather than print a FINAL line on an empty result."""
+    cmd = [sys.executable, "run_experiment.py", "--lambda", "0.0", "--steps", "0"]
+    out = subprocess.run(cmd, capture_output=True, text=True)
+    assert out.returncode != 0, out.stderr
+    assert out.stdout.strip() == "", out.stdout
+    assert out.returncode == 2
+    assert "steps" in out.stderr.lower()
+
+
 def test_cli_accepts_all_documented_flags():
     """Smoke test that every SPEC §5 flag parses (does not assert accuracy)."""
     out, _ = _run([

@@ -339,6 +339,11 @@ def main(argv=None) -> int:
     if config.lambda_ < 0.0 or config.lambda_ > 1.0:
         print(f"lambda must be in [0,1], got {config.lambda_}", file=sys.stderr)
         return 2
+    if config.steps < 1:
+        print(f"steps must be >= 1, got {config.steps}; a zero-step run is "
+              "indistinguishable from the method never having been applied",
+              file=sys.stderr)
+        return 2
     acc = train(config)
     print(f"FINAL accuracy={acc:.4f}")
     return 0

@@ -58,7 +58,7 @@ knife-edge of `s` (see `SPEC.md` §4 item 1 and `REPRODUCTION.md`). Whether the
 CWSD arm's 0.0009 gap counts as a reproduction is not asserted; see
 `REPRODUCTION.md` for the measured-vs-claimed table. Run the tests to verify
 the no-op = baseline claim without trusting the implementation: `pytest -q`
-→ 23 passed.
+→ 25 passed.
 
 ## Quickstart
 
@@ -114,7 +114,7 @@ Output contract: exactly one line on stdout, `FINAL accuracy=<float>` formatted
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 23 tests: degeneracy + invariants + data + CLI
+.venv/bin/python -m pytest -q     # 25 tests: degeneracy + invariants + data + CLI
 ```
 
 ## Environment

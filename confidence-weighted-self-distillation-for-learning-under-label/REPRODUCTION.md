@@ -25,9 +25,10 @@ claimed values, and the difference.
 Both arms were run from this folder with the venv Python and the defaults
 `--rng-layout init-first --s 0.15` (these are the program defaults, so the bare
 commands from paper §5 reproduce them). Each run prints exactly one line,
-`FINAL accuracy=<float>`. The numbers below are from `/tmp/baseline.log` and
-`/tmp/method.log`; both were re-run to confirm determinism (same command → same
-number).
+`FINAL accuracy=<float>`. The numbers below are committed (not gitignored) in
+`results/baseline_ce.txt` and `results/cwsd.txt` (per-arm raw output) and
+`results/run_all_arms.txt` (the harness output); both were re-run to confirm
+determinism (same command → same number).
 
 | Method | λ | Paper (claimed) | This run (measured) | measured − claimed | exact command |
 |---|---|---|---|---|---|
@@ -53,7 +54,7 @@ exercised here; the from-scratch environment was instead verified via a fresh
 | 4 | Entrypoint is obvious | pass | One documented command, `python run_experiment.py --lambda FLOAT`, drives the whole experiment via flags; no source edits needed. `--lambda` is required; all hyperparameters are CLI flags with the paper's values as defaults. |
 | 5 | Fast path | pass | The full 4000-step run completes in ~0.8 s, so the full run *is* the fast path; the whole train+eval path is exercised end to end in well under a couple of minutes. |
 | 6 | Deterministic / noise quantified | pass | Same command, same seed (0) → same number on re-run: baseline `0.9370` and CWSD `0.9611` reproduced on a second invocation. |
-| 7 | Degeneracy test in repo | pass | `tests/test_degeneracy.py` asserts the λ=0 path is bitwise identical to an independently written cross-entropy routine (per-step loss + every grad, and a 300-step SGD loop with identical params + accuracy). The structural and per-step checks are swept over `s ∈ {0.01,0.15,1.0,10.0}` so the gate cannot be fit to the answer via the one unstated hyperparameter. A `test_training_step_count_is_exact` pins the loop's exact step-count guard. `pytest -q` → 24 passed. |
+| 7 | Degeneracy test in repo | pass | `tests/test_degeneracy.py` asserts the λ=0 path is bitwise identical to an independently written cross-entropy routine (per-step loss + every grad, and a 300-step SGD loop with identical params + accuracy). The structural and per-step checks are swept over `s ∈ {0.01,0.15,1.0,10.0}` so the gate cannot be fit to the answer via the one unstated hyperparameter. A `test_training_step_count_is_exact` pins the loop's exact step-count guard. `pytest -q` → 25 passed. |
 | 8 | Data provenance stated | pass | Data is `sklearn.datasets.load_digits` (1797 × 8×8 digits, 10 classes), pinned via scikit-learn 1.9.0; split is stratified `train_test_split` at seed 0 (30% test); stated in README/SPEC. No manual download. |
 | 9 | Recorded number reproducible | pass | The exact commands recorded beside the numbers above, run again, produced the same numbers (baseline 0.9370, CWSD 0.9611). |
 | 10 | No hidden local state | pass | A fresh venv in a fresh location (`/tmp/freshvenv_test`) with only the repo files + pinned requirements installed runs the experiment and the tests with the recorded numbers; nothing depends on a hand-built env or home-directory state. |
@@ -237,3 +238,45 @@ exercised here; the from-scratch environment was instead verified via a fresh
   potentially lossy. Header (title, date, Status section) confirmed; this entry
   is this pass's setup record.
 
+
+## Running log (this pass, 2026-07-30, implementation step)
+
+- 2026-07-30: Implementation pass (same paper_ref
+  `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id
+  `d7735ece-02c4-4228-985c-00834c92b8f3`). The method, data pipeline, training
+  loop, evaluation metric, and baseline arm already existed from prior passes
+  (run_experiment.py + tests/ + SPEC.md + REPRODUCTION.md); they were verified
+  against the paper by an adversarial orchestration (5 parallel component
+  reviewers + 1 independent run-verify agent, run id
+  `5e7a72c8-bea8-4154-a3a6-9f2b663c77c6`). All 5 components approved; no
+  blocker or major issue. The independent verify agent ran the actual program:
+  `pytest -q` → 24 passed; `--lambda 0.0` → `FINAL accuracy=0.9370` (exact);
+  `--lambda 1.0` → `FINAL accuracy=0.9611` (within ±0.004 of 0.9620);
+  `run_all_arms.sh` → `FINAL baseline_ce=0.9370` / `FINAL cwsd=0.9611`;
+  `smoke.sh` → one FINAL line.
+- 2026-07-30: Created the run harness that the prior passes had not committed:
+  `arms.json` (exactly two arms, the paper's own Table-1 comparison: `baseline_ce`
+  lambda=0, `cwsd` lambda=1; no invented arms), `run_all_arms.sh` (runs both arms
+  at the paper's full configuration, each printing `FINAL <arm name>=<value>`
+  with names matching arms.json; rejects a missing/empty contract line with exit
+  1 and a stderr message — no success path reports OK on an empty result), and
+  `smoke.sh` (same code path, `--lambda 1.0 --steps 200`, one FINAL line; its
+  output is plumbing evidence only, never a result). All harness output is
+  committed under `results/` (not gitignored): `results/baseline_ce.txt`,
+  `results/cwsd.txt`, `results/run_all_arms.txt`, `results/smoke.txt`.
+- 2026-07-30: Hardened the one substantive minor the training-loop review
+  surfaced: `--steps 0` previously printed `FINAL accuracy=0.0815` and exited
+  0 — a no-op run indistinguishable from the method never having been applied
+  that still produced a contract line. `main()` now rejects `--steps < 1` with
+  exit 2, a stderr message, and NO stdout line. Added `test_cli_rejects_zero_steps`
+  (uses `sys.executable`) so the guard is exercised on a known-wrong input.
+  `pytest -q` → 25 passed. The degeneracy test's `train(0)` probe (0 updates
+  via the function, not the CLI) still holds; the CLI guard is a separate
+  safety layer. SPEC §5 CLI synopsis updated with the `--steps >= 1` note.
+- 2026-07-30: All other review findings were nits (redundant softmax in
+  `make_target`, duplicated forward path between `forward()` and the inline
+  forward in `loss_and_grads`, `evaluate` argmax-over-p vs SPEC's argmax-over-z
+  wording — all mathematically identical, not correctness issues) and one
+  documented modeling choice (whole-target stopgrad, SPEC §4 item 5). None
+  changed; the duplication is intentional (numerical stability via
+  log-softmax in the gradient path; `forward()` returns `p` for eval).

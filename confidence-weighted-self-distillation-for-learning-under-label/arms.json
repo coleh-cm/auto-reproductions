@@ -1,0 +1,4 @@
+{
+  "baseline_ce": "python run_experiment.py --lambda 0.0",
+  "cwsd": "python run_experiment.py --lambda 1.0"
+}

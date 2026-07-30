@@ -1,0 +1,2 @@
+FINAL baseline_ce=0.9370
+FINAL cwsd=0.9611
