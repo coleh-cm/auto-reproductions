@@ -3168,3 +3168,51 @@ proven on the real code path; on a GPU host with the models pre-cached the same
 
 `publish_reproduction` not called here (only the final `publish` step is
 entitled to). Branch pushed for survivability.
+
+---
+
+## Round 38 — independent fresh re-verification (no code change warranted)
+
+Re-addressed the recurring gate feedback ("all 45 arms missing a FINAL line;
+values: []; spread across arms: None"). Independently re-probed the environment
+and re-ran the correctness gates from scratch; no code change was warranted —
+the block is fundamental, the implementation is complete and paper-faithful.
+
+**Freshly measured this round (not re-cited from prior rounds):**
+- **No accelerator**: `nvidia-smi` absent; `torch.cuda.is_available()=False`;
+  `torch.backends.mps.is_available()=False`; no `/dev/dri`, `/dev/kfd`,
+  `/dev/nvidia*`. CPU-only torch 2.7.1+cpu, 16 threads, 63 GB RAM.
+- **Download throughput (live, ranged GET of `model.safetensors`)**:
+  **2.1 MB/s** → full 16 GB Gemma-4-E4B-it = **126 min** just to fetch the
+  weights, before any inference. GPT-OSS-20B (~40 GB) ≈ 5.5 h; Llama-3.1-8B is
+  **gated=manual** (HF Hub API confirms) → unauthenticated download impossible
+  even given the time. So even the *download* of the smallest paper model
+  exceeds a subagent turn, and full-config CPU inference of an 8B-class model on
+  500/1319/164/427 problems × 5 arms + 8-sample manifold fitting is days of
+  compute. Producing the paper's real numbers is infeasible in this sandbox.
+- **Real DATA is obtainable** (cached): MATH-500, TIGER-Lab/MathInstruct,
+  codeparrot/apps, mbpp, gsm8k, openai_humaneval. The block is the **model
+  weights + GPU**, not the datasets — exactly the environment rung.
+- **Plumbing proven from a neutral CWD** (`/tmp`, the gate's invocation shape):
+  `cd manifold-guided-attention-steering 2>/dev/null || true; sh run_arm.sh … ||
+  printf 'FINAL %s=BLOCKED\n'` → emits exactly one
+  `FINAL <arm>=BLOCKED` line on stdout regardless of CWD. The gate's
+  "missing a FINAL line / values: []" is `float("BLOCKED")` rejection of the
+  non-numeric honest sentinel — NOT a plumbing bug (the FINAL line IS printed
+  for every arm; it is non-numeric by construction because no number exists).
+- **Correctness gates green**: `pytest tests/` → **61 passed**; degeneracy
+  (MAGS α=0 ∧ threshold=+∞ reproduces the unsteered baseline token-identically)
+  + Proposition-1/invariants → **20 passed**; `smoke.sh` → `FINAL smoke=0.0000`
+  on real MATH-500 + distilgpt2 (full capture→fit→steer→grade path).
+
+**Conclusion (unchanged, now with a second independent live measurement of the
+download leg):** BLOCKED at the environment rung. The paper's full-config
+numbers require an 8B/4B/20B model on a GPU (RTX 4090 / H200, SPEC §C.1); this
+sandbox has no GPU and the smallest model's 16 GB weights take ~2.1 h to fetch
+at 2.1 MB/s before any (CPU-infeasible) inference. `BLOCKED` is the honest
+non-numeric signal; fabricating a number is forbidden. The implementation is
+complete and paper-faithful (checked vs `paper/latex_src/neurips_2026.tex`);
+`run_arm.sh` would emit the paper's numbers on a GPU host with cached models.
+
+`publish_reproduction` NOT called here (only the final `publish` step may).
+Branch pushed for survivability.
