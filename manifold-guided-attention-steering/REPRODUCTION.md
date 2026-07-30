@@ -2333,3 +2333,67 @@ fit+eval path and prints `FINAL <arm>=<0.xxx>`.
 or arm code changed (nothing to fix: the block is the environment, not the
 code). Re-verified 52 tests / smoke green / 45 FINAL lines under bash, dash,
 and no-python.
+
+---
+
+## Round 26 (2026-07-30) — THE recurring "all 45 arms missing a FINAL line" gate failure, root-caused and fixed
+
+**Symptom (the gate feedback this round addresses):** the numbers gate reported
+ALL 45 arms "missing a FINAL line" with `values: []` and `spread across arms:
+None` — i.e. it extracted zero `FINAL <arm>=<value>` lines from the entire
+arms.json. Rounds 1–25 each "verified" 45 FINAL lines in-sandbox (FINAL=BLOCKED)
+yet the gate kept returning `values: []`, so every prior round's verification
+was testing the wrong thing.
+
+**Root cause (found this round by simulating the gate, not by trusting the
+in-sandbox run):** the gate reads `manifold-guided-attention-steering/arms.json`
+by path and runs each arm's command string from the **repository root** (the
+parent that contains the per-paper subfolders), NOT from the reproduction
+folder. Every arms.json command was `sh run_arm.sh <arm-id> …` — a *relative*
+path. From the repo root `run_arm.sh` is not on that path (it lives in the
+subfolder), so `sh` prints `run_arm.sh: cannot open: No such file` to **stderr**
+and exits 2 with **zero stdout**. The gate captures stdout only, so it sees no
+`FINAL` line for any arm → `values: []`. Verified deterministically:
+  - `cd /tmp/gate_sim && sh run_arm.sh foo …` (repo root) → exit 2, **0 stdout
+    lines** (reproduces the gate feedback exactly);
+  - `cd /tmp/gate_sim/manifold-guided-attention-steering && sh run_arm.sh …`
+    (reproduction folder) → `FINAL …=BLOCKED`, exit 0.
+The in-sandbox "45 FINAL" checks of rounds 1–25 all ran from the reproduction
+folder, so they never reproduced the gate's repo-root CWD and the bug survived
+25 rounds. (The wrapper's own header comment asserted "the gate runs each
+arms.json command individually" but never identified *from where*; that
+unverifiable assumption is what every prior round fixed around.)
+
+**Why the wrapper's defensive fallback did not save it:** `run_arm.sh` is
+genuinely bulletproof *once it executes* (it prints `FINAL <arm>=BLOCKED` under
+bash, dash, no-python, no-timeout, `set -e` — all verified). The failure is one
+level up: the wrapper script is never invoked because `sh` cannot open it from
+the gate's CWD. No amount of in-wrapper defensiveness can fix a script that is
+never started.
+
+**Fix (this round):** prefix every arms.json command with a CWD-resolver so it
+works from BOTH the repo root and the reproduction folder:
+  `cd manifold-guided-attention-steering 2>/dev/null || true; sh run_arm.sh …`
+  - repo-root CWD: `cd manifold-guided-attention-steering` succeeds → CWD becomes
+    the reproduction folder → `sh run_arm.sh` runs and self-locates.
+  - reproduction-folder CWD: the `cd` fails (no such subdir), `|| true` keeps it
+    non-fatal under `set -e`, CWD stays the folder → `sh run_arm.sh` runs.
+The folder name `manifold-guided-attention-steering` is the fixed paper slug
+(the same name the gate itself uses to locate `arms.json`), so hardcoding it is
+not fragile. `run_arm.sh` is otherwise unchanged; `mags.run` is unchanged; no
+method/test/arm logic changed.
+
+**Verification (gate simulation, NOT an in-sandbox run from the folder):** a
+script that loads `manifold-guided-attention-steering/arms.json` and runs each
+command with `cwd=<repo root>` (matching the gate) now reports
+`total=45 found=45 missing=0 distinct=['BLOCKED']` — i.e. the gate sees a FINAL
+line for every arm. The same script run with `cwd=<reproduction folder>` also
+reports `found=45 missing=0`, so the fix does not regress the folder-CWD path.
+On a GPU host with cached models + fitted manifolds the `BLOCKED` values become
+the real `0.xxx` accuracies, passed through unchanged by `run_arm.sh`.
+
+**Note on `BLOCKED` vs real numbers:** this round fixes the *plumbing* so the
+gate receives a FINAL line per arm; it does not produce the paper's numbers,
+which remain blocked by the environment (no GPU, Llama gated, no pre-cached
+8B/4B/20B models — see prior rounds). `BLOCKED` is the honest "no numbers"
+string, never a fabricated value. Re-verified 52 tests + smoke green.
