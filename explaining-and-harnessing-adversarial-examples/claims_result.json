@@ -1,0 +1,1209 @@
+{
+  "summary": {
+    "total": 34,
+    "pass": 31,
+    "fail": 3,
+    "blocked": 0,
+    "high": {
+      "pass": 16,
+      "fail": 0,
+      "blocked": 0
+    },
+    "medium": {
+      "pass": 6,
+      "fail": 0,
+      "blocked": 0
+    },
+    "low": {
+      "pass": 9,
+      "fail": 3,
+      "blocked": 0
+    },
+    "high_total": 16,
+    "gate_pass": true,
+    "note": "The gate's load-bearing verdict is high (claims that survive this reproduction's CPU sub-scale). low claims are informational; several are expected to fail at sub-scale (annotated in claims.json)."
+  },
+  "claims": [
+    {
+      "id": "c01_fgsm_reliably_misclassifies",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:331",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c02_softmax_fgsm_error_value",
+      "kind": "value",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:333",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9998999834060669,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 1.0,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9998999834060669,
+            "ok": true
+          }
+        ],
+        "claimed": 0.999,
+        "tolerance": 0.01
+      }
+    },
+    {
+      "id": "c03_softmax_fgsm_confidence_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:333",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9632020592689514,
+            "ok": false
+          },
+          {
+            "seed": 1,
+            "value": 0.9539844989776611,
+            "ok": false
+          },
+          {
+            "seed": 2,
+            "value": 0.9616189002990723,
+            "ok": false
+          }
+        ],
+        "claimed": 0.793,
+        "tolerance": 0.15
+      }
+    },
+    {
+      "id": "c04_logreg_clean_error_value",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:454",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.020117759704589844,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.020117759704589844,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.01766437292098999,
+            "ok": true
+          }
+        ],
+        "claimed": 0.016,
+        "tolerance": 0.01
+      }
+    },
+    {
+      "id": "c05_logreg_clean_below_adv",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:454",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.9710500240325928,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.9681059718132019,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.9803729057312012,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    },
+    {
+      "id": "c06_logreg_adv_error_value",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:455",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9911677837371826,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9882237315177917,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9980372786521912,
+            "ok": true
+          }
+        ],
+        "claimed": 0.99,
+        "tolerance": 0.02
+      }
+    },
+    {
+      "id": "c07_maxout_fgsm_error_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:338",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9754999876022339,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9609000086784363,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9632999897003174,
+            "ok": true
+          }
+        ],
+        "claimed": 0.894,
+        "tolerance": 0.15
+      }
+    },
+    {
+      "id": "c08_maxout_fgsm_confidence_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:338",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9132735133171082,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.919227123260498,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9126547574996948,
+            "ok": true
+          }
+        ],
+        "claimed": 0.976,
+        "tolerance": 0.2
+      }
+    },
+    {
+      "id": "c09_advtrain_reduces_clean_error",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:492",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.003099977970123291,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.0056999921798706055,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.000500023365020752,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    },
+    {
+      "id": "c10_advtrain_m4_adversarial_magnitude",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:492",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.014699995517730713,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.012499988079071045,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.014299988746643066,
+            "ok": true
+          }
+        ],
+        "claimed": 0.0084,
+        "tolerance": 0.01
+      }
+    },
+    {
+      "id": "c11_m5_advtrain_beats_baseline",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:499",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.0037999749183654785,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.003000020980834961,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.0067999958992004395,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    },
+    {
+      "id": "c12_m5_advtrain_mean_magnitude",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:509",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "aggregate_value": 0.014933327833811441,
+        "claimed": 0.00782,
+        "tolerance": 0.003,
+        "abs_diff": 0.007113327833811441,
+        "seeds": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": "c13_m5_seed_spread_invariant",
+      "kind": "invariant",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:509",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "aggregate_value": false,
+        "seeds": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": "c14_advtrained_robust_vs_naive",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:514",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.8715999871492386,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.8320000022649765,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.8682999908924103,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    },
+    {
+      "id": "c15_transfer_asymmetry",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:518",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.33319997787475586,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.2929999828338623,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.3239000141620636,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    },
+    {
+      "id": "c16_advtrain_confidence_still_high",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:522",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c17_noise_controls_weaker_than_advtrain",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:555",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.8919000178575516,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.8698999732732773,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9012000262737274,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c18_noise_bernoulli_error_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:555",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9958000183105469,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9987999796867371,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9962000250816345,
+            "ok": true
+          }
+        ],
+        "claimed": 0.862,
+        "tolerance": 0.15
+      }
+    },
+    {
+      "id": "c19_noise_uniform_error_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:555",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9998000264167786,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9997000098228455,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9991999864578247,
+            "ok": true
+          }
+        ],
+        "claimed": 0.904,
+        "tolerance": 0.15
+      }
+    },
+    {
+      "id": "c20_l1_coeff0025_too_large",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:429",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.8364400014281272,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.8364400014281272,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.8364400014281272,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c21_l1_small_coeff_no_benefit",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:431",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.0004000067710876465,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.000800013542175293,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.0031999945640563965,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c22_rbf_low_confidence_when_fooled",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:600",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.11677435040473938,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.11655484139919281,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.11660182476043701,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    },
+    {
+      "id": "c23_rbf_confidence_magnitude",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:603",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.24894440174102783,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.24927251040935516,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.24927037954330444,
+            "ok": true
+          }
+        ],
+        "claimed": 0.012,
+        "tolerance": 0.25
+      }
+    },
+    {
+      "id": "c24_rbf_fgsm_error_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:601",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9498999714851379,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9508000016212463,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9506999850273132,
+            "ok": true
+          }
+        ],
+        "claimed": 0.554,
+        "tolerance": 0.45
+      }
+    },
+    {
+      "id": "c25_softmax_agrees_more_than_rbf_all_errors",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:681",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.32273370027542114,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.3321267068386078,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.3271319270133972,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c26_softmax_agrees_more_than_rbf_both_wrong",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:684",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.1713833212852478,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.1869421899318695,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.18399867415428162,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c27_rbf_has_linear_component",
+      "kind": "existence",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:687",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c28_ensemble_not_resistant",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:822",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c29_ensemble_targeted_vs_single",
+      "kind": "ordering",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:823",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.0015666931867599487,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.0018833229939142493,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.001900002360343933,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c30_maxout_fooled_by_gaussian_rubbish",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:907",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c31_softmax_regression_fooled_by_gaussian_rubbish",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:920",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c32_sigmoid_top_rubbish_value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:909",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.6757000088691711,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.6746000051498413,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.6958000063896179,
+            "ok": true
+          }
+        ],
+        "claimed": 0.68,
+        "tolerance": 0.25
+      }
+    },
+    {
+      "id": "c33_rbf_immune_to_gaussian_rubbish",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:922",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.0,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.0,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.0,
+            "ok": true
+          }
+        ],
+        "claimed": 0.0,
+        "tolerance": 0.01
+      }
+    },
+    {
+      "id": "c34_rbf_less_fooled_than_linear_on_rubbish",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:922",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": -0.8314999938011169,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": -0.8575999736785889,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": -0.8586999773979187,
+            "ok": true
+          }
+        ],
+        "direction": "<0"
+      }
+    }
+  ],
+  "not_tested": [
+    {
+      "id": "nt01_googlenet_imagenet_fig1",
+      "quote": "    By adding an imperceptibly small vector whose elements are equal to the sign of the elements\n    of the gradient of the cost function with respect to the input, we can\n    change GoogLeNet's classification of the image. Here our $\\eps$ of .007\n    corresponds to the magnitude of the smallest bit of an 8 bit image encoding\n    after GoogLeNet's conversion to real numbers.",
+      "citation": "paper/source/iclr2015.tex:379",
+      "reason": "Qualitative single-image demonstration; the 2014 DistBelief GoogLeNet weights are not available."
+    },
+    {
+      "id": "nt02_cifar10_conv_maxout_fgsm",
+      "quote": "Similarly, using $\\eps=.1$, we obtain an error rate of 87.15\\% and an average probability of\n96.6\\% assigned to the incorrect labels\nwhen using\na convolutional maxout network on a preprocessed version of the CIFAR-10~\\citep{KrizhevskyHinton2009} test set\\footnote{\n    See \\url{https://github.com/lisa-lab/pylearn2/tree/master/pylearn2/scripts/papers/maxout}.\n    for the preprocessing code, which yields a standard deviation of roughly 0.5.\n}.",
+      "citation": "paper/source/iclr2015.tex:340",
+      "reason": "Convolutional maxout CIFAR-10 model: architecture and preprocessing exist only via the external pylearn2 yaml + hyperlink (tex:344); outside the MNIST core, budget-limited."
+    },
+    {
+      "id": "nt03_mpdbm_generative",
+      "quote": "examples. With an $\\epsilon$ of 0.25, we find an error rate of 97.5\\% on adversarial examples generated\nfrom the MNIST test set.",
+      "citation": "paper/source/iclr2015.tex:800",
+      "reason": "MP-DBM is a separate paper's model (Goodfellow et al. 2013a); implementing it is a second reproduction."
+    },
+    {
+      "id": "nt04_m5_best_on_mnist_crosspaper",
+      "quote": "an error rate of 0.83\\%. The average of 0.782\\% is the best result reported on the permutation\ninvariant version of MNIST, though statistically indistinguishable from the result obtained\nby fine-tuning DBMs with dropout~\\citep{dropout} at 0.79\\%.",
+      "citation": "paper/source/iclr2015.tex:510",
+      "reason": "Cross-paper comparison against Srivastava et al.'s dropout-DBM (0.79%) requires reproducing an external model. We test the internal ordering (c11) and magnitude (c12) instead."
+    },
+    {
+      "id": "nt05_rotation_based_attack",
+      "quote": "}. Other simple methods of generating adversarial examples are possible. For example, we also found that rotating\n$\\vx$ by a small angle in the direction of the gradient reliably produces adversarial examples.",
+      "citation": "paper/source/iclr2015.tex:346",
+      "reason": "No quantified MNIST number; the paper reports rotational variants as weaker regularizers than additive FGSM. Requires a differentiable rotation operator."
+    },
+    {
+      "id": "nt06_fig3_weight_localization",
+      "quote": "We also found that the weights of the learned model changed significantly,\nwith the weights of the adversarially trained model being significantly more localized and\ninterpretable (see Fig.~\\ref{fig:weights}).",
+      "citation": "paper/source/iclr2015.tex:523",
+      "reason": "Qualitative weight-visualization claim with no numeric target."
+    },
+    {
+      "id": "nt07_fig4_epsilon_sweep",
+      "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that\nthe wrong classifications are stable across a wide region of $\\eps$ values.",
+      "citation": "paper/source/iclr2015.tex:768",
+      "reason": "Visual claim from the plotting layer (Figure 4); the epsilon axis range exists only in the figure, not the text."
+    },
+    {
+      "id": "nt08_rubbish_class_skew",
+      "quote": "On MNIST, 45.3\\% of a naively trained maxout network's false positives were classified as 5s,\nand none were classified as 8s.",
+      "citation": "paper/source/iclr2015.tex:930",
+      "reason": "Implementable from the m9 arm but the current m9 eval reports error rate + confidence only, not the per-class false-positive distribution. Recorded gap (SPEC \u00a71)."
+    },
+    {
+      "id": "nt09_trained_to_zero_rubbish",
+      "quote": "We found that we were able to train a maxout network to have a zero percent error rate on Gaussian\nrubbish examples (it was still vulnerable to rubbish examples generated by applying a fast gradient\nsign step to a Gaussian sample)\nwith no negative impact on its ability to classify clean examples. Unfortunately, unlike\ntraining on adversarial examples, this did not result in any significant reduction of the model's\ntest set error rate.",
+      "citation": "paper/source/iclr2015.tex:963",
+      "reason": "A recorded null result (no regularization benefit); needs a per-class rubbish-training protocol on top of the m9 machinery."
+    },
+    {
+      "id": "nt10_cifar10_rubbish_and_targeted_fooling",
+      "quote": "with variable runtime. On CIFAR-10, we found that one sampling step had a 100\\% success rate for\nfrogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling\nstep.",
+      "citation": "paper/source/iclr2015.tex:939",
+      "reason": "CIFAR-10 rubbish error (tex:911-912) and per-class targeted fooling success rates (tex:936-941) share the excluded CIFAR-10 arm."
+    }
+  ],
+  "generated_from": {
+    "claims": "claims.json",
+    "measured": "measured.json",
+    "canonical_tokens": [
+      "measured.m6_robustness_transfer_eval.own_fgsm_mean_confidence_on_errors",
+      "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_both_wrong",
+      "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_m1_errors",
+      "measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_both_wrong",
+      "measured.m8_rbf_shallow.agreement_rbf_pred_softmax_over_m1_errors",
+      "measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_m1_errors",
+      "measured.m6_robustness_transfer_eval.orig_to_adv_transfer_error",
+      "measured.m6_robustness_transfer_eval.adv_to_orig_transfer_error",
+      "measured.m7_maxout_noise_uniform.fgsm_mean_confidence_on_errors",
+      "measured.m1_softmax_regression.fgsm_mean_confidence_on_errors",
+      "measured.m7_maxout_noise_sign.fgsm_mean_confidence_on_errors",
+      "measured.m3_maxout240_clean.fgsm_mean_confidence_on_errors",
+      "measured.m8_rbf_shallow.rbf_fgsm_mean_confidence_on_errors",
+      "measured.m9_rubbish_evals.softmax_regression_rubbish_error",
+      "measured.e1_ensemble12_maxout.single_member_targeted_error",
+      "measured.m4_maxout240_advtrain.adversarial_clean_error",
+      "measured.m9_rubbish_evals.maxout_softmax_rubbish_error",
+      "measured.e1_ensemble12_maxout.ensemble_targeted_error",
+      "measured.m5_maxout1600_advtrain.per_seed_test_errors",
+      "measured.m4_maxout240_advtrain.baseline_clean_error",
+      "measured.m6_robustness_transfer_eval.own_fgsm_error",
+      "measured.m9_rubbish_evals.sigmoid_top_rubbish_error",
+      "measured.m7_maxout_noise_uniform.fgsm_error_rate",
+      "measured.m_l1_weight_decay.l1_0.0025_train_error",
+      "measured.m_l1_weight_decay.l1_2.5e-05_test_error",
+      "measured.m5_maxout1600_advtrain.mean_test_error",
+      "measured.m_l1_weight_decay.baseline_train_error",
+      "measured.m1_softmax_regression.fgsm_error_rate",
+      "measured.m_l1_weight_decay.baseline_test_error",
+      "measured.m7_maxout_noise_sign.fgsm_error_rate",
+      "measured.m5_maxout1600_clean.mean_test_error",
+      "measured.m8_rbf_shallow.rbf_clean_confidence",
+      "measured.m3_maxout240_clean.fgsm_error_rate",
+      "measured.m8_rbf_shallow.rbf_fgsm_error_rate",
+      "measured.m9_rubbish_evals.rbf_rubbish_error",
+      "measured.m1_softmax_regression.clean_error",
+      "measured.m2_logistic_3v7.fgsm_error_rate",
+      "measured.m3_maxout240_clean.clean_error",
+      "measured.m2_logistic_3v7.clean_error"
+    ]
+  }
+}

@@ -645,3 +645,48 @@ at sub-scale (240 units / 3 seeds) the per-seed spread is ~0.0010, above the
 paper's 0.0006 (tex:506-512, measured at 1600 units / 5 seeds), so c13 does
 not reproduce at sub-scale — a verdict the gate can now render instead of
 aborting.
+
+## Numbers-gate verdict (claims_result.json) — this session
+
+`numbers_gate.py` evaluates every claim in `claims.json` against `measured.json`
+and writes `claims_result.json` (the machine-graded verdict the reader can
+re-run). It does not decide whether the paper reproduced; it states per-claim
+pass/fail/blocked and the counts.
+
+```
+FINAL pass=31  fail=3  blocked=0
+FINAL high_pass=16  high_fail=0  high_blocked=0
+FINAL gate=PASS
+```
+
+| compute_invariance | pass | fail | blocked | total |
+|--------------------|------|------|---------|-------|
+| high (load-bearing) | 16 | 0 | 0 | 16 |
+| medium | 6 | 0 | 0 | 6 |
+| low (informational) | 9 | 3 | 0 | 12 |
+| all | 31 | 3 | 0 | 34 |
+
+The gate passes (every HIGH claim is adjudicated `pass`, none blocked). The
+3 failures are all `low` and all expected at sub-scale (annotated in
+`claims.json`): `c03` softmax FGSM confidence magnitude (paper 79.3 %,
+measured 96.3 % — drifts with training budget), `c12` M5 mean magnitude
+(paper 0.782 % over 5 seeds at 1600 units, measured 1.49 % over 3 seeds at
+240 units), `c13` M5 seed spread (paper 0.0006, measured 0.0010). The HIGH
+directional claims encoding the same content (`c09`, `c11`) pass at every
+seed. The 10 deliberately-not-tested claims (ImageNet/GoogLeNet, CIFAR-10,
+MP-DBM, rotation attacks, visualizations, …) are listed in `claims.json`
+`not_tested` with reasons and in `VERIFICATION.md` §4.
+
+### Are the two headline arms within noise of each other? — No.
+
+The M4 comparison is the paper's headline. At this sub-scale the method arm's
+clean test error is **lower than the baseline's at every one of the three
+seeds** (1.47<1.78, 1.25<1.82, 1.43<1.48 %), so the run *does* separate the
+arms — the comparison the paper makes is tested, not washed out by the
+shortened horizon. The magnitudes (2.13 %/1.38 % vs the paper's
+0.94 %/0.84 %) do not match; both are sub-scale (dropout OFF + 5000 steps vs
+dropout ON + convergence). The horizon was shortened to fit the CPU; the
+direction survives the shortening, the magnitudes do not, and the magnitude
+claims are rated `low` so a reader is not told a sub-scale number is the
+paper's number. Full ledger of what was checked and what was not:
+`VERIFICATION.md`.
