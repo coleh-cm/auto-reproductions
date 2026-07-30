@@ -88,8 +88,15 @@ fi
 # Re-emit only the FINAL lines that belong to THIS arm (primary metric, plus
 # the optional molecular `__binding_affinity` secondary). Fixed-string grep
 # so `.` / `-` in the arm-id are literal. If none, emit one honest BLOCKED.
-emit_primary=$(printf '%s\n' "$out" | grep -F "FINAL ${arm_id}=" | head -n 1 || true)
-emit_secondary=$(printf '%s\n' "$out" | grep -F "FINAL ${arm_id}__binding_affinity=" | head -n 1 || true)
+# `grep -a` (treat binary as text): `python -m mags.run` 2>&1 can embed NUL /
+# control bytes (torch/numpy/transformers progress + reprs on a real GPU run);
+# plain `grep` then emits "Binary file … matches" instead of the FINAL line,
+# dropping the arm's value (round-33 smoke.sh hit this exact failure). `-a`
+# guarantees the FINAL line is extracted even when the captured stream is
+# binary-ish. (The BLOCKED fast-path output is plain text, so this only
+# matters on a real GPU run that actually produces numbers.)
+emit_primary=$(printf '%s\n' "$out" | grep -a -F "FINAL ${arm_id}=" | head -n 1 || true)
+emit_secondary=$(printf '%s\n' "$out" | grep -a -F "FINAL ${arm_id}__binding_affinity=" | head -n 1 || true)
 
 if [ -n "$emit_primary" ]; then
     printf '%s\n' "$emit_primary"

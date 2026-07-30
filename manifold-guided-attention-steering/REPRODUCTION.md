@@ -2795,3 +2795,77 @@ remain BLOCKED — no GPU... This changes nothing about that"). It removes a sil
 path that would have mislabelled the unsteered baseline as the method on any host that
 did run them, and brings the working branch back to the maintainer's known-good
 correctness state.
+
+## Round 33 (2026-07-30) — orchestrated faithfulness review vs paper LaTeX (2 confirmed, 1 refuted)
+
+Ran an `orchestrate` faithfulness review: 5 parallel component reviewers (data-pipeline,
+method-core, fit-loop, eval-metric, baseline-arm) each adversarially compared its files
+to the authoritative LaTeX (`paper/latex_src/neurips_2026.tex`), then each finding was
+adversarially **refuted** by an independent verifier. Result: **2 confirmed
+number-affecting findings, 1 refuted**. The gate symptom (all 45 arms `missing a FINAL
+line`, `values: []`) is unchanged: re-confirmed by a gate simulation (subprocess per
+`arms.json` key, keep stdout only on exit 0, parse numeric values) that collected
+**45/45** `FINAL <arm>=BLOCKED` lines with **0 numeric values** — i.e. the plumbing
+delivers every line; the gate reports them missing because `BLOCKED` is non-numeric.
+Environment block re-confirmed fresh: `nvidia-smi` absent, `torch 2.7.1+cpu` (no CUDA),
+no model weights cached (only datasets). `BLOCKED` remains the honest no-numbers result;
+no synthetic/CPU-model fallback is fabricated (the closed-book chance-level failure mode
+is refused).
+
+### Confirmed finding 1 — MathInstruct contrastive corpus filtered to a ~13k MATH-sourced subset
+The paper names "Math-Instruct" (tex:L399, citing `yue2023mammoth` = `TIGER-Lab/MathInstruct`,
+262k mixed rows) for MATH-500; the code keeps only MATH-sourced rows with a gradable
+boxed/MC answer (~13,168: 11,237 MATH_train CoT + 1,840 college_math + ~90 camel-with-boxed;
+`mags/data/loaders.py:122-138, 215-231`). This is a ~20x reduction and is
+number-affecting (it changes the fitted `B`, `μ_c`, `τ` and the Figure-3 AUROC).
+**Decision: documented, not code-changed.** The paper does NOT state which subset to use;
+the MATH-sourced subset is the **on-distribution** choice for a MATH-500 (boxed-answer
+competition math) manifold — mixing in GSM8K-derived grade-school word problems,
+aqua_rat/mathqa multiple-choice, numglue, TheoremQA and MATH_train PoT (program-gold)
+would dilute the MATH-style error-direction signal with off-distribution content and
+needs per-source graders that do not exist. This is the same on-distribution principle
+behind Remark 1 (tex:L258-261). Already recorded as SPEC §4.23 with the full-mix variant
+flagged as a review-time knob, not the default. No code change (the choice is defensible
+and the environment block means no number can validate a change either way).
+
+### Confirmed finding 2 — ITI head search restricted to monitored-layer heads
+The paper says the ONLY adaptation to ITI is replacing the prompt-pair construction with
+correct/incorrect traces (tex:L394) and otherwise "follow[s] the hyperparameter ranges
+reported in the original paper" (tex:L605) — the published ITI fits a probe per head
+across **all `L×H` heads** (1024 for Llama-32l) and selects top-K. The code ranks ITI's
+top-K from the **monitored-layer heads only** (Llama `{8,16,24,31}×32` = 128 heads;
+`mags/baselines.py:103-156`, `mags/capture.py:88`, `mags/store.py:79`), because the shared
+capture pipeline records only the MAGS-monitored layers. This narrows the candidate pool
+(most acute at K=96: 96/128 vs 96/1024) and is number-affecting for a GPU run.
+**Decision: documented as a deviation, not code-changed.** Searching all layers needs an
+~8x-larger all-layer capture (memory/time) that **cannot be validated in this no-GPU
+environment** and would risk the green 60-test suite with an unverifiable change. This is
+the same shared-capture adaptation already recorded for Angular Steering (SPEC §4.16).
+Recorded honestly in SPEC §4.15 (round-33 correction) and the `mags/baselines.py`
+docstring; the faithful all-`L×H`-head search is the reference design if an all-layer
+capture path is later added on a GPU host.
+
+### Refuted finding — Angular Steering plane fit from monitored-layer subset
+The reviewer claimed AS's `(d_feat, d_PC0)` plane must be fit from all layers (tex:L394
+"across all layers"). The verifier refuted this: tex:L394/L161 describe the **scope of
+application** of the rotation (applied at every layer via `hook_layers='all'`,
+`baselines.py:390`, `generation.py:100-101`), NOT the plane-fitting data source. The
+paper is silent on the plane-fitting source, and SPEC §4.16 already records the
+monitored-subset fit as a deliberate, honestly-documented adaptation (a head-output
+variant of AS, not the residual-stream form). The code satisfies the paper's actual
+statement (rotation applied at all layers). Refuted, no change.
+
+### Verification this round
+- `pytest` → 60/60 (documentation-only changes; no test touched).
+- `smoke.sh` → `FINAL smoke=0.0000`.
+- `bash run_all_arms.sh` / `sh run_all_arms.sh` → 45/45 `FINAL <arm>=BLOCKED`, exit 0.
+- Gate simulation (per-arm subprocess, exit-0 stdout, numeric parse) → 45/45 lines,
+  0 numeric values (re-confirms the `[]` symptom is the honest BLOCKED signal, not a
+  plumbing bug).
+- Branch pushed (survivability).
+
+Status: still BLOCKED for every arm (no GPU; Llama gated without a token; Gemma/GPT-OSS
+CPU-infeasible at the paper's full config; molecular setup unstated by the paper, SPEC
+§4.18). The two confirmed findings are real faithfulness gaps for a future GPU run and
+are now recorded honestly; neither can be exercised or validated in this environment, so
+no unvalidatable code change was made. `publish_reproduction` not called here.

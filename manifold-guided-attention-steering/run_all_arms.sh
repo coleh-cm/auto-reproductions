@@ -304,7 +304,7 @@ while IFS="$_TAB" read -r model arm cmd; do
             :
         fi
     fi
-    line=$(grep -m1 "^FINAL " "runs/log__${arm}.log" 2>/dev/null || true)
+    line=$(grep -a -m1 "^FINAL " "runs/log__${arm}.log" 2>/dev/null || true)
     if [ -n "$line" ]; then
         printf '%s\n' "$line"
     else

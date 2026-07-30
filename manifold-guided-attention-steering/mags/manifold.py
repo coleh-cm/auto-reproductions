@@ -313,12 +313,12 @@ def fit_manifold_bank(
     """Phase A end-to-end: fit per-head manifolds on train_pids, rank heads by held-out
     (select_pids) mean-AUROC, keep top-K. Returns a ManifoldBank.
 
-    ``report_pids`` is the report-only third split (SPEC §4.8: 70/15/15) used to
-    compute the Figure-3 drift-validation diagnostic ``auroc_max`` (tex:L298) on
-    problems that were neither used to fit the manifold nor to select heads. This
-    avoids the selection bias of computing the diagnostic AUROC of the selected
-    heads on the same split that selected them. If None, falls back to select_pids
-    (the prior behaviour) so a caller without a report split still works.
+    ``report_pids`` is an optional third split (the paper uses a 70/30 split, so
+    report_pids is normally None). When None the Figure-3 drift-validation
+    diagnostic ``auroc_max`` (tex:L298) is computed on ``select_pids`` — the SAME
+    30% held-out the paper evaluates the manifold on (tex:L294–298) — matching
+    the paper. A caller may pass a distinct report split to avoid selection bias
+    on the diagnostic of the selected heads; the paper does not.
     """
     # restrict activations to train split for fitting
     train_acts = _split_heads(all_head_acts, train_pids)
@@ -344,7 +344,8 @@ def fit_manifold_bank(
         else:
             m.auroc = 0.5
         # max-AUROC for the Figure-3 drift-validation diagnostic (tex:L298) on the
-        # report-only split when available (SPEC §4.8), else on the select split.
+        # report split when a distinct one is supplied, else on the select split
+        # (the paper's 70/30: diagnostic and head selection share the 30% held-out).
         # Same anti-bias rule: never score the diagnostic on the fit split.
         diag_acts = None
         if report_acts is not None:

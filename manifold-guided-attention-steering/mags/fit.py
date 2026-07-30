@@ -126,27 +126,31 @@ def main(argv=None):
         _blocked("no problems produced both a correct and an incorrect trace within "
                  f"{args.n_samples} samples; manifold cannot be fit (tex:L399).")
 
-    # 3. problem-level 70/15/15 split (SPEC §4.8): fit / select / report-only
-    #    (the report-only split scores the Figure-3 drift-validation AUROC on
-    #    problems neither fit nor used for head selection, avoiding selection
-    #    bias on the diagnostic of the selected heads).
+    # 3. problem-level 70/30 split (tex:L294–298, tex:L304–305): fit / held-out.
+    #    The manifold is built on the 70% train split; the SAME 30% held-out is
+    #    used BOTH for head selection (mean-AUROC, tex:L305) AND the Figure-3
+    #    drift-validation diagnostic (max-AUROC, tex:L298) — matching the paper,
+    #    which evaluates both on the held-out test split. The earlier 70/15/15
+    #    carve-out (select + report-only) was a deviation that scored head
+    #    selection on only 15% of the held-out, noisier and able to flip the
+    #    top-K ranking (K=3); corrected to the paper's 70/30 (round 33 finding).
     rng = np.random.default_rng(config.DEFAULT_SEED)
     idx = rng.permutation(len(paired))
     n = len(paired)
     n_fit = int(0.70 * n)
-    n_sel = int(0.15 * n)
     fit_idx = idx[:n_fit].tolist()
-    sel_idx = idx[n_fit:n_fit + n_sel].tolist()
-    report_idx = idx[n_fit + n_sel:].tolist()
-    # Degenerate small-N: leave the held-out splits EMPTY rather than aliasing the
+    held_idx = idx[n_fit:].tolist()
+    # Degenerate small-N: leave the held-out split EMPTY rather than aliasing the
     # fit split. Aliasing fit_idx reintroduces train-data selection bias that
     # manifold.py explicitly guards against (heads scored on the fit split get
-    # inflated held-out AUROCs); with empty splits fit_manifold_bank assigns
+    # inflated held-out AUROCs); with an empty held-out fit_manifold_bank assigns
     # m.auroc=0.5 (chance) and fit_iti_bank/fit_as_bank fall back gracefully. Real
     # benchmarks have n>>7 so this is latent; smoke uses synthetic fixtures.
     fit_pids = [paired[i][0].id for i in fit_idx]
-    sel_pids = [paired[i][0].id for i in sel_idx]
-    report_pids = [paired[i][0].id for i in report_idx]
+    sel_pids = [paired[i][0].id for i in held_idx]
+    # Figure-3 diagnostic uses the SAME held-out 30% as head selection (paper):
+    # pass report_pids=None so fit_manifold_bank falls back to select_pids.
+    report_pids = None
 
     # 4. persist TraceStore and build head activations
     act_dir = args.out + ".acts"

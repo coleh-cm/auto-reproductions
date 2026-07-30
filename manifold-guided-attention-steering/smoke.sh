@@ -45,9 +45,15 @@ fi
 # Run the smoke (bounded); on any failure/timeout emit BLOCKED. `if ...; then` is
 # exempt from errexit so a raised exception or timeout can never abort before
 # the FINAL line.
+# `grep -a` (treat binary as text) is required: smoke.py's captured stdout can
+# contain NUL / control bytes (torch + numpy progress / reprs), and plain `grep`
+# then prints "Binary file … matches" to stdout instead of the FINAL line —
+# observed in round 33, where smoke.sh emitted a grep message, NOT a FINAL line,
+# so the deliverable's "exactly one FINAL line" contract was violated. `-a`
+# forces text mode so the FINAL line is always extracted; `-m1` keeps one line.
 if timeout "$SMOKE_TIMEOUT" "$PYTHON" -m smoke > runs/log__smoke.log 2>&1; then
-    grep -m1 "^FINAL " runs/log__smoke.log || echo "FINAL smoke=BLOCKED"
+    grep -a -m1 "^FINAL " runs/log__smoke.log || echo "FINAL smoke=BLOCKED"
 else
-    grep -m1 "^FINAL " runs/log__smoke.log 2>/dev/null || echo "FINAL smoke=BLOCKED"
+    grep -a -m1 "^FINAL " runs/log__smoke.log 2>/dev/null || echo "FINAL smoke=BLOCKED"
 fi
 exit 0

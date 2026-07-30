@@ -226,16 +226,31 @@ def test_truncate_prompt_left_truncates_to_context():
     assert _truncate_prompt(_M(), short, max_new_tokens=10).shape[1] == 10
 
 
-# --- 70/15/15 split: the Figure-3 diagnostic AUROC uses a report-only split ---
-def test_fit_uses_report_split_for_diagnostic_auroc():
-    """Regression (adversarial review, confirmed MINOR): SPEC §4.8 mandates a
-    70/15/15 problem-level split (fit / head-select / report-only AUROC test).
-    The prior fit_manifold_bank computed the Figure-3 drift-validation
-    ``auroc_max`` (tex:L298) on the SAME 15% select split used for top-K head
-    selection (tex:L305), biasing the reported diagnostic of the selected heads.
-    ``report_pids`` must be a distinct third split and ``auroc_max`` must be
-    computed on it; passing report_pids must not break the selection
-    (auroc/mean stays on the select split)."""
+# --- 70/30 split: head selection + Figure-3 diagnostic both on the 30% held-out ---
+def test_fit_production_path_uses_7030_diagnostic_on_select_split():
+    """Regression (round-33 adversarial review, confirmed number-affecting): the
+    paper (tex:L294–298, tex:L304–305) uses a 70/30 problem-level split — manifold
+    built on the 70% train, evaluated on the 30% held-out — and head selection is
+    by held-out AUROC on that same 30%. The production fit path (mags/fit.py) MUST
+    pass report_pids=None so fit_manifold_bank computes the Figure-3 diagnostic
+    ``auroc_max`` (tex:L298) on the select split (the 30% held-out), matching the
+    paper, NOT on a carved-out report-only split. Verified by re-reading the
+    source: fit.py sets `report_pids = None`."""
+    import mags.fit as fit_mod
+    src = open(fit_mod.__file__).read()
+    assert "report_pids = None" in src, (
+        "production fit path must pass report_pids=None (70/30, paper-faithful); "
+        "a 70/15/15 carve-out is a number-affecting deviation (round-33 finding).")
+    assert "int(0.70 * n)" in src and "int(0.15 * n)" not in src, (
+        "production fit path must use a 70/30 split, not 70/15/15.")
+
+
+def test_report_pids_mechanism_still_supported():
+    """The ``report_pids`` parameter is still supported (an optional distinct
+    third split for the Figure-3 diagnostic), even though the production path no
+    longer uses it. Passing a distinct report split must compute ``auroc_max`` on
+    it without breaking head selection (which stays on the select split), and
+    passing None falls back to the select split (no crash)."""
     rng = _rng(20)
     all_acts = {}
     pids = [f"p{i}" for i in range(20)]

@@ -5,6 +5,15 @@ CD, a logits processor at the output distribution level). The paper treats corre
 incorrect solution traces as the desired/undesired contrast sets for ITI and AS
 (tex:L394); we build each baseline's steering parameters from the same contrastive
 activation set MAGS uses.
+
+Known faithfulness gap (SPEC §4.15, round-33): the paper says ITI "follows the
+hyperparameter ranges reported in the original paper" (tex:L605) — the published ITI
+fits a probe per head across ALL LxH heads (1024 for Llama) and selects top-K. We rank
+ITI's top-K from the monitored-layer heads only (Llama 128) because the shared capture
+pipeline records only the MAGS-monitored layers (mags/capture.py:88, mags/store.py:79).
+This narrows the candidate pool (most acute at K=96: 96/128 vs 96/1024) and is
+number-affecting for a GPU run; the faithful all-LxH search needs an ~8x larger
+all-layer capture not validated in this no-GPU environment. Recorded as a deviation.
 """
 from __future__ import annotations
 from dataclasses import dataclass
