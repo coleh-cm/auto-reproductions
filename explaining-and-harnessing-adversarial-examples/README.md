@@ -61,7 +61,8 @@ running log and target numbers.
 
 ## Environment
 
-- Python 3.13
+- Python 3.12+ (this sandbox: CPython 3.12.13; the Dockerfile builds on `python:3.13-slim` — the
+  pinned wheels resolve identically on both)
 - torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2
 - CPU-only; no GPU required
 
@@ -70,9 +71,10 @@ running log and target numbers.
 ### With `uv` (recommended; matches the verified environment)
 
 ```bash
-# from this reproduction folder
-uv venv --python 3.13 .venv
-uv pip install --python .venv -r requirements.txt
+# from this reproduction folder (.venv/ is gitignored — recreate it in every fresh sandbox,
+# otherwise `.venv/bin/python` does not exist)
+uv venv .venv
+uv pip install --python .venv/bin/python -r requirements.txt
 
 # verify the environment imports and the FGSM invariant holds
 .venv/bin/python -c "import torch,numpy,pytest; print('env OK', torch.__version__, numpy.__version__, pytest.__version__)"
@@ -90,10 +92,10 @@ uv pip install --python .venv -r requirements.txt
 .venv/bin/python experiments/m1_softmax.py
 ```
 
-### With plain pip + a system Python 3.13
+### With plain pip + a system Python 3.12+
 
 ```bash
-python3.13 -m venv .venv
+python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 .venv/bin/python experiments/m1_softmax.py

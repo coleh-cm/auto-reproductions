@@ -28,7 +28,9 @@ figure. We reproduce the **MNIST core**; the rest is graded below.
 | — (excluded) | GoogLeNet/ImageNet Fig. 1 (ε=0.007) | qualitative | tex:381. Reason: 2014-era DistBelief GoogLeNet weights unavailable. |
 | — (excluded) | MP-DBM FGSM ε=0.25 → 97.5% | tex:793-800 | Reason: requires implementing the multi-prediction deep Boltzmann machine (Goodfellow et al. 2013a), a separate paper's model; out of budget. |
 
-Compute: CPU-only, 16 cores, Python 3.13, PyTorch. M5 (5 seeds × 2 arms) and E1 (12 nets) are
+Compute: CPU-only, 16 cores, Python 3.12.13 (this sandbox's system interpreter; the from-scratch
+Dockerfile pins `python:3.13-slim` — the pinned wheels resolve identically on 3.12 and 3.13), PyTorch.
+M5 (5 seeds × 2 arms) and E1 (12 nets) are
 the expensive items; seeds/ensemble members run as parallel processes.
 
 The numbers-gate contract for the table above is **`claims.json`** (§10): 34 claims over 13 named
@@ -538,10 +540,13 @@ milestone scripts set input 0.8 / hidden 1.0 to match the recipe's input-only dr
   (re-run 2026-07-30, unchanged).
   No official implementation of this paper was ever released (CleverHans is a later, different library).
 - **Decision: implement from scratch.** pylearn2/Theano itself is unmaintained since ~2016 and cannot
-  run on Python 3.13; the external yaml is used as *documentation of defaults* only.
+  run on a modern Python (3.12+); the external yaml is used as *documentation of defaults* only.
 
-Environment for our implementation: Python 3.13, PyTorch CPU (no GPU on this machine), MNIST via
-raw IDX download (torchvision if its mirror works, else direct from a mirror).
+Environment for our implementation: Python 3.12.13 (system interpreter here; Dockerfile builds on
+`python:3.13-slim` with the same pinned wheels), PyTorch CPU (no GPU on this machine), MNIST via
+raw IDX download (torchvision if its mirror works, else direct from a mirror). The `.venv/` is
+gitignored and must be recreated per sandbox: `uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt`
+(verified 2026-07-30: fresh venv, `import torch` OK, 47/47 tests pass, `./smoke.sh` prints its FINAL line).
 
 ---
 
