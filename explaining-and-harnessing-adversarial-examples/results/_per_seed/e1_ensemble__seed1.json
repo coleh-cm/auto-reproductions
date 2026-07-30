@@ -1,8 +1,8 @@
 {
-  "base_seed": 0,
+  "base_seed": 1,
   "description": "Ensemble of N maxout nets; FGSM ensemble-targeted vs single-member-targeted. Headline metric = error of the ensemble's mean-prob prediction (SPEC \u00a76 item 11).",
   "direction_matches_paper": true,
-  "ensemble_targeted_error": 0.9987000226974487,
+  "ensemble_targeted_error": 0.9988999962806702,
   "hyperparams": {
     "batch_size": 100,
     "ensemble_prediction": "argmax(mean member softmax probs)",
@@ -16,10 +16,9 @@
     "single_member_arm": "attack each member, average ensemble error",
     "units": 240
   },
-  "mean_per_member_error_ensemble_targeted": 0.9978333314259847,
-  "mean_per_member_error_single_targeted": 0.9962659759653939,
+  "mean_per_member_error_ensemble_targeted": 0.9977833280960718,
+  "mean_per_member_error_single_targeted": 0.9961333345207902,
   "member_clean_accuracies": [
-    0.9735000133514404,
     0.970300018787384,
     0.9728999733924866,
     0.9747999906539917,
@@ -30,7 +29,8 @@
     0.9728000164031982,
     0.9718999862670898,
     0.9711999893188477,
-    0.974399983882904
+    0.974399983882904,
+    0.9696999788284302
   ],
   "milestone": "E1",
   "note": "Sub-scale run (members=12, epochs=5, patience=10). The paper's 91.1/87.9% use 12 fully-converged nets. direction matches paper (ensemble-targeted >= single-targeted)",
@@ -41,18 +41,18 @@
     "single_member_targeted_error": 0.879
   },
   "per_member_single_targeted_errors": [
-    0.9983000159263611,
-    0.996999979019165,
-    0.9976999759674072,
+    0.9968000054359436,
+    0.9979000091552734,
     0.9983000159263611,
     0.9973000288009644,
-    0.9975000023841858,
+    0.9973000288009644,
     0.9966999888420105,
-    0.9947999715805054,
-    0.9980999827384949,
-    0.996999979019165,
-    0.9966999888420105,
-    0.9962000250816345
+    0.9944999814033508,
+    0.9980000257492065,
+    0.9969000220298767,
+    0.996399998664856,
+    0.9962999820709229,
+    0.9977999925613403
   ],
-  "single_member_targeted_error": 0.9971333295106888
+  "single_member_targeted_error": 0.9970166732867559
 }

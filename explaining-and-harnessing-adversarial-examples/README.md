@@ -34,11 +34,28 @@ running log and target numbers.
 - `arms.json` — the gate contract: a flat map `{"baseline": "<cmd>",
   "adversarial": "<cmd>"}` from each arm the gate runs to the shell command
   that produces it. The two arms are the paper's headline M4 comparison
-  (tex:492-494). The rich 12-arm per-milestone metadata is in
-  `arms_metadata.json`.
-- `run_all_arms.sh` — runs both arms at the paper's M4 config (maxout 240,
-  eps=0.25, alpha=0.5, 5000 steps); each prints exactly one
-  `FINAL <arm>=<value>` line (~1–2 min).
+  (tex:492-494). The rich per-milestone metadata is in `arms_metadata.json`,
+  and the full 13-arm numbers-gate map (arm → `command_per_seed`, results file,
+  metric pointers) is `claims.json`.
+- `run_all_arms.sh` — runs **every arm** of `claims.json` (13 arms: M1–M9, E1,
+  the L1 control; m5 and m7 each contribute two arms from one command) at
+  **every seed** in `claims.json['seeds']` (`[0, 1, 2]`), via `make_measured.py`.
+  It writes `measured.json` (`{arm: {seed: {metric: value}}}`) and prints exactly
+  one `FINAL <arm>=<value>` line per arm to stdout (BLOCKED if the environment
+  cannot produce it). m5's paper-full config (1600 units / patience 100 / 5
+  seeds) is infeasible on this CPU, so `make_measured.py` runs it at the
+  documented sub-scale (`--units 240 --epochs 12`); the m5 headline *magnitude*
+  (0.782%) is rated `compute_invariance=low` in claims.json, the HIGH m5 claim
+  is the *direction* (adversarial training ≤ baseline), which the sub-scale
+  reproduces at every seed. Runtime ~20–25 min on this CPU; real MNIST
+  throughout (no synthetic fallback).
+- `make_measured.py` — the harness `run_all_arms.sh` delegates to. Runs each
+  arm's `command_per_seed` at each seed (concurrent, writing per-seed result
+  files via `--out` so runs never clobber), resolves every metric from each
+  result via the `claims.json` `<results json>:<json path>` pointer (handles
+  dotted keys like `l1_0.0025` and the `per_seed[*]` array wildcard), and
+  writes `measured.json`. `--assemble-only` rebuilds it from the per-seed
+  files without re-running.
 - `smoke.sh` — the same code path at 200 steps (~3s); a path-prover only,
   never evidence about the paper.
 - `experiments/` — one script per milestone: `m1_softmax.py`, `m2_logreg.py`,
@@ -50,8 +67,19 @@ running log and target numbers.
   and the grep-able paper target. Defaults are a documented **sub-scale** for
   CPU feasibility; the CLI exposes the full-scale knobs (e.g.
   `--units 1600 --epochs 100 --patience 100 --seeds 0,1,2,3,4` for M5).
-- `tests/` — degeneracy + shape tests (e.g. FGSM on a linear model must equal
-  the closed-form max-norm adversary; `||η||_∞ == ε`; `x̃ == x` when `ε == 0`).
+- `results/` — committed result JSONs (one per arm, the seed-0 mirror) plus
+  `results/_per_seed/` (every arm × every seed, the inputs to `measured.json`).
+  Results are committed, not gitignored: a number whose output file is ignored
+  is a claim with its evidence deleted.
+- `tests/` — degeneracy, shape, invariant, constructed-truth, instrument, and
+  data-fingerprint tests (72 nodes). FGSM on a linear model must equal the
+  closed-form max-norm adversary; `||η||_∞ == ε`; `x̃ == x` when `ε == 0`; the
+  method at its no-op reproduces the baseline bit-for-bit; E6 is the brute-force
+  worst case; the MNIST loader is fingerprinted by sha/vocab/shape.
+- `instruments.json` / `mutations.json` — the instrument registry (every grader
+  with a positive+negative test) and the deliberate-defect suite (each defect
+  with a `must_fail` test node, all verified to fail under the defect and pass
+  on clean code).
 - `requirements.txt` — pinned dependencies (torch CPU, numpy, pytest, and the
   full transitive closure).
 - `Dockerfile` — builds the environment from scratch.

@@ -2,8 +2,8 @@
   "description": "Rubbish examples N(0,I_784) on maxout+softmax, sigmoid-top (TRAINED, per-class BCE), softmax-reg, RBF (unnorm exp(q) metric).",
   "evals": {
     "maxout_softmax": {
-      "error_rate": 0.8912000060081482,
-      "mean_confidence_on_errors": 0.8307926058769226,
+      "error_rate": 0.8823999762535095,
+      "mean_confidence_on_errors": 0.8234634399414062,
       "n": 10000
     },
     "rbf": {
@@ -12,13 +12,13 @@
       "n": 10000
     },
     "sigmoid_top": {
-      "error_rate": 0.6757000088691711,
-      "mean_confidence_on_errors": 0.8508305549621582,
+      "error_rate": 0.6958000063896179,
+      "mean_confidence_on_errors": 0.8673489093780518,
       "n": 10000
     },
     "softmax_regression": {
-      "error_rate": 0.8314999938011169,
-      "mean_confidence_on_errors": 0.7954514026641846,
+      "error_rate": 0.8586999773979187,
+      "mean_confidence_on_errors": 0.8121775984764099,
       "n": 10000
     }
   },
@@ -63,5 +63,5 @@
       "error": 0.598
     }
   },
-  "seed": 0
+  "seed": 2
 }

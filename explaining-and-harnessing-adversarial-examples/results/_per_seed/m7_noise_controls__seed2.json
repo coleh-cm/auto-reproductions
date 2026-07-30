@@ -1,26 +1,26 @@
 {
   "arms": {
     "baseline": {
-      "clean_accuracy": 0.9801999926567078,
+      "clean_accuracy": 0.9799000024795532,
       "fgsm_eval": {
-        "error_rate": 0.9905999898910522,
-        "mean_confidence_on_errors": 0.8989162445068359,
+        "error_rate": 0.9944000244140625,
+        "mean_confidence_on_errors": 0.8944007158279419,
         "n": 10000
       }
     },
     "bernoulli": {
-      "clean_accuracy": 0.979200005531311,
+      "clean_accuracy": 0.9830999970436096,
       "fgsm_eval": {
-        "error_rate": 0.9958000183105469,
-        "mean_confidence_on_errors": 0.8747632503509521,
+        "error_rate": 0.9962000250816345,
+        "mean_confidence_on_errors": 0.8656282424926758,
         "n": 10000
       }
     },
     "uniform": {
-      "clean_accuracy": 0.9419999718666077,
+      "clean_accuracy": 0.9452999830245972,
       "fgsm_eval": {
-        "error_rate": 0.9998000264167786,
-        "mean_confidence_on_errors": 0.85391765832901,
+        "error_rate": 0.9991999864578247,
+        "mean_confidence_on_errors": 0.8842782974243164,
         "n": 10000
       }
     }
@@ -50,5 +50,5 @@
     "uniform_fgsm_conf": 0.978,
     "uniform_fgsm_error": 0.904
   },
-  "seed": 0
+  "seed": 2
 }

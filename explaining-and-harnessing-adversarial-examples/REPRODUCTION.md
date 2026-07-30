@@ -25,8 +25,61 @@
   before quoting any equation from it. The PDF-extracted text in `paper/paper.md` is reliable
   for prose only.
 
+## Deliberate defects (mutations.json)
+
+`mutations.json` declares six minimal, uniquely-quoted source defects that a
+specific test node MUST catch. A suite nobody has broken on purpose is not
+evidence, so each defect has a `covers` category (the set spans `core` — the
+method's math — and `degeneracy` — the no-op / empty-set guards), a `find`
+string that occurs exactly once in `file`, its `replace`, and a `must_fail`
+test node that fails under the defect and passes on clean code. Every defect
+records a `what_it_breaks` reason (the `why`):
+
+- **M1** (`core`): FGSM must perturb by `eps*sign(grad)`; using the raw
+  gradient breaks `||η||∞ == eps`. Caught by `test_fgsm_perturbation_norm_equals_eps`.
+- **M2** (`core`, `degeneracy`): a `1e-3` floor on the no-op perturbation
+  breaks `eps=0 ⇒ cost == clean` exactly. Caught by `test_cost_degeneracy_eps0_equals_clean`.
+- **M3** (`core`): `mean_confidence_on_errors` must average the predicted-class
+  probability over the MISCLASSIFIED subset only; averaging over all examples
+  silently inflates it. Caught by
+  `tests/test_instruments.py::test_eval_metrics_negative_all_wrong_and_confidence_only_on_errors`.
+- **M4** (`core`): RBF confidence must be the UNNORMALIZED `exp(q)`; a softmax
+  reading is bounded below by `1/K` and structurally cannot reach the paper's
+  1.2 % / 0 %. Caught by `test_rbf_confidence_positive_decays_off_manifold`.
+- **M5** (`core`): the adversarial-logistic cost E6 is the WORST-case
+  (`eps*||w||₁` subtracted from the activation); flipping the sign makes it the
+  best case. Caught by `test_e6_negative_is_worst_case_not_best_case`.
+- **M6** (`degeneracy`, `core`): a grader fed an EMPTY input set must RAISE,
+  not return a vacuous `0.0`. Caught by `test_eval_clean_raises_on_empty`.
+
+Verification recipe (run AFTER any background compute, so a mid-run arm never
+imports a mutated `src`): for each defect, stash-clean state, apply the
+find→replace, run `.venv/bin/python -m pytest <must_fail> -q` and confirm it
+FAILS, then `git checkout -- <file>` and confirm the node PASSES on clean
+code. All six were re-verified this pass: each `must_fail` node returns
+non-zero under its defect and zero on clean code (the recipe runs in-process
+with a fresh `__pycache__` between arms so a mutated module is actually
+imported). The M3 `must_fail` was repointed this pass from
+`tests/test_invariants.py::test_confidence_only_over_misclassified` to the
+stronger instruments grader
+`tests/test_instruments.py::test_eval_metrics_negative_all_wrong_and_confidence_only_on_errors`,
+which exercises the confidence grader on a half-correct batch where the
+subset restriction changes the answer (the old all-wrong fixture could not
+distinguish subset-vs-all averaging — both readings give the same number).
+
 ## Log
 
+- 2026-07-30: Addressed review feedback "mutations.json declares no mutations
+  and gives no reason". `mutations.json` already declared six defects at HEAD;
+  this pass re-verified each one end-to-end (every `must_fail` node fails under
+  its defect and passes on clean code, recipe run in-process with a fresh
+  `__pycache__` so a mutated module is genuinely imported) and documented them
+  in the new "Deliberate defects" section above. Repointed M3's `must_fail` to
+  the stronger `tests/test_instruments.py` confidence-grader node. Also let the
+  in-flight `make_measured.py` background run finish so `measured.json` carries
+  real per-seed values for every arm the environment can produce (m5/m6/m7/m8/
+  m9/e1/m_l1 filled in); arms the CPU budget cannot reach stay `BLOCKED`. Full
+  suite 72 passed.
 - 2026-07-29: Workspace initialized. `paper/source/` was already present from a prior attempt;
   verified byte-identical against a fresh fetch of the arXiv e-print tarball. No fetch failure to
   record.
@@ -470,3 +523,84 @@ gate is substantially met but not fully verified in this environment.
 **Net:** 8 pass, 2 partial (gates 1 and 10, both resting solely on `docker`
 not being available in this sandbox; the non-Docker evidence for both is
 verified). No gate failed.
+
+## Numbers-gate pass (this session)
+
+Built the numbers-gate deliverables on top of the existing implementation.
+
+**`make_measured.py`** — runs every one of the 13 `claims.json` arms at every
+seed in `claims.json['seeds']` (`[0, 1, 2]`), resolves each metric via the
+`<results json>:<json path>` pointer, and writes `measured.json` as
+`{arm: {seed: {metric: value}}}` (arm keys at the top level; `_meta` is a
+single reserved key the gate skips). Each arm also prints one
+`FINAL <arm>=<value>` line (BLOCKED if the environment cannot produce it).
+Runs are concurrent (5 jobs × 2 OMP threads), each writing a unique per-seed
+result file via `--out` so runs never clobber. `--assemble-only` rebuilds
+`measured.json` from the per-seed files without re-running.
+
+**Sub-scale override.** `m5_large_advtrain`'s paper-full config (1600 units /
+patience 100 / 5 seeds, tex:497-512) is infeasible on this CPU — a single seed
+at 1600 units did not finish within the 5-minute budget. `make_measured.py`
+appends `--units 240 --epochs 12` to the m5 command (the reproduction's
+established sub-scale; every other arm defaults to `DEFAULT_UNITS=240`). This
+is recorded in `measured.json['_meta']['subscale_overrides']`. The m5 headline
+*magnitude* (0.782%) is rated `compute_invariance=low` in `claims.json`; the
+HIGH m5 claim is the *direction* (c11, adversarial training ≤ baseline clean
+test error), which the sub-scale reproduces at every seed (seed0 0.0182→0.0144,
+seed1 0.0180→0.0150, seed2 0.0222→0.0154).
+
+**Real data, no synthetic fallback.** Every arm loads real MNIST via
+`fgsm_repro.data.load_mnist` (raw IDX files under `mnist/`); the loader is
+fingerprinted by `tests/test_data_fingerprint.py` (raw-file sha256, label
+vocabulary + canonical histogram, size/shape, the 50000/10000 split). A missing
+or corrupted dataset raises (the data-loader test fails loudly), never a silent
+synthetic corpus.
+
+**Resolver bug found and fixed (adversarial self-review).** The json-path
+resolver originally split on `.`, so `m_l1`'s dotted result keys
+(`arms.l1_0.0025.clean_train_error`, `arms.l1_2.5e-05.clean_test_error`)
+failed to resolve and the arm reported `FINAL m_l1_weight_decay=BLOCKED`
+despite all three seed runs succeeding. Fixed to greedy longest-key matching
+(peels one key per level, handles dotted keys whole and the `per_seed[*]`
+array wildcard). After the fix all 117 metric cells (13 arms × 3 seeds) resolve
+with zero BLOCKED. This is exactly the failure mode the contract warns about:
+"a fit with nothing fitted ... each must fail loudly" — the BLOCKED was loud,
+it was caught, and the cause was a real resolver bug, not a missing run.
+
+**Claim directions verified against the paper (every seed):** c02 m1 FGSM
+error ≈0.999 (0.9999/1.0000/0.9999); c10/c11 m4 & m5 adversarial ≤ baseline
+clean error at every seed; c20 l1_0.0025 train error > 0.05 (0.8864, the
+degenerate >5%-train-error the paper reports); c28 e1 ensemble-targeted error
+> 0.5 (≈0.999). The full per-claim verdict is the numbers gate's job
+(`claims.json` + `measured.json`); this pass ensures the measurements exist and
+the directions hold.
+
+**`instruments.json`** — registry of every grader/scorer/equivalence-check/
+data-loader with `name`, `what_it_decides`, a `positive_test` (accepts
+known-correct) and `negative_test` (rejects known-wrong). All 21 referenced
+test nodes exist and pass; the data loader fingerprints MNIST; a grader fed an
+empty input raises (never a vacuous 0.0), guarded by the `eval_clean` /
+`_eval_from_probs_pred` empty-input check added to `src/fgsm_repro/eval.py`.
+
+**`mutations.json`** — 6 deliberate defects (covering `core` and `degeneracy`):
+FGSM uses raw gradient not sign; E7 no-op floor breaks degeneracy; confidence
+averaged over all not errors-only; RBF uses softmax not unnormalized exp; E6
+best-case not worst-case; eval_clean empty returns not raises. Each was
+verified by applying the defect, confirming the `must_fail` node FAILS,
+reverting, and confirming it PASSES on clean code. (One defect's original
+`must_fail` used an all-wrong fixture that could not distinguish subset-avg
+from all-avg; repointed to the half-correct instrument test that can.)
+
+**`SPEC.md §11 Constructed truth`** — states which oracle categories apply
+(degeneracy, brute-force E6 worst-case, same-quantity-two-ways, planted linear
+structure, slow/convex reference, limiting cases, naive==fast, paper baseline
+as regime oracle) and the exact test node enforcing each; where a category
+does not apply (no global minimum; MP-DBM generative inference and CIFAR-10
+arms in `not_tested`) it says why.
+
+**Tests:** 72 nodes pass (47 prior + 25 new: data fingerprint, grader
+positive/negative, constructed-truth). The orchestrate adversarial review of
+these artifacts launched but returned 0 reviewers (all subagents stalled);
+the verification was done inline instead — every instrument/mutation/constructed-
+truth node was confirmed to exist, and every mutation was confirmed to break
+its test and pass on clean code.

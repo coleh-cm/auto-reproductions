@@ -1,0 +1,262 @@
+{
+  "_meta": {
+    "blocked_sentinel": "BLOCKED",
+    "headline_metric": {
+      "e1_ensemble12_maxout": "ensemble_targeted_error",
+      "m1_softmax_regression": "fgsm_error_rate",
+      "m2_logistic_3v7": "fgsm_error_rate",
+      "m3_maxout240_clean": "fgsm_error_rate",
+      "m4_maxout240_advtrain": "adversarial_clean_error",
+      "m5_maxout1600_advtrain": "mean_test_error",
+      "m5_maxout1600_clean": "mean_test_error",
+      "m6_robustness_transfer_eval": "own_fgsm_error",
+      "m7_maxout_noise_sign": "fgsm_error_rate",
+      "m7_maxout_noise_uniform": "fgsm_error_rate",
+      "m8_rbf_shallow": "rbf_fgsm_error_rate",
+      "m9_rubbish_evals": "maxout_softmax_rubbish_error",
+      "m_l1_weight_decay": "l1_0.0025_train_error"
+    },
+    "run_log": [],
+    "schema": "measured.<arm>.<seed>.<metric>; arm keys are exactly claims.json['arms']; this _meta key is reserved and ignored by the gate.",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "subscale_overrides": {
+      "m5_large_advtrain.py": [
+        "--units",
+        "240",
+        "--epochs",
+        "12"
+      ]
+    }
+  },
+  "e1_ensemble12_maxout": {
+    "0": {
+      "ensemble_targeted_error": 0.9987000226974487,
+      "single_member_targeted_error": 0.9971333295106888
+    },
+    "1": {
+      "ensemble_targeted_error": 0.9988999962806702,
+      "single_member_targeted_error": 0.9970166732867559
+    },
+    "2": {
+      "ensemble_targeted_error": 0.9988999962806702,
+      "single_member_targeted_error": 0.9969999939203262
+    }
+  },
+  "m1_softmax_regression": {
+    "0": {
+      "clean_error": 0.07440000772476196,
+      "fgsm_error_rate": 0.9998999834060669,
+      "fgsm_mean_confidence_on_errors": 0.9632020592689514
+    },
+    "1": {
+      "clean_error": 0.07569998502731323,
+      "fgsm_error_rate": 1.0,
+      "fgsm_mean_confidence_on_errors": 0.9539844989776611
+    },
+    "2": {
+      "clean_error": 0.07599997520446777,
+      "fgsm_error_rate": 0.9998999834060669,
+      "fgsm_mean_confidence_on_errors": 0.9616189002990723
+    }
+  },
+  "m2_logistic_3v7": {
+    "0": {
+      "clean_error": 0.020117759704589844,
+      "fgsm_error_rate": 0.9911677837371826
+    },
+    "1": {
+      "clean_error": 0.020117759704589844,
+      "fgsm_error_rate": 0.9882237315177917
+    },
+    "2": {
+      "clean_error": 0.01766437292098999,
+      "fgsm_error_rate": 0.9980372786521912
+    }
+  },
+  "m3_maxout240_clean": {
+    "0": {
+      "clean_error": 0.017799973487854004,
+      "fgsm_error_rate": 0.9754999876022339,
+      "fgsm_mean_confidence_on_errors": 0.9132735133171082
+    },
+    "1": {
+      "clean_error": 0.01819998025894165,
+      "fgsm_error_rate": 0.9609000086784363,
+      "fgsm_mean_confidence_on_errors": 0.919227123260498
+    },
+    "2": {
+      "clean_error": 0.014800012111663818,
+      "fgsm_error_rate": 0.9632999897003174,
+      "fgsm_mean_confidence_on_errors": 0.9126547574996948
+    }
+  },
+  "m4_maxout240_advtrain": {
+    "0": {
+      "adversarial_clean_error": 0.014699995517730713,
+      "baseline_clean_error": 0.017799973487854004
+    },
+    "1": {
+      "adversarial_clean_error": 0.012499988079071045,
+      "baseline_clean_error": 0.01819998025894165
+    },
+    "2": {
+      "adversarial_clean_error": 0.014299988746643066,
+      "baseline_clean_error": 0.014800012111663818
+    }
+  },
+  "m5_maxout1600_advtrain": {
+    "0": {
+      "mean_test_error": 0.014400005340576172,
+      "per_seed_test_errors": [
+        0.014400005340576172
+      ]
+    },
+    "1": {
+      "mean_test_error": 0.014999985694885254,
+      "per_seed_test_errors": [
+        0.014999985694885254
+      ]
+    },
+    "2": {
+      "mean_test_error": 0.0153999924659729,
+      "per_seed_test_errors": [
+        0.0153999924659729
+      ]
+    }
+  },
+  "m5_maxout1600_clean": {
+    "0": {
+      "mean_test_error": 0.01819998025894165
+    },
+    "1": {
+      "mean_test_error": 0.018000006675720215
+    },
+    "2": {
+      "mean_test_error": 0.02219998836517334
+    }
+  },
+  "m6_robustness_transfer_eval": {
+    "0": {
+      "adv_to_orig_transfer_error": 0.6729999780654907,
+      "orig_to_adv_transfer_error": 0.33980000019073486,
+      "own_fgsm_error": 0.1039000004529953,
+      "own_fgsm_mean_confidence_on_errors": 0.6508220434188843
+    },
+    "1": {
+      "adv_to_orig_transfer_error": 0.6396999955177307,
+      "orig_to_adv_transfer_error": 0.3467000126838684,
+      "own_fgsm_error": 0.12890000641345978,
+      "own_fgsm_mean_confidence_on_errors": 0.6449339985847473
+    },
+    "2": {
+      "adv_to_orig_transfer_error": 0.6819000244140625,
+      "orig_to_adv_transfer_error": 0.3580000102519989,
+      "own_fgsm_error": 0.0949999988079071,
+      "own_fgsm_mean_confidence_on_errors": 0.6551804542541504
+    }
+  },
+  "m7_maxout_noise_sign": {
+    "0": {
+      "fgsm_error_rate": 0.9958000183105469,
+      "fgsm_mean_confidence_on_errors": 0.8747632503509521
+    },
+    "1": {
+      "fgsm_error_rate": 0.9987999796867371,
+      "fgsm_mean_confidence_on_errors": 0.8588039875030518
+    },
+    "2": {
+      "fgsm_error_rate": 0.9962000250816345,
+      "fgsm_mean_confidence_on_errors": 0.8656282424926758
+    }
+  },
+  "m7_maxout_noise_uniform": {
+    "0": {
+      "fgsm_error_rate": 0.9998000264167786,
+      "fgsm_mean_confidence_on_errors": 0.85391765832901
+    },
+    "1": {
+      "fgsm_error_rate": 0.9997000098228455,
+      "fgsm_mean_confidence_on_errors": 0.8804262280464172
+    },
+    "2": {
+      "fgsm_error_rate": 0.9991999864578247,
+      "fgsm_mean_confidence_on_errors": 0.8842782974243164
+    }
+  },
+  "m8_rbf_shallow": {
+    "0": {
+      "agreement_rbf_pred_maxout_over_both_wrong": 0.47343677282333374,
+      "agreement_rbf_pred_maxout_over_m1_errors": 0.30496668815612793,
+      "agreement_rbf_pred_softmax_over_m1_errors": 0.3869430124759674,
+      "agreement_softmax_pred_maxout_over_both_wrong": 0.6448200941085815,
+      "agreement_softmax_pred_maxout_over_m1_errors": 0.6277003884315491,
+      "rbf_clean_confidence": 0.3657187521457672,
+      "rbf_fgsm_error_rate": 0.9498999714851379,
+      "rbf_fgsm_mean_confidence_on_errors": 0.24894440174102783
+    },
+    "1": {
+      "agreement_rbf_pred_maxout_over_both_wrong": 0.4611375033855438,
+      "agreement_rbf_pred_maxout_over_m1_errors": 0.302463561296463,
+      "agreement_rbf_pred_softmax_over_m1_errors": 0.37225303053855896,
+      "agreement_softmax_pred_maxout_over_both_wrong": 0.6480796933174133,
+      "agreement_softmax_pred_maxout_over_m1_errors": 0.6345902681350708,
+      "rbf_clean_confidence": 0.365827351808548,
+      "rbf_fgsm_error_rate": 0.9508000016212463,
+      "rbf_fgsm_mean_confidence_on_errors": 0.24927251040935516
+    },
+    "2": {
+      "agreement_rbf_pred_maxout_over_both_wrong": 0.4415460526943207,
+      "agreement_rbf_pred_maxout_over_m1_errors": 0.27916330099105835,
+      "agreement_rbf_pred_softmax_over_m1_errors": 0.36123210191726685,
+      "agreement_softmax_pred_maxout_over_both_wrong": 0.6255447268486023,
+      "agreement_softmax_pred_maxout_over_m1_errors": 0.6062952280044556,
+      "rbf_clean_confidence": 0.36587220430374146,
+      "rbf_fgsm_error_rate": 0.9506999850273132,
+      "rbf_fgsm_mean_confidence_on_errors": 0.24927037954330444
+    }
+  },
+  "m9_rubbish_evals": {
+    "0": {
+      "maxout_softmax_rubbish_error": 0.8912000060081482,
+      "rbf_rubbish_error": 0.0,
+      "sigmoid_top_rubbish_error": 0.6757000088691711,
+      "softmax_regression_rubbish_error": 0.8314999938011169
+    },
+    "1": {
+      "maxout_softmax_rubbish_error": 0.8845000267028809,
+      "rbf_rubbish_error": 0.0,
+      "sigmoid_top_rubbish_error": 0.6746000051498413,
+      "softmax_regression_rubbish_error": 0.8575999736785889
+    },
+    "2": {
+      "maxout_softmax_rubbish_error": 0.8823999762535095,
+      "rbf_rubbish_error": 0.0,
+      "sigmoid_top_rubbish_error": 0.6958000063896179,
+      "softmax_regression_rubbish_error": 0.8586999773979187
+    }
+  },
+  "m_l1_weight_decay": {
+    "0": {
+      "baseline_test_error": 0.017799973487854004,
+      "baseline_train_error": 0.0031999945640563965,
+      "l1_0.0025_train_error": 0.8864400014281273,
+      "l1_2.5e-05_test_error": 0.01819998025894165
+    },
+    "1": {
+      "baseline_test_error": 0.01819998025894165,
+      "baseline_train_error": 0.002759993076324463,
+      "l1_0.0025_train_error": 0.8864400014281273,
+      "l1_2.5e-05_test_error": 0.018999993801116943
+    },
+    "2": {
+      "baseline_test_error": 0.014800012111663818,
+      "baseline_train_error": 0.0020800232887268066,
+      "l1_0.0025_train_error": 0.8864400014281273,
+      "l1_2.5e-05_test_error": 0.018000006675720215
+    }
+  }
+}

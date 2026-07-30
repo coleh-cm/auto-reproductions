@@ -1,15 +1,15 @@
 {
   "arms": {
     "baseline": {
-      "clean_test_accuracy": 0.982200026512146,
-      "clean_test_error": 0.017799973487854004,
-      "clean_train_accuracy": 0.9968000054359436,
-      "clean_train_error": 0.0031999945640563965,
+      "clean_test_accuracy": 0.9818000197410583,
+      "clean_test_error": 0.01819998025894165,
+      "clean_train_accuracy": 0.9972400069236755,
+      "clean_train_error": 0.002759993076324463,
       "coeff": 0.0,
       "epochs_run": 20,
       "fgsm_eval": {
-        "error_rate": 0.9754999876022339,
-        "mean_confidence_on_errors": 0.9132735133171082,
+        "error_rate": 0.9609000086784363,
+        "mean_confidence_on_errors": 0.919227123260498,
         "n": 10000
       }
     },
@@ -22,7 +22,7 @@
       "epochs_run": 11,
       "fgsm_eval": {
         "error_rate": 0.8865000009536743,
-        "mean_confidence_on_errors": 0.11702490597963333,
+        "mean_confidence_on_errors": 0.11259008198976517,
         "n": 10000
       }
     },
@@ -35,20 +35,20 @@
       "epochs_run": 11,
       "fgsm_eval": {
         "error_rate": 0.8865000009536743,
-        "mean_confidence_on_errors": 0.11702502518892288,
+        "mean_confidence_on_errors": 0.1125897541642189,
         "n": 10000
       }
     },
     "l1_2.5e-05": {
-      "clean_test_accuracy": 0.9818000197410583,
-      "clean_test_error": 0.01819998025894165,
-      "clean_train_accuracy": 0.9940999746322632,
-      "clean_train_error": 0.005900025367736816,
+      "clean_test_accuracy": 0.9810000061988831,
+      "clean_test_error": 0.018999993801116943,
+      "clean_train_accuracy": 0.9923999905586243,
+      "clean_train_error": 0.007600009441375732,
       "coeff": 2.5e-05,
       "epochs_run": 20,
       "fgsm_eval": {
-        "error_rate": 0.98580002784729,
-        "mean_confidence_on_errors": 0.9031000137329102,
+        "error_rate": 0.9889000058174133,
+        "mean_confidence_on_errors": 0.89715176820755,
         "n": 10000
       }
     }
@@ -80,5 +80,5 @@
     "coeff_too_large_train_error_floor": 0.05,
     "quote": "When applying L1 weight decay to the first layer, we found that even a coefficient of .0025 was too large, and caused the model to get stuck with over 5% error on the training set. Smaller weight decay coefficients permitted successful training but conferred no regularization benefit."
   },
-  "seed": 0
+  "seed": 1
 }

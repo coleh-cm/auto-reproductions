@@ -1,0 +1,63 @@
+{
+  "adv_arm_trained": true,
+  "arms": {
+    "adversarial": {
+      "mean_test_error": 0.014999985694885254,
+      "per_seed": [
+        {
+          "best_epoch_index": 11,
+          "epochs_chosen": 12,
+          "seed": 1,
+          "selection_epochs_run": 12,
+          "test_accuracy": 0.9850000143051147,
+          "test_error": 0.014999985694885254
+        }
+      ]
+    },
+    "baseline": {
+      "mean_test_error": 0.018000006675720215,
+      "per_seed": [
+        {
+          "best_epoch_index": 11,
+          "epochs_chosen": 12,
+          "seed": 1,
+          "selection_epochs_run": 12,
+          "test_accuracy": 0.9819999933242798,
+          "test_error": 0.018000006675720215
+        }
+      ]
+    }
+  },
+  "description": "Large maxout 1600x2: adv-valid early stop + 60k retrain + multi-seed mean (baseline vs adversarial).",
+  "direction_holds_adv_le_baseline": true,
+  "direction_matches_paper": true,
+  "hyperparams": {
+    "alpha": 0.5,
+    "batch_size": 100,
+    "dropout_hidden_include": 1.0,
+    "dropout_input_include": 0.8,
+    "eps": 0.25,
+    "in_dim": 784,
+    "lr": 0.1,
+    "model": "MaxoutMLP",
+    "momentum": 0.5,
+    "n_classes": 10,
+    "patience": 10,
+    "pieces": 5,
+    "select_criterion_adv": "adversarial-valid",
+    "select_criterion_base": "clean-valid",
+    "select_max_epochs": 12,
+    "units": 240
+  },
+  "milestone": "M5",
+  "note": "Sub-scale run (units=240, patience=10, seeds=1). The paper's 0.782 pct mean uses 1600 units, patience-100, 5 seeds. adversarial arm trained healthily (mean_test_error=0.0150, well below the 88.65% majority-class constant-predictor error); measurement is real, not a collapsed-arm artifact.",
+  "paper_target": {
+    "adversarial_test_error_mean": 0.00782,
+    "baseline_test_error": 0.0114,
+    "citation": "paper/source/iclr2015.tex:497-512",
+    "quote": "1600 units per layer ... 0.94% without adversarial training to 0.84% ... 1.14% ... 4 trials 0.77% + 1 trial 0.83% ... 0.782%"
+  },
+  "seeds": [
+    1
+  ]
+}

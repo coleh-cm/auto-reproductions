@@ -90,37 +90,47 @@ BLOCKED = "BLOCKED"
 
 
 def _resolve_pointer(blob: dict, json_path: str):
-    """Resolve a dotted json path with a single ``[*]`` array wildcard.
+    """Resolve a dotted json path with a single ``[*]`` array wildcard AND keys
+    that themselves contain dots (e.g. ``arms.l1_0.0025.clean_train_error``,
+    where ``l1_0.0025`` is one key).
 
-    ``arms.adversarial.per_seed[*].test_error`` -> list of the test_error of
-    every per_seed entry. Returns the leaf value, a list, or raises KeyError if
-    any step is absent.
+    Peels ONE key off the front of the path at each dict level, greedily
+    matching the longest actual key (so a dotted key like ``l1_0.0025`` is
+    matched whole before its dot-fragments). ``per_seed[*].test_error`` indexes
+    every list element and reads ``test_error`` from each. Returns the leaf
+    value, a list (for ``[*]``), or raises KeyError if any step is absent.
     """
-    cur = blob
-    # Tokenize keeping [*] attached to its predecessor key.
-    tokens = json_path.split(".")
-    for tok in tokens:
-        if tok.endswith("[*]"):
-            key = tok[:-3]
-            if key not in cur:
-                raise KeyError(key)
-            arr = cur[key]
-            if not isinstance(arr, list):
-                raise KeyError(f"{key} is not a list")
-            sub = tok[len(key) + 3:]  # anything after [*] (empty here)
-            rest_path = ".".join(t for t in tokens[tokens.index(tok) + 1:])
-            out = []
-            for el in arr:
-                if rest_path:
-                    out.append(_resolve_pointer(el, rest_path))
-                else:
-                    out.append(el)
-            return out
-        else:
-            if not isinstance(cur, dict) or tok not in cur:
-                raise KeyError(tok)
-            cur = cur[tok]
-    return cur
+    return _resolve_step(blob, json_path)
+
+
+def _resolve_step(cur, path: str):
+    if path == "":
+        return cur
+    if not isinstance(cur, dict):
+        raise KeyError(f"expected dict at {path!r}")
+    # Find the longest actual key K that prefixes `path` as either an exact
+    # match, a dotted descent (K + '.'), or an array wildcard (K + '[').
+    best_key = None
+    for k in cur:
+        if path == k or path.startswith(k + ".") or path.startswith(k + "["):
+            if best_key is None or len(k) > len(best_key):
+                best_key = k
+    if best_key is None:
+        raise KeyError(path)
+    remainder = path[len(best_key):]
+    if remainder == "":
+        return cur[best_key]
+    if remainder.startswith("[*]"):
+        arr = cur[best_key]
+        if not isinstance(arr, list):
+            raise KeyError(f"{best_key} is not a list")
+        rest = remainder[3:]
+        if rest.startswith("."):
+            rest = rest[1:]
+        return [_resolve_step(el, rest) for el in arr]
+    if remainder.startswith("."):
+        return _resolve_step(cur[best_key], remainder[1:])
+    raise KeyError(f"unparseable remainder {remainder!r} at {path!r}")
 
 
 def _run_one(cmd_template: str, seed: int, out_file: Path, env: dict) -> tuple[bool, str]:
