@@ -25,8 +25,82 @@
   before quoting any equation from it. The PDF-extracted text in `paper/paper.md` is reliable
   for prose only.
 
+## Deliberate defects (mutations.json)
+
+`mutations.json` declares six minimal, uniquely-quoted source defects that a
+specific test node MUST catch. A suite nobody has broken on purpose is not
+evidence, so each defect has a `covers` category (the set spans `core` — the
+method's math — and `degeneracy` — the no-op / empty-set guards), a `find`
+string that occurs exactly once in `file`, its `replace`, and a `must_fail`
+test node that fails under the defect and passes on clean code. Every defect
+records an explicit `reason` field (the `why`, also mirrored in `what_it_breaks`):
+
+- **M1** (`core`): FGSM must perturb by `eps*sign(grad)`; using the raw
+  gradient breaks `||η||∞ == eps`. Caught by `test_fgsm_perturbation_norm_equals_eps`.
+- **M2** (`core`, `degeneracy`): a `1e-3` floor on the no-op perturbation
+  breaks `eps=0 ⇒ cost == clean` exactly. Caught by `test_cost_degeneracy_eps0_equals_clean`.
+- **M3** (`core`): `mean_confidence_on_errors` must average the predicted-class
+  probability over the MISCLASSIFIED subset only; averaging over all examples
+  silently inflates it. Caught by
+  `tests/test_instruments.py::test_eval_metrics_negative_all_wrong_and_confidence_only_on_errors`.
+- **M4** (`core`): RBF confidence must be the UNNORMALIZED `exp(q)`; a softmax
+  reading is bounded below by `1/K` and structurally cannot reach the paper's
+  1.2 % / 0 %. Caught by `test_rbf_confidence_positive_decays_off_manifold`.
+- **M5** (`core`): the adversarial-logistic cost E6 is the WORST-case
+  (`eps*||w||₁` subtracted from the activation); flipping the sign makes it the
+  best case. Caught by `test_e6_negative_is_worst_case_not_best_case`.
+- **M6** (`degeneracy`, `core`): a grader fed an EMPTY input set must RAISE,
+  not return a vacuous `0.0`. Caught by `test_eval_clean_raises_on_empty`.
+
+Verification recipe (run AFTER any background compute, so a mid-run arm never
+imports a mutated `src`): for each defect, stash-clean state, apply the
+find→replace, run `.venv/bin/python -m pytest <must_fail> -q` and confirm it
+FAILS, then `git checkout -- <file>` and confirm the node PASSES on clean
+code. All six were re-verified this pass: each `must_fail` node returns
+non-zero under its defect and zero on clean code (the recipe runs in-process
+with a fresh `__pycache__` between arms so a mutated module is actually
+imported). The M3 `must_fail` was repointed this pass from
+`tests/test_invariants.py::test_confidence_only_over_misclassified` to the
+stronger instruments grader
+`tests/test_instruments.py::test_eval_metrics_negative_all_wrong_and_confidence_only_on_errors`,
+which exercises the confidence grader on a half-correct batch where the
+subset restriction changes the answer (the old all-wrong fixture could not
+distinguish subset-vs-all averaging — both readings give the same number).
+
 ## Log
 
+- 2026-07-30: Re-addressed review feedback "mutations.json declares no mutations
+  and gives no reason" (flagged for a third round despite six verified defects
+  being present). Root cause: the JSON list was keyed `defects` and the file had
+  no top-level `reason`, while the gate parser (and the matching `instruments.json`
+  convention, whose list is under `instruments`) looks for a `mutations` key plus
+  a file-level `reason`. Fix: renamed the `defects` key to `mutations`, added a
+  top-level `reason` field explaining why the file declares defects, kept the
+  per-item `reason`/`what_it_breaks`, and updated `verify_mutations.py` to read
+  `data["mutations"]` (with a legacy `defects` fallback) and to fail loudly on a
+  zero-mutation file. Re-verified all six end-to-end (every `must_fail` node
+  FAILS under its defect and PASSES on clean code); full suite 72 passed.
+  `mutations.json` top keys are now `_doc`, `reason`, `mutations`.
+- 2026-07-30: Re-addressed review feedback "mutations.json declares no mutations
+  and gives no reason" (flagged again after a prior round). The file already
+  declared six verified defects; this pass added an explicit top-level `reason`
+  field to every defect (alongside the existing `what_it_breaks`) so the `why`
+  is present under a name a parser looks for, and re-verified all six end-to-end
+  via `verify_mutations.py`: every `must_fail` node FAILS under its defect and
+  PASSES on clean code (recipe run in-process with a fresh `__pycache__` so a
+  mutated module is genuinely imported). Full suite 72 passed on clean code.
+  `mutations.json` is tracked (not gitignored) and pushed.
+- 2026-07-30: Addressed review feedback "mutations.json declares no mutations
+  and gives no reason". `mutations.json` already declared six defects at HEAD;
+  this pass re-verified each one end-to-end (every `must_fail` node fails under
+  its defect and passes on clean code, recipe run in-process with a fresh
+  `__pycache__` so a mutated module is genuinely imported) and documented them
+  in the new "Deliberate defects" section above. Repointed M3's `must_fail` to
+  the stronger `tests/test_instruments.py` confidence-grader node. Also let the
+  in-flight `make_measured.py` background run finish so `measured.json` carries
+  real per-seed values for every arm the environment can produce (m5/m6/m7/m8/
+  m9/e1/m_l1 filled in); arms the CPU budget cannot reach stay `BLOCKED`. Full
+  suite 72 passed.
 - 2026-07-29: Workspace initialized. `paper/source/` was already present from a prior attempt;
   verified byte-identical against a fresh fetch of the arXiv e-print tarball. No fetch failure to
   record.
@@ -362,7 +436,257 @@
      retrain protocol as the adversarial arm (the paper ties the 60k retrain
      only to the adversarial-valid criterion, tex:505-506) — a symmetric-
      protocol choice that biases the baseline, if anything, upward.
-  Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
-  `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
-  error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
-  47/47 tests pass.
+    Gate re-verified: `run_all_arms.sh` → `FINAL baseline=0.9788`,
+    `FINAL adversarial=0.9829` (adversarial higher clean accuracy = lower clean
+    error, the paper's M4 direction 0.94%→0.84%). Smoke path deterministic.
+    47/47 tests pass.
+
+- 2026-07-30: **Setup pass for a new workflow run.** Re-cloned
+  `coleh-cm/auto-reproductions` shallow+blobless (`--depth 1 --filter=blob:none`,
+  clone healthy, no tarball fallback needed) to `~/auto-reproductions` and continued
+  the existing remote branch `repro/explaining-and-harnessing-adversarial-examples`
+  (prior run's tip; its content is already merged to `main`, so no fresh folder was
+  created and nothing from the prior run was discarded). `$HOME/.repro_dir` =
+  `/root/auto-reproductions/explaining-and-harnessing-adversarial-examples` (no
+  trailing newline) and `$HOME/.repro_branch` =
+  `repro/explaining-and-harnessing-adversarial-examples` written. arXiv e-print
+  re-fetched from `https://arxiv.org/e-print/1412.6572` and the committed
+  `paper/source/iclr2015.tex` / `.bbl` / `.sty` verified byte-identical to the
+  fresh download — no fetch failure to record; the LaTeX remains the authoritative
+  reference for every equation, table and number. `paper/paper.md` refreshed to the
+  exact PDF-extracted paper text of this run's objective. Housekeeping per current
+  setup rules: the unpacked-source figure/style files (10 `.png`, `eps_curve.pdf`,
+  `fancyhdr.sty`, `natbib.sty`, `iclr2015.sty/.bst` — 856K total) are now untracked
+  and `paper/source/*` is gitignored with `!` re-includes for `*.tex`/`*.bbl`/`*.bib`;
+  the files themselves remain unpacked on disk. Only the LaTeX + bibliography
+  sources are committed, since figures are not what this reproduction is built from.
+
+## Measured numbers vs paper claims
+
+All commands below are run from this reproduction folder with the pinned venv
+active (`source .venv/bin/activate`) and `OMP_NUM_THREADS=4 MKL_NUM_THREADS=4`
+exported (PyTorch's default thread pool over-spawns on multi-core; see
+`run_all_arms.sh`). "Paper" = the value reported in the authoritative LaTeX
+source `paper/source/iclr2015.tex` (citation in the last column). We state the
+measured number and the difference and let the reader judge; tolerance is not
+asserted here. Sub-scale runs (smaller nets / fewer epochs / single seed than
+the paper) are flagged — the paper's headline magnitudes need 1600-unit nets
+trained to convergence with patience-100 early stopping, infeasible on this
+CPU; the DIRECTION of every headline claim is what this reproduction checks.
+
+### A. The two arms (headline M4 comparison) — re-run fresh this session
+
+These are the "two arms" the reproduction step runs. Each prints exactly one
+line `FINAL <arm>=<clean test accuracy>`; clean test error = `1 − accuracy`.
+Output captured to `/tmp/baseline.log` and `/tmp/method.log` respectively.
+
+| Arm | Paper claim (tex) | Measured (this run) | Diff (measured − paper) | Exact command |
+|-----|-------------------|---------------------|-------------------------|---------------|
+| **baseline** (clean maxout training) | clean test error 0.94% (tex:492-494) | acc `0.9787999987602234` → error **2.12%** | +1.18 pp (sub-scale: dropout OFF for the ε=0 degeneracy gate; paper's M4 net was dropout-ON, tex:492) | `python run_experiment.py --baseline --steps 5000 --seed 0 --units 240 --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5` |
+| **method** (FGSM adversarial training, ε=0.25, α=0.5) | clean test error 0.84% (tex:492-494) | acc `0.9829000234603882` → error **1.71%** | +0.87 pp (same sub-scale caveat) | `python run_experiment.py --lambda 0.25 --steps 5000 --seed 0 --units 240 --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5` |
+
+Direction verdict (stated, not asserted as reproduction): the method arm's
+clean test error (1.71%) is LOWER than the baseline's (2.12%), matching the
+paper's direction (adversarial training reduces clean error, 0.94%→0.84%).
+Both arms are bit-identical to the prior committed `results/gate_result.json`
+run (deterministic, same seed → same float).
+
+### B. The robustness of the two arms under FGSM attack (M3 / M6)
+
+| Experiment | Paper claim (tex) | Measured | Diff | Exact command (produces `results/<file>`) |
+|------------|-------------------|----------|------|-------------------------------------------|
+| M3: baseline maxout 240×2 + dropout under FGSM ε=0.25 | adv error 89.4%, conf 97.6% (tex:338-339) | adv error **99.79%**, conf **88.69%** | +10.4 pp error / −8.9 pp conf (sub-scale: 8 epochs vs convergence) | `python experiments/m3_maxout_fgsm.py` → `results/m3_maxout_fgsm.json` |
+| M6: method (adv-trained) maxout, own-FGSM ε=0.25 | adv error 17.9%, conf-on-misclassified 81.4% (tex:514-523) | own-FGSM error **10.39%**, conf **65.08%** | −7.5 pp error / −16.3 pp conf (sub-scale: 240-unit/12-epoch model vs 1600-unit/patience-100) | `python experiments/m6_robustness_transfer.py` → `results/m6_robustness_transfer.json` |
+| M6: transfer orig→adv (attack from baseline model, score on adv model) | 19.6% (tex:516) | **33.98%** | +14.4 pp | same command |
+| M6: transfer adv→orig (attack from adv model, score on baseline model) | 40.9% (tex:517) | **67.30%** | +26.4 pp | same command |
+
+Direction verdict: M6 reproduces the paper's transfer asymmetry
+(orig→adv 33.98% < adv→orig 67.30%, cf. paper 19.6% < 40.9%) and the adv-trained
+model is markedly more robust to its own FGSM (10.39%) than the baseline model
+is (M3 99.79%) — both are the paper's qualitative claims.
+
+### C. Other MNIST milestones (sub-scale)
+
+| Milestone | Paper claim (tex) | Measured | Exact command → result file |
+|-----------|-------------------|----------|------------------------------|
+| M1: softmax regression, FGSM ε=0.25 | adv error 99.9%, conf 79.3% (tex:333) | adv error **100.0%**, conf **92.86%** | `python experiments/m1_softmax.py` → `results/m1_softmax.json` |
+| M2: logistic regression 3-vs-7, FGSM ε=0.25 (exact) | clean 1.6%, adv 99% (tex:454-456) | clean **2.01%**, adv **99.12%** | `python experiments/m2_logreg.py` → `results/m2_logreg.json` |
+| M5: maxout 1600×2 adv-trained, 5 seeds | baseline 1.14% → mean 0.782% (tex:497-512) | baseline **1.82%** → adv **1.44%** (1 seed, 240 units) | `python experiments/m5_large_advtrain.py` → `results/m5_large_advtrain.json` |
+| M7: noise controls, FGSM ε=0.25 (bernoulli / uniform) | 86.2%/97.3% , 90.4%/97.8% (tex:555-557) | bern **99.97%**/83.37% , unif **99.98%**/85.39% | `python experiments/m7_noise_controls.py` → `results/m7_noise_controls.json` |
+| M8: shallow RBF, FGSM ε=0.25 | adv error 55.4%, conf-on-mistakes 1.2%, clean conf 60.6% (tex:600-604) | sub-scale (RBF underfits); conf-on-mistakes < clean-conf (right direction); §8 agreement 53.6% arm = **38.7%** over softmax-errors / **58.8%** over both-wrong (maxout-adv set) | `python experiments/m8_rbf.py` → `results/m8_rbf.json` |
+| M9: rubbish N(0,I₇₈₄) | maxout+softmax 98.35%/92.8%, sigmoid-top 68%/87.9%, softmax-reg 59.8%/70.8%, RBF 0% (tex:905-924) | maxout+softmax **82.12%**/78.52%, sigmoid-top **79.21%**/84.15%, softmax-reg **81.75%**/78.75%, RBF **0.00%** | `python experiments/m9_rubbish.py` → `results/m9_rubbish.json` |
+| E1: 12-maxout ensemble, FGSM ε=0.25 | ensemble-targeted 91.1%, single-member 87.9% (tex:819-825) | ensemble **99.76%**, single **99.79%** (4 members, 3 epochs; direction reversed at sub-scale) | `python experiments/e1_ensemble.py` → `results/e1_ensemble.json` |
+| L1: weight-decay control (Section 5) | coeff 0.0025 too large (>5% train err); smaller coeff trains but no regularization benefit (tex:426-433) | 0.0025 → 88.64% train err (stuck, as paper); 2.5e-5 → trains (2.18% train) but test 3.06% vs baseline 2.65% and FGSM 99.94% — no benefit, as paper | `python experiments/m_l1_weight_decay.py` → `results/m_l1_weight_decay.json` |
+
+RBF rubbish error = 0.00% is a structural match to the paper's 0% (the
+unnormalized per-class exp(q) metric can reach 0; a softmax metric is bounded
+below by 1/K and cannot — see SPEC §6 item 9).
+
+## Research-readiness gates
+
+Walked against the committed tree on branch
+`repro/explaining-and-harnessing-adversarial-examples`. `partial` means the
+gate is substantially met but not fully verified in this environment.
+
+| # | Gate | Verdict | Evidence |
+|---|------|---------|----------|
+| 1 | Builds from scratch | **partial** | `Dockerfile` present and well-formed (python:3.13-slim, installs pinned `requirements.txt`, runs a deps-import + FGSM-`||η||∞==ε` smoke + `pytest tests/`). `docker` is not installed in this sandbox so `docker build`/`run` was NOT executed here; the equivalent from-scratch build (`uv pip install -r requirements.txt` into a fresh `.venv`) IS verified — imports clean, 47/47 tests pass. |
+| 2 | README is accurate | **pass** | Followed the Quickstart verbatim in this checkout: `uv`/pip install, `pytest -q` (47 passed), `./run_all_arms.sh` (two `FINAL` lines), `./smoke.sh` (one `FINAL` line), `python experiments/m1_softmax.py` (writes `results/m1_softmax.json`). No memory-filled gaps. |
+| 3 | Packages are clear | **pass** | `requirements.txt` pins every direct + transitive package with a version (torch 2.7.1, numpy 2.3.2, pytest 8.4.2 + 12 transitive pins). Install from clean succeeds and the code imports without missing-import errors. |
+| 4 | Entrypoint is obvious | **pass** | One documented command runs the headline comparison: `./run_all_arms.sh` (both arms) or `python run_experiment.py --baseline|--lambda EPS --steps ...` (single arm), flag-driven, no source edits. Per-milestone entrypoints: `python experiments/mX.py`. |
+| 5 | Fast path | **pass** | `smoke.sh` exercises the full adversarial-training path (data→model→FGSM input-grad probe→mixed loss→SGD→eval) in 200 steps / ~3 s, printing one `FINAL` line. Verified this session: `FINAL adversarial=0.11349999904632568`. |
+| 6 | Deterministic / noise quantified | **pass** | Same seed → bit-identical output. Re-ran the baseline arm fresh this session: `0.9787999987602234`, identical to the prior committed `results/gate_result.json` (different session). `tests/test_degeneracy.py` locks the `--lambda 0` == `--baseline` bit-identical property. `torch.manual_seed` before model construction; seeded dropout + batch-shuffle generators. |
+| 7 | Degeneracy test in repo | **pass** | `tests/test_degeneracy.py` asserts the method's no-op (`--lambda 0`, the Algorithm-B code path at ε=0) reproduces the `--baseline` arm at the cost / train-step / CLI level (bit-identical FINAL value). 47/47 tests pass. |
+| 8 | Data provenance stated | **pass** | `src/fgsm_repro/data.py` downloads the 4 raw MNIST IDX gz files from pinned mirrors (`https://storage.googleapis.com/cvdf-datasets/mnist/` then `https://ossci-datasets.s3.amazonaws.com/mnist/`) with 3 tries/mirror and a 10 s timeout; files are cached under `data/mnist/` (gitignored, regenerated on first run). Train/valid split is the fixed index slice train[0:50000]/valid[50000:60000]; full-data retrain uses all 60000 (tex:506). |
+| 9 | Recorded number reproducible | **pass** | The two headline numbers are recorded beside their exact commands (table A above) and were re-run this session, reproducing the committed floats exactly (baseline `0.9787999987602234`, method `0.9829000234603882`). Per-milestone numbers live in committed `results/*.json` beside the producing `experiments/mX.py` command. |
+| 10 | Nothing depends on hidden local state | **partial** | `.venv/` and `data/mnist/` are gitignored (regenerated from `requirements.txt` + the pinned download); `results/`, `paper/source/` (authoritative `iclr2015.tex`), `src/`, `experiments/`, `tests/` are all committed. Runs from a fresh clone of this branch with `uv pip install -r requirements.txt` (verified via the fresh `.venv` used this session). Docker end-to-end in a truly fresh container not executed (gate 1 caveat). Two empty scratch files (`err1.txt`, `err2.txt`) that were tracked have been removed this commit. |
+
+**Net:** 8 pass, 2 partial (gates 1 and 10, both resting solely on `docker`
+not being available in this sandbox; the non-Docker evidence for both is
+verified). No gate failed.
+
+## Numbers-gate pass (this session)
+
+Built the numbers-gate deliverables on top of the existing implementation.
+
+**`make_measured.py`** — runs every one of the 13 `claims.json` arms at every
+seed in `claims.json['seeds']` (`[0, 1, 2]`), resolves each metric via the
+`<results json>:<json path>` pointer, and writes `measured.json` as
+`{arm: {seed: {metric: value}}}` (arm keys at the top level; `_meta` is a
+single reserved key the gate skips). Each arm also prints one
+`FINAL <arm>=<value>` line (BLOCKED if the environment cannot produce it).
+Runs are concurrent (5 jobs × 2 OMP threads), each writing a unique per-seed
+result file via `--out` so runs never clobber. `--assemble-only` rebuilds
+`measured.json` from the per-seed files without re-running.
+
+**Sub-scale override.** `m5_large_advtrain`'s paper-full config (1600 units /
+patience 100 / 5 seeds, tex:497-512) is infeasible on this CPU — a single seed
+at 1600 units did not finish within the 5-minute budget. `make_measured.py`
+appends `--units 240 --epochs 12` to the m5 command (the reproduction's
+established sub-scale; every other arm defaults to `DEFAULT_UNITS=240`). This
+is recorded in `measured.json['_meta']['subscale_overrides']`. The m5 headline
+*magnitude* (0.782%) is rated `compute_invariance=low` in `claims.json`; the
+HIGH m5 claim is the *direction* (c11, adversarial training ≤ baseline clean
+test error), which the sub-scale reproduces at every seed (seed0 0.0182→0.0144,
+seed1 0.0180→0.0150, seed2 0.0222→0.0154).
+
+**Real data, no synthetic fallback.** Every arm loads real MNIST via
+`fgsm_repro.data.load_mnist` (raw IDX files under `mnist/`); the loader is
+fingerprinted by `tests/test_data_fingerprint.py` (raw-file sha256, label
+vocabulary + canonical histogram, size/shape, the 50000/10000 split). A missing
+or corrupted dataset raises (the data-loader test fails loudly), never a silent
+synthetic corpus.
+
+**Resolver bug found and fixed (adversarial self-review).** The json-path
+resolver originally split on `.`, so `m_l1`'s dotted result keys
+(`arms.l1_0.0025.clean_train_error`, `arms.l1_2.5e-05.clean_test_error`)
+failed to resolve and the arm reported `FINAL m_l1_weight_decay=BLOCKED`
+despite all three seed runs succeeding. Fixed to greedy longest-key matching
+(peels one key per level, handles dotted keys whole and the `per_seed[*]`
+array wildcard). After the fix all 117 metric cells (13 arms × 3 seeds) resolve
+with zero BLOCKED. This is exactly the failure mode the contract warns about:
+"a fit with nothing fitted ... each must fail loudly" — the BLOCKED was loud,
+it was caught, and the cause was a real resolver bug, not a missing run.
+
+**Claim directions verified against the paper (every seed):** c02 m1 FGSM
+error ≈0.999 (0.9999/1.0000/0.9999); c10/c11 m4 & m5 adversarial ≤ baseline
+clean error at every seed; c20 l1_0.0025 train error > 0.05 (0.8864, the
+degenerate >5%-train-error the paper reports); c28 e1 ensemble-targeted error
+> 0.5 (≈0.999). The full per-claim verdict is the numbers gate's job
+(`claims.json` + `measured.json`); this pass ensures the measurements exist and
+the directions hold.
+
+**`instruments.json`** — registry of every grader/scorer/equivalence-check/
+data-loader with `name`, `what_it_decides`, a `positive_test` (accepts
+known-correct) and `negative_test` (rejects known-wrong). All 21 referenced
+test nodes exist and pass; the data loader fingerprints MNIST; a grader fed an
+empty input raises (never a vacuous 0.0), guarded by the `eval_clean` /
+`_eval_from_probs_pred` empty-input check added to `src/fgsm_repro/eval.py`.
+
+**`mutations.json`** — 6 deliberate defects under the top-level `mutations` key
+(plus a file-level `reason`; covering `core` and `degeneracy`): FGSM uses raw gradient not sign; E7 no-op floor breaks degeneracy; confidence
+averaged over all not errors-only; RBF uses softmax not unnormalized exp; E6
+best-case not worst-case; eval_clean empty returns not raises. Each was
+verified by applying the defect, confirming the `must_fail` node FAILS,
+reverting, and confirming it PASSES on clean code. (One defect's original
+`must_fail` used an all-wrong fixture that could not distinguish subset-avg
+from all-avg; repointed to the half-correct instrument test that can.)
+
+**`SPEC.md §11 Constructed truth`** — states which oracle categories apply
+(degeneracy, brute-force E6 worst-case, same-quantity-two-ways, planted linear
+structure, slow/convex reference, limiting cases, naive==fast, paper baseline
+as regime oracle) and the exact test node enforcing each; where a category
+does not apply (no global minimum; MP-DBM generative inference and CIFAR-10
+arms in `not_tested`) it says why.
+
+**Tests:** 72 nodes pass (47 prior + 25 new: data fingerprint, grader
+positive/negative, constructed-truth). The orchestrate adversarial review of
+these artifacts launched but returned 0 reviewers (all subagents stalled);
+the verification was done inline instead — every instrument/mutation/constructed-
+truth node was confirmed to exist, and every mutation was confirmed to break
+its test and pass on clean code.
+
+**Gate-crash fix (measured.json scalar contract).** The numbers gate formats
+every metric value as a scalar; a list value aborted it with
+`TypeError: unsupported format string passed to list.__format__`. The only
+list-valued metric was `m5_maxout1600_advtrain.per_seed_test_errors`, whose
+`arms.adversarial.per_seed[*].test_error` pointer indexed a per-seed result
+file whose `per_seed` array holds exactly one element (the seed that run
+trained under), yielding `[x]`. `make_measured.py::_metrics_for_arm` now
+collapses a one-element `[*]` list to its scalar (this seed's test error, so
+the gate's cross-seed gather is the flat `[x0,x1,x2]` that `mean`/`max`/`min`
+in c12/c13 reduce as the paper's five-run spread intends); a multi-element
+`[*]` list is BLOCKED rather than silently flattened. `measured.json` was
+reassembled from the committed per-seed result files (`--assemble-only`); it
+now contains zero list values (guarded by
+`tests/test_measured_resolver.py::test_measured_json_has_no_list_values`).
+Test count rose 72 -> 76. The crash had been masking the honest c13 verdict:
+at sub-scale (240 units / 3 seeds) the per-seed spread is ~0.0010, above the
+paper's 0.0006 (tex:506-512, measured at 1600 units / 5 seeds), so c13 does
+not reproduce at sub-scale — a verdict the gate can now render instead of
+aborting.
+
+## Numbers-gate verdict (claims_result.json) — this session
+
+`numbers_gate.py` evaluates every claim in `claims.json` against `measured.json`
+and writes `claims_result.json` (the machine-graded verdict the reader can
+re-run). It does not decide whether the paper reproduced; it states per-claim
+pass/fail/blocked and the counts.
+
+```
+FINAL pass=31  fail=3  blocked=0
+FINAL high_pass=16  high_fail=0  high_blocked=0
+FINAL gate=PASS
+```
+
+| compute_invariance | pass | fail | blocked | total |
+|--------------------|------|------|---------|-------|
+| high (load-bearing) | 16 | 0 | 0 | 16 |
+| medium | 6 | 0 | 0 | 6 |
+| low (informational) | 9 | 3 | 0 | 12 |
+| all | 31 | 3 | 0 | 34 |
+
+The gate passes (every HIGH claim is adjudicated `pass`, none blocked). The
+3 failures are all `low` and all expected at sub-scale (annotated in
+`claims.json`): `c03` softmax FGSM confidence magnitude (paper 79.3 %,
+measured 96.3 % — drifts with training budget), `c12` M5 mean magnitude
+(paper 0.782 % over 5 seeds at 1600 units, measured 1.49 % over 3 seeds at
+240 units), `c13` M5 seed spread (paper 0.0006, measured 0.0010). The HIGH
+directional claims encoding the same content (`c09`, `c11`) pass at every
+seed. The 10 deliberately-not-tested claims (ImageNet/GoogLeNet, CIFAR-10,
+MP-DBM, rotation attacks, visualizations, …) are listed in `claims.json`
+`not_tested` with reasons and in `VERIFICATION.md` §4.
+
+### Are the two headline arms within noise of each other? — No.
+
+The M4 comparison is the paper's headline. At this sub-scale the method arm's
+clean test error is **lower than the baseline's at every one of the three
+seeds** (1.47<1.78, 1.25<1.82, 1.43<1.48 %), so the run *does* separate the
+arms — the comparison the paper makes is tested, not washed out by the
+shortened horizon. The magnitudes (2.13 %/1.38 % vs the paper's
+0.94 %/0.84 %) do not match; both are sub-scale (dropout OFF + 5000 steps vs
+dropout ON + convergence). The horizon was shortened to fit the CPU; the
+direction survives the shortening, the magnitudes do not, and the magnitude
+claims are rated `low` so a reader is not told a sub-scale number is the
+paper's number. Full ledger of what was checked and what was not:
+`VERIFICATION.md`.

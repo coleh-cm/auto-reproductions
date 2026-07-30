@@ -3,8 +3,8 @@
   "clean_error": 0.020117759704589844,
   "description": "Logistic regression on MNIST 3-vs-7; FGSM eps=0.25 (exact).",
   "fgsm_eval": {
-    "error_rate": 0.9911677837371826,
-    "mean_confidence_on_errors": 0.9844313263893127,
+    "error_rate": 0.9882237315177917,
+    "mean_confidence_on_errors": 0.9838746190071106,
     "n": 2038
   },
   "hyperparams": {
@@ -25,7 +25,7 @@
     "clean_error": 0.016,
     "quote": "has a 1.6% error rate on the 3 versus 7 ... an error rate of 99%"
   },
-  "seed": 0,
+  "seed": 1,
   "train_info": {
     "best_valid_acc": 0.9893513917922974
   }

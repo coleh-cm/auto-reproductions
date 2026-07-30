@@ -1,11 +1,11 @@
 {
-  "clean_accuracy": 0.982200026512146,
-  "clean_error": 0.017799973487854004,
+  "clean_accuracy": 0.9818000197410583,
+  "clean_error": 0.01819998025894165,
   "description": "Maxout 240x2 + input dropout on MNIST; FGSM eps=0.25.",
   "eps": 0.25,
   "fgsm_eval": {
-    "error_rate": 0.9754999876022339,
-    "mean_confidence_on_errors": 0.9132735133171082,
+    "error_rate": 0.9609000086784363,
+    "mean_confidence_on_errors": 0.919227123260498,
     "n": 10000
   },
   "hyperparams": {
@@ -32,5 +32,5 @@
     "mean_confidence_on_errors": 0.976,
     "quote": "a maxout network misclassifies 89.4% of our adversarial examples with an average confidence of 97.6%"
   },
-  "seed": 0
+  "seed": 1
 }

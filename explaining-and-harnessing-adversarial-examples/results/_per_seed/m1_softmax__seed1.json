@@ -1,11 +1,11 @@
 {
-  "clean_accuracy": 0.925599992275238,
-  "clean_error": 0.07440000772476196,
+  "clean_accuracy": 0.9243000149726868,
+  "clean_error": 0.07569998502731323,
   "description": "Softmax regression on MNIST; FGSM eps=0.25.",
   "eps": 0.25,
   "fgsm_eval": {
-    "error_rate": 0.9998999834060669,
-    "mean_confidence_on_errors": 0.9632020592689514,
+    "error_rate": 1.0,
+    "mean_confidence_on_errors": 0.9539844989776611,
     "n": 10000
   },
   "hyperparams": {
@@ -26,5 +26,5 @@
     "mean_confidence_on_errors": 0.793,
     "quote": "an error rate of 99.9\\% with an average confidence of"
   },
-  "seed": 0
+  "seed": 1
 }
