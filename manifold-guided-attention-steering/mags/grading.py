@@ -110,11 +110,42 @@ def grade_humaneval(completion: str, problem) -> bool:
     return res["passed"] if isinstance(res, dict) else (res == "passed")
 
 
+def _extract_code(completion: str) -> str:
+    """Extract the last fenced code block from a chat-template completion.
+
+    MBPP runs the instruct model through its chat template (SPEC §4.13:
+    CHAT_TEMPLATE_BENCHMARKS includes MBPP), so the completion is prose followed
+    by a fenced ```python ...``` block. Executing the raw completion as Python
+    fails at the leading prose / fence markers (SyntaxError) and collapses MBPP
+    accuracy far below the paper's Table 1/2 (tex:L423/L469). HumanEval is
+    completion-style (no chat template) and produces raw code, so this extractor
+    is a no-op there (no fence -> fall back to the raw completion).
+
+    Returns the captured block if a fenced block is found, else the raw
+    completion unchanged.
+    """
+    import re
+    if not completion:
+        return completion
+    # last fenced block; fence opener may carry an optional language tag
+    # (```python / ```py / ```); captured group is the code between fences.
+    m = list(re.finditer(
+        r"```(?:[a-zA-Z0-9_+-]*)?\s*\n(.*?)```", completion, re.DOTALL))
+    if m:
+        return m[-1].group(1)
+    return completion
+
+
 def grade_mbpp(completion: str, problem) -> bool:
-    """MBPP sanitized: run ``test_list`` asserts against the generated code (10 s)."""
+    """MBPP sanitized: run ``test_list`` asserts against the generated code (10 s).
+
+    The completion is first passed through ``_extract_code`` so a chat-template
+    response (prose + fenced ```python``` block) is reduced to executable code
+    before the subprocess grader runs it.
+    """
     test_list = problem.extra.get("test_list", [])
     imports = problem.extra.get("test_imports", [])
-    code = completion
+    code = _extract_code(completion)
     test_code = "\n".join(imports) + "\n" + code + "\n" + "\n".join(test_list) + "\nprint('OK')"
     return _run_subprocess_ok(test_code, timeout=10)
 

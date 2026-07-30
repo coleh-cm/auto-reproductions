@@ -46,6 +46,34 @@ def test_mbpp_fail():
     assert not grade("MBPP", completion, prob)
 
 
+def test_mbpp_fenced_code_extraction():
+    """MBPP runs the instruct model through its chat template (SPEC §4.13), so the
+    completion is prose + a fenced ```python``` block. grade_mbpp must extract the
+    block before executing or the leading prose / fence markers raise SyntaxError
+    and collapse MBPP accuracy below the paper's Table 1/2 (tex:L423/L469).
+    _extract_code reduces a chat completion to the fenced block; raw code (no
+    fence) is returned unchanged so completion-style HumanEval is unaffected."""
+    from mags.grading import _extract_code, grade
+    prob = Problem(id="t3", benchmark="MBPP", prompt_text="", gold="",
+                   extra={"test_list": ["assert add(1,2)==3"], "test_imports": []})
+    chat_completion = (
+        "Sure, here's a function that adds two numbers.\n\n"
+        "```python\ndef add(a, b):\n    return a + b\n```\n"
+    )
+    assert _extract_code(chat_completion).strip() == "def add(a, b):\n    return a + b"
+    assert grade("MBPP", chat_completion, prob), "fenced-block completion must pass"
+    # language-tagged fence (```py) also extracted
+    py_tag = "Intro.\n```py\ndef add(a, b):\n    return a + b\n```"
+    assert grade("MBPP", py_tag, prob)
+    # no fence -> raw completion returned unchanged (HumanEval path)
+    assert _extract_code("def add(a, b):\n    return a + b\n") == \
+        "def add(a, b):\n    return a + b\n"
+    # multiple fences -> LAST one extracted
+    multi = ("```python\ndef old(a, b):\n    return 0\n```\n"
+             "```python\ndef add(a, b):\n    return a + b\n```")
+    assert grade("MBPP", multi, prob)
+
+
 def test_subprocess_timeout_safety():
     # infinite loop must be caught and return False, not hang
     assert not _run_subprocess_ok("while True:\n    pass\nprint('OK')", timeout=3)
@@ -65,6 +93,38 @@ def test_apps_grader_correct_and_wrong():
     wrong = "print(0)\n"
     assert not grade_apps(wrong, prob)
     assert grade_apps("", prob) is False  # no code -> fails
+
+
+def test_apps_prompt_includes_starter_code():
+    """Adversarial-review fix (training-loop F1): APPS intro/interview problems carry
+    a non-empty starter_code skeleton that the grader prepends to the completion.
+    load_apps MUST put the skeleton in the prompt the model conditions on, or the
+    model writes a standalone solution, the grader's injected skeleton misaligns,
+    all <=8 traces are marked incorrect, the keep-if-both rule (tex:L399) drops the
+    problem, and the contrastive set is biased toward empty-starter competition
+    problems — a number-affecting deviation in the fitted HumanEval/MBPP manifold.
+    Competition problems (empty starter) keep a skeleton-free prompt."""
+    import inspect
+    from mags.data import loaders
+    src = inspect.getsource(loaders.load_apps)
+    # prompt_text concatenates question + starter when starter is non-empty
+    assert "starter" in src and "prompt_text" in src
+    # build a Problem directly mimicking load_apps's prompt construction so the
+    # test does not require the APPS dataset (gated / unavailable in sandbox)
+    from mags.data.loaders import Problem
+    question = "Write a function that adds two numbers."
+    starter = "def add(a, b):\n    "
+    prompt_text = (question + "\n" + starter) if starter.strip() else question
+    prob = Problem(id="apps-starter", benchmark="APPS-train",
+                   prompt_text=prompt_text, gold="",
+                   extra={"starter_code": starter, "input_output": None})
+    assert starter in prob.prompt_text, "starter_code must appear in the prompt"
+    # empty-starter (competition) problem: prompt is the question alone
+    empty = ""
+    p2 = Problem(id="apps-comp", benchmark="APPS-train",
+                 prompt_text=question if not empty.strip() else question + "\n" + empty,
+                 gold="", extra={"starter_code": empty})
+    assert p2.prompt_text == question
 
 
 def test_humaneval_pass_and_fail():

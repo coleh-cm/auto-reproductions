@@ -2550,3 +2550,70 @@ gate receives a FINAL line per arm; it does not produce the paper's numbers,
 which remain blocked by the environment (no GPU, Llama gated, no pre-cached
 8B/4B/20B models — see prior rounds). `BLOCKED` is the honest "no numbers"
 string, never a fabricated value. Re-verified 52 tests + smoke green.
+
+## Round 29 — orchestrated faithfulness-review fixes (2 confirmed number-affecting findings)
+
+Ran the 5-component adversarial faithfulness review (orchestrate: data-pipeline,
+method-core, training-loop, evaluation-metric, baseline-arm) against the
+authoritative `paper/latex_src/neurips_2026.tex`, with per-finding independent
+verification. 3 of 5 components returned 0 findings; 2 confirmed number-affecting
+deviations, both latent (the sandbox BLOCKs at model load so the live trace
+collection / eval that would expose them never ran here, but on a GPU host they
+are real). Both fixed and regression-tested.
+
+### F1 (training-loop): APPS starter_code prompt/grader asymmetry
+
+**Finding (verified):** `load_apps` (mags/data/loaders.py) built the APPS
+contrastive-trace prompt from the `question` field only and stored
+`starter_code` solely in `extra`. The APPS grader `grade_apps`
+(mags/grading.py:144-145) prepends `starter_code` to the completion before
+executing (the standard Hendrycks APPS convention for intro/interview problems
+that carry a function/class skeleton). So the model, conditioned on a
+skeleton-free prompt, writes a *standalone* solution; the grader injects an
+unseen skeleton → the joined code is broken → the trace is marked incorrect.
+With all ≤8 samples incorrect the problem has no correct trace and the
+keep-if-both rule (tex:L399) drops it. This biases the paired contrastive set
+toward competition-style (empty-starter) problems, changing the fitted error
+subspace `B`, `μ_c`, and threshold — and hence the HumanEval/MBPP steering
+accuracy and PPL. `subset="all"` (the default) includes intro/interview
+problems, which are exactly the ones with non-trivial starter_code.
+
+**Fix:** in `load_apps`, append `starter_code` to the prompt when it is
+non-empty (`question + "\n" + starter`), leaving competition (empty-starter)
+prompts unchanged. `grade_apps` reads starter_code from `extra` (not
+`prompt_text`), so the grader is unaffected; only the fit-time prompt the model
+conditions on is corrected, making prompt and grader consistent. Recorded in
+SPEC §4 (no new gap — the paper is silent on APPS prompt formatting, tex:L399;
+this fixes an internal inconsistency, not a paper-reading choice).
+
+### F2 (evaluation-metric): MBPP fenced-code extraction
+
+**Finding (verified):** MBPP is in `CHAT_TEMPLATE_BENCHMARKS`
+(mags/generation.py:18) and the prompt is a natural-language instruction, so the
+instruct model responds with prose + a fenced ```python``` block. But
+`grade_mbpp` (mags/grading.py:117-118) ran `completion` *raw* as Python via
+`_run_subprocess_ok`, which `exec`s the leading prose and fence markers →
+`SyntaxError` → `returncode != 0` → problem marked wrong. The existing MBPP
+unit tests (tests/test_grading.py:33-46) fed a bare `def` with no prose/fence,
+so they never exercised the markdown case and missed the gap. Mechanistically,
+Llama-3.1-8B-Instruct and Gemma-it reliably wrap code in a fenced block for a
+chat "write a function" prompt, so MBPP accuracy would collapse far below the
+paper's Table 1/2 (tex:L423 Llama 0.562 / tex:L469 Gemma 0.587).
+
+**Fix:** added `_extract_code(completion)` in mags/grading.py (regex for the
+last fenced block, optional language tag, `re.DOTALL`; falls back to the raw
+completion if no fence is found) and applied it at the top of `grade_mbpp`.
+HumanEval is completion-style (no chat template) and produces raw code, so the
+extractor is a no-op there (no fence → raw completion). Added
+`test_mbpp_fenced_code_extraction` covering prose+fence, ```py tag,
+no-fence passthrough, and multi-fence-last-block.
+
+### Verification
+
+- 55 tests pass (was 53; +2 regression tests for the two fixes).
+- `smoke.sh` green (`FINAL smoke=0.0000` — same distilgpt2 end-to-end path).
+- `sh run_all_arms.sh` still emits all 45 `FINAL <arm>=BLOCKED` lines in <1s.
+- The environment block is unchanged: no GPU, CPU-only torch, Llama gated,
+  Gemma/GPT-OSS un-cached → all arms `BLOCKED` (the honest "no numbers" result;
+  no synthetic substitution). The two fixes are latent in this sandbox and take
+  effect on a GPU host with cached models + fitted manifolds.

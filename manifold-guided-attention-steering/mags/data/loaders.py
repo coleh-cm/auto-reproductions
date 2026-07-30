@@ -164,13 +164,28 @@ def load_apps(limit=None, subset="all") -> list:
     for r in d["train"]:
         if limit and len(out) >= limit:
             break
+        # APPS intro/interview problems carry a non-empty ``starter_code`` skeleton
+        # (a function/class signature the solution fills). The grader
+        # (mags.grading.grade_apps) prepends starter_code to the completion before
+        # executing, so the model MUST also see the skeleton in its prompt —
+        # otherwise it writes a standalone solution that the grader's injected
+        # skeleton misaligns, the joined code is broken, all <=8 traces are marked
+        # incorrect, the problem has no correct trace, and the keep-if-both rule
+        # (tex:L399) drops it. That biases the contrastive set toward
+        # competition-style (empty-starter) problems and corrupts the fitted
+        # error subspace B/mu_c/threshold, changing HumanEval/MBPP steering
+        # accuracy. The standard Hendrycks et al. APPS convention includes
+        # starter_code in the prompt for subsets that carry it; we append it here.
+        question = str(r.get("question", ""))
+        starter = str(r.get("starter_code", "") or "")
+        prompt_text = (question + "\n" + starter) if starter.strip() else question
         out.append(Problem(
             id=f"apps-{r['problem_id']}", benchmark="APPS-train",
-            prompt_text=str(r.get("question", "")),
+            prompt_text=prompt_text,
             gold=str(r.get("solutions", "")),
             extra={"difficulty": r.get("difficulty"), "source": "apps",
                    "input_output": r.get("input_output"),
-                   "starter_code": r.get("starter_code", "")},
+                   "starter_code": starter},
         ))
     return out
 
