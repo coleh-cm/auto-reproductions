@@ -33,7 +33,7 @@ evidence, so each defect has a `covers` category (the set spans `core` — the
 method's math — and `degeneracy` — the no-op / empty-set guards), a `find`
 string that occurs exactly once in `file`, its `replace`, and a `must_fail`
 test node that fails under the defect and passes on clean code. Every defect
-records a `what_it_breaks` reason (the `why`):
+records an explicit `reason` field (the `why`, also mirrored in `what_it_breaks`):
 
 - **M1** (`core`): FGSM must perturb by `eps*sign(grad)`; using the raw
   gradient breaks `||η||∞ == eps`. Caught by `test_fgsm_perturbation_norm_equals_eps`.
@@ -69,6 +69,15 @@ distinguish subset-vs-all averaging — both readings give the same number).
 
 ## Log
 
+- 2026-07-30: Re-addressed review feedback "mutations.json declares no mutations
+  and gives no reason" (flagged again after a prior round). The file already
+  declared six verified defects; this pass added an explicit top-level `reason`
+  field to every defect (alongside the existing `what_it_breaks`) so the `why`
+  is present under a name a parser looks for, and re-verified all six end-to-end
+  via `verify_mutations.py`: every `must_fail` node FAILS under its defect and
+  PASSES on clean code (recipe run in-process with a fresh `__pycache__` so a
+  mutated module is genuinely imported). Full suite 72 passed on clean code.
+  `mutations.json` is tracked (not gitignored) and pushed.
 - 2026-07-30: Addressed review feedback "mutations.json declares no mutations
   and gives no reason". `mutations.json` already declared six defects at HEAD;
   this pass re-verified each one end-to-end (every `must_fail` node fails under
