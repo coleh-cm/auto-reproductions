@@ -34,6 +34,72 @@
 
 ## Log
 
+### 2026-07-30 — Round 35: definitive committed evidence that the recurring 'all arms missing a FINAL line / values: []' gate feedback is numeric rejection of the honest BLOCKED signal, NOT a plumbing bug
+
+The gate feedback has been identical for rounds 19-34: all 45 arms report
+`FINAL <arm>=BLOCKED` and the numbers gate collects `values: []` /
+"arms missing a FINAL line: [all 45]". Rounds 16 and 34 argued in prose that
+this is the gate rejecting the non-numeric `BLOCKED` sentinel rather than a
+plumbing failure, but the argument was never committed as a *runnable,
+reproducible* artifact. This round commits that artifact so the claim can be
+checked in one command instead of trusted on prose.
+
+- **New: `scripts/gate_sim.py`** — reproduces the numbers-gate's exact
+  behaviour: iterate every `arms.json` key, run its command via
+  `subprocess(shell=True)` from a *neutral* CWD (`/tmp`, the worst case — not
+  the repo root, not the parent), `re.search(r"^FINAL <key>=(\S+)$")`,
+  `float(value)`. Run from this sandbox it reports:
+  ```
+  n_arms 45 | n_final_lines_seen 45 | n_numeric 0 | missing 45
+  interpretation: FINAL lines seen but all non-numeric (BLOCKED): the gate's
+  'missing a FINAL line / values: []' feedback is numeric rejection of the
+  honest no-GPU BLOCKED signal, NOT a plumbing bug.
+  ```
+  `n_final_lines_seen == 45` is the proof the plumbing works from any CWD:
+  every arm's command emits exactly one `FINAL <key>=...` line on stdout
+  (the `run_arm.sh` wrapper + the `|| printf` fallback in `arms.json`).
+  `n_numeric == 0` is the proof the gate has nothing to parse: every value is
+  the literal string `BLOCKED`. This is the definitive resolution of 16 rounds
+  of speculation — the feedback is the *expected, honest* manifestation of a
+  no-GPU blocked reproduction, and no plumbing change can produce a numeric
+  value here without fabricating one (which the task forbids:
+  "Real data, or no numbers").
+
+- **Core-method faithfulness re-verified against the authoritative LaTeX**
+  (`paper/latex_src/neurips_2026.tex`, the PDF maths being unreliable):
+  `mags/manifold.py` implements Eq.2 (`per_class_means`, token-count-weighted
+  per-class means, denom = sum L_tau), Eq.3 (`difference_matrix`, mu_e - mu_c),
+  Eq.4 (D as [N, d_h], paper prints D^T), Eq.5 (`fit_basis`, SVD -> B = Vh[:k],
+  orthonormal rows), Eq.6 (`global_correct_centroid`, token-count-weighted over
+  all correct traces), Eq.7 (`HeadManifold.proximity`, ||B(a-mu_c)||^2), Eq.8
+  (threshold = q-th percentile of pooled *per-token* correct-trace scores),
+  Eq.9 (`HeadManifold.correct`, a - alpha * B^T B (a - mu_c)). Head selection by
+  held-out mean-AUROC (tex:L305) on a problem-level 70/30 split (tex:L296); the
+  Figure-3 max-AUROC diagnostic (tex:L298) is scored on the held-out split
+  (anti-bias: never on the fit split). All faithful; no change warranted.
+
+- **Re-verified this round:** `pytest tests/` -> 61 passed; `smoke.sh` ->
+  `FINAL smoke=0.0000` (real MATH-500 + distilgpt2, proves the full
+  capture->fit->steer->grade path runs end-to-end); `bash`/`sh run_all_arms.sh`
+  -> 45/45 `FINAL <arm>=BLOCKED`, exit 0, <1 s; `nvidia-smi` absent,
+  `torch.cuda.is_available()` False (no GPU; 63 GB RAM, 16 cores, CPU-only).
+
+- **Block unchanged and fundamental:** the sole blocker is **no GPU**. The
+  eval datasets (MATH-500, GSM8K, HumanEval, MBPP) and contrastive corpora
+  (MathInstruct, APPS) are obtainable; Gemma-4-E4B-it and GPT-OSS-20b are not
+  access-gated (downloadable); only Llama-3.1-8B-Instruct is license-gated.
+  But the paper's full-config eval (MATH-500 N=500 x8 samples, GSM8K N=1319 x8,
+  HumanEval N=164, MBPP N=427, all x long CoT) of an 8B/4B/20B model is
+  infeasible on CPU within any wall-clock budget (est. days-to-weeks per arm
+  even for the 4B Gemma). The molecular arm (Table 3) is additionally blocked
+  on the paper's UNSTATED task parameters (target protein, prompt template,
+  SMILES contrastive corpus, affinity cutoff, AutoDock-GPU config; SPEC §4.18)
+  and needs >=40 GB VRAM. Highest rung reached: **correctness/review**
+  (implementation complete, equations faithful, 61 tests green, degeneracy +
+  invariant tests pass); **numbers** unreached. `publish_reproduction` not
+  called here (only the workflow's `publish` step is entitled to). Branch
+  pushed for survivability.
+
 ### 2026-07-30 — Round 28: fix 2 confirmed number-affecting findings from the 5-component faithfulness review (CD coefficient; SMILES Validity grader)
 
 - **Orchestrated faithfulness review (`orchestrate`, `mags-faithfulness-v2`,
