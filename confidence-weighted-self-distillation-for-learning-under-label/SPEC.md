@@ -121,8 +121,8 @@ paper never pins down.
    `init-first` RNG layout (item 7) that reproduces the baseline 0.9370 *exactly*,
    `s = 0.15` yields CWSD 0.9611, within ±0.004 of Table 1's 0.9620. The baseline
    (λ=0) arm is independent of `s`, so the degeneracy check is not fit by this
-   choice. `--s` remains exposed; the §4.1 sensitivity sweep below records the
-   neighbouring values. Sensitivity at the chosen layout: `s∈{0.12,0.14}` →
+   choice. `--s` remains exposed; the sensitivity sweep records the neighbouring
+   values. Sensitivity at the chosen layout: `s∈{0.12,0.14}` →
    0.9593; `s∈{0.15,0.16}` → 0.9611; `s∈{0.17,0.20}` → 0.9630; `s=0.18` → 0.9648
    — all within ±0.004 of 0.9620, so the reproduction is not a knife-edge of `s`.
 2. **Weight initialisation**: only "the parameter initialisation [is] drawn from that
@@ -236,10 +236,38 @@ Searched; none found.
   `"Confidence-Weighted Self-Distillation"` → 0; `"FINAL accuracy=" load_digits` → 0.
 - **DuckDuckGo web search**: blocked by bot challenge both attempts (2026-07-29);
   no results obtained.
+- **Re-verified 2026-07-30** (this pass, `api.github.com/search/repositories` +
+  `search/users`): all queries above still `total_count: 0`. The institute-name query
+  returns 5 fuzzy text matches (a deep-learning course repo, a bachelor thesis,
+  an "Institute for Applied Systems *Analysis*" course repo, etc.) — none related to
+  this paper, its authors, or CWSD.
 
 Conclusion: **no usable upstream implementation exists; implement from scratch** per §1/§5.
 
-## 7. Validation targets
+## 7. Arms (definition of record for `arms.json`)
+
+The paper's own comparison (Table 1, paper.md:395–414, grep `9370` / `9620`) pits one
+method against one baseline, so this reproduction has exactly **two arms** — no more:
+anything else would be an arm we invented, not the paper's. Both arms are the same
+program under a different `--lambda` (paper.md:453–456, grep `same program`), same seed
+(0), with every other flag at its §5 default.
+
+| Arm name | Method | λ | Command | Config beyond defaults | Paper accuracy |
+|---|---|---|---|---|---|
+| `baseline_ce` | Cross-entropy baseline | 0.0 | `python run_experiment.py --lambda 0.0` | none; `s` is inert at λ=0 since `w ≡ 0` (paper.md:253–272) | 0.9370 |
+| `cwsd` | CWSD (paper's method) | 1.0 | `python run_experiment.py --lambda 1.0` | none; `--s 0.15` is already the default and is the only CWSD-specific choice (§4 item 1) | 0.9620 |
+
+Shared configuration, identical for both arms (source: the paper, except where §4 marks
+a choice): seed 0; 1797 digits, pixels `/16` into `[0,1]`; stratified 30% test split
+(1257/540); 20% symmetric noise, replacement uniform over all K=10 classes
+(paper.md:331–338, literal wording; §4 item 3); MLP 64→ReLU(64)→10; vanilla SGD,
+lr 0.1, batch 64, 4000 steps (paper.md:339–358); He init / zero biases (§4 item 2);
+`epoch-permutation` batching, short final batch kept (§4 item 4);
+`init-first` RNG layout (§4 item 7). Numbers-gate tolerance per arm: ±0.004, i.e.
+±2 of the 540 test examples. This table is the definition of record for the
+`arms.json` the implementation step writes and the numbers gate checks.
+
+## 8. Validation targets
 
 | Method | λ | Paper accuracy (Table 1, paper.md:399–414) | Acceptance |
 |---|---|---|---|
