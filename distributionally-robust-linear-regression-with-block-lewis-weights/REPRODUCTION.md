@@ -139,3 +139,16 @@ centring-based log-barrier IPM reaches 1% in 22 iterations (base=init) / 19 (bas
 does converge rapidly and to the best final loss (≈OPT, matching the qualitative claim), but the
 exact 8 is not reproduced — the barrier schedule is unspecified (SPEC §6 item 10) and 8 ≈ √m
 suggests a short-step schedule with a tighter constant than our reconstructed one.
+
+### 2026-07-30 — GATE FIX: drop `_meta` from arms.json (this commit)
+The gate iterates over every key of `arms.json` and requires each to be a runnable arm that prints
+exactly one `FINAL <arm>=<value>` line. The previous `arms.json` carried a `_meta` object (paper
+title, arxiv, paper_ref, project_id, primary metric, note) alongside the 8 runnable arms; the gate
+counted `_meta` as a declared arm and flagged it as missing a FINAL line. Removed `_meta` from
+`arms.json`, which now holds only the 8 runnable arm commands. No metadata is lost: the paper
+block (title/arxiv/paper_ref/project_id) and the primary_metric (with citation) already live in
+`arms_contract.json`, and the `harness all` results JSON still records a `_meta` instance-summary
+field (instance/m/d/n/opt/gap0/budget) — that is a results-file entry, not a declared arm, and is
+not expected to print a FINAL line. Verified: each of the 8 per-arm commands prints exactly one
+`FINAL <arm>=<value>` line (reference_cvxpy=110.316, ball_oracle_euclidean=1, ball_oracle_lewis=1
+re-checked post-edit; the full 8-arm set was produced by the prior gate run).

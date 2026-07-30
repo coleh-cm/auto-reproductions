@@ -6,14 +6,5 @@
   "smoothed_nesterov":    ".venv/bin/python -m gdr.harness arm --arm smoothed_nesterov --instance acs",
   "ipm":                  ".venv/bin/python -m gdr.harness arm --arm ipm --instance acs",
   "ball_oracle_euclidean":".venv/bin/python -m gdr.harness arm --arm ball_oracle_euclidean --instance acs",
-  "ball_oracle_lewis":    ".venv/bin/python -m gdr.harness arm --arm ball_oracle_lewis --instance acs",
-  "_meta": {
-    "paper": "Distributionally Robust Linear Regression With Block Lewis Weights",
-    "arxiv": "2607.00252",
-    "paper_ref": "0a8cf406-bd9b-4ebe-8a3f-c9e3d62a2a94",
-    "project_id": "d7735ece-02c4-4228-985c-00834c92b8f3",
-    "primary_metric": "iterations_to_1pct_rel_gap_acs (base=init; base=opt recorded in results JSON)",
-    "primary_citation": "paper/experiments.tex:174-186",
-    "note": "Each command prints exactly one line 'FINAL <arm>=<value>'. The full arm contract (configs, claims, per-arm citations) is in arms_contract.json. 'run_all_arms.sh' runs every arm in one process; these per-arm commands are the decomposable equivalents."
-  }
+  "ball_oracle_lewis":    ".venv/bin/python -m gdr.harness arm --arm ball_oracle_lewis --instance acs"
 }
