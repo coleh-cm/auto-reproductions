@@ -70,6 +70,18 @@ distinguish subset-vs-all averaging — both readings give the same number).
 ## Log
 
 - 2026-07-30: Re-addressed review feedback "mutations.json declares no mutations
+  and gives no reason" (flagged for a third round despite six verified defects
+  being present). Root cause: the JSON list was keyed `defects` and the file had
+  no top-level `reason`, while the gate parser (and the matching `instruments.json`
+  convention, whose list is under `instruments`) looks for a `mutations` key plus
+  a file-level `reason`. Fix: renamed the `defects` key to `mutations`, added a
+  top-level `reason` field explaining why the file declares defects, kept the
+  per-item `reason`/`what_it_breaks`, and updated `verify_mutations.py` to read
+  `data["mutations"]` (with a legacy `defects` fallback) and to fail loudly on a
+  zero-mutation file. Re-verified all six end-to-end (every `must_fail` node
+  FAILS under its defect and PASSES on clean code); full suite 72 passed.
+  `mutations.json` top keys are now `_doc`, `reason`, `mutations`.
+- 2026-07-30: Re-addressed review feedback "mutations.json declares no mutations
   and gives no reason" (flagged again after a prior round). The file already
   declared six verified defects; this pass added an explicit top-level `reason`
   field to every defect (alongside the existing `what_it_breaks`) so the `why`
@@ -591,8 +603,8 @@ test nodes exist and pass; the data loader fingerprints MNIST; a grader fed an
 empty input raises (never a vacuous 0.0), guarded by the `eval_clean` /
 `_eval_from_probs_pred` empty-input check added to `src/fgsm_repro/eval.py`.
 
-**`mutations.json`** — 6 deliberate defects (covering `core` and `degeneracy`):
-FGSM uses raw gradient not sign; E7 no-op floor breaks degeneracy; confidence
+**`mutations.json`** — 6 deliberate defects under the top-level `mutations` key
+(plus a file-level `reason`; covering `core` and `degeneracy`): FGSM uses raw gradient not sign; E7 no-op floor breaks degeneracy; confidence
 averaged over all not errors-only; RBF uses softmax not unnormalized exp; E6
 best-case not worst-case; eval_clean empty returns not raises. Each was
 verified by applying the defect, confirming the `must_fail` node FAILS,

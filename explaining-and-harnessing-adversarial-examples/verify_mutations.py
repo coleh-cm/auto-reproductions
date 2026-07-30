@@ -7,7 +7,12 @@ ROOT = pathlib.Path(__file__).resolve().parent
 PY = str(ROOT / ".venv/bin/python")
 mut_file = ROOT / "mutations.json"
 data = json.load(open(mut_file))
-defects = data["defects"]
+# The list of defects lives under the `mutations` key (matching the filename
+# convention used by instruments.json, whose list is under `instruments`).
+# Fall back to a legacy `defects` key if present so an older file still verifies.
+defects = data.get("mutations", data.get("defects"))
+if not defects:
+    raise SystemExit("mutations.json declares no mutations under `mutations` (or `defects`)")
 
 def run_pytest(node):
     r = subprocess.run([PY, "-m", "pytest", node, "-q", "-p", "no:cacheprovider"],
@@ -44,6 +49,11 @@ allok = True
 for rid, status, det in results:
     print(f"{rid:45s} {status}  {det or ''}")
     if status != "OK": allok = False
+# A file that declares zero mutations is a silent no-op: fail loudly rather
+# than print an OK-looking banner. (Mirrors the "no OK on an empty result" rule.)
+if len(defects) == 0:
+    allok = False
+    print("ZERO MUTATIONS DECLARED — mutations.json must list at least one defect")
 print("=" * 60)
 print("ALL MUTATIONS VERIFIED" if allok else "SOME MUTATIONS BROKEN")
 sys.exit(0 if allok else 1)
