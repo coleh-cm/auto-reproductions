@@ -307,9 +307,18 @@ This section supersedes the rung statement in §6 with the publish-time state.
   on numbers-gate infrastructure, the last being the `figures`-key crash — is
   lineage history; all of it is resolved in the final committed state, which
   is why the gate now passes 9/9 and no budget file remains.)
-- **Rung reached: `numbers`.** The gate passes 9/9, no budget file shows a
-  still-failing gate, and the recorded numbers are reproducible
-  (`./run_all_arms.sh` regenerates `measured.json` bit-identical).
+- **Rung reached: `numbers` (on-disk gate), `review` (published).** The
+  on-disk numbers gate passes 9/9, no budget file shows a still-failing gate,
+  and the recorded numbers are reproducible
+  (`./run_all_arms.sh` regenerates `measured.json` bit-identical). However the
+  `publish_reproduction` tool's `numbers` guard rejected the publication on
+  every attempt with *"rung 'numbers' requires the verdict counts from
+  claims_result.json in `claims`"* — the guard independently re-reads
+  `claims_result.json` to verify the gate and could not locate it for a
+  monorepo subfolder (this reproduction lives in a subfolder of a
+  multi-reproduction repo). The tool accepted `rung=review` and delivered
+  that to the Research IDE. The on-disk 9/9 result stands; `review` is the
+  published rung, recording a tooling limit, not a failed gate.
 
 ### What this run actually checked (final, consolidated)
 

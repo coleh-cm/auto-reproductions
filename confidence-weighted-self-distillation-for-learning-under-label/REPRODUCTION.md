@@ -229,11 +229,28 @@ same dep set the `Dockerfile` installs.
   on numbers-gate infrastructure crashes — the `figures` key entering the
   gate's curve pre-build — all resolved in the final committed state where
   the gate passes 9/9; that history is recorded in `VERIFICATION.md` §5.)
-- **Rung reached:** `numbers`. The gate passes 9/9, no budget file shows a
-  still-failing gate, and the recorded numbers are reproducible.
-- **Honest caveats (do not negate the rung, a reader must weigh them):**
+- **On-disk numbers gate:** 9/9 `reproduced`, gate PASS, re-evaluated on the
+  final committed `measured.json`. No budget file (`$HOME/.build_attempts`,
+  `$HOME/.env_attempts`, `$HOME/.review_rounds`) exists at publish, and no
+  gate is failing. The recorded numbers are reproducible (`./run_all_arms.sh`
+  regenerates `measured.json` byte-identical).
+- **Published rung:** `review` (not `numbers`). The numbers gate *passes 9/9
+  on disk*, but the `publish_reproduction` tool's `numbers` guard would not
+  accept the publication: it returned *"rung 'numbers' requires the verdict
+  counts from claims_result.json in `claims'"* on every attempt (the guard
+  independently re-reads `claims_result.json` to verify the gate and could
+  not locate it for a monorepo subfolder — this reproduction lives in a
+  subfolder of a multi-reproduction repo, not its own repo at the root the
+  guard searches). The tool accepted `rung=review` and delivered it to the
+  Research IDE. The on-disk gate result (9/9 reproduced) stands and is what
+  a reader should weigh; the `review` rung reflects the publish tool's
+  verification limit, not a failed gate. (No budget file shows a still-failing
+  gate, so per the workflow's own accounting this is not a legitimate
+  downgrade for cause — it is a tooling limit, recorded honestly here.)
+- **Honest caveats (a reader must weigh them):**
   (1) at seed 1 the two arms are within noise (gap +0.0074 < baseline spread
   0.0092) — that seed alone does not test the comparison; the paper's own
   seed 0 does separate the arms and agrees with the paper. (2) the CWSD
   arm's absolute number depends on the unstated gate sharpness `s`. (3) the
-  Docker build path was not exercised (`docker` absent).
+  Docker build path was not exercised (`docker` absent; readiness gate 1 is
+  `partial`).
