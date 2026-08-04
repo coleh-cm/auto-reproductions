@@ -46,7 +46,7 @@ EPS_CIFAR = 0.10
 EPOCHS_SOFTMAX = 30
 EPOCHS_LOGREG = 30
 EPOCHS_MAXOUT240 = 25
-EPOCHS_MAXOUT1600 = 10
+EPOCHS_MAXOUT1600 = 6
 EPOCHS_RBF = 30
 EPOCHS_CONV = 8
 ENSEMBLE_MEMBERS = 12
@@ -212,9 +212,13 @@ def arm_maxout_large_naive(seed):
 
 
 def arm_maxout_large_adv(seed):
-    d = _torch_data(data.load_mnist_full(seed))
+    # Use the 50k/10k-val split for early stopping (clean val); skip the paper's
+    # 60k retrain phase to keep the 5-seed run tractable on CPU (sub-scale; the
+    # high-invariance c16 adv_err ordering survives; c18/c19 clean 0.782% are
+    # low-invariance and expected to fail here).
+    d = _torch_data(data.load_mnist(seed))
     m, h = _train_maxout(1600, seed, d, adversarial=True,
-                         monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=True)
+                         monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=False)
     x_test, y_test = d["x_test"], d["y_test"]
     clean = ev.error(m, x_test, y_test)
     adv = ev.adv_eval(m, x_test, y_test, EPS_MNIST)
@@ -466,7 +470,7 @@ def main():
                     d = _torch_data(data.load_mnist(s))
                     ln, _ = _train_maxout(1600, s, d, epochs=EPOCHS_MAXOUT1600)
                     la, _ = _train_maxout(1600, s, d, adversarial=True,
-                                          monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=True)
+                                          monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=False)
                     res = fn(s, large_naive=ln, large_adv=la)
                 elif arm == "eps_trace":
                     d = _torch_data(data.load_mnist(s))

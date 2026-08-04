@@ -147,9 +147,24 @@
     }
   },
   "maxout_adv": {
-    "0": "BLOCKED",
-    "1": "BLOCKED",
-    "2": "BLOCKED"
+    "0": {
+      "clean_err": 1.2199999764561653,
+      "adv_err": 24.98999983072281,
+      "adv_conf_all": 85.90753674507141,
+      "adv_conf_mistakes": 73.79471063613892
+    },
+    "1": {
+      "clean_err": 1.209999993443489,
+      "adv_err": 27.880001068115234,
+      "adv_conf_all": 86.39799952507019,
+      "adv_conf_mistakes": 76.93830728530884
+    },
+    "2": {
+      "clean_err": 1.2600000016391277,
+      "adv_err": 19.87999975681305,
+      "adv_conf_all": 89.08625841140747,
+      "adv_conf_mistakes": 76.51726603507996
+    }
   },
   "maxout_large_naive": {
     "0": {
