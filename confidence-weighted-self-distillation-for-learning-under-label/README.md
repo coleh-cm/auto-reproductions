@@ -83,7 +83,7 @@ knife-edge of `s` (see `SPEC.md` §4 item 1 and `REPRODUCTION.md`). Whether the
 CWSD arm's 0.0009 gap counts as a reproduction is not asserted; see
 `REPRODUCTION.md` for the measured-vs-claimed table. Run the tests to verify
 the no-op = baseline claim without trusting the implementation: `pytest -q`
-→ 47 passed.
+→ 48 passed.
 
 ## Quickstart
 
@@ -145,7 +145,7 @@ stdout contract is unchanged.
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 47 tests: degeneracy + invariants + structural-metrics + data + CLI + instruments + mutations
+.venv/bin/python -m pytest -q     # 48 tests: degeneracy + invariants + structural-metrics + data + CLI + instruments + mutations
 ```
 
 The mutation tests (`tests/test_mutations.py`) inject each defect in

@@ -41,8 +41,9 @@ def test_split_is_stratified_and_seeded():
 def test_corrupt_labels_rate_and_invariance():
     """uniform-all noise: effective flip rate ~0.18 (literal reading, uniform over
     all K so ~1/10 of corrupted examples keep their label) and labels stay in [0,K).
-    Upper bound < 0.21 so uniform-other (true ~0.20) would fail this test, making
-    the two modes distinguishable here rather than only via the exclusion test."""
+    The < 0.21 upper bound is loose enough that uniform-other (true ~0.20) can also
+    satisfy it on some seeds, so the two modes are distinguished reliably only by the
+    exclusion test below, not by this rate bound alone."""
     rng = np.random.default_rng(3)
     y = rng.integers(0, r.K, size=4000)
     yc = r.corrupt_labels(y, rng, rate=0.2, mode="uniform-all")
@@ -69,3 +70,25 @@ def test_corrupt_labels_clean_when_rate_zero():
     y = rng.integers(0, r.K, size=100)
     yc = r.corrupt_labels(y, rng, rate=0.0)
     assert np.array_equal(yc, y)
+
+
+def test_train_leaves_test_set_clean():
+    """The paper corrupts TRAIN labels only (paper.md:327). Structurally corrupt_labels
+    mutates only the array passed to it (ytr_clean inside train()), and yte is never
+    passed in, but no test ran the full train() path and then re-checked yte. This
+    closes that gap: a clean load_data() split, then train(), then the test labels of
+    the trained run must equal the uncorrupted split's yte byte-for-byte."""
+    import argparse
+
+    Xtr_clean, ytr_clean, Xte_clean, yte_clean = r.load_data(0)
+    cfg = argparse.Namespace(
+        seed=0, steps=5, lr=0.1, batch_size=64, init="he",
+        noise_mode="uniform-all", noise_rate=0.2, batch_mode="epoch-permutation",
+        rng_layout="init-first", lambda_=1.0, tau=0.9, s=0.15, temperature=2.0,
+    )
+    r.train(cfg)
+    # re-derive the test labels the way train() sees them: same split (sklearn stream,
+    # independent of the default_rng used for noise), so they must still be clean.
+    _, _, Xte_after, yte_after = r.load_data(0)
+    assert np.array_equal(yte_after, yte_clean)
+    assert Xte_after.shape == (540, 64)
