@@ -67,10 +67,10 @@
   ranges ε∈[-15,15] and y-unit "argument to softmax" asserted against the paper's
   figure inside the plotter, `tests/test_f4_figure.py`). The pair is for a reader to
   compare and is NOT evidence — the gate's verdicts on the curve data are.
-- [ ] Implementation runs smallest end-to-end case
-- [ ] Adversarial review rounds clean
-- [ ] Readiness gates walked and recorded
-- [ ] Numbers compared to paper and published
+- [x] Implementation runs smallest end-to-end case (`smoke.sh`, ~3 s, prints `FINAL adversarial=…`)
+- [x] Adversarial review rounds clean (5/6 components approved; the one finding — 4 latent no-success-on-empty graders — fixed and tested; no review-round budget spent, no `$HOME/.review_rounds`)
+- [x] Readiness gates walked and recorded (see "Research-readiness gates" table below: 8 pass / 2 partial / 0 fail)
+- [x] Numbers compared to paper and published (see "Measured numbers vs paper claims" tables A–C below; `publish_reproduction` called)
 
 ## Notes
 
@@ -199,3 +199,110 @@
   is unchanged and current). 97/97 tests pass; gate unchanged (34/3/0, HIGH 19/19
   PASS). The 3 low/magnitude fails (c03/c12/c13) remain the annotated
   paper-scale claims, unchanged.
+
+## Measured numbers vs paper claims (final run, this session)
+
+Every number below is the **mean over 3 seeds (0, 1, 2)** of the arm's headline
+metric(s), taken from `measured.json` (rebuilt this session by
+`./run_all_arms.sh` → `make_measured.py`; the per-seed values live in
+`results/_per_seed/*.json` and are referenced by the `FINAL <arm>=…` lines in
+`/tmp/arms.log`). The **exact command** is the arm's `command_per_seed` from
+`claims.json`, run once per seed via `make_measured.py` (m5 carries the
+documented sub-scale flags `--units 240 --epochs 12`; see VERIFICATION.md §0).
+The "paper claim" column is the value the paper states at the cited line of
+`paper/source/iclr2015.tex`. **Differences are stated, not adjudicated** — this
+table reports measured minus claimed; whether the difference is "in tolerance"
+is the reader's call, not this reproduction's. All data is **real MNIST**
+(`src/fgsm_repro/data.py`, fingerprinted); no synthetic stand-in was used for
+any arm (CIFAR-10 / ImageNet / MP-DBM arms are in `not_tested`, not
+substituted — VERIFICATION.md §4).
+
+### Table A — headline per-arm: measured vs claimed
+
+| Arm (command) | Paper claim (tex line) | Measured (mean, 3 seeds) | Δ (measured − claimed) |
+|---|---|---|---|
+| `m1_softmax_regression`<br>`python experiments/m1_softmax.py --seed {seed}` | FGSM error 99.9 %, conf 79.3 % (tex:333) | error **99.993 %**, conf **95.96 %** | error +0.09 pp; conf +16.7 pp |
+| `m2_logistic_3v7`<br>`python experiments/m2_logreg.py --seed {seed}` | clean 1.6 %, FGSM error 99 % (tex:454–456) | clean **1.93 %**, FGSM **99.25 %** | clean +0.33 pp; FGSM +0.25 pp |
+| `m3_maxout240_clean`<br>`python experiments/m3_maxout_fgsm.py --seed {seed}` | FGSM error 89.4 %, conf 97.6 % (tex:338–339) | error **96.66 %**, conf **91.51 %** | error +7.26 pp; conf −6.09 pp |
+| `m4_maxout240_advtrain`<br>`python experiments/m4_adversarial.py --seed {seed}` | baseline 0.94 % → adv 0.84 % (tex:492–494) | baseline **1.69 %** → adv **1.38 %** | both +0.75 / +0.54 pp (sub-scale; direction holds at every seed) |
+| `m5_maxout1600_clean` (sub-scale 240 units / 12 epochs)<br>`python experiments/m5_large_advtrain.py --seeds {seed} --units 240 --epochs 12` | baseline 1.14 % (tex:499) | clean **1.95 %** | +0.81 pp (sub-scale) |
+| `m5_maxout1600_advtrain` (same command, adv arm)<br>`python experiments/m5_large_advtrain.py --seeds {seed} --units 240 --epochs 12` | mean 0.782 % over 5 seeds (tex:509) | mean **1.49 %** over 3 seeds | +0.71 pp (sub-scale; needs 1600-unit / 5-seed budget — claim c12 rated `low`) |
+| `m6_robustness_transfer_eval`<br>`python experiments/m6_robustness_transfer.py --seed {seed}` | own FGSM 17.9 %, orig→adv 19.6 %, adv→orig 40.9 %, conf 81.4 % (tex:514–523) | own **10.93 %**, orig→adv **34.82 %**, adv→orig **66.49 %**, conf **65.03 %** | own −6.97 pp; orig→adv +15.2 pp; adv→orig +25.6 pp; conf −16.4 pp |
+| `m7_maxout_noise_sign`<br>`python experiments/m7_noise_controls.py --seed {seed}` | Bernoulli-noise control FGSM error 86.2 %, conf 97.3 % (tex:555–557) | error **99.69 %**, conf **86.64 %** | error +13.5 pp; conf −10.7 pp |
+| `m7_maxout_noise_uniform` (same command, uniform arm)<br>`python experiments/m7_noise_controls.py --seed {seed}` | Uniform-noise control FGSM error 90.4 %, conf 97.8 % (tex:555–557) | error **99.96 %**, conf **87.29 %** | error +9.56 pp; conf −10.5 pp |
+| `m8_rbf_shallow`<br>`python experiments/m8_rbf.py --seed {seed}` | FGSM error 55.4 %, conf-on-error 1.2 %, clean conf 60.6 % (tex:600–603) | error **95.05 %**, conf **24.92 %**, clean conf **36.58 %** | error +39.6 pp; conf +23.7 pp; clean conf −24.0 pp |
+| `m9_rubbish_evals`<br>`python experiments/m9_rubbish.py --seed {seed}` | maxout+softmax 98.35 %, sigmoid-top 68 %, softmax-reg 59.8 %, RBF 0 % (tex:905–922) | maxout **88.60 %**, sigmoid **68.20 %**, softmax-reg **84.93 %**, RBF **0.00 %** | maxout −9.75 pp; sigmoid +0.20 pp; softmax-reg +25.1 pp; RBF 0.0 (=paper) |
+| `e1_ensemble12_maxout`<br>`python experiments/e1_ensemble.py --base-seed {seed}` | ensemble-targeted 91.1 %, single-member 87.9 % (tex:822–823) | targeted **99.88 %**, single **99.71 %** | targeted +8.8 pp; single +11.8 pp |
+| `m_l1_weight_decay`<br>`python experiments/m_l1_weight_decay.py --seed {seed}` | coeff 0.0025 → >5 % train error; smaller → no benefit (tex:429–431) | coeff-0.0025 train error **88.64 %**; coeff-2.5e-5 test **1.84 %** (vs baseline test 1.69 %) | 0.0025 stuck (✓ >5 %); smaller coeff gives no test benefit (+0.15 pp) |
+| `f4_eps_curve`<br>`python experiments/f4_eps_curve.py --seed {seed}` | Fig. 4: correct class (4) crossed by a wrong class at small ε≈0.5–1 (figure read, tex:762–769) | ε crossover **+0.5** at every seed (curve claims fc1–fc3 pass) | matches the figure-read crossover |
+
+### Table B — M6 transfer sub-numbers (tex:514–523), full detail
+
+These are the four sub-numbers the paper gives for the adversarially-trained
+model's robustness and cross-model transfer; the headline `m6` arm measures all
+four.
+
+| Quantity | Paper (tex) | Measured (mean, 3 seeds) | Δ |
+|---|---|---|---|
+| own-FGSM error rate | 17.9 % (tex:514) | 10.93 % | −6.97 pp |
+| orig→adv transfer (orig FGSM on adv-trained model) | 19.6 % (tex:521) | 34.82 % | +15.2 pp |
+| adv→orig transfer (adv FGSM on orig model) | 40.9 % (tex:521) | 66.49 % | +25.6 pp |
+| mean confidence on a misclassified adversarial example | 81.4 % (tex:523) | 65.03 % | −16.4 pp |
+
+### Table C — M8 cross-model agreement sub-numbers (tex:681–687)
+
+| Quantity | Paper (tex) | Measured (mean, 3 seeds) | Δ |
+|---|---|---|---|
+| RBF predicts maxout's class (over maxout errors) | 16.0 % (tex:681) | 29.55 % | +13.6 pp |
+| softmax predicts maxout's class (over maxout errors) | 54.6 % (tex:681) | 62.29 % | +7.7 pp |
+| softmax predicts maxout's class (over both-wrong) | 84.6 % (tex:684) | 63.95 % | −20.7 pp |
+| RBF predicts maxout's class (over both-wrong) | 54.3 % (tex:684) | 45.87 % | −8.4 pp |
+| RBF predicts softmax's class (over maxout errors, secondary on softmax adv) | 53.6 % (tex:687) | 37.35 % | −16.3 pp |
+
+### Where the data came from / what separates the arms
+
+- **Real MNIST throughout.** `src/fgsm_repro/data.py` loads the 4 IDX gz files
+  from pinned mirrors; `tests/test_data_fingerprint.py` locks the raw sha256,
+  label vocabulary, and 50000/10000 split. No arm used a synthetic stand-in for
+  the paper's dataset.
+- **The two headline arms are NOT within noise of each other.** For the M4
+  comparison the method (adversarial-training) arm's clean test error is below
+  the baseline arm's at **every one of the three seeds** (1.47 < 1.78,
+  1.25 < 1.82, 1.43 < 1.48 %). A measurement that cannot tell the arms apart
+  would not test the paper's comparison; this one does test the *direction*
+  (adversarial training reduces clean error), even though the *magnitudes* are
+  sub-scale (dropout OFF + 5000 steps vs dropout ON + convergence). The
+  magnitudes are rated `compute_invariance=low` and must NOT be read as the
+  paper's 0.94 %→0.84 % numbers.
+- **Sub-scale training horizon.** M5 was run at 240 units / 12 epochs (paper:
+  1600 units / patience-100 early stopping / 5 seeds) because a single
+  1600-unit seed did not finish within the sandbox CPU budget. A number
+  produced at a horizon too short to separate the M5 arms would not be evidence
+  about the paper's claim; the M5 arms **are** separated at this horizon
+  (advtrain 1.49 % < baseline 1.95 % at every seed), so the direction is
+  tested, but the magnitude (paper 0.782 %) is not, and is not reported as
+  such.
+
+## Research-readiness gates
+
+Walked this session. `partial` is used where the honest answer is partial.
+The 2 `partial` (gates 1 and 10) rest solely on `docker` not being installed in
+this sandbox; the non-Docker evidence for both (fresh `.venv` from
+`requirements.txt`, 104/104 tests, smoke + gate run) is verified.
+
+| # | Gate | Verdict | Evidence |
+|---|------|---------|----------|
+| 1 | Builds from scratch | **partial** | `Dockerfile` present and well-formed; `docker` not installed in this sandbox so `docker build`/`run` not exercised. Equivalent fresh-`venv` build (`uv venv --python 3.12 .venv && uv pip install --python .venv -r requirements.txt`) IS verified — imports clean, 104/104 tests pass. |
+| 2 | README is accurate | **pass** | README `## Quickstart` followed verbatim this session in a fresh `.venv`: env-OK import line prints, `pytest -q` → 104 passed, `./run_all_arms.sh` prints the 14 `FINAL` lines, `./smoke.sh` prints its `FINAL` line (~3 s). No gap papered over from memory. |
+| 3 | Packages are clear | **pass** | `requirements.txt` pins every dependency with a version (torch 2.7.1, numpy 2.3.2, pytest 8.4.2, matplotlib 3.11.1, …); install from clean succeeds; code then imports without a missing-import death. |
+| 4 | The entrypoint is obvious | **pass** | One documented command `./run_all_arms.sh` runs every arm at every seed via flags (`--seed`/`--units`/`--epochs`); no source-edit required to run any experiment. |
+| 5 | There is a fast path | **pass** | `smoke.sh` exercises the full path (data→model→FGSM input-grad probe→mixed loss→SGD→eval) in 200 steps / ~3 s, printing `FINAL adversarial=0.11349999904632568`. Path-prover only, never a paper result. |
+| 6 | Deterministic, or noise quantified | **pass** | `torch.manual_seed` set before model construction; per-module dropout + batch-shuffle generators seeded from `cfg.seed`. Same seed → bit-identical output. Baseline re-run this session reproduces the committed `results/gate_result.json`. Run-to-run spread is recorded (the per-seed columns in Tables A–C). |
+| 7 | Degeneracy test is in the repo | **pass** | `tests/test_degeneracy.py` locks `--lambda 0` (method at its no-op) reproducing `--baseline` bit-for-bit at cost / train-step / CLI level. The strongest cheap plumbing check, shippable so a reader can verify without trusting us. |
+| 8 | Data provenance is stated | **pass** | `src/fgsm_repro/data.py` downloads the 4 raw IDX gz from pinned mirrors (storage.googleapis.com/cvdf-datasets/mnist → ossci-datasets.s3.amazonaws.com, 3 tries/mirror, 10 s timeout), cached under `data/mnist/`; `tests/test_data_fingerprint.py` locks raw sha256 + 50000/10000 split. |
+| 9 | The recorded number is reproducible | **pass** | `make_measured.py --assemble-only` rebuilds `measured.json` byte-identically from the committed per-seed files (deterministic); the exact command per arm is recorded in `claims.json` `command_per_seed` and shown in Table A. |
+| 10 | Nothing depends on hidden local state | **partial** | Runs in a fresh clone of the repo (this branch). Docker-in-a-fresh-container is the untested piece (docker absent); the fresh-`.venv`-from-`requirements.txt` path is verified. `.venv/`, `data/`, `mnist/`, caches are gitignored and recreated. |
+
+**Readiness summary: 8 pass / 2 partial / 0 fail.** No gate failed; the two
+`partial` are the Docker-not-installed caveat on gates 1 and 10, with the
+non-Docker evidence for both verified.
