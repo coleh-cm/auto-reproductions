@@ -111,10 +111,19 @@ def test_spec_embedded_claims_json_is_byte_identical():
 
 
 def test_every_arm_metric_pointer_resolves_in_shipped_results():
-    """Every scalar metric pointer resolves in the arm's shipped results file."""
+    """Every scalar metric pointer resolves in the arm's shipped results file.
+
+    ``derived:<spec>`` pointers are NOT file paths: they name a cross-arm /
+    cross-seed aggregate that make_measured.py computes after assembly (the
+    numbers gate's expression evaluator has no min/max/mean builtins, so such
+    aggregates must be precomputed). They are skipped here and exercised by
+    test_measured_resolver / the gate run itself.
+    """
     for arm, spec in CLAIMS["arms"].items():
         blob = json.loads((REPRO_ROOT / spec["results"]).read_text())
         for metric, pointer in spec["metrics"].items():
+            if pointer.startswith("derived:"):
+                continue
             _f, _, path = pointer.partition(":")
             cur = blob
             # deep keys may contain dots; walk greedily like make_measured does

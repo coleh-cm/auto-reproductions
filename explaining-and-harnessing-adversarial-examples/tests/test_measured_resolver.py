@@ -17,8 +17,9 @@ paper intends. A multi-element list is a genuine ambiguity and must be BLOCKED
 rather than silently flattened.
 
 This test also asserts the shipped ``measured.json`` contains NO list values
-(every metric is a scalar or the ``"BLOCKED"`` sentinel), which is the property
-the gate depends on.
+for SCALAR metrics (curve_metrics are exempted: they are sequences by design,
+stored as lists so a ``curve`` claim can read them point by point). That
+scalar-only property is what the gate's per-seed evaluator depends on.
 """
 from __future__ import annotations
 
@@ -71,13 +72,21 @@ def test_scalar_pointer_unchanged():
 
 
 def test_measured_json_has_no_list_values():
-    """The shipped measured.json must contain only scalars or BLOCKED.
+    """The shipped measured.json must contain only scalars or BLOCKED, EXCEPT
+    for ``curve_metrics`` (sequences a ``curve`` claim reads point by point).
 
-    The numbers gate formats each value as a scalar; a list value is the crash
-    this test guards against. Every arm x seed x metric must be a number or the
-    string ``"BLOCKED"`` (never a list/dict).
+    The numbers gate formats each SCALAR metric value as a scalar; a list value
+    for a scalar metric is the crash this test guards against. Curve metrics
+    are deliberately stored as lists (one value per x in the figure's sample
+    grid, same length/order at every seed) so a ``curve`` claim can read its
+    quantity/x/against sequences straight from measured.json; those are
+    exempted by name from claims.json's ``curve_metrics`` blocks.
     """
     measured = json.loads((REPRO_ROOT / "measured.json").read_text())
+    claims = json.loads((REPRO_ROOT / "claims.json").read_text())
+    curve_metric_names = set()
+    for arm_spec in claims["arms"].values():
+        curve_metric_names.update(arm_spec.get("curve_metrics", {}).keys())
     bad = []
     for arm, per_seed in measured.items():
         if arm == "_meta":
@@ -85,6 +94,12 @@ def test_measured_json_has_no_list_values():
         for seed, md in per_seed.items():
             for metric, v in md.items():
                 if v == BLOCKED:
+                    continue
+                if metric in curve_metric_names:
+                    # curve metrics MUST be lists of numbers (or BLOCKED above)
+                    if not (isinstance(v, list) and all(
+                            isinstance(x, (int, float)) for x in v)):
+                        bad.append((arm, seed, metric, type(v).__name__, v))
                     continue
                 if not isinstance(v, (int, float)):
                     bad.append((arm, seed, metric, type(v).__name__, v))

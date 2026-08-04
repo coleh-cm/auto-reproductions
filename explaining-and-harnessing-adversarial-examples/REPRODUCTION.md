@@ -28,6 +28,39 @@
 - [x] Numbers gate re-run: `make_measured.py` (f4 arm × seeds 0,1,2) + `--assemble-only` +
   `numbers_gate.py` → **34 pass / 3 fail / 0 blocked; HIGH 19/19 pass; gate=PASS**
   (the 3 fails are the annotated low/magnitude claims c03/c12/c13 needing paper scale)
+- [x] **2026-08-04 unevaluable-claims fix-up pass:** the prior gate run left 9 claims
+  `unevaluable` (defects in the claims contract, not results). All 9 are now evaluable:
+  - c12/c13/c17/c34 used `mean(...)` / `min(a,b)` / `max-min`, but the numbers
+    gate's expression evaluator exposes no `min`/`max`/`mean` builtins, so each
+    raised `NameError`. Rewritten to reference **precomputed derived scalars**
+    (new `derived:` metrics computed by `make_measured.py`'s new
+    `_compute_derived` step, because the gate can't aggregate inline):
+    `m5_maxout1600_advtrain.per_seed_spread` (c13, max−min over seeds),
+    `m6_robustness_transfer_eval.min_noise_control_fgsm_error` (c17, min of the
+    two m7 noise-control FGSM rates), `m9_rubbish_evals.min_linear_rubbish_error`
+    (c34, min of the two linear-model rubbish rates); c12 now uses the existing
+    per-seed `mean_test_error` (= `per_seed_test_errors` at sub-scale). c12/c13
+    honestly **refute at sub-scale** (1.49% mean, 0.10% spread vs the paper's
+    0.782% / 0.06% — both LOW, expected to need 1600-unit/5-seed paper scale);
+    c17/c34 **reproduce**.
+  - c20/c21 referenced metric names containing dots (`l1_0.0025_train_error`,
+    `l1_2.5e-05_test_error`); the gate tokenizes `measured.<arm>.<metric>` by
+    splitting on `.`, so the dotted metric parsed as the invalid decimal literal
+    `0025_train_error` (`SyntaxError`). Renamed the metric KEYS to dot-free
+    `l1_coeff0025_train_error` / `l1_coeff000025_test_error` (the JSON-pointer
+    path `arms.l1_0.0025.clean_train_error` — the result-file key — is
+    unchanged). c20/c21 **reproduce**.
+  - fc1/fc2/fc3 (Figure-4 curve claims) referenced `measured.f4_eps_curve.<curve>`
+    but the curve sequences lived only in per-seed files, not `measured.json`,
+    so the gate saw "no measurement for correct_logit". `make_measured.py` now
+    resolves `curve_metrics` and stores the sequences (61-point ε∈[-15,15] grid,
+    same length/order at every seed) verbatim into `measured.json` so a `curve`
+    claim reads them point by point. fc1/fc2/fc3 **reproduce**.
+  - Tests updated: `test_measured_resolver` exempts `curve_metrics` from the
+    scalar-only assertion; `test_claims_integrity` skips `derived:` pointers in
+    the file-resolution test; SPEC.md §10 embedded claims.json re-embedded to
+    stay byte-identical. **104/104 tests pass; gate 34 pass / 3 fail / 0
+    blocked; HIGH 19/19; gate=PASS.**
 - [x] Figure a curve claim came from regenerated beside the paper's
   (`experiments/f4_plot.py` → `results/figures/f4_eps_curve_repro{,_seed1,_seed2}.png`
   from the committed curve DATA in `results/f4_eps_curve.json` + per-seed files; axis

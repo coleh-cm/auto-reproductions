@@ -394,15 +394,25 @@
           1,
           2
         ],
-        "aggregate_value": 0.014933327833811441,
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.014400005340576172,
+            "ok": false
+          },
+          {
+            "seed": 1,
+            "value": 0.014999985694885254,
+            "ok": false
+          },
+          {
+            "seed": 2,
+            "value": 0.0153999924659729,
+            "ok": false
+          }
+        ],
         "claimed": 0.00782,
-        "tolerance": 0.003,
-        "abs_diff": 0.007113327833811441,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "tolerance": 0.003
       }
     },
     {
@@ -417,11 +427,22 @@
           1,
           2
         ],
-        "aggregate_value": false,
-        "seeds": [
-          0,
-          1,
-          2
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": false,
+            "ok": false
+          },
+          {
+            "seed": 1,
+            "value": false,
+            "ok": false
+          },
+          {
+            "seed": 2,
+            "value": false,
+            "ok": false
+          }
         ]
       }
     },
@@ -1288,6 +1309,7 @@
       "measured.m6_robustness_transfer_eval.own_fgsm_mean_confidence_on_errors",
       "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_both_wrong",
       "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_m1_errors",
+      "measured.m6_robustness_transfer_eval.min_noise_control_fgsm_error",
       "measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_both_wrong",
       "measured.m8_rbf_shallow.agreement_rbf_pred_softmax_over_m1_errors",
       "measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_m1_errors",
@@ -1304,13 +1326,15 @@
       "measured.m9_rubbish_evals.maxout_softmax_rubbish_error",
       "measured.e1_ensemble12_maxout.ensemble_targeted_error",
       "measured.m5_maxout1600_advtrain.per_seed_test_errors",
+      "measured.m_l1_weight_decay.l1_coeff000025_test_error",
       "measured.m4_maxout240_advtrain.baseline_clean_error",
       "measured.m6_robustness_transfer_eval.own_fgsm_error",
       "measured.m9_rubbish_evals.sigmoid_top_rubbish_error",
+      "measured.m_l1_weight_decay.l1_coeff0025_train_error",
+      "measured.m9_rubbish_evals.min_linear_rubbish_error",
       "measured.m7_maxout_noise_uniform.fgsm_error_rate",
-      "measured.m_l1_weight_decay.l1_0.0025_train_error",
-      "measured.m_l1_weight_decay.l1_2.5e-05_test_error",
       "measured.m5_maxout1600_advtrain.mean_test_error",
+      "measured.m5_maxout1600_advtrain.per_seed_spread",
       "measured.m_l1_weight_decay.baseline_train_error",
       "measured.m1_softmax_regression.fgsm_error_rate",
       "measured.m_l1_weight_decay.baseline_test_error",
