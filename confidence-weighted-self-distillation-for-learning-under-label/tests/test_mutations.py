@@ -111,12 +111,20 @@ def _inv_target_in_simplex(mod):
 
 
 def _inv_stopgrad_gradient(mod):
-    """M6: the analytic dL/dz equals (p-t)/B with t held constant (Eq. 3
-    stop-grad). Finite-difference the loss with t FROZEN at the unperturbed
-    params on a peaked net (W2 scaled 8x, so p is non-uniform and a
-    no-stopgrad gradient diverges); the stopgrad analytic grad matches that
-    frozen-target FD, a no-stopgrad grad does not. Uses the same peaked-net
-    setup as test_gradient_matches_finite_differences / _stopgrad_grad_err."""
+    """M6/M7: the paper-LITERAL analytic dL/dz (stopgrad ONLY on p_tilde; the
+    gate weight w differentiable in z, so the L->t->w->c->z gate path is
+    included) equals the finite-difference of the loss with p_tilde FROZEN at
+    the unperturbed params (and w recomputed from the perturbed logits) on a
+    peaked net (W2 scaled 8x, so p is non-uniform and BOTH the gate-path term
+    and the d p_tilde/dz chain term are non-negligible). Uses the same peaked-net
+    setup as test_gradient_matches_finite_differences / _stopgrad_grad_err.
+
+    This checker DISTINGUISHES the literal gradient from both failure modes:
+      - M6 (detached / drop the gate-path term): the analytic omits the gate
+        path; the frozen-p_tilde FD includes it -> mismatch -> caught.
+      - M7 (no stop-grad on p_tilde): the analytic adds the d p_tilde/dz chain;
+        the frozen-p_tilde FD omits it -> mismatch -> caught.
+    The original literal analytic matches the frozen-p_tilde FD (~1e-3)."""
     rng = np.random.default_rng(123)
     P = {
         "W1": (rng.standard_normal((4, 5)) * 0.1).astype(np.float32),
@@ -128,26 +136,34 @@ def _inv_stopgrad_gradient(mod):
     Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
     h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
     z0 = h0 @ P["W2"] + P["b2"]
-    t0 = mod.make_target(z0, Y, 1.0, 0.9, 0.15, 2.0)
-    _, grads = mod.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)
+    _, grads = mod.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0, grad_mode="literal")
     eps = 1e-4
     for name in ("W1", "b1", "W2", "b2"):
         num = np.zeros_like(P[name])
         for idx in np.ndindex(P[name].shape):
             orig = P[name][idx]
             P[name][idx] = orig + eps
-            # loss with t frozen (the Eq. 3 stop-grad): recompute only log p
+            # loss with p_tilde frozen (the Eq. 3 stop-grad on p_tilde): recompute
+            # w from the perturbed z but p_tilde from the unperturbed z0.
             h = np.maximum(0.0, X @ P["W1"] + P["b1"])
             z = h @ P["W2"] + P["b2"]
             zc = z - z.max(axis=-1, keepdims=True)
             log_p = zc - np.log(np.exp(zc).sum(axis=-1, keepdims=True))
-            lp = float(-np.sum(t0 * log_p) / X.shape[0])
+            p = np.exp(log_p)
+            w = 1.0 / (1.0 + np.exp(-(p.max(axis=-1) - 0.9) / 0.15))
+            pt = mod.softmax(z0 / 2.0)            # FROZEN p_tilde
+            t = (1 - w[:, None]) * Y + w[:, None] * pt
+            lp = float(-np.sum(t * log_p) / X.shape[0])
             P[name][idx] = orig - eps
             h = np.maximum(0.0, X @ P["W1"] + P["b1"])
             z = h @ P["W2"] + P["b2"]
             zc = z - z.max(axis=-1, keepdims=True)
             log_p = zc - np.log(np.exp(zc).sum(axis=-1, keepdims=True))
-            lm = float(-np.sum(t0 * log_p) / X.shape[0])
+            p = np.exp(log_p)
+            w = 1.0 / (1.0 + np.exp(-(p.max(axis=-1) - 0.9) / 0.15))
+            pt = mod.softmax(z0 / 2.0)
+            t = (1 - w[:, None]) * Y + w[:, None] * pt
+            lm = float(-np.sum(t * log_p) / X.shape[0])
             P[name][idx] = orig
             num[idx] = (lp - lm) / (2 * eps)
         if not np.allclose(num, grads[name], atol=2e-3):
@@ -161,7 +177,8 @@ _CHECKERS = {
     "M3-loss-reduction-mean-over-elements": _inv_loss_grads_equal_ce,
     "M4-temperature-leaks-into-loss-prediction": _inv_loss_grads_equal_ce,
     "M5-target-not-in-simplex": _inv_target_in_simplex,
-    "M6-stop-grad-removed-gradient-leaks-through-target": _inv_stopgrad_gradient,
+    "M6-detached-gradient-drops-gate-path": _inv_stopgrad_gradient,
+    "M7-no-stop-grad-on-ptilde": _inv_stopgrad_gradient,
 }
 
 

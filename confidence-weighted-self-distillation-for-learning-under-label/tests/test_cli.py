@@ -44,6 +44,7 @@ def test_cli_accepts_all_documented_flags():
     """Smoke test that every SPEC §5 flag parses (does not assert accuracy)."""
     out, _ = _run([
         "--lambda", "1.0", "--steps", "5",
+        "--grad-mode", "literal",
         "--s", "0.15", "--tau", "0.9", "--temperature", "2.0",
         "--seed", "0", "--lr", "0.1", "--batch-size", "64",
         "--init", "he", "--noise-mode", "uniform-all",

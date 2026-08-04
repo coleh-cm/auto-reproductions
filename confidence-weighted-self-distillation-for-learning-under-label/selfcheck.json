@@ -11,10 +11,10 @@
       "compute_invariance": "high",
       "per_seed": {
         "0": "pass",
-        "1": "pass",
+        "1": "fail",
         "2": "pass"
       },
-      "verdict": "pass"
+      "verdict": "fail"
     },
     {
       "id": "baseline-accuracy-value",
@@ -32,22 +32,22 @@
       "kind": "value",
       "compute_invariance": "low",
       "per_seed": {
-        "0": "pass",
-        "1": "pass",
-        "2": "pass"
+        "0": "fail",
+        "1": "fail",
+        "2": "fail"
       },
-      "verdict": "pass"
+      "verdict": "fail"
     },
     {
       "id": "improvement-magnitude-2p5-points",
       "kind": "value",
       "compute_invariance": "low",
       "per_seed": {
-        "0": "pass",
-        "1": "pass",
-        "2": "pass"
+        "0": "fail",
+        "1": "fail",
+        "2": "fail"
       },
-      "verdict": "pass"
+      "verdict": "fail"
     },
     {
       "id": "lambda-zero-is-exact-cross-entropy",
@@ -104,5 +104,18 @@
       },
       "verdict": "pass"
     }
-  ]
+  ],
+  "counterfactual_detached": {
+    "baseline": {
+      "0": 0.937,
+      "1": 0.9407,
+      "2": 0.9315
+    },
+    "cwsd": {
+      "0": 0.9611,
+      "1": 0.9481,
+      "2": 0.9556
+    }
+  },
+  "counterfactual_detached_note": "DETACHED gradient (grad_mode detached, whole target constant) accuracy at each seed -- the standard self-distillation convention the paper does NOT mark on w (Eq. 3 marks stopgrad ONLY on p_tilde). This is the variant under which Table 1 (0.9620) and the +2.5-point headline ARE reachable. NOT the gated arm: the gated cwsd arm uses the paper-LITERAL gradient (grad_mode literal), under which the headline does NOT reproduce (see the 'claims' block above)."
 }

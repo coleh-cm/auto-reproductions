@@ -38,6 +38,7 @@
         "tau": 0.9,
         "s": 0.15,
         "temperature": 2.0,
+        "grad_mode": "literal",
         "steps": 4000,
         "lr": 0.1,
         "batch_size": 64,
@@ -49,22 +50,23 @@
       },
       "metrics": {
         "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line (paper/paper.md:466-469). Headline metric.",
-        "param_count": "Number of parameter tensors {W1,b1,W2,b2}; ==4 (single network, no extra params; paper/paper.md:21-23).",
+        "param_count": "Number of parameter tensors in the single network (len({W1,b1,W2,b2}) == 4; single network, no extra params; paper/paper.md:21-23). COMPUTED from the params dict, not a literal.",
         "gate_w_min": "Min over a batch of w=lam*sigmoid((c-tau)/s) (Eq. 2); ==0 at lambda=0 (degeneracy anchor).",
         "gate_w_max": "Max over a batch of w; ==0 at lambda=0 (w identically zero, t==y).",
         "degeneracy_loss_err": "|loss(lambda=0) - independent cross-entropy loss| on a batch; exactly 0.0 (paper/paper.md:253-280, 'recovers the cross-entropy baseline exactly').",
         "degeneracy_grad_err": "max|grad(lambda=0) - independent CE grad| over all four params; exactly 0.0."
       },
-      "notes": "Paper Table 1 first row (tokens at paper/paper.md:400-406). Same program as CWSD with --lambda 0.0; tau, s and temperature are inert at lambda=0 because w is identically 0 (paper/paper.md:253-280). The degeneracy_*_err metrics ARE the paper's own verification gate (lambda=0 reproduces the baseline exactly), measured as a bitwise comparison to an independently written cross-entropy routine."
+      "notes": "Paper Table 1 first row (tokens at paper/paper.md:400-406). Same program as CWSD with --lambda 0.0; tau, s, temperature and grad_mode are inert at lambda=0 because w is identically 0 and the gate-path gradient term is lam*...=0 (paper/paper.md:253-280), so the baseline is bit-identical under grad-mode literal or detached. The degeneracy_*_err metrics ARE the paper's own verification gate (lambda=0 reproduces the baseline exactly), measured as a bitwise comparison to an independently written cross-entropy routine."
     },
     "cwsd": {
       "name": "CWSD (ours)",
-      "command": "python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>",
+      "command": "python run_experiment.py --lambda 1.0 --seed {seed} --grad-mode literal --metrics-out <tmp>",
       "config": {
         "lambda": 1.0,
         "tau": 0.9,
         "s": 0.15,
         "temperature": 2.0,
+        "grad_mode": "literal",
         "steps": 4000,
         "lr": 0.1,
         "batch_size": 64,
@@ -76,14 +78,14 @@
       },
       "metrics": {
         "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line. Headline metric.",
-        "param_count": "Number of parameter tensors {W1,b1,W2,b2}; ==4 (single network, no extra params; paper/paper.md:21-23).",
+        "param_count": "Number of parameter tensors in the single network (len({W1,b1,W2,b2}) == 4; single network, no extra params; paper/paper.md:21-23). COMPUTED from the params dict, not a literal.",
         "gate_w_min": "Min over a batch of w=lam*sigmoid((c-tau)/s) (Eq. 2); >0 for lambda>0 (sigmoid is strictly positive).",
         "gate_w_max": "Max over a batch of w; <lambda=1 (sigmoid<1), so w<1 (paper/paper.md:113-124, 'maximum influence self-distillation may have').",
         "target_min": "Min t_ik over a batch (Eq. 3); >=0 (t is a convex combination of two distributions, both >=0).",
         "target_sum_err": "max|sum_k t_ik - 1| over a batch; ~1e-7 (t is a convex combination of two distributions, both summing to 1; paper/paper.md:171-174).",
-        "stopgrad_grad_err": "max|hand-derived grad - central finite-diff grad| with the target t FROZEN at the unperturbed params, on a peaked network (W2 scaled 8x so p is non-uniform); ~1.16e-3 (float32 finite-diff noise). Proves dL/dz=(p-t)/B with t held constant (Eq. 3 stop-grad; paper/paper.md:213-214). The frozen-target FD is essential: finite-differencing loss_and_grads(...)[0] directly recomputes t from the perturbed z and returns the no-stopgrad gradient, passing only by coincidence on near-uniform p; the M6 mutation (a no-stopgrad gradient invisible to the lambda=0 degeneracy gate) is caught by this check, proving it is non-vacuous."
+        "stopgrad_grad_err": "max|literal-grad - central finite-diff grad with p_tilde FROZEN at the unperturbed params (w recomputed)|, on a peaked network (W2 scaled 8x so p is non-uniform and BOTH the gate-path term and the d p_tilde/dz chain are non-negligible); ~1.08e-3 (float32 finite-diff noise). Proves dL/dz = (p-t)/B + gate-path term with p_tilde held constant (Eq. 3 stop-grad on p_tilde ONLY, gate weight w differentiable; paper/paper.md:198, :213-214). The frozen-p_tilde FD is essential: it returns the literal gradient (gate path included, p_tilde chain omitted); a NO-stopgrad implementation (adds the p_tilde chain) and a DETACHED implementation (drops the gate path) both diverge from it on the peaked net (~2.1 and ~4.0 respectively), so the check discriminates both failure modes (M6 detached + M7 no-stopgrad mutations are caught)."
       },
-      "notes": "Paper Table 1 second row (tokens at paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-375); s=0.15 is calibrated because the paper never states the gate sharpness (SPEC.md section 4 item 1). The structural metrics (gate_w_*, target_*, stopgrad_grad_err, param_count) are the measured evidence for the paper's equation-invariants."
+      "notes": "Paper Table 1 second row (tokens at paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-375); s=0.15 is an unstated free parameter (the paper never gives the gate sharpness, SPEC.md section 4 item 1) -- it is NOT calibrated to Table 1 here, because the paper-LITERAL gradient (grad_mode literal, the default, faithful to Eq. 3's stopgrad on p_tilde alone) does NOT reproduce Table 1 at any s: it lands CWSD ~= baseline (0.9407/0.9296/0.9333 at seeds 0/1/2 vs baseline 0.9370/0.9407/0.9315), so the headline +2.5-point claim and the cwsd-improves-over-baseline ordering do NOT reproduce under the paper's stated equations (the ordering flips at seed 1). The structural metrics (gate_w_*, target_*, stopgrad_grad_err, param_count) are the measured evidence for the paper's equation-invariants, which DO hold under the literal gradient. The DETACHED variant (grad_mode detached, whole target constant -- the standard self-distillation convention the paper does NOT mark on w) DOES reproduce Table 1 (0.9611/0.9481/0.9556); it is reported as a counterfactual in REPRODUCTION.md / selfcheck.json, not as the faithful reproduction."
     }
   },
   "claims": [
@@ -95,7 +97,7 @@
       "citation": "paper/paper.md:416-427 (grep 'improves over the cross-entropy' resolves to line 420)",
       "quantity": "measured.cwsd.accuracy - measured.baseline.accuracy",
       "direction": ">0",
-      "arithmetic": "(measured.cwsd.accuracy - measured.baseline.accuracy) > 0, evaluated at every seed in [0, 1, 2]. This is the paper's central claim (Table 1 caption) and the one the reproduction gates on; it asks for a sign only, so it survives a smaller compute budget and seed changes."
+      "arithmetic": "(measured.cwsd.accuracy - measured.baseline.accuracy) > 0, evaluated at every seed in [0, 1, 2]. This is the paper's central claim (Table 1 caption). NOTE: under the paper-LITERAL gradient (grad_mode literal, the default, faithful to Eq. 3's stopgrad on p_tilde alone -- the gate weight w is differentiable), this sign does NOT reproduce: measured gaps are +0.0037 / -0.0111 / +0.0019 at seeds 0/1/2 -- the ordering FLIPS at seed 1 and is within noise at seeds 0 and 2. The +2.5-point headline is reachable only under the DETACHED variant (whole target constant), which the paper does not state on w; see REPRODUCTION.md. The claim is retained as the paper's own claim so the gate can adjudicate it honestly against the literal arm."
     },
     {
       "id": "baseline-accuracy-value",
@@ -106,7 +108,7 @@
       "quantity": "measured.baseline.accuracy",
       "claimed": 0.937,
       "tolerance": 0.01,
-      "arithmetic": "abs(measured.baseline.accuracy - 0.9370) <= 0.01 at every seed. Exact magnitudes do not survive seed changes (the paper reports a single seed-0 run), hence low compute-invariance; the tolerance covers the paper's number plus five test examples on the 540-example test set."
+      "arithmetic": "abs(measured.baseline.accuracy - 0.9370) <= 0.01 at every seed. The baseline is grad-mode-independent (w==0 and the gate-path term is lam*...=0 at lambda=0), so this reproduces under the literal arm: 0.9370/0.9407/0.9315 at seeds 0/1/2 (deviations 0/0.0037/0.0055, all <= 0.01). Exact magnitudes do not survive seed changes (the paper reports a single seed-0 run), hence low compute-invariance; the tolerance covers the paper's number plus five test examples on the 540-example test set."
     },
     {
       "id": "cwsd-accuracy-value",
@@ -117,7 +119,7 @@
       "quantity": "measured.cwsd.accuracy",
       "claimed": 0.962,
       "tolerance": 0.015,
-      "arithmetic": "abs(measured.cwsd.accuracy - 0.9620) <= 0.015 at every seed. Low compute-invariance for the same reason as baseline-accuracy-value."
+      "arithmetic": "abs(measured.cwsd.accuracy - 0.9620) <= 0.015 at every seed. NOTE: under the paper-LITERAL gradient (the default cwsd arm) this does NOT reproduce: measured 0.9407/0.9296/0.9333 at seeds 0/1/2 (deviations 0.0213/0.0324/0.0287, all > 0.015). The paper's 0.9620 is reachable only under the DETACHED variant (grad_mode detached), which the paper does not state on w (it marks stopgrad ONLY on p_tilde); the detached counterfactual measures 0.9611/0.9481/0.9556 (see REPRODUCTION.md). The claim is retained as the paper's own claim so the gate adjudicates it honestly."
     },
     {
       "id": "improvement-magnitude-2p5-points",
@@ -128,7 +130,7 @@
       "quantity": "measured.cwsd.accuracy - measured.baseline.accuracy",
       "claimed": 0.025,
       "tolerance": 0.02,
-      "arithmetic": "abs((measured.cwsd.accuracy - measured.baseline.accuracy) - 0.025) <= 0.02 at every seed. The gap's magnitude is seed-sensitive; the paper tested only seed 0, so the tolerance spans the observed seed spread. The robust claim is the ordering (cwsd-improves-over-baseline), not the exact 2.5 points."
+      "arithmetic": "abs((measured.cwsd.accuracy - measured.baseline.accuracy) - 0.025) <= 0.02 at every seed. NOTE: under the paper-LITERAL gradient (the default cwsd arm) this does NOT reproduce: gaps +0.0037/-0.0111/+0.0019 at seeds 0/1/2 (deviations from 0.025 of 0.0213/0.0361/0.0231, all > 0.02). The +2.5-point magnitude is reachable only under the DETACHED variant (grad_mode detached, gaps +0.0241/+0.0074/+0.0241), which the paper does not state on w. The robust claim the paper rests on is the ordering (cwsd-improves-over-baseline); under the literal gradient even that does not survive across seeds (flips at seed 1). See REPRODUCTION.md."
     },
     {
       "id": "lambda-zero-is-exact-cross-entropy",
@@ -164,7 +166,8 @@
       "quote": "The stop-gradient is essential: without it the target follows the prediction and the objective admits a trivial solution.",
       "citation": "paper/paper.md:213-214 (grep 'trivial solution' resolves to line 214; 'stopgrad' appears at line 198 in Eq. (3))",
       "predicate": "measured.cwsd.stopgrad_grad_err < 5e-3",
-      "check": "pytest -q tests/test_invariants.py::test_gradient_matches_finite_differences"
+      "check": "pytest -q tests/test_invariants.py::test_gradient_matches_finite_differences",
+      "arithmetic": "measured.cwsd.stopgrad_grad_err < 5e-3 at every seed. stopgrad_grad_err = max|literal-grad - central FD with p_tilde FROZEN at the unperturbed params (w recomputed)| on a peaked net; ~1.08e-3. Under the paper-LITERAL reading Eq. (3) marks stopgrad ONLY on p_tilde (paper/paper.md:198, :171-174 'the latter treated as a constant'), so the gate weight w is differentiable and the target is NOT fully constant -- the invariant is that p_tilde is held constant (preventing the trivial solution the paper warns about) while the gate path is active. The check discriminates both failure modes: a no-stopgrad (through p_tilde) and a detached (no gate path) implementation both diverge on the peaked net (M6 + M7 mutations)."
     },
     {
       "id": "single-network-no-extra-parameters",
@@ -185,7 +188,12 @@
     {
       "quote": "All results are single runs at seed 0",
       "citation": "paper/paper.md:385 (grep 'single runs at seed' resolves to line 385)",
-      "reason": "The paper's exact Table-1 magnitudes are seed-0 runs of a pipeline in which the split, noise mask, and init all depend on the seed. Value-type claims at seeds 1 and 2 are therefore out-of-distribution for the paper's numbers and are covered by widened tolerances rather than asserted as reproductions at those seeds."
+      "reason": "The paper's exact Table-1 magnitudes are seed-0 runs of a pipeline in which the split, noise mask, and init all depend on the seed. Value-type claims at seeds 1 and 2 are out-of-distribution for the paper's numbers; under the paper-LITERAL gradient the CWSD value/magnitude claims fail at every seed (including 0), and the ordering flips at seed 1 -- so the widened tolerances are not the reason those claims fail here (the literal gradient is); they remain relevant only to the baseline value claim, which reproduces."
+    },
+    {
+      "quote": "Setting the mixing coefficient to zero recovers the cross-entropy baseline exactly",
+      "citation": "paper/paper.md:35-36 (grep 'recovers the cross-entropy baseline exactly' resolves to line 35)",
+      "reason": "Counterfactual arm, not a claim dodged. The DETACHED gradient variant (grad_mode detached, the WHOLE target constant -- stopgrad on p_tilde AND the gate weight w) is the standard self-distillation convention the paper does NOT mark on w (Eq. 3 marks stopgrad ONLY on p_tilde). It is the variant under which Table 1's 0.9620 and the +2.5-point headline ARE reachable (0.9611/0.9481/0.9556, ordering +0.0241/+0.0074/+0.0241). It is implemented (--grad-mode detached, exercised by tests and reported in REPRODUCTION.md / selfcheck.json) but is NOT the gated arm: the gated cwsd arm uses the paper-LITERAL gradient (grad_mode literal), which is faithful to Eq. 3 as written and under which the headline does NOT reproduce. The degeneracy claim above (lambda=0 reproduces the baseline exactly) holds under BOTH modes (the gate-path term is lam*...=0 at lambda=0)."
     }
   ]
 }

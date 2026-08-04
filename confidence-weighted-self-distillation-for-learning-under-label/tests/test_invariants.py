@@ -105,19 +105,25 @@ def test_gate_open_target_equals_ptilde():
 
 
 def test_gradient_matches_finite_differences():
-    """Analytic dL/dz = (p-t)/B (with t held constant, Eq. 3 stop-grad) vs
-    central finite differences of the loss with t FROZEN at the unperturbed
-    params (SPEC §7 gate d).
+    """Paper-LITERAL analytic gradient (stopgrad ONLY on p_tilde; the gate
+    weight w differentiable in z, so the L->t->w->c->z path is included) vs
+    central finite differences of the loss with p_tilde FROZEN at the
+    unperturbed params (and w recomputed from the perturbed logits).
 
-    Finite-differencing ``loss_and_grads(...)[0]`` directly is WRONG here: that
-    recomputes t from the perturbed z on every call, so its value-FD returns
-    the full no-stopgrad gradient (including the dt/dz chain) and the check
-    would pass against the stopgrad analytic grad only by coincidence on
-    near-uniform p. We freeze t via ``_loss_with_frozen_target`` and FD only
-    the log p term, which is the gradient the stop-grad actually produces.
-    A peaked network (large W2) is used so p is non-uniform: a no-stopgrad
-    implementation would diverge here (~6 vs the analytic grad), proving the
-    check is not vacuous.
+    Eq. (3) marks stopgrad ONLY on p_tilde ("the latter treated as a constant",
+    paper/paper.md:171-174); w = lam*sigma((c-tau)/s) is unmarked and is a
+    function of z through c = max_k p_k, so the literal gradient treats p_tilde
+    as constant and w as differentiable. The finite-difference that reproduces
+    THIS gradient freezes p_tilde (not the whole target) and recomputes w:
+    ``_loss_with_frozen_ptilde``. Freezing the WHOLE target t would instead
+    return the DETACHED gradient (no gate path), which the literal analytic
+    does NOT match -- so the frozen quantity must be p_tilde, matching Eq. (3).
+
+    A peaked network (large W2) is used so p is non-uniform and the gate-path
+    term is non-negligible: a detached (no gate path) or no-stopgrad (chain
+    through p_tilde) implementation would diverge here (see
+    test_stopgrad_grad_err_is_nonvacuous), proving the match is not a
+    coincidence of near-uniform p.
     """
     rng = np.random.default_rng(2)
     P = {
@@ -128,11 +134,10 @@ def test_gradient_matches_finite_differences():
     }
     X = rng.standard_normal((3, 4)).astype(np.float32)
     Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
-    # Freeze the target at the unperturbed params (the Eq. (3) stop-grad).
+    # Freeze p_tilde at the unperturbed params (the Eq. (3) stop-grad on p_tilde).
     h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
     z0 = h0 @ P["W2"] + P["b2"]
-    t0 = r.make_target(z0, Y, 1.0, 0.9, 0.15, 2.0)
-    _, grads = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)
+    _, grads = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0, grad_mode="literal")
     eps = 1e-4
     # check ALL four params, including W1/b1 (the ReLU backprop path — the most
     # error-prone: a wrong ReLU mask or transposed W2 would only show up here).
@@ -141,20 +146,23 @@ def test_gradient_matches_finite_differences():
         for idx in np.ndindex(P[name].shape):
             orig = P[name][idx]
             P[name][idx] = orig + eps
-            lp = r._loss_with_frozen_target(P, X, t0)
+            lp = r._loss_with_frozen_ptilde(P, X, Y, z0, 1.0, 0.9, 0.15, 2.0)
             P[name][idx] = orig - eps
-            lm = r._loss_with_frozen_target(P, X, t0)
+            lm = r._loss_with_frozen_ptilde(P, X, Y, z0, 1.0, 0.9, 0.15, 2.0)
             P[name][idx] = orig
             num[idx] = (lp - lm) / (2 * eps)
         assert np.allclose(num, grads[name], atol=2e-3), name
 
 
 def test_stopgrad_target_independent_of_params():
-    """The target is treated as a constant w.r.t. theta (Eq. 3 stopgrad; SPEC
-    §4 item 5). Perturbing the parameters must NOT change the target computed
-    from the *same* logits — i.e. make_target is a pure function of (z, Y, ...).
-    This is structural in numpy (no autograd), but assert it explicitly so a
-    future autograd port cannot silently re-introduce the trivial solution."""
+    """The forward target ``make_target`` is a pure function of (z, Y, ...) —
+    perturbing the parameters does not change the target computed from the SAME
+    logits. This is structural in numpy (no autograd): the gradient's stop-grad
+    on p_tilde (Eq. 3) is enforced in ``loss_and_grads`` by recomputing p_tilde
+    from the SAME z used for the loss prediction (the literal mode freezes
+    p_tilde for the FINITE-DIFFERENCE check only, not in the forward target).
+    Asserted explicitly so a future autograd port cannot silently re-introduce
+    a target that depends on theta through a path the forward misses."""
     params, X, Y, out = _case(seed=31)
     z = out["z"].copy()
     t0 = r.make_target(z, Y, 1.0, 0.9, 0.15, 2.0)

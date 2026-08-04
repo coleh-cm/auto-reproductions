@@ -10,10 +10,21 @@ a convex combination; Eq. 4 must reduce to plain cross-entropy at `λ = 0` — a
 paper itself supplies the prose for). Every citation below is `paper/paper.md:LINE` plus a grep
 anchor; all anchors were re-executed and resolve (2026-08-04).
 
-**Verification note (this SPEC pass, 2026-08-04).** A prior run of this same workflow left a
-complete reproduction in this folder (code, tests, claims); nothing from it is trusted without
-re-verification. This SPEC was re-derived from `paper/paper.md` alone, and every load-bearing
-assertion was re-measured in this pass:
+**Verification note (this SPEC pass, 2026-08-04, post-adversarial-review fix).**
+A prior run of this same workflow left a complete reproduction in this folder; an
+adversarial review REJECTED it on one blocking, outcome-determinative finding:
+the implementation applied the stop-gradient to the WHOLE target `t`, but Eq. (3)
+marks stopgrad ONLY on `p_tilde` (`paper/paper.md:198`, "the latter treated as a
+constant", `:171-174`). Under the paper-LITERAL gradient (stopgrad on `p_tilde`
+only; the gate weight `w` differentiable through `c = max_k p_k`) the +2.5-point
+headline and the central `cwsd > baseline` ordering do NOT reproduce (CWSD
+0.9407/0.9296/0.9333 at seeds 0/1/2 vs baseline 0.9370/0.9407/0.9315 — the
+ordering flips at seed 1). This pass fixes that: the default `--grad-mode literal`
+implements the paper's equations as written; the `detached` variant (whole target
+constant) is kept as a documented counterfactual (the standard self-distillation
+convention the paper does not mark on `w`, and the only variant under which Table
+1's 0.9620 is reachable). The `param_count` metric is now COMPUTED from the params
+dict (was a hardcoded literal). Everything below was re-verified in this pass:
 
 - **Quotes:** all 11 `claims.json` quotes re-checked verbatim against `paper/paper.md` under the
   §8 normalization (11/11 PASS); all 24 grep anchors cited below re-executed and resolve to the
@@ -23,28 +34,32 @@ assertion was re-measured in this pass:
   hyperparameter sentence (`:361-375`) lists exactly `λ = 1`, `τ = 0.9`, `T = 2` and stops.
   Eq. (2)'s stacked token layout (`τ` at `:138` over `s` at `:139` inside the parentheses)
   confirms the fractional reading `(c − τ)/s`.
-- **Arms re-executed** on a fresh install of the pinned env (numpy 2.5.1, scikit-learn 1.9.0,
-  Python 3.12.13): seeds 0/1/2 → baseline `0.9370` / `0.9407` / `0.9315`, CWSD `0.9611` /
-  `0.9481` / `0.9556` — byte-identical to `measured.json`; baseline seed 0 matches Table 1
-  *exactly* (0.9370); ordering `cwsd > baseline` holds at every seed (+0.0241, +0.0074, +0.0241).
+- **Arms re-executed** on the pinned env (numpy 2.5.1, scikit-learn 1.9.0, Python 3.12.13):
+  seeds 0/1/2 → baseline `0.9370` / `0.9407` / `0.9315` (grad-mode-independent at λ=0),
+  CWSD-LITERAL `0.9407` / `0.9296` / `0.9333` — byte-identical to `measured.json`. The
+  paper-LITERAL CWSD arm does NOT reproduce Table 1 at any seed; the ordering `cwsd > baseline`
+  holds at seeds 0/2 (+0.0037, +0.0019, within noise) and FLIPS at seed 1 (−0.0111). The
+  DETACHED counterfactual (`--grad-mode detached`) measures `0.9611` / `0.9481` / `0.9556`
+  and reproduces Table 1 within 0.001; it is reported in `selfcheck.json` / REPRODUCTION.md,
+  not as the gated arm.
 - **Structural metrics re-measured** (`--metrics-out`, seeds 0/1/2): baseline `gate_w_max = 0.0`,
-  `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0` (bitwise); CWSD `gate_w_min > 0`,
-  `gate_w_max < 1`, `target_min > 0`, `target_sum_err = 1.19e-07 < 1e-6`,
-  `stopgrad_grad_err = 1.16e-03 < 5e-3` — every high claim's predicate passes.
-  (This pass fixed the stop-grad check: `_stopgrad_grad_err` previously finite-differenced
-  `loss_and_grads(...)[0]`, which recomputes the target `t` from the perturbed `z` on every
-  call, so its value-FD returned the FULL no-stopgrad gradient and passed only by coincidence
-  on a near-uniform tiny net. It now finite-differences a `_loss_with_frozen_target` helper
-  with `t` frozen at the unperturbed params, on a peaked net (W2 scaled 8×) where the
-  no-stopgrad gradient diverges by ~6.1 — so the check now actually distinguishes a correct
-  stop-grad from a no-stopgrad implementation. See §11.)
+  `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0` (bitwise, holds under literal too —
+  the gate-path term is `lam*...=0` at λ=0); CWSD-LITERAL `param_count = 4` (COMPUTED via
+  `len(params)`), `gate_w_min > 0`, `gate_w_max < 1`, `target_min > 0`,
+  `target_sum_err = 1.19e-07 < 1e-6`, `stopgrad_grad_err = 1.08e-03 < 5e-3` — every high
+  invariant/existence claim's predicate passes. `stopgrad_grad_err` now finite-differences the
+  loss with `p_tilde` FROZEN (w recomputed) — the literal gradient — and discriminates BOTH
+  failure modes: a no-stopgrad (through `p_tilde`) FD diverges (~2.1) and a detached analytic
+  (no gate path) diverges (~4.0) on the peaked net.
 - **Calibration evidence re-measured:** baseline RNG layouts `spawned` → 0.9315 and
   `noise-first` → 0.9426 (falsify themselves against Table 1's 0.9370; `init-first` reproduces
-  it exactly); CWSD seed-0 sensitivity `s = 0.12→0.9593, 0.14→0.9593, 0.15→0.9611, 0.16→0.9611,
-  0.17→0.9630, 0.18→0.9648, 0.20→0.9630`; the `λ = 0` arm is bitwise insensitive to `s`
-  (s = 0.01 and s = 10.0 both → 0.9370), so the calibrated `s` cannot touch the degeneracy gate.
-- **Test suite:** `python -m pytest -q tests` → 51 passed (48 prior + 3 this pass: a
-  non-vacuous stop-grad test, an M6 no-stopgrad mutation checker, and the M6 anchor).
+  it exactly); CWSD-LITERAL seed-0 sensitivity `s = 0.05→0.9537, 0.10→0.9370 (tie), 0.15→0.9407,
+  0.20→0.9352, 0.30→0.9426` — the literal gap is fragile and s-dependent even at seed 0 (zero at
+  s=0.1, negative at s=0.2); at seed 1 the literal gap is NEGATIVE for every s ∈ {0.05…0.3}, so
+  the ordering robustly fails at seed 1 under the literal equations. The `λ = 0` arm is bitwise
+  insensitive to `s` and to `grad-mode` (s=0.01/s=10.0, literal/detached all → 0.9370).
+- **Test suite:** `python -m pytest -q tests` → 53 passed (was 51; +2 from the M6 detached /
+  M7 no-stopgrad-on-p_tilde mutations, both caught by the rewritten frozen-`p_tilde` FD check).
 - **Figures:** `paper/` contains only `paper.md`; `grep -niE "figure|fig\.|curve|plot"
   paper/paper.md` matches nothing → no figures, no `curve` claims possible (§7).
 - **Upstream code:** paper URL/code grep → no matches; GitHub repository search
@@ -52,9 +67,9 @@ assertion was re-measured in this pass:
   noise`, `"Institute for Applied Learning Systems"`) and user search (author trio) →
   `total_count: 0` throughout (§9).
 - **Interfaces:** SPEC §5 diffed clean against `run_experiment.py`
-  (`--lambda --s --tau --temperature --seed --steps --lr --batch-size --init --noise-mode
-  --noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels,
-  init_params, forward, make_target, loss_and_grads, batches, evaluate, train`).
+  (`--lambda --grad-mode --s --tau --temperature --seed --steps --lr --batch-size --init
+  --noise-mode --noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels,
+  init_params, forward, make_target, _gate_path_grad, loss_and_grads, batches, evaluate, train`).
 
 ## 1. The method as an explicit algorithm
 
@@ -99,7 +114,10 @@ assertion was re-measured in this pass:
 6. `L = −(1/B) Σ_i Σ_k t_ik log p_ik` — Eq. (4). NOTE the asymmetry: `p` in the loss is the
    `T = 1` softmax from step 1; `T` appears only inside the stop-graded target.
 7. `θ ← θ − 0.1 · ∇_θ L` — vanilla SGD (`:344-348`; "Gradients are those of Eq. (4)", `:359`;
-   no momentum/decay/schedule mentioned — §4 item 6).
+   no momentum/decay/schedule mentioned — §4 item 6). **`∇_θ L` is the paper-LITERAL
+   gradient** (default `--grad-mode literal`, §3/§4 item 5): stopgrad ONLY on `p̃`, so the
+   gate weight `w` is differentiable in `z` and `dL/dz = (p − t)/B + gate-path term`. The
+   `--grad-mode detached` variant (whole target constant) drops the gate-path term.
 
 **Evaluation**: single test accuracy after the final step on the clean 540-example test set,
 printed as exactly one line `FINAL accuracy=<float>` (`paper/paper.md:466-469`,
@@ -145,10 +163,23 @@ Axis contract: the loss sums over the class axis `K`, then averages over the bat
 | (4) | `L = −(1/B) Σ_{i=1..B} Σ_{k=1..K} t_ik log p_ik` | `paper/paper.md:215-252`; `cross-entropy between this target` → :215 |
 | degeneracy | `λ = 0 ⇒ w = 0 ⇒ t = y ⇒` Eq. (4) = standard CE | `paper/paper.md:253-280`; `strict generalisation` → :273; `reproduces the baseline result exactly` → :280 |
 
-Gradient actually implemented (hand-derived; the numpy implementation has no autograd, so
-`stopgrad` is structural): with `t` constant, `∂L/∂z_i = (p_i − t_i)/B`, then standard backprop
-through `W2`, ReLU, `W1`. Cross-checked by central finite differences
-(`tests/test_invariants.py::test_gradient_matches_finite_differences`).
+Gradient actually implemented (hand-derived; the numpy implementation has no autograd).
+The DEFAULT `--grad-mode literal` is the paper-faithful gradient: stopgrad ONLY on `p̃`
+(Eq. 3 as written, `paper/paper.md:198, :171-174`); the gate weight `w = λσ((c−τ)/s)` is
+differentiable in `z` through `c = max_k p_k`, so the gradient INCLUDES the `L→t→w→c→z`
+gate path:
+
+    dL/dz_ik = (p_ik − t_ik)/B − (1/B)·λσ(u_i)(1−σ(u_i))·(1/s)·p_im*·(δ_{m*,k} − p_ik)·g_i
+
+where `u_i = (c_i − τ)/s`, `m* = argmax_m p_im`, `g_i = Σ_m (p̃_im − y_im) log p_im`, and
+`p̃ = softmax(z/T)` is held constant. The gate-path term is `λ·...` and vanishes exactly at
+`λ = 0`, so the degeneracy (== plain CE) holds bitwise. `--grad-mode detached` treats the
+WHOLE target `t` as constant (`dL/dz = (p − t)/B` only); that is the standard self-distillation
+convention the paper does NOT mark on `w`, and the variant under which Table 1 is reachable.
+Cross-checked by central finite differences of the loss with `p̃` frozen (w recomputed), on a
+peaked net (`tests/test_invariants.py::test_gradient_matches_finite_differences`,
+`stopgrad_grad_err ≈ 1.08e-3 < 5e-3`); the check discriminates both a no-stopgrad (through
+`p̃`) and a detached (no gate path) implementation (M6/M7 mutations).
 
 ## 4. What the paper does NOT state
 
@@ -156,15 +187,19 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
 
 1. **`s`, the gate sharpness in Eq. (2), has no value anywhere.** §3 of the paper lists
    `λ = 1`, `τ = 0.9`, `T = 2` and stops (`paper/paper.md:361-375`). The CWSD arm cannot run
-   without choosing `s`, and its value matters: with `τ = 0.9` and digit confidences often near
-   `τ`, `s = 0.01` makes the gate nearly binary while `s = 0.2` makes it almost linear.
-   → **Choice: `s = 0.15` (CLI default, exposed as `--s`).** Calibrated against the paper's own
-   reported CWSD accuracy ONLY under the RNG layout that first reproduces the baseline 0.9370
-   exactly (item 7): `s = 0.15` → CWSD 0.9611, within ±0.004 of Table 1's 0.9620. The `λ = 0`
-   arm is independent of `s`, so the degeneracy check is not fit by this choice. Sensitivity at
-   the chosen layout, re-measured 2026-08-04: `s ∈ {0.12, 0.14}` → 0.9593; `s ∈ {0.15, 0.16}` →
-   0.9611; `s ∈ {0.17, 0.20}` → 0.9630; `s = 0.18` → 0.9648 — the reproduction is not a
-   knife-edge of `s`, but the paper genuinely omits it.
+   without choosing `s`, and its value matters.
+   → **Choice: `s = 0.15` (CLI default, exposed as `--s`).** NOT calibrated to Table 1 in this
+   pass: the paper-LITERAL CWSD arm (the default `--grad-mode literal`) does NOT reproduce
+   Table 1 at any `s` (it lands ~baseline), so there is no headline to calibrate `s` against
+   under the faithful gradient. `s = 0.15` is a middle value of an unstated free parameter.
+   Sensitivity at seed 0 (literal): `s = 0.05→0.9537, 0.10→0.9370 (tie), 0.15→0.9407,
+   0.20→0.9352, 0.30→0.9426` — the literal gap is fragile (zero at s=0.1, negative at s=0.2).
+   At seed 1 the literal gap is NEGATIVE for every `s ∈ {0.05…0.3}`, so the ordering robustly
+   fails at seed 1 under the literal equations. The `λ = 0` arm is bitwise insensitive to `s`
+   (and to grad-mode), so the degeneracy check is not touched by this choice. (A prior pass
+   calibrated `s = 0.15` against Table 1 under the DETACHED gradient; that calibration is moot
+   under the literal default, and the detached variant is now a documented counterfactual, not
+   the gated arm.)
 2. **Weight initialisation.** Only "the parameter initialisation [is] drawn from that seed"
    (`paper/paper.md:385-389`). No distribution, scale, or scheme; biases never mentioned
    (assumed present, zero-init — the architecture sentence `:339-343` doesn't say biases exist
@@ -176,10 +211,24 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
 4. **Minibatch sampling.** 4000 steps × 64 over 1257 examples ≈ 203.7 epochs; with-replacement
    vs shuffled-epoch cycling and the short final batch (41 examples) are all unstated.
    → Choice: reshuffled permutation per pass, short final batch kept (`--batch-mode`).
-5. **Scope of the stop-gradient.** Eq. (3) annotates `stopgrad` only on `p̃`
-   (`paper/paper.md:198`); whether `w` (a function of `p`, hence of `θ`) is detached is never
-   stated — only that `p̃` is "treated as a constant with respect to θ" (`:171-174`).
-   → Choice: the whole target `t` is constant (numpy implementation: structural).
+5. **Scope of the stop-gradient (the BLOCKING finding of the adversarial review).** Eq. (3)
+   annotates `stopgrad` ONLY on `p̃` (`paper/paper.md:198`) and says only "the latter [= p̃]
+   treated as a constant with respect to θ" (`:171-174`). The gate weight `w = λσ((c−τ)/s)` is
+   a function of `θ` through `c = max_k p_k` and is NOT marked stopped; "Gradients are those of
+   Eq. (4)" (`:359`) under the literal reading therefore includes the `L → t → w → c → z` path.
+   → **Choice (DEFAULT, paper-faithful): `--grad-mode literal` — stopgrad ONLY on `p̃`; `w` is
+   differentiable and the gate path is included** (the literal gradient derived in §3). This is
+   what Eqs. (2)–(4) literally state. Under it the paper's Table-1 CWSD number (0.9620) and the
+   `cwsd > baseline` ordering do NOT reproduce (CWSD ≈ baseline; the ordering flips at seed 1).
+   → **Counterfactual (NOT the default, NOT the gated arm): `--grad-mode detached` — the WHOLE
+   target `t` is constant (stopgrad on `p̃` AND `w`)**, so `dL/dz = (p − t)/B` only. This is the
+   standard self-distillation convention the paper does NOT mark on `w`; it is the variant under
+   which Table 1 IS reachable (0.9611/0.9481/0.9556), reported in `selfcheck.json` /
+   REPRODUCTION.md. An adversarial review found the prior run used the detached gradient as the
+   primary arm while marking the headline "reproduced" — outcome-determinative and not what the
+   paper states — so this pass makes the literal gradient the default and reports the detached
+   variant honestly as the counterfactual. At `λ = 0` both modes are bit-identical (the gate-path
+   term is `λ·... = 0`), so the paper's degeneracy gate holds under either.
 6. **SGD flavour.** No momentum, weight decay, clipping, or LR schedule is mentioned
    (`paper/paper.md:344-359`). → Choice: vanilla constant-LR SGD.
 7. **RNG stream layout ("seed handling").** Split, noise mask, and init all come from seed 0
@@ -214,6 +263,7 @@ CLI (matches `argparse` in `run_experiment.py` exactly):
 
 ```
 python run_experiment.py --lambda FLOAT            # required; 0.0 = baseline, 1.0 = CWSD
+                         [--grad-mode literal|detached]   # default literal (paper-faithful)
                          [--s 0.15] [--tau 0.9] [--temperature 2.0]
                          [--seed 0] [--steps 4000] [--lr 0.1] [--batch-size 64]
                          [--init he|xavier] [--noise-mode uniform-all|uniform-other]
@@ -234,7 +284,8 @@ corrupt_labels(y[N], rng, rate=0.2, mode="uniform-all") -> int64[N]
 init_params(rng, scheme="he") -> {W1 f32[64,64], b1 f32[64], W2 f32[64,10], b2 f32[10]}
 forward(params, X[B,64]) -> {h f32[B,64], z f32[B,10], p f32[B,10]}
 make_target(z[B,10], Y[B,10], lam, tau, s, T) -> t[B,10]
-loss_and_grads(params, X, Y, lam, tau, s, T) -> (loss scalar, grads shaped like params)
+_gate_path_grad(p, log_p, Y, p_tilde, lam, tau, s) -> dz_gate[B,10]  # literal-mode gate-path term
+loss_and_grads(params, X, Y, lam, tau, s, T, grad_mode="literal") -> (loss scalar, grads shaped like params)
 batches(n, B, rng, mode="epoch-permutation") -> iterator of index arrays (last may be short)
 evaluate(params, Xte, yte) -> float in [0,1]           # full test set, argmax over z
 train(config) -> (accuracy, params, Xtr, Ytr_onehot)    # exactly --steps SGD updates; the
@@ -255,8 +306,8 @@ exactly one flag.
 
 | Arm | λ | Command | Config |
 |---|---|---|---|
-| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: lr 0.1, batch 64, 4000 steps, 20% symmetric noise, seed 0. `τ/s/T` are **inert** at λ=0 (`w ≡ 0`, `:253-280`). Defaults per §4: s 0.15, init he, noise-mode uniform-all, batch-mode epoch-permutation, rng-layout init-first. |
-| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (`:361-375`), same optimiser/steps/noise as baseline. `s=0.15` unstated, calibrated per §4 item 1; rest identical to `baseline`. |
+| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --grad-mode literal --seed {seed} --metrics-out <tmp>` | Paper-stated: lr 0.1, batch 64, 4000 steps, 20% symmetric noise, seed 0. `τ/s/T/grad-mode` are **inert** at λ=0 (`w ≡ 0` and the gate-path term is `λ·...=0`, `:253-280`); the baseline is bit-identical under literal or detached. Defaults per §4: s 0.15, init he, noise-mode uniform-all, batch-mode epoch-permutation, rng-layout init-first. |
+| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --grad-mode literal --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (`:361-375`), same optimiser/steps/noise as baseline. `--grad-mode literal` is the paper-faithful gradient (stopgrad ONLY on `p̃`, gate path active; §4 item 5). `s=0.15` unstated, NOT calibrated to Table 1 (the literal arm does not reproduce Table 1 at any s; §4 item 1). Under this arm the headline +2.5 and the ordering do NOT reproduce; the DETACHED counterfactual (`--grad-mode detached`, same config) reproduces Table 1 and is reported in `selfcheck.json` / REPRODUCTION.md. |
 
 Metric (both arms): held-out test accuracy from the single `FINAL accuracy=<float>` line.
 Each run additionally emits the structural-invariant metrics of Eqs. 1–4 via `--metrics-out`
@@ -289,31 +340,39 @@ kept (so `temperature-softened` survives and `dispropor-tionately` keeps its hyp
 
 The claims:
 
-| id | kind | compute_invariance | settles |
-|---|---|---|---|
-| `cwsd-improves-over-baseline` | ordering | **high** | `measured.cwsd.accuracy - measured.baseline.accuracy > 0` at every seed |
-| `baseline-accuracy-value` | value | low | `abs(measured.baseline.accuracy − 0.9370) ≤ 0.01` at every seed |
-| `cwsd-accuracy-value` | value | low | `abs(measured.cwsd.accuracy − 0.9620) ≤ 0.015` at every seed |
-| `improvement-magnitude-2p5-points` | value | low | `abs((cwsd−baseline) − 0.025) ≤ 0.02` at every seed |
-| `lambda-zero-is-exact-cross-entropy` | invariant | **high** | `gate_w_max == 0 and degeneracy_loss_err < 1e-12 and degeneracy_grad_err < 1e-12` |
-| `gate-weight-bounded-by-lambda` | invariant | **high** | `gate_w_min > 0 and gate_w_max < 1` |
-| `target-is-convex-combination` | invariant | **high** | `target_min >= 0 and target_sum_err < 1e-6` |
-| `stop-gradient-holds-target-constant` | invariant | **high** | `stopgrad_grad_err < 5e-3` |
-| `single-network-no-extra-parameters` | existence | **high** | `param_count == 4` |
+| id | kind | compute_invariance | settles | literal-arm verdict |
+|---|---|---|---|---|
+| `cwsd-improves-over-baseline` | ordering | **high** | `measured.cwsd.accuracy - measured.baseline.accuracy > 0` at every seed | FAIL (flips at seed 1: +0.0037/−0.0111/+0.0019) |
+| `baseline-accuracy-value` | value | low | `abs(measured.baseline.accuracy − 0.9370) ≤ 0.01` at every seed | PASS (0.9370/0.9407/0.9315) |
+| `cwsd-accuracy-value` | value | low | `abs(measured.cwsd.accuracy − 0.9620) ≤ 0.015` at every seed | FAIL (0.9407/0.9296/0.9333; dev 0.021–0.032) |
+| `improvement-magnitude-2p5-points` | value | low | `abs((cwsd−baseline) − 0.025) ≤ 0.02` at every seed | FAIL (gap ≈0; dev 0.021–0.036) |
+| `lambda-zero-is-exact-cross-entropy` | invariant | **high** | `gate_w_max == 0 and degeneracy_loss_err < 1e-12 and degeneracy_grad_err < 1e-12` | PASS (holds under literal too) |
+| `gate-weight-bounded-by-lambda` | invariant | **high** | `gate_w_min > 0 and gate_w_max < 1` | PASS |
+| `target-is-convex-combination` | invariant | **high** | `target_min >= 0 and target_sum_err < 1e-6` | PASS |
+| `stop-gradient-holds-target-constant` | invariant | **high** | `stopgrad_grad_err < 5e-3` (stopgrad on `p̃` only) | PASS (1.08e-3) |
+| `single-network-no-extra-parameters` | existence | **high** | `param_count == 4` (COMPUTED) | PASS |
 
 Compute-invariance rationale: the ordering claim is sign-only and the five invariant/existence
-claims are structural (independent of the 4000-step training budget and of seed), so all six
-high claims survive a smaller budget than the paper's; the three value claims are exact
-magnitudes from single seed-0 runs and honestly cannot be high. The gate settles on the high
-claims. Measured evidence re-derived this pass (2026-08-04, seeds 0/1/2): baseline
-0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — ordering holds at all seeds
-(+0.0241, +0.0074, +0.0241) and every predicate passes.
+claims are structural, so all six are high; the three value claims are exact magnitudes from
+single seed-0 runs and are low. Under the paper-LITERAL gradient (the default cwsd arm), the
+5 high structural claims + the baseline value PASS, and the central ordering + the two CWSD
+value claims FAIL — i.e. the paper's headline and central ordering do NOT reproduce under the
+paper's stated equations. The DETACHED counterfactual (`--grad-mode detached`, not the gated
+arm) reproduces Table 1 (0.9611/0.9481/0.9556, ordering +0.0241/+0.0074/+0.0241); it is the
+standard self-distillation convention the paper does NOT mark on `w`. Measured evidence
+re-derived this pass (2026-08-04, seeds 0/1/2): baseline 0.9370/0.9407/0.9315, CWSD-LITERAL
+0.9407/0.9296/0.9333; CWSD-DETACHED (counterfactual) 0.9611/0.9481/0.9556.
 
 **Deliberately not tested** (`claims.json.not_tested`): (a) the attribution claim
 ("We attribute the gain to the gate suppressing…", `paper/paper.md:445-447`) — a mechanism claim
 the paper itself phrases as attribution, needing per-example gate-weight logging that the output
-contract (one `FINAL accuracy=` line) does not expose; (b) Table-1 magnitudes at seeds ≠ 0,
-which the paper never commits to ("All results are single runs at seed 0", `:385`).
+contract (one `FINAL accuracy=` line) does not expose; (b) Table-1 magnitudes at seeds ≠ 0
+(`paper/paper.md:385`) — under the literal gradient the value claims fail at every seed
+(including 0), so the widened tolerances are not the reason they fail here; (c) the DETACHED
+counterfactual — the standard self-distillation convention (whole target constant) the paper
+does NOT mark on `w`, implemented as `--grad-mode detached` and reported in `selfcheck.json` /
+REPRODUCTION.md as the variant under which Table 1 IS reachable, but NOT the gated arm (the
+gated cwsd arm is the paper-literal gradient, faithful to Eq. 3 as written).
 
 ## 9. Upstream code — searched, none found (re-verified 2026-08-04)
 
@@ -330,19 +389,28 @@ against §1/§5. (Prior runs reported the same.)
 
 ## 10. Validation targets
 
-| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This pass 2026-08-04 (seed 0) | Within ±0.004 |
+| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This pass 2026-08-04 (seed 0, LITERAL) | This pass (seed 0, DETACHED counterfactual) |
 |---|---|---|---|---|
-| Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 | ✅ exact (506/540) |
-| CWSD | 1.0 | 0.9620 | 0.9611 | ✅ (gap 0.0009) |
+| Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 (exact, 506/540) | 0.9370 (same; λ=0 is grad-mode-independent) |
+| CWSD | 1.0 | 0.9620 | 0.9407 (does NOT reproduce; +0.0037 over baseline) | 0.9611 (within 0.001; +0.0241) |
 
-Structural gates (all implemented in `tests/`, 48 tests, passing 2026-08-04):
+The paper's Table-1 CWSD number (0.9620) is NOT reachable under the paper-LITERAL gradient
+(stopgrad only on `p̃`, as Eq. 3 marks it) at any seed; it is reachable only under the DETACHED
+variant (whole target constant), which the paper does not state on `w`. The faithful
+reproduction therefore reports the headline as NOT reproduced under the paper's equations,
+with the detached variant documented as the counterfactual that matches the table.
+
+Structural gates (all implemented in `tests/`, 53 tests, passing 2026-08-04):
 (a) `λ = 0` path is exact CE, asserted bitwise (per-step loss+grads and a 300-step SGD loop)
 against an independently written CE routine, swept over `s ∈ {0.01…10.0}` so the gate cannot be
-fit through the one unstated hyperparameter; (b) `t = y` at `w = 0`; (c) Eq. (4) at `t = p̃`
-equals a direct `CE(p̃, p)`; (d) `∂L/∂z = (p−t)/B` vs finite differences on all four parameters;
-(e) the loop performs exactly `--steps` updates; (f) data loader fingerprinted against a
-re-derivation (`tests/test_instruments.py`). Sensitivity over the §4 choices (`s`, init,
-noise-mode, batch-mode, rng-layout) is what it is — the paper cannot adjudicate it; reported in
+fit through the one unstated hyperparameter — and the degeneracy holds under BOTH grad modes
+(the gate-path term is `λ·...=0` at λ=0); (b) `t = y` at `w = 0`; (c) Eq. (4) at `t = p̃`
+equals a direct `CE(p̃, p)`; (d) the LITERAL `∂L/∂z = (p−t)/B + gate-path` vs finite differences
+with `p̃` frozen (w recomputed) on all four parameters, on a peaked net where a no-stopgrad
+(through `p̃`) and a detached (no gate path) implementation both diverge; (e) the loop performs
+exactly `--steps` updates; (f) data loader fingerprinted against a re-derivation
+(`tests/test_instruments.py`). Sensitivity over the §4 choices (`s`, init, noise-mode,
+batch-mode, rng-layout, grad-mode) is what it is — the paper cannot adjudicate it; reported in
 REPRODUCTION.md.
 
 ## 11. Constructed truth
@@ -370,20 +438,32 @@ by a constructed truth that does not depend on the 4000-step budget.
   exercises the oracle on a known-degenerate (positive) and a
   known-non-degenerate (`λ = 1`, negative) input.
 - **Naive implementation agreeing with the fast one.** YES — the hand-derived
-  analytic gradient `∂L/∂z = (p − t)/B` (with `t` held constant, the Eq. (3)
-  stop-grad made structural) is checked against a central finite-difference of
-  the loss with `t` **frozen at the unperturbed params** (`_loss_with_frozen_target`),
-  on a **peaked** network (W2 scaled 8×, so `p` is non-uniform) over all four
-  parameters (`tests/test_invariants.py::test_gradient_matches_finite_differences`,
-  `stopgrad_grad_err ≈ 1.16e-3 < 5e-3`). The "slow" reference is finite
+  analytic literal gradient `∂L/∂z = (p − t)/B + gate-path` (with `p̃` held
+  constant, the Eq. (3) stop-grad made structural) is checked against a central
+  finite-difference of the loss with `p̃` **frozen at the unperturbed params**
+  (and `w` recomputed — the literal gradient), on a **peaked** network (W2
+  scaled 8×, so `p` is non-uniform and both the gate-path term and the
+  `d p̃/dz` chain are non-negligible) over all four parameters
+  (`tests/test_invariants.py::test_gradient_matches_finite_differences`,
+  `stopgrad_grad_err ≈ 1.08e-3 < 5e-3`). The "slow" reference is finite
   differences; the "fast" one is the analytic backprop. Their agreement is the
-  evidence that no gradient flows through the target. **Non-vacuity is proven**:
-  `tests/test_structural_metrics.py::test_stopgrad_grad_err_is_nonvacuous` shows
-  that the OLD broken check (finite-differencing `loss_and_grads(...)[0]`, which
-  recomputes `t` from the perturbed `z` and so returns the no-stopgrad gradient)
-  diverges to ~6.1 on the same peaked net, and the M6 mutation
-  (`dz = (p-t)/B + lam*(p_tilde-p)/B`, a no-stopgrad gradient invisible to the
-  λ=0 degeneracy gate by construction) is caught by this check.
+  evidence that the stop-grad is on `p̃` only and the gate path is included.
+  **Non-vacuity is proven two ways**: `tests/test_structural_metrics.py::test_stopgrad_grad_err_is_nonvacuous`
+  shows a NO-stopgrad FD (recomputing `p̃`, i.e. the chain through `p̃`) diverges
+  to ~2.1 and a DETACHED analytic (dropping the gate path) diverges to ~4.0 on
+  the same peaked net; and two mutations are caught by the same check — M6
+  (detached, drop the gate-path term — the exact divergence an adversarial review
+  rejected) and M7 (no stop-grad on `p̃`, the trivial-solution hazard the paper
+  warns about).
+- **The method's limiting cases.** YES — the `λ = 0` degeneracy (above) is the
+  method's limiting case, AND the gradient-mode contrast is itself a limiting-
+  case argument: the LITERAL gradient (stopgrad on `p̃` only, the paper's
+  letter) vs the DETACHED gradient (whole target constant, the standard
+  convention) are two limiting readings of the under-specified stop-grad; the
+  literal one is the default (faithful) and the detached one is the
+  counterfactual that reproduces Table 1. Their divergence (headline
+  reproduces under detached, not under literal) IS the reproduction's central
+  finding about the paper.
 - **The paper's standard baseline as a common-knowledge oracle.** YES — the
   baseline `0.9370` (Table 1) is common knowledge from the paper, and the
   `init-first` RNG layout (§4 item 7) was selected precisely because it is the
@@ -410,9 +490,12 @@ by a constructed truth that does not depend on the 4000-step budget.
   finite-difference gradient check above is the closest analogue and is
   already listed under "naive agrees with fast".
 
-Net: four of the eight candidate strategies apply (degeneracy, two-ways,
-naive-vs-fast, baseline-as-oracle); two are honestly N/A (closed-form
-brute force, exact/convex reference); one is used only to exercise an
-instrument, not as gate evidence (planted structure). The reproduction's
-evidence is the structural / sign-only high claims, each tied to one of
-the four applying strategies, not the seed-0 magnitudes.
+Net: five of the eight candidate strategies apply (degeneracy, two-ways,
+naive-vs-fast, limiting-cases, baseline-as-oracle); two are honestly N/A
+(closed-form brute force, exact/convex reference); one is used only to exercise
+an instrument, not as gate evidence (planted structure). The reproduction's
+evidence is the structural / sign-only high claims, each tied to one of the
+applying strategies, not the seed-0 magnitudes. The literal-vs-detached
+limiting-case contrast is itself the reproduction's central finding: the
+paper's headline reproduces only under the detached reading the paper does not
+state, not under the literal reading Eq. (3) marks.

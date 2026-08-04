@@ -156,8 +156,8 @@ def test_training_step_count_is_exact():
         saved_fn = r.loss_and_grads
         seen = {"n": 0}
 
-        def counting(params, X, Y_onehot, lam, tau, s, T):
-            loss, g = saved_fn(params, X, Y_onehot, lam, tau, s, T)
+        def counting(params, X, Y_onehot, lam, tau, s, T, **kw):
+            loss, g = saved_fn(params, X, Y_onehot, lam, tau, s, T, **kw)
             seen["n"] += 1
             return loss, g
         r.loss_and_grads = counting
@@ -167,6 +167,7 @@ def test_training_step_count_is_exact():
                 steps=steps, lr=0.1, batch_size=64, init="he",
                 noise_mode="uniform-all", noise_rate=0.2,
                 batch_mode="epoch-permutation", rng_layout="init-first",
+                grad_mode="literal",
             )
             r.train(ns)
         finally:

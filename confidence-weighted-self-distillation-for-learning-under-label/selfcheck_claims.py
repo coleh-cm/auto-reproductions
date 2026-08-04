@@ -167,14 +167,62 @@ def _eval_expr(expr, measured, seed):
     return eval(e, {"__builtins__": {}}, {})
 
 
+def _detached_counterfactual(claims_path):
+    """Run the DETACHED gradient variant (grad_mode detached, the WHOLE target
+    constant -- stopgrad on p_tilde AND the gate weight w) at every seed and
+    record its test accuracy. This is the standard self-distillation convention
+    the paper does NOT mark on w (Eq. 3 marks stopgrad ONLY on p_tilde); it is
+    the variant under which Table 1's 0.9620 and the +2.5-point headline ARE
+    reachable. Reported as a COUNTERFACTUAL (not a gated arm): the gated cwsd
+    arm uses the paper-LITERAL gradient, under which the headline does NOT
+    reproduce. Imported here so a reader can re-run it; written to selfcheck.json
+    under 'counterfactual_detached' for machine readability."""
+    import argparse
+    import run_experiment as r
+    claims = json.loads(Path(claims_path).read_text())
+    seeds = claims.get("seeds", [])
+    out = {}
+    for arm in ("baseline", "cwsd"):
+        cfg = claims["arms"][arm]["config"]
+        per = {}
+        for seed in seeds:
+            ns = argparse.Namespace(
+                lambda_=cfg["lambda"], s=cfg["s"], tau=cfg["tau"],
+                temperature=cfg["temperature"], seed=seed, steps=cfg["steps"],
+                lr=cfg["lr"], batch_size=cfg["batch_size"], init=cfg["init"],
+                noise_mode=cfg["noise_mode"], noise_rate=cfg["noise_rate"],
+                batch_mode=cfg["batch_mode"], rng_layout=cfg["rng_layout"],
+                grad_mode="detached",
+            )
+            acc, _, _, _ = r.train(ns)
+            per[str(seed)] = float(f"{acc:.4f}")
+        out[arm] = per
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--claims", default="claims.json")
     ap.add_argument("--measured", default="measured.json")
     ap.add_argument("--out", default="selfcheck.json")
     ap.add_argument("--strict", action="store_true")
+    ap.add_argument("--no-counterfactual", action="store_true",
+                    help="skip running the detached counterfactual arm")
     args = ap.parse_args()
     res = evaluate(args.claims, args.measured)
+    if not args.no_counterfactual:
+        try:
+            res["counterfactual_detached"] = _detached_counterfactual(args.claims)
+            res["counterfactual_detached_note"] = (
+                "DETACHED gradient (grad_mode detached, whole target constant) "
+                "accuracy at each seed -- the standard self-distillation convention "
+                "the paper does NOT mark on w (Eq. 3 marks stopgrad ONLY on p_tilde). "
+                "This is the variant under which Table 1 (0.9620) and the +2.5-point "
+                "headline ARE reachable. NOT the gated arm: the gated cwsd arm uses "
+                "the paper-LITERAL gradient (grad_mode literal), under which the "
+                "headline does NOT reproduce (see the 'claims' block above).")
+        except Exception as e:  # pragma: no cover - counterfactual is supplementary
+            res["counterfactual_detached"] = {"error": str(e)}
     Path(args.out).write_text(json.dumps(res, indent=2))
     n_pass = sum(1 for c in res["claims"] if c["verdict"] == "pass")
     n_fail = sum(1 for c in res["claims"] if c["verdict"] == "fail")

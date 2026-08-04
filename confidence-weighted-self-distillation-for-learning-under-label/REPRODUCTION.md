@@ -11,9 +11,17 @@
 
 ## Status
 
-Current rung: **numbers** (implementation re-verified this run; all 9 claims
-pass the local self-check at all 3 seeds; measured.json regenerated
-byte-identical on the accuracy arms).
+Current rung: **correctness** (implementation faithful to the paper's equations;
+adversarial review's blocking finding fixed). The paper's Table-1 headline
+(+2.5 points, 0.9620) and the central `cwsd > baseline` ordering do NOT
+reproduce under the paper's LITERAL gradient (stopgrad only on `p_tilde`, as
+Eq. 3 marks it); they reproduce only under the DETACHED variant (whole target
+constant), which the paper does not state on the gate weight `w`. The
+reproduction implements the literal gradient as the default (faithful) and
+reports the detached variant as a counterfactual. The 5 high structural
+invariants + the baseline value reproduce; the central ordering + the two CWSD
+value claims honestly fail. `selfcheck_claims.py` → `selfcheck.json` reports
+6 pass / 3 fail / 0 blocked at all 3 seeds; `measured.json` regenerated.
 
 - [x] Reproductions repo cloned (shallow, blobless) into `$HOME`; workspace folder
       present at the slug name
@@ -22,11 +30,14 @@ byte-identical on the accuracy arms).
       created from `origin/main` and pushed
 - [x] Paper text saved to `paper/paper.md`
 - [x] Comprehension (SPEC)
-- [x] Implementation / verification (this pass: stop-grad check fixed + M6
-      mutation + self-check; 51 tests pass; arms re-run; measured.json
-      regenerated)
-- [ ] Adversarial review rounds clean (one review pass done; one confirmed
-      minor defect found and fixed)
+- [x] Implementation / verification (this pass: paper-LITERAL gradient made the
+      default; DETACHED kept as counterfactual; `param_count` computed;
+      stop-grad FD check rewritten to freeze `p_tilde` (w recomputed) and
+      discriminate both no-stopgrad and detached; M6 detached + M7 no-stopgrad
+      mutations added; 53 tests pass; arms re-run; measured.json regenerated)
+- [x] Adversarial review rounds: the prior pass was REJECTED on one blocking,
+      outcome-determinative finding (whole-target stop-grad contradicts Eq. 3);
+      this pass fixes it
 - [ ] Readiness gates
 - [ ] Publish
 
@@ -107,3 +118,79 @@ byte-identical on the accuracy arms).
   `claims_result.json` committed by a prior run (the gate refuses any copy it
   did not produce). All four other components cleared review with no confirmed
   issues.
+- 2026-08-04 — Implementation pass 2 (adversarial REJECTION → blocking fix). A
+  follow-up adversarial review REJECTED the above on one blocking,
+  outcome-determinative finding (verified by independent re-execution, not
+  from docs): the implementation applied the stop-gradient to the WHOLE target
+  `t`, but Eq. (3) marks stopgrad ONLY on `p_tilde` ("the latter [= p_tilde]
+  treated as a constant", paper/paper.md:171-174, :198). Under the paper-LITERAL
+  gradient (stopgrad on `p_tilde` only; the gate weight `w = λσ((c−τ)/s)` is
+  differentiable in `z` through `c = max_k p_k`, so the `L → t → w → c → z`
+  path is included) the Table-1 headline +2.5 points and the central
+  `cwsd > baseline` ordering do NOT reproduce — re-measured at seeds 0/1/2:
+  CWSD-LITERAL 0.9407 / 0.9296 / 0.9333 vs baseline 0.9370 / 0.9407 / 0.9315,
+  i.e. the ordering flips at seed 1 and is within noise at seeds 0/2. The
+  detached-t variant (the prior primary arm) reproduces Table 1 (0.9611 /
+  0.9481 / 0.9556), but it is the standard self-distillation convention the
+  paper does NOT mark on `w`. The prior pass therefore reached the paper's
+  number through a mechanism the paper forbids by omission — exactly what the
+  gate exists to prevent.
+
+  FIX (this pass):
+  (1) Added `--grad-mode literal|detached` (default **literal**, paper-faithful):
+  stopgrad ONLY on `p_tilde`, gate weight `w` differentiable; the full literal
+  gradient `dL/dz = (p − t)/B + gate-path term` is hand-derived
+  (`_gate_path_grad`) and verified against a frozen-`p_tilde` finite-difference
+  to ~1e-3 on a peaked net. The DETACHED variant (whole target constant) is kept
+  as a documented COUNTERFACTUAL — the variant under which Table 1 is reachable
+  — reported in `selfcheck.json` / REPRODUCTION.md, NOT as the gated arm.
+  (2) Rewrote the stop-grad FD check to freeze `p_tilde` (not the whole `t`),
+  with `w` recomputed; it now discriminates BOTH failure modes — a no-stopgrad
+  (through `p_tilde`) FD diverges (~2.1) and a detached (no gate path) analytic
+  diverges (~4.0) on the peaked net.
+  (3) Replaced the prior M6 mutation with two: M6 (detached, drop the gate-path
+  term — the exact divergence the review rejected) and M7 (no stop-grad on
+  `p_tilde`, the trivial-solution hazard the paper warns about); both caught by
+  the rewritten FD check.
+  (4) `param_count` is now COMPUTED (`len(params)`) rather than a hardcoded
+  literal `4` (a prior review noted the literal would report 4 even if
+  parameters were added).
+  (5) `claims.json` cwsd arm uses `--grad-mode literal`; the value/ordering
+  claims are retained as the paper's claims so the gate adjudicates them
+  honestly against the literal arm (they fail); the detached counterfactual is
+  in `not_tested`. `--s` is no longer described as "calibrated to Table 1"
+  (the literal arm does not reproduce Table 1 at any `s`).
+
+  Result (re-measured this pass, seeds 0/1/2): baseline 0.9370/0.9407/0.9315
+  (grad-mode-independent at λ=0, degeneracy holds under literal too — the
+  gate-path term is `λ·...=0`); CWSD-LITERAL 0.9407/0.9296/0.9333; CWSD-DETACHED
+  (counterfactual) 0.9611/0.9481/0.9556. `selfcheck.json`: 6 pass (5 high
+  structural invariants + baseline value) / 3 fail (central ordering at seed 1,
+  cwsd value, improvement magnitude) / 0 blocked. `pytest -q tests` → 53
+  passed (was 51; +2 from M6/M7). The reproduction's honest conclusion: the
+  paper's headline and central ordering do NOT reproduce under the paper's
+  stated equations; they reproduce only under the detached variant the paper
+  does not state — a genuine, reported finding, not a fabricated "reproduced".
+
+## Literal vs detached — the central finding
+
+The paper's Eq. (3) annotates `stopgrad` ONLY on `p_tilde`
+(`paper/paper.md:198`, "the latter treated as a constant", `:171-174`). The
+gate weight `w = λσ((c−τ)/s)` is unmarked and is a function of `θ` through
+`c = max_k p_k`. Two faithful readings of the under-specified stop-grad:
+
+| reading | stop-grad on | gate path `w` | CWSD seed 0/1/2 | ordering | Table 1 (0.9620) |
+|---|---|---|---|---|---|
+| **literal** (default, paper's letter) | `p_tilde` only | differentiable (included) | 0.9407 / 0.9296 / 0.9333 | flips at seed 1 | NOT reachable |
+| **detached** (standard convention, counterfactual) | `p_tilde` AND `w` | constant (dropped) | 0.9611 / 0.9481 / 0.9556 | holds all seeds | reachable (±0.001) |
+
+The literal gradient is the default because it is what Eqs. (2)–(4) literally
+state; under it the headline does not reproduce. The detached variant is the
+standard self-distillation convention (treat the whole target as a constant),
+which the paper does not state on `w`; it is the only reading under which
+Table 1 is reachable, so it is implemented (`--grad-mode detached`) and
+reported as a counterfactual (`selfcheck.json`), not as the gated arm. The
+divergence between the two readings IS the reproduction's central finding
+about the paper: its headline rests on a gradient computation it does not
+explicitly state. (Both readings agree at `λ = 0` — the gate-path term is
+`λ·...=0` — so the paper's degeneracy gate holds under either.)
