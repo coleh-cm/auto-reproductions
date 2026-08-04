@@ -146,7 +146,7 @@ Per minibatch (x, y):
 Early stopping (M5): track ADVERSARIAL validation-set error (FGSM against the current model),
 NOT the clean valid error (tex:503-505). After choosing epochs, retrain on all 60,000 (tex:506).
 ```
-Equation: **J̃(θ,x,y) = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇ₓJ(θ,x,y)))** — tex:486-487 `\[ \tilde{J}(\vtheta, \vx, y) = \alpha J(\vtheta, \vx, y) + (1-\alpha) J(\vtheta,`; α=0.5 — tex:488 `we used $\alpha = 0.5$`. ε=0.25 for MNIST adversarial training — tex:428-429 `good results using adversarial training with $\eps = .25$`.
+Equation: **J̃(θ,x,y) = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇ₓJ(θ,x,y)))** — tex:486-487 `\[ \tilde{J}(\vtheta, \vx, y) = \alpha J(\vtheta, \vx, y) + (1-\alpha) J(\vtheta,`; α=0.5 — tex:488 `we used $\alpha = 0.5$`. ε=0.25 for MNIST adversarial training — tex:428-429, grep strings `obtained good results using` (tex:428) and `adversarial training with $\eps = .25$` (tex:429; the sentence wraps across the file's line break).
 
 ### Algorithm C — Closed-form adversarial logistic regression (3-vs-7)
 
@@ -276,14 +276,14 @@ milestone id, all hyperparams, seed, and the four fields above per eval.
 |---|----------|----------------------|
 | E1 | η = ε sign(∇ₓ J(θ,x,y)) | `paper/source/iclr2015.tex:309` — `\[ \veta = \eps \sign \left( \nabla_\vx J(\vtheta, \vx, y) \right). \]` |
 | E2 | x̃ = x + η; require ‖η‖∞ < ε | tex:235 `$\tilde{\vx} = \vx + \veta$`; tex:239 `$||\veta||_\infty < \eps$` |
-| E3 | wᵀx̃ = wᵀx + wᵀη; growth max with η=ε·sign(w) ⇒ εmn (n dims, avg weight magnitude m) | tex:243 `\[ \vw^\top \tilde{\vx} = \vw^\top \vx + \vw^\top \veta. \]`; tex:246-247 `by assigning $\eta = \text{sign}(\vw)$` / `the activation will grow by $\eps m n$` |
+| E3 | wᵀx̃ = wᵀx + wᵀη; growth max with η=ε·sign(w) ⇒ εmn (n dims, avg weight magnitude m) | tex:243 `\[ \vw^\top \tilde{\vx} = \vw^\top \vx + \vw^\top \veta. \]`; tex:246 `$\eta = \text{sign}(\vw)$` (sentence ends at tex:245 `by assigning`); tex:247 `the activation will grow by $\eps m n$` |
 | E4 | y∈{−1,1}, P(y=1)=σ(wᵀx+b) | tex:399 `with $P(y=1) = \sigma\left( \vw^\top \vx + b\right)$` |
 | E5 | logistic cost E ζ(−y(wᵀx+b)), ζ(z)=log(1+exp z) | tex:401-404 `\mathbb{E}_{\vx, y \sim p_\text{data}} \zeta( -y (\vw^\top \vx + b))` / `\zeta(z) = \log \left(1 + \exp(z) \right)` |
 | E6 | adversarial logistic cost E ζ(y(ε‖w‖₁ − wᵀx − b)) | tex:410-412 `\mathbb{E}_{\vx, y \sim p_\text{data}} \zeta( y (\eps ||\vw||_1 - \vw^\top \vx - b)).`; derivation tex:407 |
 | E7 | J̃ = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇ₓJ(θ,x,y))); α=0.5 | tex:486-487 (grep `tilde{J}`); tex:488 `$\alpha = 0.5$` |
 | E8 | RBF p(y=1\|x) = exp((x−μ)ᵀβ(x−μ)) | tex:595 `p(y=1 \mid \vx ) = \exp \left( (\vx - \mu)^\top \vbeta (\vx - \mu) \right)` |
 | E9 | targeted fooling x += ε∇ₓ p(y=i\|x) (sign-step per Fig.5 caption) | tex:936 `adding $\eps \nabla_\vx p(y = i \mid \vx)$ to a Gaussian sample`; tex:954 `taking a gradient sign step` |
-| E10 | noise controls: x + ε·b, b~Bernoulli{±1}; x + u, u~U(−ε,ε) | tex:555-556 `randomly adding $\pm \eps$ to each pixel, or adding noise in $U(-\eps, \eps)$` |
+| E10 | noise controls: x + ε·b, b~Bernoulli{±1}; x + u, u~U(−ε,ε) | tex:555 `randomly adding $\pm \eps$`; tex:556 `or adding noise in $U(-\eps, \eps)$ to each pixel` (the sentence wraps across the file's line break at "…$\pm \eps$" / "to each pixel, …") |
 
 Implied, not displayed: `J` = cross-entropy/NLL for softmax models (tex:305-306 defines J only
 as "the cost used to train the neural network"). Ensemble gradient for E1 = gradient of the
