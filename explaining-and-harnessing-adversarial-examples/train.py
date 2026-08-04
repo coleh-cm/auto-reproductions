@@ -41,6 +41,8 @@ def _add_noise(x, cfg, gen):
     if noise is None:
         return x
     eps = float(noise.get("eps", 0.25))
+    if eps == 0.0:
+        return x  # degeneracy: eps=0 noise is a true no-op (no RNG consumed)
     typ = noise.get("type", "uniform")
     if typ == "rademacher":
         signs = torch.randint(0, 2, x.shape, generator=gen).float() * 2 - 1
@@ -119,6 +121,10 @@ def train(model, data, cfg):
 
     adv_eps = float((adversarial or {}).get("eps", 0.25)) if adversarial else 0.25
     adv_alpha = float((adversarial or {}).get("alpha", 0.5)) if adversarial else 0.5
+    # degeneracy: adversarial eps=0 is a true no-op — x_adv == x, so skip the
+    # redundant adversarial half entirely (keeps the code path bit-identical to
+    # plain training, which the degeneracy test asserts).
+    adv_active = adversarial is not None and adv_eps > 0.0
 
     opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
 
@@ -146,7 +152,7 @@ def train(model, data, cfg):
                 yb = y_tr[batch_idx]
                 xb = _add_noise(xb, cfg, gen)
                 loss = model_local.loss(xb, yb)
-                if adversarial is not None:
+                if adv_active:
                     x_adv = _build_x_adv(model_local, xb, yb, adv_eps)
                     loss_adv = model_local.loss(x_adv, yb)
                     loss = adv_alpha * loss + (1 - adv_alpha) * loss_adv
@@ -190,7 +196,7 @@ def train(model, data, cfg):
             yb = y_train[batch_idx]
             xb = _add_noise(xb, cfg, gen)
             loss = model.loss(xb, yb)
-            if adversarial is not None:
+            if adv_active:
                 x_adv = _build_x_adv(model, xb, yb, adv_eps)
                 loss_adv = model.loss(x_adv, yb)
                 loss = adv_alpha * loss + (1 - adv_alpha) * loss_adv
@@ -246,7 +252,7 @@ def train(model, data, cfg):
                 yb = y_full[batch_idx]
                 xb = _add_noise(xb, cfg, gen)
                 loss = model.loss(xb, yb)
-                if adversarial is not None:
+                if adv_active:
                     x_adv = _build_x_adv(model, xb, yb, adv_eps)
                     loss_adv = model.loss(x_adv, yb)
                     loss = adv_alpha * loss + (1 - adv_alpha) * loss_adv

@@ -1,0 +1,76 @@
+{
+  "mutations": [
+    {
+      "id": "mut_fgsm_clip",
+      "covers": ["core", "degeneracy"],
+      "file": "attack.py",
+      "find": "    return (x + eta).detach()",
+      "replace": "    return (x + eta).clamp(0.0, 1.0).detach()",
+      "must_fail": "tests/test_invariants.py::test_fgsm_no_clipping"
+    },
+    {
+      "id": "mut_fgsm_eps_scale",
+      "covers": ["core"],
+      "file": "attack.py",
+      "find": "    eta = eps * torch.sign(g)\n    return (x + eta).detach()",
+      "replace": "    eta = eps * 0.5 * torch.sign(g)\n    return (x + eta).detach()",
+      "must_fail": "tests/test_invariants.py::test_fgsm_inf_norm_equals_eps"
+    },
+    {
+      "id": "mut_adv_leak_grad",
+      "covers": ["core", "degeneracy"],
+      "file": "train.py",
+      "find": "    with torch.no_grad():\n        x_req = x.clone().detach().requires_grad_(True)\n        loss0 = model.loss(x_req, y)\n        g = torch.autograd.grad(loss0, x_req, create_graph=False)[0]\n        x_req.requires_grad_(False)\n        eta = eps * torch.sign(g)\n        x_adv = (x + eta).detach()\n    return x_adv",
+      "replace": "    x_req = x.clone().detach().requires_grad_(True)\n        loss0 = model.loss(x_req, y)\n        g = torch.autograd.grad(loss0, x_req, create_graph=True)[0]\n        x_req.requires_grad_(False)\n        eta = eps * torch.sign(g)\n        x_adv = x + eta\n    return x_adv",
+      "must_fail": "tests/test_degeneracy.py::test_adversarial_eps0_equals_baseline_exact"
+    },
+    {
+      "id": "mut_adv_eps0_no_shortcircuit",
+      "covers": ["degeneracy"],
+      "file": "train.py",
+      "find": "    if eps == 0.0:\n        return x  # degeneracy: eps=0 noise is a true no-op (no RNG consumed)",
+      "replace": "    if eps == 0.0:\n        torch.randint(0, 2, x.shape, generator=gen)  # consume RNG even at eps=0",
+      "must_fail": "tests/test_degeneracy.py::test_noise_eps0_equals_baseline_exact"
+    },
+    {
+      "id": "mut_logreg_analytic_sign",
+      "covers": ["core"],
+      "file": "tests/test_invariants.py",
+      "find": "    x_adv = x - eps * torch.sign(w).unsqueeze(0)",
+      "replace": "    x_adv = x + eps * torch.sign(w).unsqueeze(0)",
+      "must_fail": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form"
+    },
+    {
+      "id": "mut_rbf_softmax_norm",
+      "covers": ["core"],
+      "file": "models.py",
+      "find": "    def prob(self, x):\n        return torch.exp(self.logits(x))  # [B, K] rows need NOT sum to 1",
+      "replace": "    def prob(self, x):\n        return torch.softmax(self.logits(x), dim=-1)  # rows sum to 1",
+      "must_fail": "tests/test_invariants.py::test_rbf_prob_rows_need_not_sum_to_one"
+    },
+    {
+      "id": "mut_softmax_not_sum1",
+      "covers": ["core"],
+      "file": "models.py",
+      "find": "    def prob(self, x):\n        return F.softmax(self.logits(x), dim=-1)\n\n    def loss(self, x, y):\n        logits = self.logits(x)\n        y = y.to(torch.long).view(-1)\n        return F.cross_entropy(logits, y)\n\n    def predict(self, x):\n        return self.prob(x).argmax(dim=-1).to(torch.long)\n\n    def confidence(self, x):\n        return self.prob(x).max(dim=-1).values\n\n\n# ---------------------------------------------------------------------------\n# Binary logistic regression",
+      "replace": "    def prob(self, x):\n        return torch.sigmoid(self.logits(x))  # BUG: not normalized\n\n    def loss(self, x, y):\n        logits = self.logits(x)\n        y = y.to(torch.long).view(-1)\n        return F.cross_entropy(logits, y)\n\n    def predict(self, x):\n        return self.prob(x).argmax(dim=-1).to(torch.long)\n\n    def confidence(self, x):\n        return self.prob(x).max(dim=-1).values\n\n\n# ---------------------------------------------------------------------------\n# Binary logistic regression",
+      "must_fail": "tests/test_invariants.py::test_softmax_prob_rows_sum_to_one"
+    },
+    {
+      "id": "mut_eps_trace_direction_per_eps",
+      "covers": ["core"],
+      "file": "attack.py",
+      "find": "    direction = torch.sign(g)  # [1, D] (or [B,D]); fixed\n    eps_grid = torch.as_tensor(eps_grid, dtype=torch.float32).view(-1, 1, 1)  # [E,1,1]\n    x_exp = x.unsqueeze(0)  # [1,B,D]\n    x_eps = x_exp + eps_grid * direction.unsqueeze(0)  # [E,B,D]",
+      "replace": "    # BUG: recompute direction at each eps (not fixed at eps=0)\n    eps_grid = torch.as_tensor(eps_grid, dtype=torch.float32).view(-1, 1, 1)\n    x_exp = x.unsqueeze(0)\n    outs = []\n    for e in eps_grid[:,0,0]:\n        xt = (x + e).clone().detach().requires_grad_(True)\n        lt = model.loss(xt, y_t)\n        gt = torch.autograd.grad(lt, xt, create_graph=False)[0]\n        outs.append(model.logits(x + e * torch.sign(gt)))\n    logits = torch.stack(outs, dim=0).squeeze(1)\n    return logits",
+      "must_fail": "tests/test_invariants.py::test_eps_trace_piecewise_linear_in_eps"
+    },
+    {
+      "id": "mut_empty_input_silent",
+      "covers": ["core"],
+      "file": "models.py",
+      "find": "    if x.numel() == 0:\n        raise ValueError(f\"empty {name}\")\n    return x.float()",
+      "replace": "    if x.numel() == 0:\n        return x  # BUG: pass empty through silently\n    return x.float()",
+      "must_fail": "tests/test_invariants.py::test_empty_input_raises"
+    }
+  ]
+}
