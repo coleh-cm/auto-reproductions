@@ -307,3 +307,42 @@ skipped = cifar positive, download unavailable). A typo introduced while
 editing `load_mnist_3v7` (key `y_te` instead of `y_test`, which would have
 broken the `logreg_3v7` arm) was caught by `test_mnist_real` and fixed; the
 fingerprint check inside the loader is what surfaced it.
+
+## Instruments: single-node `positive_test`/`negative_test` (2026-08-04, instruments fix)
+
+The instruments declaration was rejected again: four fields listed multiple
+tests as a comma-separated string (`numbers_gate.negative_test`,
+`fgsm_inf_norm.positive_test`, `degeneracy_check.positive_test`,
+`rubbish_any_prob_threshold.positive_test`). The declaration checker does not
+split a comma-separated string — it treats the whole string as one (invalid)
+node id and reports every test named in it as missing, even though all those
+tests exist and pass (every single-node field was found). The tests themselves
+were correct and unchanged; only the declaration format was wrong.
+
+Fix: each instrument's `positive_test` and `negative_test` is now exactly ONE
+`<file>::<test>` node id — the canonical representative for that side of the
+contract (a known-correct input the instrument accepts / a known-wrong input
+it rejects). The remaining tests that previously shared the comma-separated
+field are preserved (the linkage is real evidence and is not dropped) under a
+new `additional_tests` array on each instrument:
+
+- `numbers_gate` — negative `test_gate_negative_known_wrong` (verdict "fail" on
+  a known-wrong input); additional `test_gate_blocked_metric_not_silent_pass`,
+  `test_gate_raises_on_unusable_input` (the two other negative paths the
+  contract names: a blocked metric is never a silent pass; a grader that cannot
+  run raises a traceback, never a verdict).
+- `fgsm_inf_norm` — positive `test_fgsm_inf_norm_equals_eps` (||η||_∞ == ε);
+  additional `test_fgsm_no_clipping` (x_adv may exceed [0,1]).
+- `degeneracy_check` — positive `test_adversarial_eps0_equals_baseline_exact`
+  (adversarial eps=0 → baseline bit-identical); additional
+  `test_noise_eps0_equals_baseline_exact`, `test_l1_coef0_equals_baseline_exact`
+  (the other two no-op settings).
+- `rubbish_any_prob_threshold` — positive `test_rubbish_eval_rbf_near_zero`
+  (the RBF-zero oracle that proves the 0.5 threshold is load-bearing);
+  additional `test_rubbish_eval_softmax_in_range_and_shares_sum_to_100`.
+
+All 20 referenced nodes (12 primary + 8 additional) collect and pass
+(`pytest tests/` → 29 passed, 1 skipped = cifar positive, download
+unavailable). The numbers gate re-run on the real `measured.json` is
+byte-identical to the committed `claims_result.json` (18/19 HIGH pass, 1
+CIFAR-blocked; `produced_by=numbers_gate.py`).

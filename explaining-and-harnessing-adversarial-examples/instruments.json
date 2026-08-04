@@ -19,8 +19,12 @@
       "name": "numbers_gate",
       "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by=numbers_gate.py stamp. A blocked or failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict. claims_result.json is written BY the gate and never by hand -- its produced_by stamp exists for exactly this reason.",
       "positive_test": "tests/test_numbers_gate.py::test_gate_positive_known_correct",
-      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong, tests/test_numbers_gate.py::test_gate_blocked_metric_not_silent_pass, tests/test_numbers_gate.py::test_gate_raises_on_unusable_input",
-      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate is exercised through sys.executable in an isolated temp dir (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here."
+      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong",
+      "additional_tests": [
+        "tests/test_numbers_gate.py::test_gate_blocked_metric_not_silent_pass",
+        "tests/test_numbers_gate.py::test_gate_raises_on_unusable_input"
+      ],
+      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate is exercised through sys.executable in an isolated temp dir (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here. The negative_test is the canonical known-wrong case (verdict 'fail'); the additional_tests cover the two other negative paths the contract names -- a blocked metric is never a silent 'pass' and a grader that cannot run raises a traceback rather than a verdict."
     },
     {
       "name": "logreg_analytic_equivalence",
@@ -32,22 +36,32 @@
     {
       "name": "fgsm_inf_norm",
       "what_it_decides": "That the FGSM perturbation satisfies ||eta||_inf == eps exactly (tex:309) with sign(0):=0 and NO clipping of x_adv (SPEC sec 4.9: x_adv may exceed [0,1]). The positive tests assert max|eta| == eps, every perturbed pixel is exactly eps, and x_adv is not clipped; the negative test asserts a clipping implementation and a scaled (0.5*eps) perturbation are both rejected by those assertions.",
-      "positive_test": "tests/test_invariants.py::test_fgsm_inf_norm_equals_eps, tests/test_invariants.py::test_fgsm_no_clipping",
+      "positive_test": "tests/test_invariants.py::test_fgsm_inf_norm_equals_eps",
       "negative_test": "tests/test_invariants.py::test_fgsm_rejects_clipping_and_scaling",
+      "additional_tests": [
+        "tests/test_invariants.py::test_fgsm_no_clipping"
+      ],
       "requires_tools": "none"
     },
     {
       "name": "degeneracy_check",
       "what_it_decides": "That the method at its no-op setting reproduces the baseline EXACTLY (bit-identical weights via torch.equal): adversarial eps=0, noise eps=0, and L1 coef=0 each reduce to plain training. The cheapest real correctness evidence -- catches a mis-wired adversarial/noise/L1 loop in seconds. The negative test asserts that with eps>0 (a genuinely non-degenerate run) the weights DIFFER from baseline, so the check is sensitive to a leak rather than a rubber stamp.",
-      "positive_test": "tests/test_degeneracy.py::test_adversarial_eps0_equals_baseline_exact, tests/test_degeneracy.py::test_noise_eps0_equals_baseline_exact, tests/test_degeneracy.py::test_l1_coef0_equals_baseline_exact",
+      "positive_test": "tests/test_degeneracy.py::test_adversarial_eps0_equals_baseline_exact",
       "negative_test": "tests/test_degeneracy.py::test_degeneracy_detects_nonzero_eps",
+      "additional_tests": [
+        "tests/test_degeneracy.py::test_noise_eps0_equals_baseline_exact",
+        "tests/test_degeneracy.py::test_l1_coef0_equals_baseline_exact"
+      ],
       "requires_tools": "none"
     },
     {
       "name": "rubbish_any_prob_threshold",
       "what_it_decides": "Whether a model assigns any class probability > 0.5 to Gaussian rubbish inputs (tex:905-911). For softmax-top: max_k p_k > 0.5; for sigmoid-top / RBF (rows need not sum to 1): any p_k > 0.5 (equivalently max_k p_k > 0.5). The 0.5 threshold is load-bearing: a softmax scores ~100% rubbish error (the paper's result) while an RBF far from data scores ~0% -- the RBF-zero assertion is the oracle that proves the threshold is correct. The negative test shows a buggy threshold (>0.0, always true for exp-quadratic RBF) would mis-report the robust RBF as ~100% error, which the correct eval rejects.",
-      "positive_test": "tests/test_invariants.py::test_rubbish_eval_softmax_in_range_and_shares_sum_to_100, tests/test_invariants.py::test_rubbish_eval_rbf_near_zero",
+      "positive_test": "tests/test_invariants.py::test_rubbish_eval_rbf_near_zero",
       "negative_test": "tests/test_invariants.py::test_rubbish_rejects_wrong_threshold",
+      "additional_tests": [
+        "tests/test_invariants.py::test_rubbish_eval_softmax_in_range_and_shares_sum_to_100"
+      ],
       "requires_tools": "none"
     }
   ]
