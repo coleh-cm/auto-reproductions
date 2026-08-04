@@ -107,5 +107,30 @@
       "verdict": "reproduced",
       "why": "held at 3 of 3 seeds"
     }
-  ]
+  ],
+  "summary": {
+    "total": 9,
+    "pass": 9,
+    "fail": 0,
+    "untested": 0,
+    "blocked": 0,
+    "reproduced": 9,
+    "refuted": 0,
+    "high": {
+      "pass": 6,
+      "fail": 0,
+      "blocked": 0
+    },
+    "low": {
+      "pass": 3,
+      "fail": 0,
+      "blocked": 0
+    },
+    "high_total": 6,
+    "gate_pass": true,
+    "note": "9 claims adjudicated by the reproduce-paper numbers gate against measured.json; reproduced=9 (6 high + 3 low compute-invariance), 0 refuted/untested/blocked."
+  },
+  "verdict_counts": {
+    "reproduced": 9
+  }
 }
