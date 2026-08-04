@@ -11,7 +11,7 @@
 
 ## Status
 
-Current rung: **environment** (workspace setup for this run).
+Current rung: **comprehension** (SPEC re-derived and re-verified this run).
 
 - [x] Reproductions repo cloned (shallow, blobless) into `$HOME`; workspace folder
       present at the slug name
@@ -19,7 +19,7 @@ Current rung: **environment** (workspace setup for this run).
 - [x] Branch `repro/confidence-weighted-self-distillation-for-learning-under-label`
       created from `origin/main` and pushed
 - [x] Paper text saved to `paper/paper.md`
-- [ ] Comprehension (SPEC)
+- [x] Comprehension (SPEC)
 - [ ] Implementation / verification
 - [ ] Adversarial review rounds clean
 - [ ] Readiness gates
@@ -58,3 +58,18 @@ Current rung: **environment** (workspace setup for this run).
 
 - 2026-08-04 — Ingest: workspace set up; branch pushed; paper text saved;
   `arxiv_id` unknown recorded; fresh REPRODUCTION.md started for this run.
+- 2026-08-04 — Comprehension (SPEC): re-derived from `paper/paper.md`, not from
+  the prior run's notes. Independently re-verified: all 11 claims.json quotes
+  verbatim (11/11), all 24 grep anchors, Eq. (2)'s `s` valueless (tokens only at
+  paper.md:139/:162; hyperparameter sentence lists λ=1, τ=0.9, T=2 and stops);
+  no figures (nothing for `read-figure`); no URLs in paper; GitHub
+  repo+user searches all `total_count: 0` (no upstream code). Arms re-run on a
+  fresh pinned env (numpy 2.5.1, sklearn 1.9.0, Python 3.12.13): baseline
+  0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 (seeds 0/1/2) — byte-identical
+  to committed `measured.json`; baseline seed 0 matches Table 1 exactly; ordering
+  holds at every seed. Structural predicates all pass (degeneracy errors 0.0
+  bitwise; gate/target/stop-grad bounds as claimed). Calibration evidence
+  re-measured: rng-layout spawned 0.9315 / noise-first 0.9426; s sensitivity
+  0.12→0.9593 … 0.18→0.9648; λ=0 bitwise s-independent. `pytest -q tests` →
+  48 passed. SPEC.md rewritten with the single-pass verification note;
+  claims.json unchanged (still correct per this pass).

@@ -8,51 +8,45 @@ arXiv LaTeX source (arxiv_id unknown), so maths is reconstructed from the PDF to
 sanity-checked against the surrounding prose (Eq. 2 must be a weight in `[0, λ]`; Eq. 3 must be
 a convex combination; Eq. 4 must reduce to plain cross-entropy at `λ = 0` — all three checks the
 paper itself supplies the prose for). Every citation below is `paper/paper.md:LINE` plus a grep
-anchor; all anchors were executed and resolve (2026-08-04).
+anchor; all anchors were re-executed and resolve (2026-08-04).
 
-**History note.** A prior run of this same workflow (same paper_ref/project_id) left a full
-reproduction here (code, tests, SPEC, claims; final commit `3f47d2c`, rung `review`). This SPEC
-was rewritten independently from `paper/paper.md`; every number it asserts was re-measured on
-2026-08-04 with the existing code (`requirements.txt` pins: numpy 2.5.1, scikit-learn 1.9.0,
-Python 3.12): baseline 0.9370 (seed 0), CWSD 0.9611 (seed 0), cross-seed spot-checks
-baseline/seed1 0.9407 and cwsd/seed2 0.9556 — all matching `measured.json` and Table 1 within
-the stated tolerances; the 48-test suite passes (`python -m pytest -q tests` → `48 passed`).
-The frozen interfaces in §5 were diffed against the actual argparse/function signatures of
-`run_experiment.py`.
+**Verification note (this SPEC pass, 2026-08-04).** A prior run of this same workflow left a
+complete reproduction in this folder (code, tests, claims); nothing from it is trusted without
+re-verification. This SPEC was re-derived from `paper/paper.md` alone, and every load-bearing
+assertion was re-measured in this pass:
 
-**Re-verified this SPEC pass (2026-08-04).** Independent of the prior run's claims: all 11
-`claims.json` quotes re-checked verbatim against `paper/paper.md` under the §8 normalization
-(11/11 pass); all 24 grep anchors cited below re-executed and resolve to the stated lines;
-`paper/` contains only `paper.md` — no figures, no LaTeX — so no `curve` claims are possible;
-GitHub repo/search re-run (`confidence-weighted self-distillation`, `self-distillation label
-noise`, `"Institute for Applied Learning Systems"`, author trio) → `total_count: 0` throughout;
-`grep -niE "http|www\.|github|arxiv|doi|available at" paper/paper.md` → no matches;
-`requirements.txt` re-installed (numpy 2.5.1, scikit-learn 1.9.0) and `python -m pytest -q
-tests` → `48 passed`; SPEC §5 interfaces diffed clean against `run_experiment.py`
-(`--lambda --s --tau --temperature --seed --steps --lr --batch-size --init --noise-mode
---noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels, init_params,
-forward, make_target, loss_and_grads, batches, evaluate, train`); `measured.json` values match §8's numbers.
-
-**Re-verified again this pass (2026-08-04, comprehension step).** Re-run from the paper, not
-from the notes above: Eq. (2)'s `s` confirmed valueless by exhausting the file's two lone `s`
-tokens (`grep -n '^s$' paper/paper.md` → only :139 inside Eq. (2) and :162 in the prose — no
-assignment anywhere; the §3 hyperparameter sentence at :361-375 lists exactly `λ = 1`,
-`τ = 0.9`, `T = 2` and stops); Eq. (2)'s stacked layout `τ` (:138) over `s` (:139) inside the
-parentheses confirms the fractional reading `(c − τ)/s` used throughout. Arms re-executed on
-the pinned env (numpy 2.5.1, sklearn 1.9.0, Python 3.12.13): seed 0 → baseline `0.9370`
-(matches Table 1 *exactly*, 506/540), CWSD `0.9611` (Table 1: 0.9620, gap 0.0009); seeds 1,2 →
-baseline `0.9407`/`0.9315`, CWSD `0.9481`/`0.9556` — all identical to `measured.json` and §8;
-ordering `cwsd > baseline` holds at every seed. `--metrics-out` re-run at seed 0:
-baseline `gate_w_max = 0.0`, `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0`
-(bitwise); CWSD `gate_w_min = 0.0126 > 0`, `gate_w_max = 0.5379 < 1`, `target_min > 0`,
-`target_sum_err = 1.19e-07 < 1e-6`, `stopgrad_grad_err = 8.9e-04 < 5e-3` — every high claim's
-predicate verified as measured evidence. `python -m pytest -q tests` → `48 passed`. All 11
-quotes re-verified verbatim (11/11 PASS under the §8 normalization); every grep anchor cited
-below re-executed and resolving to the stated line; `paper/` confirmed to contain only
-`paper.md` (no figures/LaTeX → no `curve` claims); paper URL/code grep → no matches; GitHub
-repository searches re-run (`confidence-weighted self-distillation`, `self-distillation label
-noise`, `cwsd label noise`, `"Institute for Applied Learning Systems"`) → `total_count: 0`
-throughout; GitHub user search on the author trio → `total_count: 0`.
+- **Quotes:** all 11 `claims.json` quotes re-checked verbatim against `paper/paper.md` under the
+  §8 normalization (11/11 PASS); all 24 grep anchors cited below re-executed and resolve to the
+  stated lines.
+- **Eq. (2)'s `s` is genuinely valueless:** the file's only two bare `s` tokens resolve to
+  `paper/paper.md:139` (inside Eq. (2)) and `:162` (prose) — no assignment anywhere; the §3
+  hyperparameter sentence (`:361-375`) lists exactly `λ = 1`, `τ = 0.9`, `T = 2` and stops.
+  Eq. (2)'s stacked token layout (`τ` at `:138` over `s` at `:139` inside the parentheses)
+  confirms the fractional reading `(c − τ)/s`.
+- **Arms re-executed** on a fresh install of the pinned env (numpy 2.5.1, scikit-learn 1.9.0,
+  Python 3.12.13): seeds 0/1/2 → baseline `0.9370` / `0.9407` / `0.9315`, CWSD `0.9611` /
+  `0.9481` / `0.9556` — byte-identical to `measured.json`; baseline seed 0 matches Table 1
+  *exactly* (0.9370); ordering `cwsd > baseline` holds at every seed (+0.0241, +0.0074, +0.0241).
+- **Structural metrics re-measured** (`--metrics-out`, seeds 0/1/2): baseline `gate_w_max = 0.0`,
+  `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0` (bitwise); CWSD `gate_w_min > 0`,
+  `gate_w_max < 1`, `target_min > 0`, `target_sum_err = 1.19e-07 < 1e-6`,
+  `stopgrad_grad_err = 8.9e-04 < 5e-3` — every high claim's predicate passes.
+- **Calibration evidence re-measured:** baseline RNG layouts `spawned` → 0.9315 and
+  `noise-first` → 0.9426 (falsify themselves against Table 1's 0.9370; `init-first` reproduces
+  it exactly); CWSD seed-0 sensitivity `s = 0.12→0.9593, 0.14→0.9593, 0.15→0.9611, 0.16→0.9611,
+  0.17→0.9630, 0.18→0.9648, 0.20→0.9630`; the `λ = 0` arm is bitwise insensitive to `s`
+  (s = 0.01 and s = 10.0 both → 0.9370), so the calibrated `s` cannot touch the degeneracy gate.
+- **Test suite:** `python -m pytest -q tests` → 48 passed.
+- **Figures:** `paper/` contains only `paper.md`; `grep -niE "figure|fig\.|curve|plot"
+  paper/paper.md` matches nothing → no figures, no `curve` claims possible (§7).
+- **Upstream code:** paper URL/code grep → no matches; GitHub repository search
+  (`confidence-weighted self-distillation`, `self-distillation label noise`, `cwsd label
+  noise`, `"Institute for Applied Learning Systems"`) and user search (author trio) →
+  `total_count: 0` throughout (§9).
+- **Interfaces:** SPEC §5 diffed clean against `run_experiment.py`
+  (`--lambda --s --tau --temperature --seed --steps --lr --batch-size --init --noise-mode
+  --noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels,
+  init_params, forward, make_target, loss_and_grads, batches, evaluate, train`).
 
 ## 1. The method as an explicit algorithm
 
@@ -160,9 +154,9 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
    reported CWSD accuracy ONLY under the RNG layout that first reproduces the baseline 0.9370
    exactly (item 7): `s = 0.15` → CWSD 0.9611, within ±0.004 of Table 1's 0.9620. The `λ = 0`
    arm is independent of `s`, so the degeneracy check is not fit by this choice. Sensitivity at
-   the chosen layout: `s ∈ {0.12, 0.14}` → 0.9593; `s ∈ {0.15, 0.16}` → 0.9611;
-   `s ∈ {0.17, 0.20}` → 0.9630; `s = 0.18` → 0.9648 — the reproduction is not a knife-edge
-   of `s`, but the paper genuinely omits it.
+   the chosen layout, re-measured 2026-08-04: `s ∈ {0.12, 0.14}` → 0.9593; `s ∈ {0.15, 0.16}` →
+   0.9611; `s ∈ {0.17, 0.20}` → 0.9630; `s = 0.18` → 0.9648 — the reproduction is not a
+   knife-edge of `s`, but the paper genuinely omits it.
 2. **Weight initialisation.** Only "the parameter initialisation [is] drawn from that seed"
    (`paper/paper.md:385-389`). No distribution, scale, or scheme; biases never mentioned
    (assumed present, zero-init — the architecture sentence `:339-343` doesn't say biases exist
@@ -185,7 +179,8 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
    `init-first` — one `numpy.random.default_rng(seed)` consumed as init → corrupt → batch —
    because among the plausible arrangements it is the one that reproduces the paper's baseline
    0.9370 *exactly* (506/540) through the paper's own λ=0 verification gate; alternatives exposed
-   as `--rng-layout spawned|noise-first` give 0.9315 / 0.9426 and falsify themselves.
+   as `--rng-layout spawned|noise-first` give 0.9315 / 0.9426 (re-measured 2026-08-04) and
+   falsify themselves.
 8. **Evaluation protocol detail.** `FINAL accuracy` implies one evaluation after step 4000 on
    the clean test set; no intermediate eval, best checkpointing, or eval batching is mentioned.
    (Accuracy is batch-invariant, so only timing matters.)
@@ -298,13 +293,13 @@ The claims:
 | `stop-gradient-holds-target-constant` | invariant | **high** | `stopgrad_grad_err < 5e-3` |
 | `single-network-no-extra-parameters` | existence | **high** | `param_count == 4` |
 
-Compute-invariance rationale: the ordering claim is sign-only and the six invariant/existence
+Compute-invariance rationale: the ordering claim is sign-only and the five invariant/existence
 claims are structural (independent of the 4000-step training budget and of seed), so all six
 high claims survive a smaller budget than the paper's; the three value claims are exact
 magnitudes from single seed-0 runs and honestly cannot be high. The gate settles on the high
-claims. Measured evidence this run (2026-08-04, seeds 0/1/2): baseline 0.9370/0.9407/0.9315,
-CWSD 0.9611/0.9481/0.9556 — ordering holds at all seeds (+0.0241, +0.0074, +0.0241) and every
-predicate passes.
+claims. Measured evidence re-derived this pass (2026-08-04, seeds 0/1/2): baseline
+0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — ordering holds at all seeds
+(+0.0241, +0.0074, +0.0241) and every predicate passes.
 
 **Deliberately not tested** (`claims.json.not_tested`): (a) the attribution claim
 ("We attribute the gain to the gate suppressing…", `paper/paper.md:445-447`) — a mechanism claim
@@ -317,18 +312,17 @@ which the paper never commits to ("All results are single runs at seed 0", `:385
 - **In the paper**: no URLs, DOIs, code-availability statements (`grep -niE
   "http|www\.|github|arxiv|doi|available at" paper/paper.md` → no matches); §5 "Reproducing"
   gives only commands (`paper/paper.md:449-469`).
-- **GitHub repository search** (`api.github.com/search/repositories`, run 2026-08-04):
+- **GitHub repository search** (`api.github.com/search/repositories`, re-run 2026-08-04):
   `confidence-weighted self-distillation` → `total_count: 0`; `self-distillation label noise`
   → `0`; `cwsd label noise` → `0`; `"Institute for Applied Learning Systems"` → `0`.
-- **GitHub user search** (run 2026-08-04): `Bergstrom Oyelaran Vasquez` → `total_count: 0`.
+- **GitHub user search** (re-run 2026-08-04): `Bergstrom Oyelaran Vasquez` → `total_count: 0`.
 
 Conclusion: **no usable upstream implementation exists**; the method is implemented from scratch
-against §1/§5. (Prior run reported the same on 2026-07-29/2026-08-04, including an authenticated
-code search `"Confidence-Weighted Self-Distillation"` → 0.)
+against §1/§5. (Prior runs reported the same.)
 
 ## 10. Validation targets
 
-| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This run 2026-08-04 (seed 0) | Within ±0.004 |
+| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This pass 2026-08-04 (seed 0) | Within ±0.004 |
 |---|---|---|---|---|
 | Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 | ✅ exact (506/540) |
 | CWSD | 1.0 | 0.9620 | 0.9611 | ✅ (gap 0.0009) |
