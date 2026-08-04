@@ -87,6 +87,28 @@
   curve-gate tests (below/increasing/matches/every-seed/missing-file) remain in
   `tests/test_curve_gate.py` as additional coverage; the named pair is the canonical
   crosses pair (fc1). 93/93 tests pass; gate unaffected (34/3/0, HIGH 19/19 PASS).
+- **2026-08-04 (setup pass, this session ~08:40 UTC):** re-ran the ingest step of
+  a fresh workflow dispatch for this paper. Re-cloned `coleh-cm/auto-reproductions`
+  to `~/auto-reproductions` shallow+blobless (`--depth 1 --filter=blob:none`, clone
+  healthy, no tarball fallback needed). `$HOME/.repro_dir` =
+  `/root/auto-reproductions/explaining-and-harnessing-adversarial-examples` and
+  `$HOME/.repro_branch` = `repro/explaining-and-harnessing-adversarial-examples`
+  written (no trailing newlines) and asserted. Continued the existing remote branch
+  at tip `5fb3af9` — today's ingest (06:19) and subsequent figure/instruments/
+  adversarial-review work (through 07:55) already sit on this ref, having started
+  this `REPRODUCTION.md` fresh; nothing from that work was discarded, and the prior
+  completed reproduction remains in this branch's history and on `main` (landed as
+  `4f8171c`). Branch pushed (up-to-date). Re-fetched the arXiv e-print
+  `https://arxiv.org/e-print/1412.6572` (704 KB tarball): the committed
+  `paper/source/iclr2015.tex` and `iclr2015.bbl` are byte-identical to the fresh
+  download — no fetch failure to record. Full source unpacked on disk under
+  `paper/source/` (10 `.png`, `eps_curve.pdf`, `fancyhdr.sty`, `natbib.sty`,
+  `iclr2015.sty/.bst`); only `*.tex`/`*.bbl`/`*.bib` are tracked, the rest are
+  gitignored per the folder `.gitignore`. `paper/paper.md` verified to carry this
+  run's objective text (spot-checked distinctive strings incl. "Potemkin village",
+  "0.782", "45.3%", "accidental steganography"). LaTeX remains authoritative for
+  every equation, table and number; resolve preamble `\def`/`\newcommand` macros
+  before quoting.
 - **2026-08-04 (adversarial component review pass):** ran an orchestrated
   adversarial review of all six components (data pipeline, attacks, objectives,
   training loop, eval metrics, harness) against the paper's `iclr2015.tex`, each
