@@ -20,6 +20,19 @@ the stated tolerances; the 47-test suite passes (`python -m pytest -q tests` →
 The frozen interfaces in §5 were diffed against the actual argparse/function signatures of
 `run_experiment.py`.
 
+**Re-verified this SPEC pass (2026-08-04).** Independent of the prior run's claims: all 11
+`claims.json` quotes re-checked verbatim against `paper/paper.md` under the §8 normalization
+(11/11 pass); all 24 grep anchors cited below re-executed and resolve to the stated lines;
+`paper/` contains only `paper.md` — no figures, no LaTeX — so no `curve` claims are possible;
+GitHub repo/search re-run (`confidence-weighted self-distillation`, `self-distillation label
+noise`, `"Institute for Applied Learning Systems"`, author trio) → `total_count: 0` throughout;
+`grep -niE "http|www\.|github|arxiv|doi|available at" paper/paper.md` → no matches;
+`requirements.txt` re-installed (numpy 2.5.1, scikit-learn 1.9.0) and `python -m pytest -q
+tests` → `47 passed`; SPEC §5 interfaces diffed clean against `run_experiment.py`
+(`--lambda --s --tau --temperature --seed --steps --lr --batch-size --init --noise-mode
+--noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels, init_params,
+forward, make_target, loss_and_grads, batches, evaluate, train`); `measured.json` values match §8's numbers.
+
 ## 1. The method as an explicit algorithm
 
 **Inputs**
