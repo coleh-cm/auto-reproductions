@@ -69,22 +69,19 @@ def _l1_first_layer_penalty(model, coef):
 
 
 def _build_x_adv(model, x, y, eps):
-    """Compute FGSM perturbation under no_grad, then return x_adv detached.
-
-    The loss J(theta, x_adv, y) is evaluated in the forward pass that DOES
-    backprop into theta, so the only thing detached is the sign of the input
-    gradient (computed at the current theta). This matches the paper's
-    equation (sign is non-differentiable; grads flow through x_adv as a
-    constant w.r.t. theta).
+    """Compute the FGSM perturbation of the CURRENT theta, returning x_adv
+    detached so the training loss J(theta, x_adv, y) backprops into theta only
+    (not through the sign of the input gradient). The input-gradient step must
+    run with grad ENABLED (torch.autograd.grad needs a graph), then the result
+    is detached. (tex:486-488; sign is non-differentiable, so grads flow
+    through x_adv as a constant w.r.t. theta.)
     """
-    with torch.no_grad():
-        x_req = x.clone().detach().requires_grad_(True)
-        loss0 = model.loss(x_req, y)
-        g = torch.autograd.grad(loss0, x_req, create_graph=False)[0]
-        x_req.requires_grad_(False)
-        eta = eps * torch.sign(g)
-        x_adv = (x + eta).detach()
-    return x_adv
+    x_req = x.detach().requires_grad_(True)
+    loss0 = model.loss(x_req, y)
+    g = torch.autograd.grad(loss0, x_req, create_graph=False)[0]
+    x_req.requires_grad_(False)
+    eta = eps * torch.sign(g)
+    return (x + eta).detach()
 
 
 def _eval_train_err(model, x, y, batch=2000):

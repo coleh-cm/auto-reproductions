@@ -75,24 +75,24 @@ def _torch_data(d):
 def _primary(arm, m):
     """One headline metric per arm for the FINAL line."""
     table = {
-        "softmax_reg": ("adv_err", "adv_err"),
-        "logreg_3v7": ("clean_err", "clean_err"),
-        "maxout_naive": ("clean_err", "clean_err"),
-        "maxout_adv": ("clean_err", "clean_err"),
-        "maxout_large_naive": ("clean_err", "clean_err"),
-        "maxout_large_adv": ("clean_err", "clean_err"),
-        "maxout_sigmoid": ("rubbish_err", "rubbish_err"),
-        "noise_rademacher": ("adv_err", "adv_err"),
-        "noise_uniform": ("adv_err", "adv_err"),
-        "l1_maxout": ("train_err", "train_err"),
-        "rbf_shallow": ("adv_err", "adv_err"),
-        "ensemble12": ("adv_err_ensemble_crafted", "adv_err_ensemble_crafted"),
-        "agreement_mnist": ("agree_softmax_cond", "agree_softmax_cond"),
-        "transfer_mnist": ("err_orig_on_advfromnew", "err_orig_on_advfromnew"),
-        "eps_trace": ("logit_correct_seq", None),  # sequence; print mean
-        "cifar_conv_maxout": ("adv_err", "adv_err"),
+        "softmax_reg": "adv_err",
+        "logreg_3v7": "clean_err",
+        "maxout_naive": "clean_err",
+        "maxout_adv": "clean_err",
+        "maxout_large_naive": "clean_err",
+        "maxout_large_adv": "clean_err",
+        "maxout_sigmoid": "rubbish_err",
+        "noise_rademacher": "adv_err",
+        "noise_uniform": "adv_err",
+        "l1_maxout": "train_err",
+        "rbf_shallow": "adv_err",
+        "ensemble12": "adv_err_ensemble_crafted",
+        "agreement_mnist": "agree_softmax_cond",
+        "transfer_mnist": "err_orig_on_advfromnew",
+        "eps_trace": "margin_seq",  # sequence; prints mean
+        "cifar_conv_maxout": "adv_err",
     }
-    return table.get(arm, (None, None))
+    return table.get(arm)
 
 
 def _seeded(seeds, fn):
@@ -352,13 +352,17 @@ def arm_eps_trace(seed, maxout_naive_model=None):
     d = _torch_data(data.load_mnist(seed))
     if maxout_naive_model is None:
         maxout_naive_model, _ = _train_maxout(240, seed, d, epochs=EPOCHS_MAXOUT240)
+    maxout_naive_model.eval()
     x_test, y_test = d["x_test"], d["y_test"]
     # first class-4 test example correctly classified by this seed's model
     with torch.no_grad():
         preds = maxout_naive_model.predict(x_test)
-    correct = (preds == y_test.view(-1)) & (y_test.view(-1) == 4)
+    yv = y_test.view(-1)
+    correct = (preds == yv) & (yv == 4)
     idx = torch.where(correct)[0]
     if len(idx) == 0:
+        print(f"  eps_trace: no correctly-classified class-4 test example "
+              f"(preds==y sum={(preds==yv).sum().item()}, class-4 count={(yv==4).sum().item()})", flush=True)
         return "BLOCKED"
     ex_i = int(idx[0].item())
     x0 = x_test[ex_i]
@@ -415,11 +419,11 @@ ARMS = {
 
 
 def _print_final(arm, res):
-    _, key = _primary(arm, None)
+    key = _primary(arm, None)
     if res == "BLOCKED" or res is None:
         print(f"FINAL {arm}=BLOCKED", flush=True)
         return
-    if key is None or key not in res:
+    if key is None or not isinstance(res, dict) or key not in res:
         print(f"FINAL {arm}=BLOCKED", flush=True)
         return
     val = res[key]
@@ -431,18 +435,27 @@ def _print_final(arm, res):
 
 def main():
     torch.set_num_threads(max(1, os.cpu_count() // 2))
+    measured_path = os.path.join(REPO, "measured.json")
     measured = {}
-    # run order: heavy composite arms reuse models; to avoid retraining, we
-    # train shared models once per seed and pass them in.
+    if os.path.exists(measured_path) and not os.environ.get("EAE_FRESH"):
+        try:
+            measured = json.load(open(measured_path))
+        except Exception:
+            measured = {}
     only = os.environ.get("EAE_ONLY")
     for arm, (seeds, fn) in ARMS.items():
         if only and arm != only:
             continue
         print(f"\n=== arm {arm} (seeds {seeds}) ===", flush=True)
         t0 = time.time()
-        measured[arm] = {}
+        measured.setdefault(arm, {})
         for s in seeds:
             ts = time.time()
+            # resume: skip seeds already completed with dict (non-BLOCKED) data
+            existing = measured[arm].get(str(s))
+            if isinstance(existing, dict) and not os.environ.get("EAE_FORCE"):
+                print(f"  seed {s}: cached ({time.time()-ts:.0f}s)", flush=True)
+                continue
             try:
                 # composite arms: reuse shared trained models of this seed
                 if arm == "agreement_mnist":
@@ -468,7 +481,7 @@ def main():
             measured[arm][str(s)] = res
             _print_final(arm, res if str(s) == str(seeds[-1]) else None) if False else None
             # print per-seed headline
-            _, key = _primary(arm, None)
+            key = _primary(arm, None)
             if isinstance(res, dict) and key and key in res:
                 v = res[key]
                 vs = f"{sum(v)/len(v):.4f}" if isinstance(v, list) else f"{v:.4f}"
