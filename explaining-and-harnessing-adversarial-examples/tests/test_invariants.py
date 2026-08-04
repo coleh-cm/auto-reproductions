@@ -322,3 +322,31 @@ def test_rubbish_rejects_wrong_threshold():
     buggy_err = float((conf > 0.0).float().mean().item()) * 100.0  # the bug
     assert correct_err <= 5.0, f"correct eval not ~0 on robust RBF: {correct_err}"
     assert buggy_err >= 95.0, f"buggy eval not ~100 on robust RBF: {buggy_err}"
+
+
+def test_rbf_nu_trainable_receives_gradient():
+    """positive (RBF autograd invariant): when nu_trainable=True the nu
+    Parameter MUST receive a gradient from loss.backward(). An earlier
+    implementation wrapped self.nu in float(...) inside _quad, which detached
+    it from the autograd graph and silently zeroed the nu gradient. The default
+    (nu_trainable=False, a buffer) is unaffected, but the trainable path must
+    not be silently broken."""
+    torch.manual_seed(0)
+    m = models.RBFNet(nu=0.01, nu_trainable=True)
+    assert m.nu.requires_grad, "nu_trainable=True must make nu a learnable Parameter"
+    x = torch.from_numpy(data.rubbish(784, 32, seed=0))
+    y = torch.zeros(32, dtype=torch.long)
+    loss = m.loss(x, y)
+    loss.backward()
+    assert m.nu.grad is not None, "nu received no gradient (float(nu) detach bug?)"
+    assert torch.isfinite(m.nu.grad), "nu gradient is not finite"
+
+
+def test_rbf_nu_buffer_default_is_not_learnable():
+    """negative: by default nu is a fixed buffer (not a Parameter), so it has
+    no .grad attribute and requires_grad=False. This is the paper-silent default
+    (SPEC 4.4); the trainable path above is opt-in."""
+    torch.manual_seed(0)
+    m = models.RBFNet(nu=0.01)  # nu_trainable defaults False
+    assert not isinstance(m.nu, torch.nn.Parameter), "default nu must be a buffer"
+    assert not m.nu.requires_grad, "default nu must not require grad"

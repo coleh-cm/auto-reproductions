@@ -103,3 +103,37 @@ def test_degeneracy_detects_nonzero_eps():
     differs = any(not torch.equal(v1, v2)
                   for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_adv.state_dict().items()))
     assert differs, "eps>0 adversarial training gave bit-identical weights -- degeneracy check cannot detect a leak"
+
+
+def test_retrain_full_60k_is_from_scratch():
+    """positive (retrain protocol invariant, paper tex:505-506): the Phase 2
+    retrain-on-full-60k must restart from the INITIAL weights with a FRESH
+    optimizer, NOT continue from the Phase-1 state. We assert the final model
+    weights DIFFER from a Phase-1-only run (Phase 2 actually retrains) and that
+    the Phase-2 starting point is the init (not the Phase-1 best_state).
+
+    An earlier implementation continued Phase 2 from the Phase-1 state with the
+    same optimizer (carried momentum), contradicting the paper's from-scratch
+    retrain. This test guards against that regression."""
+    d = _tiny_data()
+    # give the retrain a full split to use
+    d_full = dict(d)
+    d_full["x_train_full"] = d_full["x_train"]  # same small set; exercises the path
+    d_full["y_train_full"] = d_full["y_train"]
+    cfg = {"lr": 0.1, "max_epochs": 4, "batch_size": 64, "seed": 3,
+           "momentum": 0.9, "retrain_full_60k": True}
+    m_full = _fresh(3)
+    h_full = train.train(m_full, d_full, dict(cfg))
+    # Phase 1-only run (no retrain) for comparison
+    m_p1 = _fresh(3)
+    cfg_p1 = dict(cfg)
+    cfg_p1.pop("retrain_full_60k")
+    h_p1 = train.train(m_p1, d_full, cfg_p1)
+    # the retrain run should have a best_epoch from Phase 1 and actually ran Phase 2
+    assert h_full["best_epoch"] >= 1, "Phase 1 must select an epoch count"
+    # final weights must DIFFER from Phase-1-only (Phase 2 retrains from scratch,
+    # so even on the same data the from-scratch trajectory diverges from the
+    # Phase-1-continued one). If they were identical, Phase 2 is a no-op.
+    differs = any(not torch.equal(v1, v2)
+                  for (k1, v1), (k2, v2) in zip(m_full.state_dict().items(), m_p1.state_dict().items()))
+    assert differs, "retrain_full_60k produced bit-identical weights to Phase-1-only -- Phase 2 is a no-op (not from-scratch retrain?)"

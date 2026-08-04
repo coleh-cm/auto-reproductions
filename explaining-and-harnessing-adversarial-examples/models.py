@@ -245,8 +245,12 @@ class RBFNet(nn.Module):
         diff = x.unsqueeze(1) - self.mu.unsqueeze(0)  # [B, K, D]
         psi = self.psi  # [K, D, rank]
         psi_d = torch.einsum("kdr,bkd->bkr", psi, diff)  # [B, K, rank]
-        nu = self.nu if isinstance(self.nu, torch.Tensor) else torch.tensor(self.nu)
-        quad = -(psi_d ** 2).sum(-1) - float(nu) * (diff ** 2).sum(-1)  # [B, K] <= 0
+        # nu is a 0-dim tensor (Parameter when nu_trainable else buffer). Keep it
+        # as a tensor -- float(nu) would detach it from the autograd graph and
+        # silently zero the nu gradient on the trainable path (SPEC 4.4). The
+        # default buffer path (requires_grad=False) is numerically unchanged.
+        nu = self.nu
+        quad = -(psi_d ** 2).sum(-1) - nu * (diff ** 2).sum(-1)  # [B, K] <= 0
         return quad
 
     def logits(self, x):

@@ -23,7 +23,7 @@ see SPEC §0). The self-check grader adjudicates all 70 claims.
 - [x] `instruments.json`, `mutations.json`, `## Constructed truth` in SPEC
 - [x] Self-check grader (`selfcheck_claims.py` → `selfcheck.json`): **HIGH 18 pass / 0 fail / 1 blocked**
 - [ ] CIFAR-10 arm — BLOCKED (download throttled in this env; see Blockers)
-- [ ] Adversarial review rounds clean — review running (see "Adversarial review")
+- [x] Adversarial review round 1 clean — 5/7 approved, 2 findings fixed + guarded (see "Adversarial review")
 
 ## Self-check grader (NOT claims_result.json)
 
@@ -176,17 +176,45 @@ sub-scale. Two independent reviewers' full verdicts are in `selfcheck.json`.
 
 ## Adversarial review
 
-An orchestration (`orchestrate`) fans out parallel reviewers over each component
-(data, models, attack, train, eval, arms, measured-consistency) against the
-paper LaTeX, then a verify stage tries to refute each HIGH/correctness finding
-against the real code. Confirmed findings are fixed in the same commit as their
-description here; refuted findings are dropped. (See the commit log for the
-round's outcome.)
+An orchestration (`orchestrate`) fanned out 7 parallel reviewers over each
+component (data, models, attack, train, eval, arms, measured-consistency)
+against the paper LaTeX, then a verify stage tried to refute each
+HIGH/correctness finding against the real code. Result: **5/7 components
+approved** (models, attack, eval, arms, measured-consistency); 1 finding
+refuted; 2 surviving correctness findings fixed + guarded with tests:
+
+- **train.py Phase 2 retrain was NOT from scratch** (MEDIUM correctness,
+  confirmed): Phase 2 continued from the Phase-1 state with the same optimizer
+  (carried momentum), contradicting `tex:505-506`. ALSO `load_mnist_full` set
+  `x_train` = full 60k (val ⊂ train leakage) instead of a 50k/10k split for
+  Phase-1 early-stopping. **Fixed:** `load_mnist_full` now returns the 50k
+  train split + the 60k as `x_train_full`; `train.train` captures the initial
+  weights and Phase 2 restores them + a fresh optimizer. Guarded by
+  `tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch`.
+- **models.py `float(nu)` detached the RBF `nu` from autograd** (LOW, dormant —
+  `nu_trainable` defaults False, never set in arms; confirmed): the
+  `nu_trainable=True` path silently received no gradient. **Fixed:** `_quad`
+  uses `self.nu` (a tensor) directly. Guarded by
+  `tests/test_invariants.py::test_rbf_nu_trainable_receives_gradient`.
+- **data.py CIFAR fingerprint was a rubber stamp** (MEDIUM completeness): it
+  checked only shape/std/labels, so a std-matched iid synthetic corpus passed
+  (the closed-book failure mode). No synthetic substitution occurred in practice
+  (the arm gates on `cifar10_available` and raises → BLOCKED), but the
+  defensive instrument was weak. **Fixed:** added a per-pixel-variance
+  structural check (real images have non-uniform per-pixel std; iid Gaussian
+  does not — needs no precomputed checksum, which can't be populated while
+  CIFAR is blocked here) and extended the negative test to reject a
+  std-matched synthetic corpus. Also extended the std check to val/test.
+
+Low/defensible items left as-is (documented): `Ensemble.loss` uses
+`cross_entropy(mean logits)` — a defensible perturb-the-whole-ensemble
+objective (the paper is silent, `tex:819-821`); both flows send gradients to
+all members; low impact on the FGSM direction / c34-c35 (tolerances 8.0).
 
 ## How to run
 
 ```bash
-.venv/bin/pytest -q                       # tests (29 pass; cifar positive skips)
+.venv/bin/pytest -q                       # tests (30 pass, 1 skip; cifar positive skips)
 .venv/bin/python smoke.sh                 # smoke (one FINAL line; not evidence)
 .venv/bin/python -m run_all_arms          # every arm x seed -> measured.json
 .venv/bin/python selfcheck_claims.py      # claims.json vs measured.json -> selfcheck.json

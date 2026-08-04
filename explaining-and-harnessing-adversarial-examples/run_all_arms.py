@@ -466,8 +466,14 @@ def _print_final(arm, res):
         print(f"FINAL {arm}=BLOCKED", flush=True)
         return
     val = res[key]
+    # The gate parses FINAL lines as exactly `FINAL <arm>=<value>` (or
+    # `=BLOCKED`); a trailing annotation like `(seq mean)` breaks that match
+    # and the arm reads as having printed no FINAL line. For a sequence-valued
+    # primary metric (e.g. eps_trace.margin_seq) we print the mean as the
+    # single headline number; the full per-eps sequence that the curve claims
+    # actually evaluate lives in measured.json under the arm.
     if isinstance(val, list):
-        print(f"FINAL {arm}={sum(val)/len(val):.4f} (seq mean)", flush=True)
+        print(f"FINAL {arm}={sum(val)/len(val):.4f}", flush=True)
     else:
         print(f"FINAL {arm}={val:.4f}", flush=True)
 

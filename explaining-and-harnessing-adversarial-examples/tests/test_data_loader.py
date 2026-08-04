@@ -122,9 +122,13 @@ def test_cifar10_real():
 
 
 def test_cifar10_rejects_synthetic():
-    """negative: a wrong-dim array (1024 instead of 3072) and a non-GCN array
-    (global std ~1.0) each fail check_cifar10_fingerprint. Does not require the
-    download -- exercises the fingerprint logic directly on synthetic arrays."""
+    """negative: a wrong-dim array (1024 instead of 3072), a non-GCN array
+    (global std ~1.0), AND a std-MATCHED iid synthetic corpus (right shape, right
+    global std ~0.5, right label set) each fail check_cifar10_fingerprint. The
+    std-matched case is the closed-book failure mode: a shape+std+label check
+    rubber-stamps it, but the per-pixel-variance structural check rejects it
+    (real images have non-uniform per-pixel variance; iid Gaussian does not).
+    Does not require the download -- exercises the fingerprint logic directly."""
     rng = np.random.default_rng(0)
     # (a) wrong dimension (1024, not 3072)
     bad_dim = {
@@ -154,3 +158,28 @@ def test_cifar10_rejects_synthetic():
     bad_labels = {**bad_std, "y_train": np.zeros(45000, dtype=np.int64)}
     with pytest.raises(AssertionError):
         data.check_cifar10_fingerprint(bad_labels)
+
+    # (d) std-MATCHED iid synthetic corpus: right shape, right global std ~0.5,
+    #     right label set -- passes (a)/(b)/(c) but the per-pixel-variance
+    #     structural check rejects it (the closed-book failure mode a bare
+    #     shape+std check rubber-stamps). iid N(0,0.25*I) GCN'd to std 0.5 has
+    #     ~uniform per-pixel std (spread ~0), unlike real structured images.
+    g = np.random.default_rng(1)
+    x_tr = (g.standard_normal((45000, 3072)).astype(np.float32) * 0.25)
+    x_va = (g.standard_normal((5000, 3072)).astype(np.float32) * 0.25)
+    x_te = (g.standard_normal((10000, 3072)).astype(np.float32) * 0.25)
+    # center+scale each split to global std ~0.5 so the std check alone passes
+    for arr in (x_tr, x_va, x_te):
+        arr -= arr.mean()
+        arr *= 0.5 / arr.std()
+    std_matched = {
+        "x_train": x_tr, "x_val": x_va, "x_test": x_te,
+        "y_train": g.integers(0, 10, 45000, dtype=np.int64),
+        "y_val": g.integers(0, 10, 5000, dtype=np.int64),
+        "y_test": g.integers(0, 10, 10000, dtype=np.int64),
+    }
+    # confirm it passes the bare std check (so the rejection is from the
+    # structural check, not a trivial std miss)
+    assert abs(float(std_matched["x_train"].std()) - 0.5) < 0.04
+    with pytest.raises(AssertionError):
+        data.check_cifar10_fingerprint(std_matched)
