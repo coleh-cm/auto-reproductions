@@ -1,55 +1,47 @@
-# Reproducible environment for
+# Reproducible build for the reproduction of
 # "Explaining and Harnessing Adversarial Examples"
-# (Ian J. Goodfellow, Jonathon Shlens, Christian Szegedy; ICLR 2015).
+# (Goodfellow, Shlens, Szegedy; ICLR 2015, arXiv:1412.6572v3).
 #
-# Builds from scratch: a clean Python 3.13 base, installs the pinned
-# requirements, copies the reproduction in, and smoke-tests that the
-# dependencies import and that the core FGSM autograd path works
-# (||η||_∞ == ε exactly, the paper's max-norm constraint).
+# CPU-only PyTorch environment. The paper's MNIST / CIFAR-10 experiments are
+# small enough to run on CPU; this image has no CUDA runtime.
 #
-# CPU-only: the reproduced MNIST experiments need no CUDA/GPU. torch is the
-# +cpu wheel, so this image runs on any amd64 machine with no GPU driver.
+# Build:  docker build -t eae-repro .
+# Run:    docker run --rm -it eae-repro
+# Tests: docker run --rm -it eae-repro pytest -q
+#
+FROM python:3.13-slim AS base
 
-FROM python:3.13-slim
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
+# uv is used as the installer so the in-image install matches the documented
+# quickstart exactly (same resolver, same pins).
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (pinned) — a single static binary.
+RUN curl -fsSL https://astral.sh/uv/install.sh | sh \
+    && mv /root/.local/bin/uv /usr/local/bin/uv
+
 WORKDIR /repro
 
-# No extra system packages are required: torch + numpy ship manylinux/aarch64
-# CPU wheels that need only the slim base's glibc.
-
-# Install pinned Python dependencies first (better layer caching).
+# Install dependencies first (better layer caching than copying source).
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv venv --python 3.13 .venv \
+    && uv pip install --python .venv -r requirements.txt
 
-# Copy the reproduction: implementation, experiments, tests, and docs.
-# (The implementation package and experiment scripts are added by the
-# implementation step; this Dockerfile is written for the committed end
-# state so a human can `docker build` after cloning.)
-COPY . /repro
+# Copy the rest of the reproduction (implementation, tests, paper sources).
+COPY . .
 
-# Build-time smoke test: the only thing guaranteed to exist at every step is
-# the dependency set, so we verify it imports AND that the FGSM invariant
-# (η = ε·sign(∇ₓJ) ⇒ ||η||_∞ == ε) holds on a tiny synthetic batch. This is
-# the gate the paper's method correctness depends on.
-RUN python -c "import torch, numpy, pytest; \
-import torch.nn.functional as F; \
-x = torch.randn(8,784, requires_grad=True); y = torch.randint(0,10,(8,)); \
-W = torch.randn(784,10, requires_grad=True); b = torch.randn(10, requires_grad=True); \
-J = F.cross_entropy(x @ W + b, y); g = torch.autograd.grad(J, x)[0]; \
-eta = 0.25 * g.sign(); \
-assert (x + eta).shape == x.shape and abs(float(eta.abs().max()) - 0.25) < 1e-6; \
-print('deps import OK; ||eta||_inf == eps == 0.25')"
+# Put the venv on PATH so `python` and `pytest` resolve to the pinned env.
+ENV PATH="/repro/.venv/bin:${PATH}"
 
-# When the implementation step lands the package under src/fgsm_repro and the
-# experiment entry scripts, run the degeneracy/shape tests as a build gate.
-# `tests/` may be absent in intermediate commits, so guard with a check.
-RUN if [ -d tests ]; then python -m pytest -q tests; else echo "no tests/ yet; skipping"; fi
+# MNIST / CIFAR-10 are downloaded on first run into ./data; keep it on a volume
+# so repeated runs don't re-download.
+VOLUME ["/repro/data"]
 
-# Default command: smoke-import the environment. The implementation step
-# replaces this with the experiment runner (e.g. `python -m fgsm_repro.cli`).
-CMD ["python", "-c", "import torch, numpy, pytest; print('fgsm-repro env OK', torch.__version__, numpy.__version__, pytest.__version__)"]
+# Default: run the test suite. Override with `docker run eae-repro <cmd>`.
+CMD ["pytest", "-q"]

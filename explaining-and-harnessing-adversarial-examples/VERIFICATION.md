@@ -1,283 +1,151 @@
-# VERIFICATION — what this reproduction checked, and what it did not
+# VERIFICATION — Explaining and Harnessing Adversarial Examples
 
-> Companion to `REPRODUCTION.md`. This file is the honest ledger of the checks
-> that actually ran, the budget each ran at, and — the part that matters — what
-> remains **untested** and why. None of the checks below establish that the
-> implementation is *correct*; they establish that it is *not wrong in the ways
-> that were checked*, and that list is worth more to a reader than the headline
-> number. The paper-reproduction verdict (measured vs claimed, per arm) lives in
-> `REPRODUCTION.md` tables A–C; the machine-graded verdict over every claim lives
-> in `claims_result.json` (produced by `numbers_gate.py`).
+This file lists **every check this reproduction ran**, what it found, the
+budget it ran at, and — the part that matters — **what remains untested and
+why**. None of this establishes that the implementation is *correct*; it
+establishes that it is *not wrong in the ways that were checked*. That list is
+worth more to a reader than the headline number.
 
-## 0. The budget this reproduction ran at
+All commands were run on a CPU sandbox (no GPU, no docker). Dates 2026-08-04.
 
-Every number in this reproduction was produced at a **strict sub-scale** of the
-paper's configuration, because the paper's full configuration is infeasible on
-this CPU sandbox:
+---
 
-| Knob | Paper (tex) | This reproduction | Why |
-|------|-------------|--------------------|-----|
-| Maxout units/layer | 1600 (tex:500) | **240** | a single 1600-unit seed did not finish within the 5-minute budget |
-| Early-stopping patience | 100 epochs (tex:504) | **10–12 epochs** | same CPU budget |
-| M5 retrain seeds | 5 (tex:506–509) | **3** (`[0,1,2]`; c12/c13 request 5 but only 3 ran) | same |
-| Ensemble members (E1) | 12 fully-converged nets (tex:819) | **12 nets, 5 epochs, patience 10** (sub-converged) | same |
-| Training horizon (M4 gate) | to convergence, dropout ON (tex:492) | **5000 SGD steps, dropout OFF** | dropout OFF is required so the `ε=0` degeneracy holds bit-for-bit (`tests/test_degeneracy.py`); the dropout-ON magnitude arm lives separately in `experiments/m4_adversarial.py` |
+## 1. Environment / build
 
-**This is a shortened training horizon.** It is recorded honestly because it is
-necessary, but it is not by itself sufficient: a number produced at a horizon
-too short to separate the arms would not be evidence about the paper's claim.
-The two headline arms **are** separated at this horizon (see §1), so the
-*direction* comparison is still tested; the *magnitudes* are not, and are rated
-`compute_invariance=low` (informational) in `claims.json`.
+| check | command | budget | found |
+|---|---|---|---|
+| venv builds from pinned closure | `uv venv --python 3.13 .venv && uv pip install --python .venv -r requirements.txt` | ~minutes | succeeds; `uv pip freeze` matches `requirements.txt` |
+| imports resolve | `.venv/bin/python -c "import torch, numpy, matplotlib, pytest"` | seconds | torch 2.7.1+cpu, numpy 2.3.2, matplotlib 3.11.1, pytest 8.4.2 |
+| FGSM autograd path | `torch.autograd.grad(loss, x)` → `ε·sign(g)` | seconds | works for every model class |
+| docker build | `docker build -t eae-repro .` | — | **NOT RUN** — docker unavailable in this sandbox |
 
-All data is **real MNIST** loaded from the pinned IDX mirrors by
-`src/fgsm_repro/data.py` (fingerprinted by `tests/test_data_fingerprint.py`); no
-synthetic stand-in was used for any arm. The CIFAR-10 / ImageNet / MP-DBM arms
-are in `not_tested` (§4), not substituted.
+**Untested:** the `Dockerfile` is present and well-formed but was never built
+here, so the image itself (layer install, `CMD pytest -q`) is unverified. A
+reader with docker should run `docker build -t eae-repro . && docker run --rm
+eae-repro pytest -q`.
 
-## 1. The two headline arms (the paper's M4 comparison)
+## 2. Data provenance
 
-There are **two** M4-style measurements in this repo; both were re-verified
-this session and both reproduce the paper's *direction*. They are kept separate
-because they sacrifice a different thing to the CPU budget:
+| check | command | found |
+|---|---|---|
+| MNIST fingerprint | `data.check_mnist_fingerprint` (inside `load_mnist`) | size 50k/10k/10k×784, labels {0..9}, range [0,1] f32, pixel-sum checksum (5133683.0 / 1012586.25 / 1038914.5) — matches the canonical corpus |
+| MNIST 3-vs-7 fingerprint | `data.check_mnist_3v7_fingerprint` | only {-1,+1}, +1 == digit 3 by count |
+| CIFAR-10 fingerprint | `data.check_cifar10_fingerprint` | code present; **not exercised on real data** — the download stalled |
 
-**(a) The m4 arm — `experiments/m4_adversarial.py`, dropout ON, full epochs, 3
-seeds.** This is the arm `claims.json` gates (claim c09, HIGH). Re-run this
-session (`make_measured.py`, metrics reproduced byte-identically). Clean test
-error:
+**Untested:** CIFAR-10. The download from `cs.toronto.edu` stalled at ~11 MB of
+~170 MB (throttled to a few MB/min; no reachable S3 pickle mirror). The
+`cifar_conv_maxout` arm is BLOCKED and **no synthetic CIFAR substitute was
+used**. Fix: obtain the real CIFAR-10 pickle tarball, place it in `./data/`,
+re-run `EAE_ONLY=cifar_conv_maxout .venv/bin/python run_all_arms.py`.
 
-| Arm | Mean over seeds 0,1,2 | Per-seed errors |
-|-----|------------------------|-----------------|
-| baseline (maxout 240×2, dropout ON, no adv training) | **1.69 %** | 1.78 / 1.82 / 1.48 % |
-| method — FGSM adversarial training, ε=0.25, α=0.5 | **1.38 %** | 1.47 / 1.25 / 1.43 % |
+## 3. Correctness: test suite
 
-Per-seed adversarial−baseline gaps: −0.31 / −0.57 / **−0.05 pp** (adv lower at
-3/3 seeds). The seed-2 margin is ~5 test examples of 10 000, i.e. at the edge
-of what 3 seeds resolve; the direction is sign-stable (3/3) but the magnitude
-is comparable to seed noise — see `REPRODUCTION.md` §C.
+| check | command | budget | found |
+|---|---|---|---|
+| full suite | `.venv/bin/python -m pytest tests/ -q` | ~13 s | **29 passed, 1 skipped** (the skip is the CIFAR-positive test, download unavailable) |
 
-**(b) The degeneracy-valid direction gate — `run_experiment.py`, dropout OFF,
-5000 SGD steps, single seed 0.** Committed in `results/gate_result.json`.
-Dropout OFF is required so the `ε=0` degeneracy holds bit-for-bit
-(`tests/test_degeneracy.py`); it is NOT a magnitude match to the paper's
-dropout-ON 0.94 %→0.84 %. Clean test error: baseline **2.12 %** → adversarial
-**1.71 %** (single seed; `FINAL baseline=0.9787999987602234`,
-`FINAL adversarial=0.9829000234603882`).
+What the suite covers:
 
-Paper claim (tex:492–494): 0.94 % → 0.84 %. **The arms are NOT within noise of
-each other**: in both (a) and (b) the method arm's clean test error is lower
-than the baseline's at every seed, so the comparison the paper makes
-(adversarial training reduces clean error) is genuinely tested by this run,
-not washed out by the shortened horizon. The *magnitudes* (1.69 %/1.38 % and
-2.12 %/1.71 % vs 0.94 %/0.84 %) do not match — all are sub-scale; the magnitude
-claims are rated `compute_invariance=low`. The numbers-gate claim that carries
-this comparison is `c09_advtrain_reduces_clean_error` (ordering, high): it
-passes at every seed.
+- **Degeneracy** (`tests/test_degeneracy.py`): adversarial eps=0, noise eps=0,
+  L1 coef=0 are bit-identical (`torch.equal`) to the baseline — the no-op
+  settings truly reproduce the baseline. `test_degeneracy_detects_nonzero_eps`
+  asserts eps>0 is bit-different (the check is sensitive to a leak).
+- **Invariants** (`tests/test_invariants.py`): FGSM `‖η‖∞ == ε`; no clipping of
+  `x̃`; `sign(0)=0`; softmax rows sum to 1; logreg `sign(grad) == -sign(w)`;
+  `w·sign(w) == ‖w‖₁`; FGSM loss == analytic closed form (c07, max absdiff
+  9.5e-7); non-negative loss; eps-trace piecewise-linear in ε; empty-input
+  raises; adversarial training reduces adv_err.
+- **Mutations** (`tests/test_mutations.py`): 9 deliberate defects, each
+  planted, run, and `must_fail`-caught, then reverted (with `.pyc` purging and
+  conftest-time git restore so an interrupted run can never ship a defect).
+- **Data-loader instruments** (`tests/test_data_loader.py`): MNIST real passes;
+  a synthetic corpus is rejected; CIFAR positive is skipped (download), CIFAR
+  negative (rejects synthetic) runs.
+- **Numbers-gate instruments** (`tests/test_numbers_gate.py`): the grader
+  returns "pass" on a known-correct input, "fail" on a known-wrong input,
+  "blocked" on an absent arm (never a silent pass), and **raises** on a
+  malformed `measured.json` (never a silent negative verdict).
 
-## 2. Checks that ran, and what each found
+**Untested by the suite:** end-to-end behavior on CIFAR-10; the MP-DBM and
+GoogLeNet/ImageNet arms (not built — see SPEC §9); the full-budget value
+claims (the suite checks plumbing, not the paper's tight numbers).
 
-### 2.1 Unit / invariant test suite — 105 passed, 0 failed
-Command: `.venv/bin/python -m pytest tests/ -q` (this session, ~7 s, 8/8
-consecutive runs identical). A `tests/conftest.py` autouse fixture added this
-run pins `torch.set_num_threads(1)` and `torch.manual_seed(0)` per test: this
-removed a rare order-/thread-dependent flake (a handful of invariant /
-instrument / constructed-truth tests compare exact integer counts or exact
-sign-equality on small random batches, and thread-parallel float reductions
-plus inherited global RNG state could occasionally flip a borderline gradient
-sign and make two attackers' error counts tie). The suite is now
-order-independent and reproducible. Per-file counts:
+## 4. Fast path
 
-| File | # | What it checks |
-|------|---|----------------|
-| `test_shapes.py` (8) | 8 | tensor shapes through model / FGSM / eval; eval return types |
-| `test_invariants.py` (19) | 19 | FGSM `‖η‖∞ == ε`; cost degeneracy `ε=0 ⇒ cost == clean`; confidence averaged over misclassified only; RBF unnormalized `exp(q)` decays off-manifold; E6 worst-case sign; best-epoch selected not stopping-epoch (M5 retrain fix); attack-source separation |
-| `test_fix_invariants.py` (15) | 15 | regression guards for the review-driven fixes (M5 over-training, sigmoid-top sum normalization, direction flags) |
-| `test_degeneracy.py` (5) | 5 | `--lambda 0` (method at its no-op) reproduces `--baseline` bit-for-bit at cost / train-step / CLI level |
-| `test_instruments.py` (22) | 22 | every grader/scorer in `instruments.json`: positive test accepts known-correct, negative test rejects known-wrong; empty-input grader raises (not vacuous 0.0) |
-| `test_constructed_truth.py` (4) | 4 | the constructed-truth oracle categories (degeneracy, brute-force worst-case, same-quantity-two-ways, planted linear structure) map to a real enforcing test node |
-| `test_data_fingerprint.py` (3) | 3 | raw-file sha256, label vocabulary + canonical histogram, 50000/10000 split of real MNIST |
-| `test_measured_resolver.py` (4) | 4 | one-element `[*]` pointer collapses to scalar; multi-element `[*]` BLOCKS; scalar passthrough; `measured.json` holds no list values |
-| `test_curve_gate.py` (10) | 10 | the numbers-gate `curve` evaluator on known-correct and known-wrong synthetic sequences: crosses / below / increasing / matches each accepted when true and rejected when false; x_range restriction respected; every-seed-must-pass; missing per-seed file BLOCKS rather than fabricating |
-| `test_f4_figure.py` (7) | 7 | the regenerated Figure-4 panel: axis ranges/units asserted against the paper's figure; idempotent regen |
-| `test_claims_integrity.py` (8) | 8 | every claim + not_tested quote is a VERBATIM substring of `paper/source/iclr2015.tex` starting at the cited line; claim kinds carry their arithmetic fields; compute-invariance counts truthful; every arm metric pointer resolves in the shipped results; SPEC.md's embedded claims.json is byte-identical to the file the gate enforces; `claims_result.json` carries the gate's `produced_by` stamp |
+| check | command | budget | found |
+|---|---|---|---|
+| smoke | `bash smoke.sh` | ~1.5 s | trains softmax on 2k MNIST examples × 5 epochs, FGSM ε=.25, prints `FINAL softmax_reg=99.6000` |
 
-### 2.2 Mutation (defect) verification — 6/6 verified
-Command: `.venv/bin/python verify_mutations.py`. For each of the 6 deliberate
-defects in `mutations.json`: apply `find→replace`, confirm the `must_fail` test
-node **FAILS**, revert, confirm it **PASSES** on clean code. All six:
-`defect_fail=True clean_pass=True`. A suite nobody has broken on purpose is not
-evidence; these prove each load-bearing property is actually guarded by a test
-that fails when the property is removed (FGSM uses sign not raw gradient; no-op
-floor; confidence over errors-only; RBF unnormalized exp; E6 worst-case; empty
-grader raises).
+The smoke path is proof the code runs; **it is not evidence about the paper**
+and is never reported as a result.
 
-### 2.3 Numbers gate — 34 pass / 3 fail / 0 blocked; HIGH 19/19 pass
-Command: `.venv/bin/python numbers_gate.py` (this session). Reads `claims.json`
-+ `measured.json`, writes `claims_result.json`.
+## 5. Arms run (the numbers)
 
-| compute_invariance | pass | fail | blocked | total |
-|--------------------|------|------|---------|-------|
-| **high** (load-bearing) | **19** | 0 | 0 | 19 |
-| medium | 6 | 0 | 0 | 6 |
-| low (informational) | 9 | 3 | 0 | 12 |
-| **all** | **34** | **3** | **0** | **37** |
+| check | command | budget | found |
+|---|---|---|---|
+| all arms | `.venv/bin/python run_all_arms.py` (resume) | 15 MNIST arms × 3 seeds (5 for `maxout_large_adv`); 1600-unit maxout capped at **6 epochs** (no 60k retrain); conv 8 epochs | 15 arms produce real measured numbers in `measured.json`; `cifar_conv_maxout` BLOCKED |
+| numbers gate | `.venv/bin/python numbers_gate.py` | seconds | **pass=40 fail=19 blocked=11; HIGH: 18 pass / 0 fail / 1 blocked; gate=FAIL** |
 
-The 37 claims include the three `curve` claims fc1–fc3 (Figure 4, §2.3a below),
-all rated `high`, all passing at every seed.
+The gate is FAIL *only* because of the single HIGH block (c63, CIFAR-10). The
+19 fails are low/medium *value* claims that need the paper's full GPU budget;
+their HIGH-invariance *ordering* counterparts pass. See REPRODUCTION.md for
+the full measured-vs-paper table.
 
-`FINAL gate=PASS` (gate passes iff every HIGH claim is adjudicated `pass` with
-none blocked). The 3 failures are all `low` and all **expected** at sub-scale,
-each annotated in `claims.json`:
-- `c03_softmax_fgsm_confidence_value` — paper 79.3 % confidence; measured 96.3 % (confidence drifts with training budget; informational).
-- `c12_m5_advtrain_mean_magnitude` — paper 0.782 % mean over 5 seeds at 1600 units; measured 1.49 % mean over 3 seeds at 240 units. Needs the paper's full scale.
-- `c13_m5_seed_spread_invariant` — paper spread 0.0006 (0.77 %…0.83 %); measured spread 0.0010 over 3 sub-scale seeds. Needs the paper's full scale / 5 seeds.
+**Horizon deviation (honest, necessary, not sufficient):** the 1600-unit
+maxout trained 6 epochs vs the paper's full budget + 60k retrain. The paper's
+headline clean-error regularization claim (0.94→0.84→0.782) is **not
+reproduced** — at 6 epochs the naive (1.80 ± 0.28) and adv (1.87 ± 0.34) arms
+are within noise. A number produced at a horizon too short to separate the
+arms is not evidence about the paper's claim, and is not presented as one.
 
-No `blocked` claims: every one of the 14 arms × 3 seeds = 123 scalar metric cells
-resolves to a number (the dotted-key resolver bug that previously BLOCKED
-`m_l1` was fixed; `test_measured_resolver.py` guards it), and the six curve
-sequence pointers (fc1–fc3's `quantity`/`x`) resolve in the per-seed result
-files for all three seeds.
+**Untested at the numbers level:** every CIFAR-10 claim (c56-c63); the
+full-budget tight value claims (clean 0.94/0.84/0.782, adv 17.9, RBF 55.4/1.2)
+— these need the paper's full GPU run; MP-DBM (§9, error 0.88% / adv 97.5%);
+the GoogLeNet/ImageNet Fig. 1 demo; the ensemble-of-12 *value* (only the
+ordering vs single-member is checked at sub-scale).
 
-### 2.3a Figure claims — the Fig. 4 eps-sweep curve (read via `read-figure`)
+## 6. Figures
 
-Figure 4's claims live in the plotting layer (the ε axis range −15…15 exists
-only in the figure, not the text). The figure was read with `read-figure`
-(transcript committed at `paper/figure_transcripts.md`), the read was turned
-into three `curve` claims in `claims.json`, and a new arm
-(`experiments/f4_eps_curve.py`, naive maxout 240×2 — tex:766 "This plot was
-made from a naively trained maxout network") replays the sweep: logits along
-x₀ + ε·sign(∇ₓJ) for the first class-4 test example, ε ∈ [−15, 15] step 0.5.
+| check | command | found |
+|---|---|---|
+| Figure 4 reproduction | `.venv/bin/python regenerate_figures.py` → `figures/eps_curve_reproduced.png` | eps-sweep logit curve from the `eps_trace` arm (seed 0, example 33); paired with `paper/source/eps_curve.pdf` for visual comparison only |
+| Figure 4 gate | c65-c68 (HIGH, curve claims) | **pass** — the thin-manifold shape (margin positive near ε=0, large negative far away, piecewise-linear) is reproduced |
 
-| Claim | Comparison | x_range | Result (seeds 0/1/2) |
-|-------|-----------|---------|----------------------|
-| fc1 correct-class logit crossed by a wrong class | `crosses` (correct vs max-wrong logit, `against`) | [0, 15] | PASS — correct on top at ε=0 (12.3/13.8/14.6 vs 6.9/5.3/6.2), crossing at ε=0.5, deeply below at ε=15 |
-| fc2 wrong classification stable over a wide ε region | `below` (correct-class logit strictly below max-wrong logit, `against`, at all 23 samples) | [4, 15] | PASS — 23/23 below at every seed; min margin −1622.3/−1094.6/−954.3 logits (equivalently 0/23 correct) |
-| fc3 predictions become very extreme with ε | `increasing` (max-wrong logit, tol 0.5) | [0, 15] | PASS — 6.9→872.7, 5.3→480.9, 6.2→467.6; max dip below running max = 0.0 |
+**Untested:** Figures 1, 2, 3, 5 are not regenerated (Fig. 1 needs GoogLeNet/
+ImageNet; Figs. 2/3 are qualitative weight/perturbation visualizations; Fig. 5
+needs CIFAR-10). The Figure-4 pair image is **not evidence** — the gate
+verdicts on c65-c68 are the evidence.
 
-Gate evaluator: `numbers_gate.evaluate_curve_claim`, instrument-tested on
-synthetic known-correct/known-wrong sequences (`tests/test_curve_gate.py`).
+## 7. Review
 
-### 2.4 Full arm harness — 14 arms × 3 seeds, 0 BLOCKED
-Command: `.venv/bin/python make_measured.py` (the committed `measured.json` +
-`results/_per_seed/*.json` are its output; `--assemble-only` rebuilds from the
-per-seed files without recompute and reproduces them byte-identically).
-Headline per-arm values (mean of the arm's headline metric over seeds, the
-`FINAL` lines in `/tmp/arms.log`):
+No tracked adversarial-review rounds were run in this reproduction (no
+`.review_rounds` journal). Verification instead took the form of: mutation
+testing (9 defects caught), instrument positive/negative tests, degeneracy
+and invariant tests, and the numbers-gate self-tests. This is a
+**correctness-level** verification, not a formal review pass.
 
-```
-FINAL m1_softmax_regression=0.9999333222707113   (FGSM error, paper 99.9 %)
-FINAL m2_logistic_3v7=0.9924762646357218         (FGSM error, paper 99 %)
-FINAL m3_maxout240_clean=0.9665666619936625      (FGSM error, paper 89.4 %)
-FINAL m4_maxout240_advtrain=0.013833324114481607(clean error, paper 0.84 %)
-FINAL m5_maxout1600_clean=0.0194666584332784    (clean error, paper 1.14 %)
-FINAL m5_maxout1600_advtrain=0.014933327833811441(clean error, paper 0.782 %)
-FINAL m6_robustness_transfer_eval=0.10926666855812073 (own-FGSM error, paper 17.9 %)
-FINAL m7_maxout_noise_sign=0.9969333410263062   (FGSM error, paper 86.2 %)
-FINAL m7_maxout_noise_uniform=0.9995666742324829(FGSM error, paper 90.4 %)
-FINAL m8_rbf_shallow=0.9504666527112325          (FGSM error, paper 55.4 %)
-FINAL m9_rubbish_evals=0.8860333363215128        (maxout+softmax rubbish error, paper 98.35 %)
-FINAL e1_ensemble12_maxout=0.9988333384195963   (ensemble-targeted error, paper 91.1 %)
-FINAL m_l1_weight_decay=0.8864400014281273      (L1 coeff 0.0025 train error, paper >5 %)
-FINAL f4_eps_curve=0.5                          (epsilon where a wrong class overtakes class 4; figure read: ~0.5–1)
-```
+---
 
-### 2.5 Headline direction gate — `run_experiment.py`
-Command: `python run_experiment.py --baseline --steps 5000 --seed 0 --units 240
---pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5` and the same with
-`--lambda 0.25` (committed `results/gate_result.json`). Both arms of the M4
-comparison, dropout OFF for degeneracy validity. Reproduces the **direction**
-of the paper's M4 claim (adversarial training reduces clean test error:
-2.12 % → 1.71 % at this gate); not a magnitude match to 0.94 %→0.84 % (those
-need dropout ON + convergence, in `experiments/m4_adversarial.py`, §1a).
+## What this reproduction does NOT establish
 
-### 2.6 Fast path — `smoke.sh`
-Command: `./smoke.sh`. Exercises the full adversarial-training path
-(data→model→FGSM input-grad probe→mixed loss→SGD→eval) in 200 steps / ~3 s,
-printing one `FINAL adversarial=0.11349999904632568` line. A path-prover only.
+- It does **not** establish that the implementation is correct — only that it
+  is not wrong in the ways the tests, invariants, mutations, instruments, and
+  gate check.
+- It does **not** reproduce the paper's headline clean-error regularization
+  claim (within noise at the 6-epoch sub-scale horizon).
+- It does **not** reproduce any CIFAR-10 result (arm BLOCKED on data
+  download).
+- It does **not** verify the Docker image builds (docker unavailable).
+- The RBF *value* claims (c29/c30) do not match (98.5% / 22.4% conf vs paper
+  55.4% / 1.2%); only the RBF *ordering* claims pass. The β/μ parametrization
+  the paper never specifies is the likely source.
 
-### 2.7 Data provenance — real MNIST, fingerprinted
-`src/fgsm_repro/data.py` downloads the 4 raw IDX gz files from pinned mirrors
-(`storage.googleapis.com/cvdf-datasets/mnist` then
-`ossci-datasets.s3.amazonaws.com/mnist`) with 3 tries/mirror, 10 s timeout;
-cached under `data/mnist/` (gitignored, regenerated). `test_data_fingerprint.py`
-locks the raw-file sha256, label vocabulary + canonical histogram, and the
-50000/10000 split. A missing/corrupted dataset raises (the loader test fails
-loudly) — never a silent synthetic corpus.
+## Rung reached
 
-### 2.8 Research-readiness gates — 8 pass / 2 partial / 0 fail
-Walked in `REPRODUCTION.md`. The 2 `partial` (gates 1 and 10) rest **solely** on
-`docker` not being installed in this sandbox; the non-Docker evidence for both
-is verified (fresh `.venv` from `requirements.txt`, 105/105 tests). No gate
-failed.
-
-## 3. Determinism / reproducibility of the recorded numbers
-
-Same seed → bit-identical output. `torch.manual_seed` is set before model
-construction; per-module dropout generators and the batch-shuffle generator are
-seeded from `cfg.seed`. The baseline arm re-run this session
-(`0.9787999987602234` accuracy) is identical to the prior committed
-`results/gate_result.json` from a different session. `--assemble-only`
-reproduces `measured.json` byte-identically from the committed per-seed files.
-`tests/test_degeneracy.py` locks `--lambda 0 == --baseline` bit-for-bit.
-
-## 4. What remains UNTESTED, and why
-
-### 4.1 Deliberately not tested (9 claims in `claims.json` `not_tested`)
-These are claims the paper makes that this reproduction does not attempt, each
-with a recorded reason:
-- **GoogLeNet / ImageNet Fig 1** (tex:361-389) — needs the GoogLeNet model + ImageNet; out of this reproduction's scope (MNIST/CIFAR-scale CPU sandbox). (The clean/perturbed panda panels were read with read-figure and are visually indistinguishable — transcript `paper/figure_transcripts.md`.)
-- **CIFAR-10 arm** (convolutional maxout, ε=0.1, 87.15 %/96.6 %, tex:340–343) — CIFAR-10 + a conv maxout; not built here.
-- **MP-DBM generative-inference arm** (97.5 % FGSM error, tex:793-802) — differentiable generative model not implemented.
-- **"Best on permutation-invariant MNIST" cross-paper comparison** (tex:510–512, vs DBM-dropout 0.79 %) — a comparison to another paper's number, not a property of this method.
-- **Rotation-based adversarial examples** (tex:345–347) — a different attack family; the FGSM family is what this reproduction builds.
-- **Fig 3 weight-localization** (tex:523-525) — a qualitative visualization claim, not a number. (Both weight panels were read with read-figure: adversarially trained filters visibly more localized/sparse than naive ones — qualitative support only; no claim gated.)
-- **MNIST rubbish class-skew** (45.3 % fives / no eights, tex:929-933) — a distributional statistic over fooling images; not gated.
-- **Train-to-zero-on-Gaussian-rubbish null result** (tex:963-968) — a negative result the paper itself calls not beneficial; not gated.
-- **CIFAR-10 target-specific fooling rates** (airplane 24.7 %, mean 75.3 %, tex:935-941) — CIFAR-10 + per-class fooling; not built here. (Fig. 5's panels were read with read-figure — images are colorful static, not airplanes.)
-
-(The Fig. 4 ε-sweep visualization was previously listed here; it is now TESTED
-by the curve claims fc1–fc3, §2.3a.)
-
-### 4.2 Tested but not reproduced at this scale (3 `low` claims, §2.3)
-`c03` (softmax FGSM confidence magnitude), `c12` (M5 mean magnitude 0.782 %),
-`c13` (M5 seed spread 0.0006). All three are rated `compute_invariance=low` in
-`claims.json` precisely because they need the paper's full 1600-unit /
-patience-100 / 5-seed budget. They are **informational failures**, not gate
-failures — the HIGH (sub-scale-invariant) claims that encode the same
-*directional* content (`c09`, `c11`) pass at every seed.
-
-### 4.3 Not run in this sandbox
-- **`docker build`/`docker run`** — `docker` is not installed in this sandbox.
-  The `Dockerfile` is present and well-formed; the equivalent from-scratch build
-  (`uv pip install -r requirements.txt` into a fresh `.venv`) IS verified
-  (imports clean, 105/105 tests pass). Docker end-to-end in a truly fresh
-  container is the untested piece (readiness gates 1 and 10 are `partial` for
-  this reason).
-- **Full-scale M5 (1600 units / patience 100 / 5 seeds)** — a single 1600-unit
-  seed did not finish within the 5-minute budget; the sub-scale (240 units /
-  12 epochs / 3 seeds) is what ran and what the gate adjudicates.
-- **Adversarial review by subagents** — `$HOME/.review_rounds` records that
-  **4 review rounds** were spent. The loop went quiet on substance: the final
-  round raised only non-blocking documentation issues (stale claim notes, an
-  epoch-count typo, tolerance-inflation disclosures), all acted on this run,
-  with no blocking objection remaining. The round budget was spent getting
-  there (it is not a zero-review run); the inline verification (every
-  instrument/mutation/constructed-truth node confirmed to exist, every mutation
-  confirmed to break its test and pass on clean code, 105/105 suite) is what
-  backs the checks below.
-
-## 5. What this does NOT establish
-
-- It does **not** establish the implementation is correct — only that it is not
-  wrong in the specific ways the 105 tests, 6 mutations, and 34-claim numbers gate
-  check.
-- It does **not** reproduce the paper's headline **magnitudes** (0.94 %→0.84 %,
-  0.782 %, 89.4 %, 17.9 %, 91.1 %, 98.35 %, …) at the paper's scale. It
-  reproduces their **directions** at a strictly smaller scale, and rates the
-  magnitude claims `low`/informational so a reader is not told a sub-scale number
-  is the paper's number.
-- It does **not** test any claim that depends on ImageNet, CIFAR-10, GoogLeNet,
-  the MP-DBM, or rotation-based attacks (§4.1).
-
-The reader should weigh the headline numbers in `REPRODUCTION.md` against this
-ledger, not against a single pass/fail.
+**correctness** — environment builds, comprehension (SPEC) done, implementation
+runs, and the correctness gate (tests/invariants/mutations/instruments) is
+green. The numbers gate was run (18/19 HIGH pass) but reports **FAIL** on the
+single HIGH CIFAR block (c63), so the **numbers** rung is not reached. The
+block is an environment/dataset one (CIFAR-10 download stalled), not a method
+failure — but it is not an all-BLOCKED arms result either, so it is reported
+as the gate failing, not as a clean environment stop.

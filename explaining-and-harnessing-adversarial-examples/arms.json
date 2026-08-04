@@ -1,4 +1,0 @@
-{
-  "baseline": "python run_experiment.py --baseline --steps 5000 --seed 0 --units 240 --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5",
-  "adversarial": "python run_experiment.py --lambda 0.25 --steps 5000 --seed 0 --units 240 --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5"
-}

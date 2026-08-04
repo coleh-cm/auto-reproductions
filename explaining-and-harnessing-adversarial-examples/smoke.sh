@@ -1,27 +1,23 @@
 #!/usr/bin/env bash
-# smoke.sh — prove the code path runs end-to-end. Same code path as
-# run_all_arms.sh but at a size that finishes in well under a couple of
-# minutes, printing exactly one FINAL line.
-#
-# This is a PATH-PROVER, NOT evidence about the paper: 200 SGD steps leaves
-# the maxout net undertrained, so the accuracy here is meaningless. It only
-# demonstrates that the data pipeline, the model, the FGSM adversarial-
-# training cost (Algorithm B), the training loop, and the eval metric all
-# run and produce a well-formed `FINAL adversarial=<float>` line.
-# (Per the reproduction contract: never report smoke output as a result.)
+# smoke.sh — the same code path at a size that finishes in a couple of minutes.
+# Proves the path runs; NOT evidence about the paper (never report its output
+# as a result). Prints one FINAL line.
 set -euo pipefail
-
 cd "$(dirname "$0")"
+PY="${PY:-.venv/bin/python}"
+[ -x "$PY" ] || PY="$(command -v python3)"
 
-export OMP_NUM_THREADS=4
-export MKL_NUM_THREADS=4
-
-if [ -f .venv/bin/activate ]; then
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-fi
-
-# 200 steps of the method arm (Algorithm B, eps=0.25). Tiny but exercises the
-# full adversarial-training path (input-gradient probe + mixed loss + SGD).
-python run_experiment.py --lambda 0.25 --steps 200 --seed 0 --units 64 \
-  --pieces 5 --batch-size 100 --lr 0.1 --alpha 0.5
+EAE_SMOKE=1 EAE_ONLY=softmax_reg exec "$PY" -c "
+import os, time, torch, numpy as np
+import data, models, train, eval as ev
+torch.set_num_threads(2)
+# tiny: 2000 train examples, 5 epochs, seed 0 only
+d = data.load_mnist(0)
+import torch as T
+dt = {k: T.from_numpy(v) for k,v in d.items()}
+dt['x_train'] = dt['x_train'][:2000]; dt['y_train'] = dt['y_train'][:2000]
+m = models.SoftmaxRegression()
+h = train.train(m, dt, {'lr':0.5,'max_epochs':5,'batch_size':256,'seed':0,'momentum':0.9})
+adv = ev.adv_eval(m, dt['x_test'][:500], dt['y_test'][:500], 0.25)
+print(f'FINAL softmax_reg={adv[\"adv_err\"]:.4f}')
+"

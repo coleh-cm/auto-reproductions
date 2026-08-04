@@ -1,80 +1,76 @@
 {
-  "_doc": "Deliberate defects. Each is a minimal, uniquely-quoted change to one source line that a specific test node MUST catch (the test FAILS when the defect is applied and PASSES on clean code). A suite nobody has broken on purpose is not evidence. `covers` lists the correctness category the defect probes; the set covers `core` (the method's math) and `degeneracy` (the no-op/empty-set guards) at minimum. Each defect carries an explicit `reason` field (the why, mirrored in `what_it_breaks`), the `file`, a uniquely-quoted `find`, its `replace`, and the `must_fail` test node. Verification recipe (run AFTER any background compute, so a mid-run arm never imports a mutated src): for each defect, `git stash`-clean state, apply the find->replace, run `.venv/bin/python -m pytest <must_fail> -q` and confirm it FAILS, then `git checkout -- <file>` to revert; confirm the node PASSES on clean code. Automated by `verify_mutations.py`. Every must_fail node below was verified to fail under its defect and pass on clean code.",
-  "reason": "A suite nobody has broken on purpose is not evidence, so this file declares six minimal, uniquely-quoted source defects that a specific must_fail test node MUST catch. They cover `core` (the FGSM / E6 / RBF-confidence / confidence-subset math) and `degeneracy` (the eps=0 no-op equals the baseline; the empty-input grader must raise). Every defect carries its own per-item `reason` (the why) and `what_it_breaks`; this top-level `reason` exists so a parser looking for a file-level explanation finds one. verify_mutations.py confirms each must_fail node FAILS under its defect and PASSES on clean code. The file is tracked (not gitignored).",
   "mutations": [
     {
-      "id": "M1_fgsm_uses_gradient_not_sign",
-      "covers": [
-        "core"
-      ],
-      "file": "src/fgsm_repro/attacks.py",
-      "reason": "FGSM (E1, tex:309) must perturb by eps*sign(grad); using the raw gradient makes ||eta||_inf != eps and destroys the max-norm attack.",
-      "what_it_breaks": "FGSM (E1, tex:309) must perturb by eps*sign(grad); using the raw gradient makes ||eta||_inf != eps and destroys the max-norm attack.",
-      "find": "    J = cross_entropy_cost(model, x, y)\n    g = torch.autograd.grad(J, x)[0]\n    eta = eps * torch.sign(g)\n    x_tilde = (x + eta).detach()\n    return x_tilde",
-      "replace": "    J = cross_entropy_cost(model, x, y)\n    g = torch.autograd.grad(J, x)[0]\n    eta = eps * g\n    x_tilde = (x + eta).detach()\n    return x_tilde",
-      "must_fail": "tests/test_invariants.py::test_fgsm_perturbation_norm_equals_eps"
+      "id": "mut_fgsm_clip",
+      "covers": ["core", "degeneracy"],
+      "file": "attack.py",
+      "find": "    return (x + eta).detach()",
+      "replace": "    return (x + eta).clamp(0.0, 1.0).detach()",
+      "must_fail": "tests/test_invariants.py::test_fgsm_no_clipping"
     },
     {
-      "id": "M2_advtrain_nonzero_floor_breaks_degeneracy",
-      "covers": [
-        "core",
-        "degeneracy"
-      ],
-      "file": "src/fgsm_repro/objectives.py",
-      "reason": "E7 at eps=0 must equal the clean cost exactly (x + 0*sign(g) == x). Adding a 1e-3 floor makes the no-op perturbation nonzero, so the method no longer reproduces the baseline at its degenerate setting.",
-      "what_it_breaks": "E7 at eps=0 must equal the clean cost exactly (x + 0*sign(g) == x). Adding a 1e-3 floor makes the no-op perturbation nonzero, so the method no longer reproduces the baseline at its degenerate setting.",
-      "find": "    x_tilde = (x.detach() + eps * torch.sign(g)).detach()",
-      "replace": "    x_tilde = (x.detach() + (eps + 1e-3) * torch.sign(g)).detach()",
-      "must_fail": "tests/test_degeneracy.py::test_cost_degeneracy_eps0_equals_clean"
+      "id": "mut_fgsm_eps_scale",
+      "covers": ["core"],
+      "file": "attack.py",
+      "find": "    eta = eps * torch.sign(g)\n    return (x + eta).detach()",
+      "replace": "    eta = eps * 0.5 * torch.sign(g)\n    return (x + eta).detach()",
+      "must_fail": "tests/test_invariants.py::test_fgsm_inf_norm_equals_eps"
     },
     {
-      "id": "M3_confidence_averaged_over_all_not_errors",
-      "covers": [
-        "core"
-      ],
-      "file": "src/fgsm_repro/eval.py",
-      "reason": "mean_confidence_on_errors must average the predicted-class probability over the MISCLASSIFIED subset only (SPEC \u00a76 item 14). Averaging over ALL examples silently inflates the metric when the model is mostly correct.",
-      "what_it_breaks": "mean_confidence_on_errors must average the predicted-class probability over the MISCLASSIFIED subset only (SPEC \u00a76 item 14). Averaging over ALL examples silently inflates the metric when the model is mostly correct.",
-      "find": "        conf = probs.gather(1, pred.unsqueeze(1)).squeeze(1)\n        mean_conf = conf[wrong].mean().item()",
-      "replace": "        conf = probs.gather(1, pred.unsqueeze(1)).squeeze(1)\n        mean_conf = conf.mean().item()",
-      "must_fail": "tests/test_instruments.py::test_eval_metrics_negative_all_wrong_and_confidence_only_on_errors"
+      "id": "mut_adv_leak_grad",
+      "covers": ["core", "degeneracy"],
+      "file": "train.py",
+      "find": "    eta = eps * torch.sign(g)\n    return (x + eta).detach()",
+      "replace": "    eta = -eps * torch.sign(g)  # BUG: wrong-sign perturbation helps the model\n    return (x + eta).detach()",
+      "must_fail": "tests/test_invariants.py::test_adversarial_training_reduces_adv_err"
     },
     {
-      "id": "M4_rbf_uses_softmax_not_unnorm_exp",
-      "covers": [
-        "core"
-      ],
-      "file": "src/fgsm_repro/eval.py",
-      "reason": "RBF confidence must be the UNNORMALIZED per-class exp(q_k) (SPEC \u00a76 item 9); a softmax reading is bounded below by 1/K=0.1 and structurally cannot reproduce the paper's 1.2% / 0% (tex:600-604,923). This defect swaps in softmax, so off-manifold confidence stays >= 0.1.",
-      "what_it_breaks": "RBF confidence must be the UNNORMALIZED per-class exp(q_k) (SPEC \u00a76 item 9); a softmax reading is bounded below by 1/K=0.1 and structurally cannot reproduce the paper's 1.2% / 0% (tex:600-604,923). This defect swaps in softmax, so off-manifold confidence stays >= 0.1.",
-      "find": "    return torch.exp(q.clamp(max=80.0))",
-      "replace": "    return torch.softmax(q, dim=-1)",
-      "must_fail": "tests/test_instruments.py::test_rbf_confidence_positive_decays_off_manifold"
+      "id": "mut_adv_eps0_no_shortcircuit",
+      "covers": ["degeneracy"],
+      "file": "train.py",
+      "find": "    if eps == 0.0:\n        return x  # degeneracy: eps=0 noise is a true no-op (no RNG consumed)",
+      "replace": "    if eps == 0.0:\n        torch.randint(0, 2, x.shape, generator=gen)  # consume RNG even at eps=0",
+      "must_fail": "tests/test_degeneracy.py::test_noise_eps0_equals_baseline_exact"
     },
     {
-      "id": "M5_e6_best_case_instead_of_worst_case",
-      "covers": [
-        "core"
-      ],
-      "file": "src/fgsm_repro/objectives.py",
-      "reason": "E6 (tex:410-412) is the WORST-case adversarial loss (eps*||w||_1 SUBTRACTED from the activation reduces the margin). Flipping the sign makes it the BEST case (E6 < clean), contradicting the adversary.",
-      "what_it_breaks": "E6 (tex:410-412) is the WORST-case adversarial loss (eps*||w||_1 SUBTRACTED from the activation reduces the margin). Flipping the sign makes it BEST case (E6 < clean), contradicting the adversary.",
-      "find": "    val = y_pm * (eps * w.abs().sum() - s)",
-      "replace": "    val = y_pm * (-eps * w.abs().sum() - s)",
-      "must_fail": "tests/test_instruments.py::test_e6_negative_is_worst_case_not_best_case"
+      "id": "mut_logreg_analytic_sign",
+      "covers": ["core"],
+      "file": "tests/test_invariants.py",
+      "find": "    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b",
+      "replace": "    margin_fgsm = (x + eps * sign_w.unsqueeze(0)) @ w + b",
+      "must_fail": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form"
     },
     {
-      "id": "M6_eval_clean_empty_returns_not_raises",
-      "covers": [
-        "degeneracy",
-        "core"
-      ],
-      "file": "src/fgsm_repro/eval.py",
-      "reason": "A grader fed an EMPTY input set must RAISE, not return a vacuous 0.0 (a silent OK on an empty result is indistinguishable from the method never being applied). This defect removes the empty-input guard so eval_clean returns nan/0.0 instead of raising.",
-      "what_it_breaks": "A grader fed an EMPTY input set must RAISE, not return a vacuous 0.0 (silent OK on an empty result is indistinguishable from the method never being applied). This defect removes the empty-input guard so eval_clean returns nan/0.0 instead of raising.",
-      "find": "    if int(x.shape[0]) == 0:\n        raise ValueError(\"eval_clean: empty input set; a grader must raise, not return a vacuous verdict\")\n    model.eval()",
-      "replace": "    model.eval()",
-      "must_fail": "tests/test_instruments.py::test_eval_clean_raises_on_empty"
+      "id": "mut_rbf_softmax_norm",
+      "covers": ["core"],
+      "file": "models.py",
+      "find": "        return torch.exp(self.logits(x))  # [B, K] in (0, 1], rows need NOT sum to 1",
+      "replace": "        return torch.softmax(self.logits(x), dim=-1)  # rows sum to 1",
+      "must_fail": "tests/test_invariants.py::test_rbf_prob_rows_need_not_sum_to_one"
+    },
+    {
+      "id": "mut_softmax_not_sum1",
+      "covers": ["core"],
+      "file": "models.py",
+      "find": "    def prob(self, x):\n        return F.softmax(self.logits(x), dim=-1)\n\n    def loss(self, x, y):\n        logits = self.logits(x)\n        y = y.to(torch.long).view(-1)\n        return F.cross_entropy(logits, y)\n\n    def predict(self, x):\n        return self.prob(x).argmax(dim=-1).to(torch.long)\n\n    def confidence(self, x):\n        return self.prob(x).max(dim=-1).values\n\n\n# ---------------------------------------------------------------------------\n# Binary logistic regression",
+      "replace": "    def prob(self, x):\n        return torch.sigmoid(self.logits(x))  # BUG: not normalized\n\n    def loss(self, x, y):\n        logits = self.logits(x)\n        y = y.to(torch.long).view(-1)\n        return F.cross_entropy(logits, y)\n\n    def predict(self, x):\n        return self.prob(x).argmax(dim=-1).to(torch.long)\n\n    def confidence(self, x):\n        return self.prob(x).max(dim=-1).values\n\n\n# ---------------------------------------------------------------------------\n# Binary logistic regression",
+      "must_fail": "tests/test_invariants.py::test_softmax_prob_rows_sum_to_one"
+    },
+    {
+      "id": "mut_eps_trace_direction_per_eps",
+      "covers": ["core"],
+      "file": "attack.py",
+      "find": "    direction = torch.sign(g)  # [1, D] (or [B,D]); fixed\n    eps_grid = torch.as_tensor(eps_grid, dtype=torch.float32).view(-1, 1, 1)  # [E,1,1]\n    x_exp = x.unsqueeze(0)  # [1,B,D]\n    x_eps = x_exp + eps_grid * direction.unsqueeze(0)  # [E,B,D]",
+      "replace": "    # BUG: recompute direction at each eps (not fixed at eps=0)\n    eps_grid = torch.as_tensor(eps_grid, dtype=torch.float32).view(-1, 1, 1)\n    x_exp = x.unsqueeze(0)\n    outs = []\n    for e in eps_grid[:,0,0]:\n        xt = (x + e).clone().detach().requires_grad_(True)\n        lt = model.loss(xt, y_t)\n        gt = torch.autograd.grad(lt, xt, create_graph=False)[0]\n        outs.append(model.logits(x + e * torch.sign(gt)))\n    logits = torch.stack(outs, dim=0).squeeze(1)\n    return logits",
+      "must_fail": "tests/test_invariants.py::test_eps_trace_piecewise_linear_in_eps"
+    },
+    {
+      "id": "mut_empty_input_silent",
+      "covers": ["core"],
+      "file": "models.py",
+      "find": "    if x.numel() == 0:\n        raise ValueError(f\"empty {name}\")\n    return x.float()",
+      "replace": "    if x.numel() == 0:\n        return x  # BUG: pass empty through silently\n    return x.float()",
+      "must_fail": "tests/test_invariants.py::test_empty_input_raises"
     }
   ]
 }

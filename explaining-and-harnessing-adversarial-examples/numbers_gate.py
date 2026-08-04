@@ -1,137 +1,144 @@
 #!/usr/bin/env python3
 """numbers_gate.py — evaluate claims.json against measured.json, write claims_result.json.
 
-The numbers gate. For each claim in ``claims.json`` it resolves the
-``measured.<arm>.<metric>`` tokens from ``measured.json`` (per seed) and renders a
+The numbers gate. For each claim in claims.json it resolves the
+``measured.<arm>.<metric>`` tokens from measured.json (per seed) and renders a
 verdict:
 
   - ``pass``    the assertion holds at every seed the reproduction ran.
   - ``fail``    the assertion does not hold at some seed the reproduction ran.
-  - ``blocked`` a referenced metric is missing or carries the ``BLOCKED`` sentinel
-                (the environment could not produce a number); the claim is NOT
-                adjudicated.
+  - ``blocked`` a referenced metric is missing or carries the ``BLOCKED``
+                sentinel (the environment could not produce a number); the
+                claim is NOT adjudicated.
 
-Semantics (mirrors claims.json['evaluation']):
+Semantics mirror claims.json['evaluation_rules']:
+  - ordering : quantity (an expression over measured.<arm>.<metric>) must
+               satisfy `direction` at EVERY seed.
+  - value    : mean of quantity over the claim's seeds must satisfy
+               |mean - claimed| <= tolerance.  (Per the rules, value claims
+               compare the MEAN over seeds, not per-seed; an aggregate
+               `mean(...)`/`min(...)`/`max(...)` wrapping a single token is
+               also honored as an explicit cross-seed aggregate.)
+  - existence/invariant : the boolean `predicate` must hold at every seed.
+  - curve    : quantity (and, for above/below/crosses, `against`) resolve to
+               SEQUENCES stored in measured.json under the arm (one value per x
+               in the order of the claim's `x` list); sample at `x`; diffs =
+               quantity - against:
+                 above     = all sampled diffs > 0
+                 below     = all sampled diffs < 0
+                 crosses   = first sampled diff > 0 and last < 0
+                 increasing= last > first with >=80% of consecutive diffs >= 0
+                 matches   = elementwise |sampled - claimed| <= tolerance
+               The comparison must hold at EVERY seed.
 
-  - ``ordering``       the ``quantity`` (an expression over measured.<arm>.<metric>)
-                       must satisfy ``direction`` at EVERY seed.
-  - ``value``          ``abs(quantity - claimed) <= tolerance`` at every seed.
-  - ``existence`` /    the boolean ``predicate`` must hold at every seed.
-    ``invariant``
-  - ``curve``          a figure claim. ``quantity`` (and, for ``crosses`` /
-                       curve-vs-curve ``above`` / ``below``, ``against`` -- the
-                       OTHER curve; deprecated alias: ``reference``)
-                       resolve through the arm's ``curve_metrics`` to SEQUENCES
-                       read from that arm's per-seed result file
-                       (``results/_per_seed/<stem>__seed<seed>.json``) --
-                       measured.json stays scalar-only. ``x`` is the sample
-                       grid (a sequence of the same length); ``x_range``
-                       optionally restricts to the figure's axis region before
-                       evaluating. ``comparison`` is one of:
-                         ``crosses``    (q-r) changes strict sign between the
-                                        first and last sampled x
-                         ``above``      every q_i > r_i, or > claimed (+0 slack)
-                         ``below``      every q_i < r_i, or < claimed (+tol slack)
-                         ``increasing`` q_last > q_first AND no q_i drops more
-                                        than ``tolerance`` below the running max
-                         ``decreasing`` mirror of increasing
-                         ``matches``    every |q_i - claimed_i| <= tolerance
-                       The comparison must hold at EVERY seed.
+Tokens are derived from the claim expressions themselves: every
+``measured.<arm>.<metric>`` substring where <arm> is a key of
+claims.json['arms']. This avoids depending on a separate metric registry and
+handles metrics whose names contain dots (the known arm name is the split
+point, longest-first).
 
-  - A claim whose expression aggregates across seeds — ``min(measured.x.y)``,
-    ``max(measured.x.y)`` or ``mean(measured.x.y)`` wrapping a SINGLE measured
-    token — is evaluated ONCE over the per-seed list (``min``/``max`` reduce the
-    list; ``mean`` is ``sum/len``). Every other expression is evaluated per seed.
-    A multi-argument ``min(a, b)`` / ``max(a, b)`` is element-wise (per seed),
-    NOT a cross-seed aggregation.
+Output: claims_result.json = {produced_by, summary, claims, not_tested,
+generated_from}. Prints one FINAL line per verdict category and one
+FINAL gate=PASS|FAIL line (gate passes iff every HIGH claim is adjudicated
+``pass`` with none blocked). Exits non-zero on a blocked HIGH claim or a
+failed HIGH claim — the gate's load-bearing verdict is over
+compute_invariance == "high".
 
-  - ``seeds`` per-claim (default claims.json['seeds']) selects the seeds; only the
-    seeds actually present in measured.json are adjudicated (a sub-scale run that
-    could not finish all five M5 seeds adjudicates the three that ran, and the
-    claim's note already records the scale gap).
-
-  - Metric names may contain dots (e.g. ``l1_0.0025_train_error``,
-    ``l1_2.5e-05_test_error``), so the canonical ``measured.<arm>.<metric>``
-    tokens are taken from claims.json's ``arms`` block and matched as literal
-    strings (longest first), never by regex.
-
-The gate's load-bearing verdict is over the ``compute_invariance == "high"``
-claims (the assertions that survive this reproduction's CPU sub-scale); the
-``low`` claims are informational and several are *expected* to fail at sub-scale
-(they need the paper's full 1600-unit / 5-seed budget). All three verdict
-categories are reported so a reader can see which is which.
-
-Output: ``claims_result.json`` —
-``{produced_by, summary, claims, not_tested, generated_from}``.
-Prints one ``FINAL <verdict>=<count>`` line per verdict category and one
-``FINAL gate=PASS|FAIL`` line (gate passes iff every HIGH claim is adjudicated
-``pass`` with none blocked).
-
-``produced_by`` stamps the file with the gate's own identity so a hand-authored
-table can be told apart from a gate-generated one. The contract requires that
-claims_result.json be written BY this gate and never by hand: a table authored
-by hand replaces four honest verdicts with pass/fail, which is the one report
-worse than a failure. The stamp is the cheap proof the file came from the gate.
+produced_by stamps the file with the gate's identity: claims_result.json must
+be written BY this gate and never by hand.
 """
 from __future__ import annotations
 
 import json
-import re
 import statistics
 import sys
 from pathlib import Path
 
-REPRO_ROOT = Path(__file__).resolve().parent
-CLAIMS_PATH = REPRO_ROOT / "claims.json"
-MEASURED_PATH = REPRO_ROOT / "measured.json"
-OUT_PATH = REPRO_ROOT / "claims_result.json"
+REPO = Path(__file__).resolve().parent
+CLAIMS_PATH = REPO / "claims.json"
+MEASURED_PATH = REPO / "measured.json"
+OUT_PATH = REPO / "claims_result.json"
 
 BLOCKED = "BLOCKED"
 
 
 def build_canonical_tokens(claims_doc: dict) -> dict:
-    """token -> (arm, metric) for every measured.<arm>.<metric> in claims.json.
+    """token -> (arm, metric) for every measured.<arm>.<metric> referenced by
+    any claim, where <arm> is a key of claims.json['arms']. Sorted longest-first
+    so substitution never partly overlaps (arm names are matched as literal
+    strings, not regex)."""
+    arm_names = list(claims_doc.get("arms", {}).keys())
+    # longest arm name first so 'maxout_large_adv' wins over 'maxout_adv' etc.
+    arm_names_sorted = sorted(arm_names, key=len, reverse=True)
+    tokens = {}
+    seen = set()
 
-    Metric names may contain dots (l1_0.0025_train_error), so we cannot regex-parse
-    them; we read arm/metric straight from claims.json's arms block. Returned dict
-    is ordered longest-token-first so substitution never partly overlaps. Both
-    scalar ``metrics`` and sequence ``curve_metrics`` are registered; the curve
-    claims resolve theirs from per-seed result files, not measured.json.
-    """
-    pairs = {}
-    for arm, spec in claims_doc.get("arms", {}).items():
-        for metric in spec.get("metrics", {}):
-            pairs[f"measured.{arm}.{metric}"] = (arm, metric)
-        for metric in spec.get("curve_metrics", {}):
-            pairs[f"measured.{arm}.{metric}"] = (arm, metric)
-    return dict(sorted(pairs.items(), key=lambda kv: len(kv[0]), reverse=True))
+    def harvest(expr):
+        if not isinstance(expr, str):
+            return
+        for arm in arm_names_sorted:
+            prefix = f"measured.{arm}."
+            i = 0
+            while True:
+                j = expr.find(prefix, i)
+                if j < 0:
+                    break
+                end = j + len(prefix)
+                # metric = up to the next char that ends a python identifier
+                # tail: stop at ) , space + - * / < > = & | ] and end of string
+                k = end
+                while k < len(expr) and (expr[k].isalnum() or expr[k] in "_.[]'\""):
+                    k += 1
+                token = expr[j:k]
+                if token and token not in seen:
+                    seen.add(token)
+                    metric = expr[end:k]
+                    tokens[token] = (arm, metric)
+                i = k if k > i else end
+
+    for c in claims_doc.get("claims", []):
+        harvest(c.get("quantity"))
+        harvest(c.get("predicate"))
+        harvest(c.get("against"))
+        harvest(c.get("reference"))
+        harvest(c.get("x"))
+    return dict(sorted(tokens.items(), key=lambda kv: len(kv[0]), reverse=True))
 
 
-def _safe_eval(expr: str) -> object:
-    """Eval an arithmetic/boolean expression with min/max/mean/abs only.
-
-    measured.<arm>.<metric> tokens MUST already be substituted out of ``expr``
-    (dotted names are not valid Python identifiers). Only the contract's allowed
-    names (min, max, mean, abs, arithmetic, comparisons, and, or) are in scope.
-    """
-    allowed_names = {"min": min, "max": max, "mean": statistics.mean,
-                     "abs": abs, "True": True, "False": False}
+def _safe_eval(expr: str, aggregate: bool = False) -> object:
+    """Eval an arithmetic/boolean expression with min/max/mean/abs/count only.
+    measured tokens MUST already be substituted out. Only the contract's names
+    are in scope. When aggregate=True (cross-seed), tokens are numpy arrays and
+    count/mean/min/max use numpy so comparisons broadcast (e.g.
+    count(arr <= 0.9) sums the True elements)."""
+    import numpy as _np
+    if aggregate:
+        allowed = {
+            "min": lambda *a: _np.minimum.reduce(a[0]) if len(a) == 1 else _np.minimum(*a),
+            "max": lambda *a: _np.maximum.reduce(a[0]) if len(a) == 1 else _np.maximum(*a),
+            "mean": lambda x: float(_np.mean(x)),
+            "abs": _np.abs,
+            "count": lambda x: int(_np.sum(_np.asarray(x, dtype=bool))),
+            "True": True, "False": False,
+        }
+    else:
+        allowed = {"min": min, "max": max, "mean": statistics.mean,
+                   "abs": abs, "count": lambda it: len(list(it)),
+                   "True": True, "False": False}
     code = compile(expr, "<claim-expr>", "eval")
     for name in code.co_names:
-        if name not in allowed_names:
+        if name not in allowed:
             raise ValueError(f"disallowed name in expression: {name!r}")
-    return eval(code, {"__builtins__": {}}, allowed_names)
+    return eval(code, {"__builtins__": {}}, allowed)
 
 
 def _tokens_in(expr: str, canonical: dict) -> list:
-    """Canonical tokens present as substrings of expr (longest first)."""
     return [t for t in canonical if t in expr]
 
 
 def _substitute(expr: str, token_values: dict, canonical: dict) -> str:
-    """Replace each canonical token with repr of its mapped value (longest first)."""
     out = expr
-    for token in canonical:  # already sorted longest-first
+    for token in canonical:  # longest-first
         if token in token_values and token in out:
             out = out.replace(token, repr(token_values[token]))
     leftover = [t for t in canonical if t in out and t not in token_values]
@@ -141,16 +148,29 @@ def _substitute(expr: str, token_values: dict, canonical: dict) -> str:
 
 
 def is_aggregate(expr: str, canonical: dict) -> bool:
-    """True iff min/max/mean wraps a SINGLE canonical token (cross-seed aggregation)."""
-    for fn in ("min", "max", "mean"):
+    """True iff min/max/mean/count wraps a SINGLE canonical token (cross-seed
+    aggregation): forms ``fn(token)`` (exact) or ``fn(token <cmp> ...)`` where
+    the token is the sole argument (no comma before the closing paren). A
+    two-argument ``min(a, b)`` / ``max(a, b)`` is per-seed element-wise, NOT
+    a cross-seed aggregate."""
+    for fn in ("min", "max", "mean", "count"):
         for token in canonical:
+            # exact single-arg: fn(token)
             if f"{fn}({token})" in expr:
                 return True
+            # single-arg with comparison: fn(token <cmp> ...), no comma after token
+            prefix = f"{fn}({token}"
+            i = expr.find(prefix)
+            while i >= 0:
+                after = expr[i + len(prefix):]
+                # next char must start a comparison (<=, >=, ==, !=, <, >), not a comma
+                if after and after[0] in "<>=!":
+                    return True
+                i = expr.find(prefix, i + 1)
     return False
 
 
-def _measured_scalar(measured: dict, arm: str, metric: str, seed) -> object:
-    """measured[arm][str(seed)][metric]; BLOCKED sentinel if missing."""
+def _measured_value(measured: dict, arm: str, metric: str, seed):
     arm_block = measured.get(arm)
     if not isinstance(arm_block, dict):
         return BLOCKED
@@ -167,83 +187,54 @@ def _available_seeds(measured: dict, arm: str) -> set:
     return {int(s) for s in arm_block.keys() if str(s).isdigit()}
 
 
-def _resolve_json_path(blob, path: str):
-    """Resolve a simple dotted json path (no wildcards; curve pointers are
-    plain keys by contract). Raises KeyError on any missing key."""
-    cur = blob
-    for key in path.split("."):
-        if not isinstance(cur, dict) or key not in cur:
-            raise KeyError(path)
-        cur = cur[key]
-    return cur
+def _sample_at_x(seq, x_full, x_want):
+    """Return seq sampled at the x values in x_want (by exact match, falling
+    back to nearest). x_full is the claim's `x` list (the index labels)."""
+    out = []
+    for xv in x_want:
+        # exact match first
+        if xv in x_full:
+            out.append(seq[x_full.index(xv)])
+            continue
+        # nearest
+        best_i = min(range(len(x_full)), key=lambda i: abs(x_full[i] - xv))
+        out.append(seq[best_i])
+    return out
 
 
-def _per_seed_results_file(claims_doc: dict, arm: str, seed) -> Path:
-    """results/_per_seed/<stem>__seed<seed>.json — the file make_measured.py
-    writes when it runs the arm's command_per_seed at that seed. The gate
-    NEVER invents a sequence: a missing file blocks the claim."""
-    spec = claims_doc["arms"][arm]
-    m = re.search(r"experiments/(\S+\.py)", spec["command_per_seed"])
-    stem = m.group(1).replace(".py", "") if m else arm
-    return REPRO_ROOT / "results" / "_per_seed" / f"{stem}__seed{seed}.json"
-
-
-def _curve_sequence(claims_doc: dict, arm: str, metric: str, seed):
-    """Resolve a curve metric to a list of floats from the per-seed result file."""
-    spec = claims_doc["arms"][arm]
-    curve_metrics = spec.get("curve_metrics", {})
-    if metric not in curve_metrics:
-        raise KeyError(f"{arm}.{metric} is not a curve metric")
-    pointer = curve_metrics[metric]
-    _file, _, json_path = pointer.partition(":")
-    f = _per_seed_results_file(claims_doc, arm, seed)
-    if not f.exists():
-        raise FileNotFoundError(str(f))
-    val = _resolve_json_path(json.loads(f.read_text()), json_path)
-    if not isinstance(val, list) or not all(isinstance(v, (int, float)) for v in val):
-        raise TypeError(f"curve metric {arm}.{metric} at seed {seed} is not a list of numbers")
-    return [float(v) for v in val]
-
-
-def _restrict(x, *seqs, x_range=None):
-    """Restrict x and aligned sequences to x_range [lo, hi] (inclusive)."""
-    if x_range is None:
-        return x, seqs
-    lo, hi = x_range
-    keep = [i for i, xi in enumerate(x) if lo - 1e-9 <= xi <= hi + 1e-9]
-    if not keep:
-        raise ValueError(f"x_range {x_range} selects no samples")
-    return [x[i] for i in keep], [[s[i] for i in keep] for s in seqs]
-
-
-def _curve_verdict(comparison: str, q: list, r: list | None,
-                   claimed, tolerance: float) -> bool:
-    """Evaluate one curve comparison on already-restricted sequences."""
+def _curve_verdict(comparison, q, r, claimed, tolerance):
     n = len(q)
     if comparison == "crosses":
         if r is None:
             raise ValueError("crosses needs an `against` curve sequence")
         d0, dn = q[0] - r[0], q[-1] - r[-1]
-        return d0 * dn < 0
-    if comparison in ("above", "below"):
+        return d0 > 0 and dn < 0
+    if comparison == "above":
         if r is not None:
-            pairs = zip(q, r)
-        else:
-            c = float(claimed)
-            pairs = ((qi, c) for qi in q)
-        if comparison == "above":
-            return all(qi > ri - tolerance for qi, ri in pairs)
-        return all(qi < ri + tolerance for qi, ri in pairs)
-    if comparison in ("increasing", "decreasing"):
-        if not (q[-1] - q[0] > 0 if comparison == "increasing" else q[-1] - q[0] < 0):
+            return all(qi - ri > 0 for qi, ri in zip(q, r))
+        c = float(claimed)
+        return all(qi - c > 0 for qi in q)
+    if comparison == "below":
+        if r is not None:
+            return all(qi - ri < 0 for qi, ri in zip(q, r))
+        c = float(claimed)
+        return all(qi - c < 0 for qi in q)
+    if comparison == "increasing":
+        if n < 2:
             return False
-        running = q[0]
-        for qi in q[1:]:
-            slack = qi - running if comparison == "increasing" else running - qi
-            if slack < -tolerance:
-                return False
-            running = max(running, qi) if comparison == "increasing" else min(running, qi)
-        return True
+        if not (q[-1] > q[0]):
+            return False
+        diffs = [q[i + 1] - q[i] for i in range(n - 1)]
+        nonneg = sum(1 for d in diffs if d >= 0)
+        return nonneg >= 0.8 * len(diffs)
+    if comparison == "decreasing":
+        if n < 2:
+            return False
+        if not (q[-1] < q[0]):
+            return False
+        diffs = [q[i + 1] - q[i] for i in range(n - 1)]
+        nonpos = sum(1 for d in diffs if d <= 0)
+        return nonpos >= 0.8 * len(diffs)
     if comparison == "matches":
         if not isinstance(claimed, list) or len(claimed) != n:
             raise ValueError("matches needs `claimed` as a list of the same length")
@@ -251,75 +242,77 @@ def _curve_verdict(comparison: str, q: list, r: list | None,
     raise ValueError(f"unknown curve comparison {comparison!r}")
 
 
-def evaluate_curve_claim(claim: dict, claims_doc: dict, top_seeds: list,
-                         canonical: dict) -> dict:
-    """Evaluate a ``curve`` figure claim at every seed, from per-seed files."""
+def evaluate_curve_claim(claim, measured, top_seeds, canonical):
     seeds_requested = claim.get("seeds", top_seeds)
     comparison = claim["comparison"]
-    q_tok, x_tok = claim["quantity"], claim["x"]
-    # ``against`` names the OTHER curve for crosses / curve-vs-curve above/below;
-    # ``reference`` is kept as a deprecated alias for older claims documents.
+    q_tok = claim["quantity"]
     r_tok = claim.get("against", claim.get("reference"))
-    if q_tok not in canonical or x_tok not in canonical:
-        return {"verdict": "blocked", "reason": "quantity/x is not a measured token",
+    x_list = claim["x"]
+    if q_tok not in canonical:
+        return {"verdict": "blocked", "reason": "quantity is not a measured token",
                 "seeds_evaluated": []}
     q_arm, q_metric = canonical[q_tok]
-    x_arm, x_metric = canonical[x_tok]
     r_arm = r_metric = None
     if r_tok is not None:
         if r_tok not in canonical:
             return {"verdict": "blocked", "reason": "against is not a measured token",
                     "seeds_evaluated": []}
         r_arm, r_metric = canonical[r_tok]
-    if not (q_arm == x_arm and (r_arm is None or r_arm == q_arm)):
-        return {"verdict": "blocked",
-                "reason": "curve claims must draw quantity/x/against from ONE arm",
-                "seeds_evaluated": []}
-    arm = q_arm
-    if q_metric not in claims_doc["arms"][arm].get("curve_metrics", {}) or \
-            x_metric not in claims_doc["arms"][arm].get("curve_metrics", {}):
-        return {"verdict": "blocked",
-                "reason": "quantity/x must be curve_metrics (sequences), not scalar metrics",
-                "seeds_evaluated": []}
-
-    per_seed = []
-    for s in seeds_requested:
-        f = _per_seed_results_file(claims_doc, arm, s)
-        if not f.exists():
-            return {"verdict": "blocked", "reason": f"missing per-seed file {f}",
+        if r_arm != q_arm:
+            return {"verdict": "blocked",
+                    "reason": "curve claims must draw quantity/against from ONE arm",
                     "seeds_evaluated": []}
+    arm = q_arm
+    seeds = sorted(set(seeds_requested) & _available_seeds(measured, arm))
+    if not seeds:
+        return {"verdict": "blocked", "reason": f"no seed data for arm {arm}",
+                "seeds_evaluated": []}
+    # Resolve the x-axis index labels: a curve claim's `x` holds SAMPLE POINTS
+    # (e.g. eps values), but the sequences are stored positionally. The arm's
+    # `eps_grid` (or generic `x_axis`/`grid` metric) gives the index labels; if
+    # absent, fall back to 0..n-1 (positional).
+    x_axis = None
+    for axis_key in ("eps_grid", "x_axis", "grid"):
+        if isinstance(_measured_value(measured, arm, axis_key, seeds[0]), list):
+            x_axis = _measured_value(measured, arm, axis_key, seeds[0])
+            break
+    per_seed = []
+    for s in seeds:
+        q_raw = _measured_value(measured, arm, q_metric, s)
+        r_raw = _measured_value(measured, arm, r_metric, s) if r_tok else None
+        if q_raw == BLOCKED or (r_tok and r_raw == BLOCKED):
+            return {"verdict": "blocked", "reason": f"BLOCKED cell at seed {s}",
+                    "seeds_evaluated": []}
+        if not isinstance(q_raw, list):
+            return {"verdict": "blocked",
+                    "reason": f"{arm}.{q_metric} at seed {s} is not a sequence",
+                    "seeds_evaluated": []}
+        if r_tok and not isinstance(r_raw, list):
+            return {"verdict": "blocked",
+                    "reason": f"{arm}.{r_metric} at seed {s} is not a sequence",
+                    "seeds_evaluated": []}
+        # x_full = the index labels (eps_grid if available, else 0..n-1)
+        x_full = x_axis if x_axis is not None else list(range(len(q_raw)))
+        # sample at the claim's x (sample points)
+        q = _sample_at_x(q_raw, x_full, x_list)
+        r = _sample_at_x(r_raw, x_full, x_list) if r_tok else None
         try:
-            x = _curve_sequence(claims_doc, arm, x_metric, s)
-            q = _curve_sequence(claims_doc, arm, q_metric, s)
-            r = _curve_sequence(claims_doc, arm, r_metric, s) if r_tok else None
-            if not (len(x) == len(q) and (r is None or len(r) == len(q))):
-                raise ValueError("x/quantity/reference length mismatch")
-            x2, seqs = _restrict(x, q, *([r] if r is not None else []),
-                                 x_range=claim.get("x_range"))
-            q2 = seqs[0]
-            r2 = seqs[1] if r is not None else None
-            ok = _curve_verdict(comparison, q2, r2,
-                                claim.get("claimed"), float(claim.get("tolerance", 0.0)))
-            per_seed.append({"seed": s, "ok": bool(ok),
-                             "n_samples": len(x2),
-                             "q_first": q2[0], "q_last": q2[-1]})
+            ok = _curve_verdict(comparison, q, r, claim.get("claimed"),
+                                float(claim.get("tolerance", 0.0)))
         except Exception as e:
             return {"verdict": "blocked", "reason": f"seed {s}: {e}",
                     "seeds_evaluated": []}
+        per_seed.append({"seed": s, "ok": bool(ok), "n_samples": len(q),
+                         "q_first": q[0], "q_last": q[-1]})
     verdict = "pass" if all(p["ok"] for p in per_seed) else "fail"
     return {"verdict": verdict, "seeds_evaluated": [p["seed"] for p in per_seed],
-            "comparison": comparison, "x_range": claim.get("x_range"),
-            "per_seed": per_seed}
+            "comparison": comparison, "per_seed": per_seed}
 
 
-def evaluate_claim(claim: dict, measured: dict, top_seeds: list,
-                   canonical: dict, claims_doc: dict | None = None) -> dict:
+def evaluate_claim(claim, measured, top_seeds, canonical, claims_doc=None):
     kind = claim["kind"]
     if kind == "curve":
-        if claims_doc is None:
-            return {"verdict": "blocked", "reason": "curve claims need claims_doc",
-                    "seeds_evaluated": []}
-        return evaluate_curve_claim(claim, claims_doc, top_seeds, canonical)
+        return evaluate_curve_claim(claim, measured, top_seeds, canonical)
     seeds_requested = claim.get("seeds", top_seeds)
     if kind in ("existence", "invariant"):
         expr, is_bool = claim["predicate"], True
@@ -328,7 +321,7 @@ def evaluate_claim(claim: dict, measured: dict, top_seeds: list,
 
     tokens = _tokens_in(expr, canonical)
     if not tokens:
-        return {"verdict": "blocked", "reason": "no measured token found in expression",
+        return {"verdict": "blocked", "reason": "no measured token in expression",
                 "seeds_evaluated": []}
 
     common = set(seeds_requested)
@@ -339,60 +332,65 @@ def evaluate_claim(claim: dict, measured: dict, top_seeds: list,
         return {"verdict": "blocked",
                 "reason": "no requested seed has data for all referenced metrics",
                 "seeds_evaluated": []}
-
     for s in seeds:
         for t in tokens:
             arm, metric = canonical[t]
-            if _measured_scalar(measured, arm, metric, s) == BLOCKED:
+            if _measured_value(measured, arm, metric, s) == BLOCKED:
                 return {"verdict": "blocked",
                         "reason": f"BLOCKED cell at seed {s}: {t}",
                         "seeds_evaluated": []}
 
     try:
         if is_aggregate(expr, canonical):
+            import numpy as _np
             token_values = {}
             for t in tokens:
                 arm, metric = canonical[t]
-                token_values[t] = [_measured_scalar(measured, arm, metric, s) for s in seeds]
+                token_values[t] = _np.array([_measured_value(measured, arm, metric, s) for s in seeds], dtype=float)
             sub = _substitute(expr, token_values, canonical)
-            result = _safe_eval(sub)
+            result = _safe_eval(sub, aggregate=True)
             if is_bool:
-                ok = bool(result)
-                return {"verdict": "pass" if ok else "fail",
-                        "seeds_evaluated": seeds,
-                        "aggregate_value": bool(result), "seeds": seeds}
+                return {"verdict": "pass" if bool(result) else "fail",
+                        "seeds_evaluated": seeds, "aggregate_value": bool(result)}
             val = float(result)
             ok = abs(val - claim["claimed"]) <= claim["tolerance"]
             return {"verdict": "pass" if ok else "fail", "seeds_evaluated": seeds,
                     "aggregate_value": val, "claimed": claim["claimed"],
                     "tolerance": claim["tolerance"],
-                    "abs_diff": abs(val - claim["claimed"]), "seeds": seeds}
+                    "abs_diff": abs(val - claim["claimed"])}
 
-        # per-seed evaluation
+        # value claim: compare MEAN over seeds (per evaluation_rules)
+        if kind == "value" and not is_bool:
+            per_seed_vals = []
+            for s in seeds:
+                tv = {t: _measured_value(measured, *canonical[t], s) for t in tokens}
+                sub = _substitute(expr, tv, canonical)
+                per_seed_vals.append(float(_safe_eval(sub)))
+            mean_val = statistics.mean(per_seed_vals)
+            ok = abs(mean_val - claim["claimed"]) <= claim["tolerance"]
+            return {"verdict": "pass" if ok else "fail", "seeds_evaluated": seeds,
+                    "mean": mean_val, "per_seed": per_seed_vals,
+                    "claimed": claim["claimed"], "tolerance": claim["tolerance"],
+                    "abs_diff": abs(mean_val - claim["claimed"])}
+
+        # ordering / existence / invariant: per-seed, must hold at EVERY seed
         per_seed = []
         for s in seeds:
-            token_values = {}
-            for t in tokens:
-                arm, metric = canonical[t]
-                token_values[t] = _measured_scalar(measured, arm, metric, s)
-            sub = _substitute(expr, token_values, canonical)
+            tv = {t: _measured_value(measured, *canonical[t], s) for t in tokens}
+            sub = _substitute(expr, tv, canonical)
             val = _safe_eval(sub)
             if is_bool:
                 ok = bool(val)
-            elif kind == "value":
-                ok = abs(float(val) - claim["claimed"]) <= claim["tolerance"]
             else:  # ordering
                 v = float(val)
                 d = claim["direction"]
                 ok = (v < 0 if d == "<0" else v > 0 if d == ">0"
                       else v <= 0 if d == "<=0" else v >= 0 if d == ">=0"
-                      else v == 0 if d == "==0" else (_ for _ in ()).throw(
-                          ValueError(f"unknown direction {d!r}")))
+                      else v == 0 if d == "==0"
+                      else (_ for _ in ()).throw(ValueError(f"unknown direction {d!r}")))
             per_seed.append({"seed": s, "value": val, "ok": ok})
         detail = {"per_seed": per_seed}
-        if kind == "value":
-            detail["claimed"], detail["tolerance"] = claim["claimed"], claim["tolerance"]
-        elif kind == "ordering":
+        if kind == "ordering":
             detail["direction"] = claim["direction"]
         verdict = "pass" if all(p["ok"] for p in per_seed) else "fail"
         return {"verdict": verdict, "seeds_evaluated": seeds, **detail}
@@ -430,9 +428,9 @@ def main() -> int:
         "high": high, "medium": counts("medium"), "low": counts("low"),
         "high_total": sum(high.values()),
         "gate_pass": high["pass"] == sum(high.values()) and high["blocked"] == 0,
-        "note": "The gate's load-bearing verdict is high (claims that survive this "
-                "reproduction's CPU sub-scale). low claims are informational; several "
-                "are expected to fail at sub-scale (annotated in claims.json).",
+        "note": "The gate's load-bearing verdict is over compute_invariance == 'high'. "
+                "low claims are informational; several are expected to fail at sub-scale "
+                "(annotated in claims.json).",
     }
 
     out = {

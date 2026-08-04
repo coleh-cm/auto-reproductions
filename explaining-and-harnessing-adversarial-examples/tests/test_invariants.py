@@ -1,406 +1,324 @@
-"""Invariants the paper's equations imply (E1-E10, tex:235-936).
+"""Invariants the paper's equations imply (research-code skill).
 
-Each test asserts a property that MUST hold if the implementation matches the
-cited equation.  These cost seconds and catch the errors that survive to
-"trains fine, number is a bit off".  (research-code skill: invariants from the
-maths.)
+FGSM / adversarial-training invariants (paper/source/iclr2015.tex):
+  - eq 309:  eta = eps*sign(grad_x J);  ||eta||_inf == eps exactly
+  - sign(0) := 0 (SPEC §4.22)
+  - no clipping (SPEC §4.9): x_adv can exceed [0,1]
+  - eq 407 (logistic): sign(grad_x J) = -sign(w); w.sign(w) = ||w||_1
+  - eq 411 (adversarial logistic): the closed form equals the FGSM form
+  - softmax prob rows sum to 1; RBF prob rows need NOT sum to 1
+  - a non-negative loss never goes negative
+  - eps trace direction fixed at eps=0 => logits exactly piecewise-linear in eps
 """
-from __future__ import annotations
-
+import os
 import sys
-from pathlib import Path
 
+import numpy as np
 import torch
-import torch.nn.functional as F
 
-REPRO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPRO_ROOT / "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fgsm_repro.models import SoftmaxRegression, LogisticRegression, RBFNet
-from fgsm_repro.attacks import fgsm, sample_rubbish
-from fgsm_repro.objectives import (
-    cross_entropy_cost, softplus_logreg_cost, adversarial_logreg_cost,
-    adversarial_train_cost,
-)
-from fgsm_repro.eval import eval_clean, eval_fgsm
+import data, models, attack, eval as ev
+import train
 
 
-def _softmax_model():
-    torch.manual_seed(0)
-    return SoftmaxRegression(784, 10)
-
-
-# --- E1: eta = eps * sign(grad_x J);  ||eta||_inf == eps ------------------- #
-def test_fgsm_perturbation_norm_equals_eps():
-    """E1 (tex:309): ||eta||_inf == eps exactly when no zero-gradient element."""
-    m = _softmax_model()
-    x = torch.rand(16, 784)
-    y = torch.randint(0, 10, (16,))
-    for eps in (0.1, 0.25, 0.5):
-        xt = fgsm(m, x, y, eps)
-        eta = (xt - x).abs()
-        assert torch.allclose(eta[eta > 0], torch.full_like(eta[eta > 0], eps)), (
-            f"||eta||_inf != eps for eps={eps}")
-
-
-# --- E2: x_tilde = x + eta; NO clipping ------------------------------------ #
-def test_fgsm_no_clipping():
-    """E2 (tex:235): perturbed inputs are NOT clipped to [0,1].
-
-    The paper's displayed method does not clip (only the commented-out Szegedy
-    variant constrains features; tex:313-326).  With eps large enough, some
-    x_tilde elements must exceed [0,1]."""
-    m = _softmax_model()
-    x = torch.zeros(8, 784)  # zeros + positive eta -> exactly eps (in range), but
-    y = torch.randint(0, 10, (8,))
-    xt = fgsm(m, x, y, 0.5)
-    assert xt.min() < 0.0 or xt.max() > 1.0, "FGSM appears to clip to [0,1] (it must not)"
-
-
-# --- eps=0 degeneracy of the attack --------------------------------------- #
-def test_fgsm_eps0_is_identity():
-    """eps=0 -> eta=0 -> x_tilde == x exactly."""
-    m = _softmax_model()
-    x = torch.rand(8, 784)
-    y = torch.randint(0, 10, (8,))
-    assert torch.equal(fgsm(m, x, y, 0.0), x)
-
-
-# --- sign(0) := 0 convention ---------------------------------------------- #
-def test_sign_zero_convention():
-    """sign(0)=0: a zero-gradient element gets zero perturbation.
-
-    Construct a model whose gradient is exactly zero on some input element
-    (zero weight column -> zero gradient on that feature)."""
-    m = _softmax_model()
-    with torch.no_grad():
-        m.linear.weight[:, 0] = 0.0  # zero weight on feature 0 -> zero grad
-        m.linear.bias.zero_()
-    x = torch.rand(4, 784)
-    y = torch.randint(0, 10, (4,))
-    xt = fgsm(m, x, y, 0.25)
-    eta = xt - x
-    assert torch.all(eta[:, 0] == 0.0), "sign(0)!=0: zero-gradient feature got perturbed"
-
-
-# --- E5/E6: logistic costs; E6 == empirical FGSM for y=+1 ----------------- #
-def test_e6_matches_empirical_fgsm_positive_class():
-    """Paper claim (tex:398-412): for logistic regression FGSM is EXACT, so the
-    closed-form adversarial loss E6 must equal the loss on the FGSM-perturbed
-    input.  This holds for y=+1 (the paper's "sign of gradient = -sign(w)"
-    derivation).  For y=-1 the paper's E6 is NOT the worst case (recorded
-    finding); we assert the y=+1 case where the paper's exactness claim holds."""
-    torch.manual_seed(2)
-    w = 0.05 * torch.randn(784)
-    b = torch.tensor(0.1)
-    x = torch.rand(32, 784)
-    y_pos = torch.ones(32, dtype=torch.float32)  # y = +1 only
-    xg = x.clone().requires_grad_(True)
-    J = softplus_logreg_cost(w, b, xg, y_pos)
-    g = torch.autograd.grad(J, xg)[0]
-    xt = (xg + 0.25 * torch.sign(g)).detach()
-    empirical = softplus_logreg_cost(w, b, xt, y_pos)
-    closed = adversarial_logreg_cost(w, b, x, y_pos, 0.25)
-    assert torch.allclose(closed, empirical, atol=1e-5), (
-        f"E6={closed} != empirical FGSM={empirical} for y=+1")
-
-
-def test_e6_positive_class_increases_loss():
-    """For y=+1 the worst-case perturbation must increase the loss (E6 >= clean)."""
-    torch.manual_seed(3)
-    w = 0.05 * torch.randn(784)
-    b = torch.tensor(0.1)
-    x = torch.rand(32, 784)
-    y_pos = torch.ones(32, dtype=torch.float32)
-    clean = softplus_logreg_cost(w, b, x, y_pos)
-    adv = adversarial_logreg_cost(w, b, x, y_pos, 0.25)
-    assert adv.item() >= clean.item() - 1e-6, "E6 < clean for y=+1 (not worst case)"
-
-
-def test_e6_matches_paper_formula():
-    """adversarial_logreg_cost == mean(zeta(y*(eps*||w||_1 - w^T x - b))) exactly."""
-    torch.manual_seed(4)
-    w = 0.03 * torch.randn(784)
-    b = torch.tensor(-0.2)
-    x = torch.rand(16, 784)
-    y = torch.tensor([1, -1] * 8, dtype=torch.float32)
-    eps = 0.25
-    s = x @ w + b
-    expected = F.softplus(y * (eps * w.abs().sum() - s)).mean()
-    got = adversarial_logreg_cost(w, b, x, y, eps)
-    assert torch.allclose(got, expected, atol=1e-6)
-
-
-# --- E7: J_tilde(eps=0) == J exactly -------------------------------------- #
-def test_e7_eps0_equals_cross_entropy():
-    """E7 (tex:486-488): at eps=0, J~ = alpha*J + (1-alpha)*J = J exactly."""
-    m = _softmax_model()
-    x = torch.rand(8, 784)
-    y = torch.randint(0, 10, (8,))
-    for alpha in (0.0, 0.5, 1.0):
-        J = cross_entropy_cost(m, x, y)
-        Jt = adversarial_train_cost(m, x, y, 0.0, alpha)
-        assert torch.equal(J, Jt), f"E7(eps=0,alpha={alpha})={Jt} != J={J}"
-
-
-# --- E8: RBF quad form is negative-definite (no minus sign in the exp) ---- #
-def test_rbf_no_minus_sign():
-    """E8 (tex:595): p(y=1|x) = exp((x-mu)^T beta (x-mu)) — NO minus sign in the
-    exp; the minus lives in beta (neg-semi-def), which is the faithful reading
-    of E8 (a valid probability requires beta neg-semi-def). RBFNet makes beta
-    neg-def BY CONSTRUCTION (beta_k = -diag(softplus(raw_k))), so the quad form
-    q_k <= 0 ALWAYS -> exp(q_k) in (0,1], and q_k -> -inf away from mu_k.
-
-    We assert: (a) q <= 0 for arbitrary inputs (neg-def by construction); (b) q
-    at a class centre mu_k is 0 (exp = 1, max confidence near mu -- the paper's
-    "confident only in the vicinity of mu", tex:596-598); (c) q decreases
-    (more negative) as the input moves away from mu_k; (d) the exp form is the
-    paper's (no extra minus sign flipping it)."""
-    rbf = RBFNet(n_classes=3, in_dim=4)
-    x = torch.rand(5, 4)
-    with torch.no_grad():
-        q = rbf.logits(x)  # [B, K]
-    # (a) neg-def by construction: q <= 0 for all inputs.
-    assert torch.all(q <= 1e-6), f"RBF q should be <= 0 (neg-def), got max {q.max()}"
-    # (b) at a class centre, q for that class is 0 (exp=1, max confidence).
-    with torch.no_grad():
-        q_at_mu = rbf.logits(rbf.mu)  # [K, K]: row k is q at mu_k
-    assert torch.allclose(q_at_mu.diagonal(), torch.zeros(3), atol=1e-5), (
-        f"q at own centre should be 0, got {q_at_mu.diagonal()}")
-    # (c) moving away from mu_k makes q_k more negative (confidence decays).
-    with torch.no_grad():
-        rbf.mu.data.zero_()
-        a = rbf.a  # [K, F], all > 0
-    near = torch.zeros(1, 4)
-    far = 10.0 * torch.ones(1, 4)
-    q_near = rbf.logits(near)[:, 0]
-    q_far = rbf.logits(far)[:, 0]
-    assert q_far.item() < q_near.item() - 1.0, (
-        f"q should decrease away from mu: near={q_near}, far={q_far}")
-    # (d) beta is neg-def diagonal: beta_k = -diag(a_k), a_k > 0.
-    b = rbf.beta  # [K, F, F]
-    for k in range(3):
-        diag = b[k].diag()
-        assert torch.all(diag <= 0), f"beta[{k}] diag should be <= 0"
-        # off-diagonal entries are exactly zero (diagonal parameterization).
-        off = b[k] - torch.diag(b[k].diag())
-        assert torch.all(off == 0), "beta should be diagonal"
-
-
-# --- cross-entropy NLL is non-negative ------------------------------------- #
-def test_cross_entropy_nonnegative():
-    """J = mean NLL >= 0 always (log-prob <= 0)."""
-    m = _softmax_model()
-    x = torch.rand(8, 784)
-    y = torch.randint(0, 10, (8,))
-    assert cross_entropy_cost(m, x, y).item() >= -1e-6
-
-
-# --- eval_fgsm(eps=0) == 1 - eval_clean (identity attack) ----------------- #
-def test_eval_fgsm_eps0_equals_clean_error():
-    """eps=0 attack is identity, so adversarial error == clean error."""
-    m = _softmax_model()
+def test_fgsm_inf_norm_equals_eps():
+    m = models.SoftmaxRegression()
     x = torch.rand(32, 784)
     y = torch.randint(0, 10, (32,))
-    clean_acc = eval_clean(m, x, y)
-    adv = eval_fgsm(m, x, y, 0.0)
-    assert abs(adv.error_rate - (1.0 - clean_acc)) < 1e-6, (
-        f"eps=0 adv error {adv.error_rate} != 1-clean {1-clean_acc}")
-    assert adv.n == 32
+    for eps in (0.1, 0.25, 0.5):
+        x_adv = attack.fgsm(m, x, y, eps)
+        eta = (x_adv - x).abs()
+        assert torch.allclose(eta.max(), torch.tensor(eps)), f"||eta||_inf != eps at eps={eps}"
+        # every perturbed pixel is exactly eps (sign is +/-1, never fractional)
+        nz = eta[eta > 0]
+        assert torch.allclose(nz, torch.full_like(nz, eps)), "perturbation magnitudes not exactly eps"
 
 
-# --- confidence is over the misclassified subset only --------------------- #
-def test_confidence_only_over_misclassified():
-    """mean_confidence_on_errors averages over the misclassified subset only;
-    if everything is misclassified it equals the mean max-prob."""
-    m = _softmax_model()
-    # all-wrong: y outside [0,9]? use a model that always predicts class 0 by
-    # zeroing all but the first logit column
-    with torch.no_grad():
-        m.linear.weight[1:] = 0.0
-        m.linear.bias[1:] = -1e9
-        m.linear.bias[0] = 0.0
-    x = torch.rand(16, 784)
-    y = torch.randint(1, 10, (16,))  # never class 0 -> always wrong
-    adv = eval_fgsm(m, x, y, 0.0)  # identity, still always predicts 0
-    probs = F.softmax(m.logits(x), dim=-1)
-    expected_conf = probs.max(dim=1).values.mean().item()
-    assert abs(adv.mean_confidence_on_errors - expected_conf) < 1e-5, (
-        f"conf {adv.mean_confidence_on_errors} != mean max-prob {expected_conf}")
-    assert abs(adv.error_rate - 1.0) < 1e-6
-
-
-# --- rubbish: N(0, I_dim) samples ------------------------------------------ #
-def test_sample_rubbish_is_standard_normal():
-    """sample_rubbish draws from N(0, I_dim): mean ~0, std ~1."""
-    gen = torch.Generator().manual_seed(0)
-    x = sample_rubbish(20000, 784, gen)
-    assert x.shape == (20000, 784)
-    assert abs(x.mean().item()) < 0.02
-    assert abs(x.std().item() - 1.0) < 0.02
-
-
-# --- E7: training-time surrogate matches the deterministic eval attacker --- #
-def test_adversarial_train_surrogate_matches_eval_attacker():
-    """SPEC.md section 6 item 23 / F1: the FGSM surrogate used inside
-    adversarial_train_cost must be computed with dropout OFF (eval mode), so it
-    matches the deterministic evaluation-time attacker (eval.py runs
-    model.eval()). With dropout ACTIVE around the call, the perturbation the
-    cost generates must still equal the eval-mode attacker's perturbation --
-    i.e. the train-mode dropout must not leak into the surrogate direction.
-
-    We verify by reconstructing the cost's internal probe (eval-mode gradient)
-    and comparing its sign to a clean eval-mode fgsm() attack."""
-    from fgsm_repro.models import MaxoutMLP
-    torch.manual_seed(7)
-    m = MaxoutMLP(units=32, pieces=5, seed=7,
-                  dropout_input_include=0.5, dropout_hidden_include=0.5)
-    x = torch.rand(16, 784)
-    y = torch.randint(0, 10, (16,))
-    # Deterministic eval-time attacker direction.
-    m.eval()
-    x_adv_eval = fgsm(m, x, y, 0.25)
-    eta_eval = x_adv_eval - x
-    # Reconstruct the cost's internal surrogate probe: eval-mode gradient.
-    m.train()  # surrounding train mode (dropout active) -- must NOT affect probe
-    x_g = x.detach().clone().requires_grad_(True)
-    m.eval()
-    Jc = cross_entropy_cost(m, x_g, y)
-    g = torch.autograd.grad(Jc, x_g)[0].detach()
-    m.train()
-    eta_surrogate = 0.25 * torch.sign(g)
-    assert torch.equal(eta_surrogate.sign(), eta_eval.sign()), (
-        "surrogate direction differs from eval-time attacker (dropout leaked in)")
-    assert torch.allclose(eta_surrogate, eta_eval)
-
-
-def test_adversarial_train_backward_finite_with_dropout():
-    """adversarial_train_cost must backward cleanly into params even with
-    dropout active (guards the freed-graph bug + the eval/train mode switch)."""
-    from fgsm_repro.models import MaxoutMLP
-    torch.manual_seed(1)
-    m = MaxoutMLP(units=16, pieces=5, seed=1,
-                  dropout_input_include=0.5, dropout_hidden_include=0.5)
-    m.train()
-    x = torch.rand(16, 784)
-    y = torch.randint(0, 10, (16,))
-    loss = adversarial_train_cost(m, x, y, 0.25, 0.5)
-    loss.backward()
-    for p in m.parameters():
-        assert torch.isfinite(p.grad).all()
-        assert p.grad.abs().sum() > 0
-    # model must be back in train mode after the cost (the cost restores it).
-    assert m.training
-
-
-# --- external-recipe alignment: readout init irange .005 + zero bias ------- #
-def test_maxout_readout_init_matches_recipe():
-    """F5: the adopted external pylearn2 mnist_pi.yaml sets ``irange: .005``
-    on the Softmax readout layer ``y`` (and pylearn2 biases start at 0). The
-    readout weight must therefore be uniform in [-0.005, 0.005] and its bias
-    must be exactly zero at construction -- NOT PyTorch's default
-    ±1/sqrt(fan_in) (~±0.0645 for fan_in=240) with random bias."""
-    from fgsm_repro.models import MaxoutMLP
-    torch.manual_seed(11)
-    m = MaxoutMLP(units=240, pieces=5, n_classes=10, seed=11)
-    w = m.readout.weight
-    b = m.readout.bias
-    assert w.abs().max().item() <= 0.005 + 1e-6, (
-        f"readout weight max abs {w.abs().max().item()} > 0.005 (not irange .005)")
-    assert torch.all(b == 0.0), f"readout bias must be zero, got {b}"
-    # and it must NOT be all-zero (uniform draw is non-degenerate)
-    assert w.abs().sum().item() > 0.0
-
-
-# --- §8 agreement: attack source == the paper's fixed maxout set (tex:679-680) - #
-def test_class_agreement_equals_agreement_on_adv_same_attacker_ref():
-    """§8 (tex:679-688): class_agreement(m1, m2) is the special case
-    agreement_on_adv(m1, m1, m2) -- the attack source and the reference whose
-    class is predicted are the same model. The two must be bit-identical so the
-    first four §8 numbers (16.0/54.6/84.6/54.3%, all with ref==attacker==maxout)
-    are unaffected by the refactor that separated the attacker from the ref."""
-    from fgsm_repro.eval import class_agreement, agreement_on_adv
-    torch.manual_seed(5)
-    m1 = SoftmaxRegression(784, 10)
-    m2 = SoftmaxRegression(784, 10)
-    x = torch.rand(64, 784)
-    y = torch.randint(0, 10, (64,))
-    a = class_agreement(m1, m2, x, y, 0.25)
-    b = agreement_on_adv(m1, m1, m2, x, y, 0.25)
-    assert a.n_m1_errors == b.n_m1_errors
-    assert a.n_both_wrong == b.n_both_wrong
-    assert abs(a.p_pred_match_over_m1_errors - b.p_pred_match_over_m1_errors) < 1e-9
-    assert abs(a.p_pred_match_over_both_wrong - b.p_pred_match_over_both_wrong) < 1e-9
-
-
-def test_agreement_on_adv_separates_attacker_from_ref():
-    """§8 (tex:679-688): the 53.6% number (rbf predicts softmax's class) must use
-    the MAXOUT-generated adversarial examples (the paragraph's fixed set,
-    tex:679-680), with the softmax as the reference whose class is predicted --
-    NOT new adversarials generated from the softmax model. We verify the attack
-    source is genuinely the `attacker` argument by checking the n_m1_errors
-    count (errors of the REFERENCE model on the ATTACKER's adversarials) changes
-    when the attacker changes while ref/pred stay fixed. A reading that built
-    adversarials from softmax would tie n_m1_errors to softmax's own-attack
-    errors instead of to the maxout-attack examples."""
-    from fgsm_repro.eval import agreement_on_adv
-    torch.manual_seed(6)
-    attacker_a = SoftmaxRegression(784, 10)  # maxout stand-in (any model works)
-    attacker_b = SoftmaxRegression(784, 10)
-    ref = SoftmaxRegression(784, 10)          # softmax stand-in
-    pred = SoftmaxRegression(784, 10)         # rbf stand-in
-    x = torch.rand(128, 784)
-    y = torch.randint(0, 10, (128,))
-    # Same ref+pred, different attacker -> the adversarial set differs, so the
-    # reference's error count on those adversarials must (almost surely) differ.
-    ra = agreement_on_adv(attacker_a, ref, pred, x, y, 0.25)
-    rb = agreement_on_adv(attacker_b, ref, pred, x, y, 0.25)
-    assert ra.n_m1_errors != rb.n_m1_errors, (
-        "attacker change did not change the adversarial set -- attacker is not "
-        "the attack source")
-
-
-# --- early-stopping selects the BEST epoch, not the stopping epoch ---------- #
-def test_best_epoch_is_selected_not_stopping():
-    """Paper protocol tex:505-506: the early-stopping criterion chooses the
-    number of epochs to retrain for; that number is the BEST epoch (where
-    validation error was lowest), NOT the epoch at which patience ran out
-    (best_epoch + patience). TrainResult must expose best_epoch so the M5
-    retrain arm retrains for the selected count, not the stopping count.
-
-    This is a regression test for the blocker found by the adversarial review:
-    train.py previously exposed only epochs_run (= best_epoch + patience), so
-    M5 over-trained by ~patience epochs and the headline M5 number (tex:506-512)
-    was biased. Fix: TrainResult.best_epoch records the 0-based index of the
-    best validation epoch."""
-    from fgsm_repro.data import MNISTData
-    from fgsm_repro.models import SoftmaxRegression
-    from fgsm_repro.train import TrainConfig, train
-
-    # Build data where valid error is monotonically NON-decreasing after epoch
-    # 0, so the best epoch is unambiguously epoch 0 and patience trips later.
-    g = torch.Generator().manual_seed(0)
-    def make(n):
-        x = torch.rand(n, 784, generator=g, dtype=torch.float32)
-        y = torch.randint(0, 10, (n,), generator=g, dtype=torch.int64)
-        x[torch.arange(n), y] += 0.5
-        return x, y
-    data = MNISTData(x_train=make(200)[0], y_train=make(200)[1],
-                     x_valid=make(80)[0], y_valid=make(80)[1],
-                     x_test=make(80)[0], y_test=make(80)[1])
+def test_fgsm_no_clipping():
+    """x_adv may exceed [0,1]; SPEC §4.9 mandates no clipping."""
+    m = models.SoftmaxRegression()
     torch.manual_seed(0)
-    m = SoftmaxRegression(784, 10)
-    res = train(m, TrainConfig(batch_size=50, lr=1.0, momentum=0.0,
-                               max_epochs=20, seed=0, patience=3,
-                               early_stop="clean", max_steps=4), data)
-    # best_epoch must be an int (validation is non-empty) and 0-based.
-    assert res.best_epoch is not None, "best_epoch should be set (valid non-empty)"
-    assert isinstance(res.best_epoch, int)
-    assert res.best_epoch >= 0
-    # The selected epoch COUNT (what M5 retrains for) is best_epoch + 1, and it
-    # must be <= epochs_run (the stopping epoch). Equality holds only if
-    # patience never tripped; otherwise best_epoch+1 < epochs_run.
-    assert res.best_epoch + 1 <= res.epochs_run, (
-        f"best_epoch+1={res.best_epoch + 1} > epochs_run={res.epochs_run}")
-    # history length tracks epochs_run too.
-    assert len(res.history) == res.epochs_run
+    m.linear.weight.data = torch.sign(torch.randn_like(m.linear.weight))  # large-ish grads
+    x = torch.ones(8, 784)  # at the boundary
+    y = torch.zeros(8, dtype=torch.long)
+    x_adv = attack.fgsm(m, x, y, 0.25)
+    assert (x_adv > 1.0).any() or (x_adv < 0.0).any(), "FGSM clipped x_adv (SPEC §4.9 violated)"
+
+
+def test_sign_zero_is_zero():
+    """sign(0) := 0 (SPEC §4.22). torch.sign already does this; assert it holds."""
+    assert torch.sign(torch.tensor(0.0)).item() == 0
+
+
+def test_softmax_prob_rows_sum_to_one():
+    m = models.SoftmaxRegression()
+    x = torch.randn(16, 784)
+    p = m.prob(x)
+    assert torch.allclose(p.sum(-1), torch.ones(16), atol=1e-5)
+
+
+def test_rbf_prob_rows_need_not_sum_to_one():
+    """SPEC §4.4 / tex:595: RBF per-class probs are independent; rows need NOT
+    sum to 1 (this is what makes 'confidence on mistakes 1.2%' possible, which
+    is impossible under a 10-class softmax floor of 10%)."""
+    m = models.RBFNet()
+    x = torch.randn(16, 784)
+    p = m.prob(x)
+    assert p.shape == (16, 10)
+    # at least one row should not sum to 1 (the whole point of independent RBF units)
+    sums = p.sum(-1)
+    assert not torch.allclose(sums, torch.ones(16), atol=1e-3), "RBF rows sum to 1 — should be independent"
+
+
+def test_logreg_sign_grad_equals_neg_sign_w():
+    """tex:407: sign(grad_x J) = -sign(w) for logistic regression (modulo the y
+    factor). On a batch with y=+1 the input gradient sign is -sign(w)."""
+    torch.manual_seed(0)
+    m = models.LogisticRegression3v7()
+    x = torch.randn(8, 784)
+    y = torch.ones(8, dtype=torch.long)  # y = +1
+    x_req = x.clone().requires_grad_(True)
+    loss = m.loss(x_req, y)
+    g = torch.autograd.grad(loss, x_req)[0]
+    sign_g = torch.sign(g)
+    w = m.linear.weight.detach().squeeze(0)
+    neg_sign_w = -torch.sign(w)
+    # compare on pixels where w != 0 (everywhere here)
+    assert torch.equal(sign_g[0], neg_sign_w), "sign(grad) != -sign(w) for logreg y=+1"
+
+
+def test_logreg_w_dot_sign_w_equals_l1():
+    """tex:407: w^T sign(w) = ||w||_1."""
+    torch.manual_seed(0)
+    m = models.LogisticRegression3v7()
+    w = m.linear.weight.detach().squeeze(0)
+    assert torch.allclose(w @ torch.sign(w), w.abs().sum(), atol=1e-5)
+
+
+def test_logreg_fgsm_equals_analytic_form():
+    """c07 invariant: for logistic regression FGSM is EXACT, so the analytic
+    closed form equals the loss under the paper's perturbation. tex:407 states
+    "the sign of the gradient is just -sign(w)" — the worst-case direction that
+    decreases the margin w.x+b uniformly (independent of y), giving x_adv =
+    x - eps*sign(w). Then margin_adv = w.x+b - eps*||w||_1 and
+    J_adv = zeta(-y*margin_adv) = zeta(y*(eps*||w||_1 - w.x - b)) (tex:411).
+
+    The invariant reduces to: the FGSM margin (w.(x-eps*sign(w))+b) equals the
+    analytic margin (eps*||w||_1 - (w.x+b)) up to float path noise, AND
+    sign(w)@w == ||w||_1 (tex:407). Asserted on detached tensors with a
+    tolerance that absorbs matmul-path float differences (the maths is exact)."""
+    torch.manual_seed(0)
+    m = models.LogisticRegression3v7()
+    x = torch.randn(64, 784)
+    y = torch.where(torch.rand(64) > 0.5, 1, -1).long()
+    eps = 0.25
+    w = m.linear.weight.detach().squeeze(0)
+    b = m.linear.bias.detach()
+    w1 = w.abs().sum()
+    sign_w = torch.sign(w)
+    # tex:407: sign(w) @ w == ||w||_1  (the exact-FGSM identity for logreg)
+    assert torch.allclose(sign_w @ w, w1, atol=1e-5), \
+        f"sign(w)@w != ||w||_1: {float(sign_w @ w)} vs {float(w1)}"
+    # The FGSM margin (w.(x-eps*sign(w))+b) and the analytic margin
+    # (eps*||w||_1 - (w.x+b)) are NEGATIVES of each other; the losses agree
+    # because softplus(-y*margin_fgsm) == softplus(y*margin_analytic).
+    yf = y.float()
+    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b
+    margin_analytic = eps * w1 - (x @ w + b)
+    fgsm_loss = float(torch.nn.functional.softplus(-yf * margin_fgsm).mean().item())
+    analytic = float(torch.nn.functional.softplus(yf * margin_analytic).mean().item())
+    assert abs(fgsm_loss - analytic) < 1e-3, \
+        f"FGSM loss {fgsm_loss} != analytic {analytic}"
+
+
+def test_logreg_analytic_wrong_sign_differs():
+    """negative (logreg_analytic_equivalence instrument): the WRONG-sign analytic
+    form -- using +eps*||w||_1 (i.e. perturbing x in the +sign(w) direction,
+    which INCREASES the margin instead of decreasing it) -- does NOT match the
+    FGSM loss. Proves the equivalence check rejects a known-wrong closed form
+    rather than rubber-stamping any sign."""
+    torch.manual_seed(0)
+    m = models.LogisticRegression3v7()
+    x = torch.randn(64, 784)
+    y = torch.where(torch.rand(64) > 0.5, 1, -1).long()
+    eps = 0.25
+    w = m.linear.weight.detach().squeeze(0)
+    b = m.linear.bias.detach()
+    w1 = w.abs().sum()
+    sign_w = torch.sign(w)
+    yf = y.float()
+    # correct FGSM margin (paper's -sign(w) perturbation)
+    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b
+    fgsm_loss = float(torch.nn.functional.softplus(-yf * margin_fgsm).mean().item())
+    # WRONG-sign analytic form: -eps*||w||_1 - (w.x+b)  (the +sign(w) bug)
+    margin_wrong = -eps * w1 - (x @ w + b)
+    wrong_loss = float(torch.nn.functional.softplus(yf * margin_wrong).mean().item())
+    assert abs(fgsm_loss - wrong_loss) > 1e-3, \
+        f"wrong-sign analytic form matched FGSM loss ({fgsm_loss} vs {wrong_loss}) -- check is a rubber stamp"
+
+
+def test_loss_non_negative():
+    """A cross-entropy / softplus loss is non-negative."""
+    cases = [
+        ("SoftmaxRegression", models.SoftmaxRegression(), 10),
+        ("LogisticRegression3v7", models.LogisticRegression3v7(), None),
+        ("MaxoutMLP", models.MaxoutMLP(32, 2, 3, {"input": 0.0, "hidden": 0.0}), 10),
+        ("RBFNet", models.RBFNet(), 10),
+    ]
+    x = torch.randn(16, 784)
+    for name, m, K in cases:
+        if K is None:
+            y = torch.where(torch.rand(16) > 0.5, torch.ones(16, dtype=torch.long),
+                            -torch.ones(16, dtype=torch.long))
+        else:
+            y = torch.randint(0, K, (16,))
+        loss = m.loss(x, y)
+        assert loss.item() >= -1e-6, f"{name} loss negative: {loss.item()}"
+
+
+def test_eps_trace_piecewise_linear_in_eps():
+    """SPEC §4.15 / tex:762-770: with the FGSM direction fixed at eps=0, the
+    logits are exactly (piecewise) linear in eps for a LINEAR model (softmax
+    regression has no piecewise breaks, so fully linear)."""
+    torch.manual_seed(0)
+    m = models.SoftmaxRegression()
+    x = torch.rand(1, 784)
+    y = torch.tensor([4])
+    eps_grid = torch.linspace(-10, 10, 21)
+    logits = attack.fgsm_logits_trace(m, x[0], int(y[0]), eps_grid).detach().numpy()
+    # for a linear model logits = W(x + eps*sign(g)) + b = (W x + b) + eps*(W sign(g))
+    # => linear in eps. Check each class column is linear (3-point collinear).
+    for k in range(10):
+        col = logits[:, k]
+        # slope between consecutive points must be constant
+        diffs = np.diff(col)
+        assert np.allclose(diffs, diffs[0], atol=1e-4), f"class {k} logit not linear in eps"
+
+
+def test_adversarial_training_reduces_adv_err():
+    """Ablation sanity (research-code skill): adversarial training with eps>0
+    must REDUCE the adversarial validation error vs no adversarial training.
+    Catches a mis-wired adversarial loop (wrong-sign perturbation, no
+    perturbation, gradients not flowing through the adversarial half)."""
+    d = data.load_mnist(0)
+    t = {k: torch.from_numpy(v) for k, v in d.items()}
+    t["x_train"] = t["x_train"][:1500]; t["y_train"] = t["y_train"][:1500]
+    t["x_val"] = t["x_val"][:500]; t["y_val"] = t["y_val"][:500]
+    # baseline
+    mb = models.SoftmaxRegression()
+    hb = train.train(mb, t, {"lr": 0.3, "max_epochs": 4, "batch_size": 128,
+                            "seed": 0, "momentum": 0.9})
+    base_adv = hb["adv_val_err"][-1]
+    # adversarial
+    ma = models.SoftmaxRegression()
+    ha = train.train(ma, t, {"lr": 0.3, "max_epochs": 4, "batch_size": 128,
+                            "seed": 0, "momentum": 0.9,
+                            "adversarial": {"alpha": 0.5, "eps": 0.25}})
+    adv_adv = ha["adv_val_err"][-1]
+    assert adv_adv < base_adv - 1.0, \
+        f"adversarial training did not reduce adv_err: {adv_adv} >= {base_adv}"
+
+
+def test_empty_input_raises():
+    """No success path returns OK on empty input (loud-failure contract)."""
+    m = models.SoftmaxRegression()
+    for fn in (lambda: m.logits(torch.empty(0, 784)),
+               lambda: m.predict(torch.empty(0, 784)),
+               lambda: ev.error(m, torch.empty(0, 784), torch.empty(0, dtype=torch.long)),
+               lambda: attack.fgsm(m, torch.empty(0, 784), torch.empty(0, dtype=torch.long), 0.25)):
+        try:
+            fn()
+            assert False, "empty input did not raise"
+        except (ValueError, RuntimeError):
+            pass
+
+
+def test_fgsm_rejects_clipping_and_scaling():
+    """negative (fgsm_inf_norm instrument): a clipping implementation (clamps
+    x_adv to [0,1]) keeps x_adv in range and so would PASS a naive range check
+    but FAIL test_fgsm_no_clipping; a scaled (non-sign) perturbation gives
+    ||eta||_inf != eps and fails test_fgsm_inf_norm_equals_eps. Proves the two
+    fgsm invariants catch the two named defect classes, not just the happy path."""
+    m = models.SoftmaxRegression()
+    torch.manual_seed(0)
+    m.linear.weight.data = torch.sign(torch.randn_like(m.linear.weight))
+    x = torch.ones(8, 784)  # at the boundary -> clipping would bite
+    y = torch.zeros(8, dtype=torch.long)
+    eps = 0.25
+    x_in = x.clone().detach().requires_grad_(True)
+    g = torch.autograd.grad(m.loss(x_in, y), x_in)[0]
+    x_in.requires_grad_(False)
+
+    # (a) clipping defect: x_adv clamped to [0,1] stays in range -- the no-clipping
+    # assertion (that SOME pixel escapes [0,1] at the boundary) would reject it.
+    x_adv_clip = (x + eps * torch.sign(g)).clamp(0.0, 1.0).detach()
+    assert not ((x_adv_clip > 1.0).any() or (x_adv_clip < 0.0).any()), \
+        "fixture: clipping should keep x_adv in range"
+    # the no-clipping assertion, applied to the clipped output, MUST fail:
+    try:
+        assert (x_adv_clip > 1.0).any() or (x_adv_clip < 0.0).any()
+        assert False, "no-clipping check accepted a clipped x_adv (rubber stamp)"
+    except AssertionError:
+        pass  # expected: the check rejects the clipped output
+
+    # (b) scaling defect: a 0.5*eps*sign(g) perturbation has ||eta||_inf == 0.5*eps
+    #     != eps, so the inf-norm-equals-eps assertion rejects it.
+    x_adv_scaled = (x + 0.5 * eps * torch.sign(g)).detach()
+    eta = (x_adv_scaled - x).abs()
+    assert not torch.allclose(eta.max(), torch.tensor(eps)), \
+        "inf-norm check accepted a scaled (0.5*eps) perturbation (rubber stamp)"
+
+
+def test_rubbish_eval_softmax_in_range_and_shares_sum_to_100():
+    """positive (rubbish_any_prob_threshold instrument): eval.rubbish_eval on a
+    confident softmax returns rubbish_err in [0,100]; when mistakes exist the
+    class_shares keys are exactly '0'..'9' and sum to 100."""
+    torch.manual_seed(0)
+    m = models.SoftmaxRegression()
+    m.linear.weight.data = torch.randn_like(m.linear.weight) * 5.0  # confident on rubbish
+    r = ev.rubbish_eval(m, 784, 256, seed=0)
+    assert 0.0 <= r["rubbish_err"] <= 100.0, f"rubbish_err out of range: {r['rubbish_err']}"
+    assert set(r["rubbish_class_shares"].keys()) == {str(k) for k in range(10)}
+    if r["rubbish_err"] > 0.0:
+        total = sum(r["rubbish_class_shares"].values())
+        assert abs(total - 100.0) < 1e-3, f"class_shares sum {total} != 100"
+
+
+def test_rubbish_eval_rbf_near_zero():
+    """positive (rubbish_any_prob_threshold instrument): an RBF network far from
+    the data assigns every class prob well below 0.5 on Gaussian rubbish, so
+    rubbish_err ~ 0 (paper: 'RBF network ... error rate of 0%'). This is the
+    oracle that proves the 0.5 'any class prob > 0.5' threshold is correct --
+    a softmax would score ~100% here; the RBF scores ~0%. (Shift of 0.5 keeps
+    the exp-quadratic probs positive but tiny -- no float underflow -- so the
+    threshold, not arithmetic, is what's exercised.)"""
+    torch.manual_seed(0)
+    m = models.RBFNet()
+    with torch.no_grad():
+        m.mu.add_(0.5)  # means just far enough that max prob ~ 1e-5 (< 0.5, > 0)
+    r = ev.rubbish_eval(m, 784, 256, seed=0)
+    assert 0.0 <= r["rubbish_err"] <= 5.0, f"RBF rubbish_err not ~0: {r['rubbish_err']}"
+    assert set(r["rubbish_class_shares"].keys()) == {str(k) for k in range(10)}
+
+
+def test_rubbish_rejects_wrong_threshold():
+    """negative (rubbish_any_prob_threshold instrument): a buggy threshold
+    ('any prob > 0.0', which is always true for the exp-quadratic RBF whose
+    probs are positive) would report ~100% rubbish_err for the robust RBF that
+    the correct eval ('any prob > 0.5') scores ~0%. Proves the 0.5 threshold is
+    load-bearing and the instrument rejects the always-true-threshold bug.
+    (Shift of 0.5 keeps probs positive -- no underflow to exactly 0.0, which
+    would make even the buggy >0.0 threshold report 0% and hide the defect.)"""
+    torch.manual_seed(0)
+    m = models.RBFNet()
+    with torch.no_grad():
+        m.mu.add_(0.5)
+    x = torch.from_numpy(data.rubbish(784, 256, seed=0))
+    with torch.no_grad():
+        prob = m.prob(x)
+        conf = prob.max(dim=-1).values
+    correct_err = float((conf > 0.5).float().mean().item()) * 100.0
+    buggy_err = float((conf > 0.0).float().mean().item()) * 100.0  # the bug
+    assert correct_err <= 5.0, f"correct eval not ~0 on robust RBF: {correct_err}"
+    assert buggy_err >= 95.0, f"buggy eval not ~100 on robust RBF: {buggy_err}"

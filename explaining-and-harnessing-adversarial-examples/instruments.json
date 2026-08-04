@@ -1,115 +1,68 @@
 {
-  "_doc": "Every instrument that decides whether an output is correct: a grader, scorer, equivalence check, or data loader. Each has a positive_test (proves it accepts a known-correct input) and a negative_test (proves it rejects a known-wrong one). Test commands use sys.executable (the venv interpreter at .venv/bin/python); any subprocess inside a test also uses sys.executable, never bare `python`. A grader that cannot run MUST raise, never return a false verdict. Run a single node: `.venv/bin/python -m pytest <node> -q`. A top-level `not_applicable` is reserved for the single case where NOTHING in this reproduction judges an output; when present it is one sentence saying why. A per-instrument exemption is NOT put there — it is put ON the instrument itself, as `\"not_applicable\": {\"reason\": ...}`, so the other instruments still run.",
-  "_run_command_template": "{sys.executable} -m pytest {node} -q   (in this sandbox: .venv/bin/python -m pytest {node} -q)",
   "instruments": [
     {
-      "name": "mnist_data_loader",
-      "what_it_decides": "What dataset every arm runs on. Fingerprints the paper's own MNIST by (a) raw IDX file sha256, (b) label vocabulary {0..9} + the canonical per-class histogram, (c) size/shape (60000 train / 10000 test, 784-dim, float32 in [0,1]) and the 50000/10000 split. A synthetic or corrupted corpus is REJECTED, so a closed-book fallback to chance-level numbers cannot pass undetected.",
-      "positive_test": "tests/test_data_fingerprint.py::test_load_mnist_shapes_range_and_split",
-      "negative_test": "tests/test_data_fingerprint.py::test_mnist_raw_files_fingerprint",
-      "requires_tools": "external: MNIST raw IDX files under mnist/ (downloaded by fgsm_repro.data from cvdf-datasets / ossci S3 mirrors). If absent the loader raises, not silently substitutes."
+      "name": "data_loader_mnist",
+      "what_it_decides": "Whether the MNIST dataset loaded by data.load_mnist matches the paper's own dataset by fingerprint -- size (50k/10k/10k x 784), vocabulary (labels exactly {0..9}), pixel range ([0,1] f32), and a checksum (pixel sums) that a synthetic / all-zeros / wrong-corpus substitute cannot match. A closed-book run that fell back to a 65-token synthetic corpus passed every downstream gate and meant nothing; this fingerprint prevents that. data.check_mnist_fingerprint (called inside load_mnist) raises AssertionError on any mismatch, never returns a boolean. data.check_mnist_3v7_fingerprint verifies the 3-vs-7 subset (only {-1,+1}, +1 == digit 3).",
+      "positive_test": "tests/test_data_loader.py::test_mnist_real",
+      "negative_test": "tests/test_data_loader.py::test_mnist_rejects_synthetic",
+      "requires_tools": "network (MNIST IDX download from ossci-datasets S3 mirror)"
     },
     {
-      "name": "eval_clean",
-      "what_it_decides": "Clean classification accuracy = mean(argmax(logits)==y) (binary: sign(score)). Decides whether a model's clean prediction is correct. Empty input raises (test_eval_clean_raises_on_empty), never returns a vacuous 0.0.",
-      "positive_test": "tests/test_instruments.py::test_eval_clean_positive_known_correct",
-      "negative_test": "tests/test_instruments.py::test_eval_clean_negative_known_wrong"
+      "name": "data_loader_cifar10",
+      "what_it_decides": "Whether CIFAR-10 loaded by data.load_cifar10 is the real dataset by fingerprint -- size (45k/5k/10k x 3072), vocabulary (labels {0..9} int64), dtype float32, and GLOBAL std of x_train ~0.5 (within 0.04), the GCN preprocessing target (paper footnote 2, tex:343-345). data.check_cifar10_fingerprint (called inside load_cifar10) raises on a non-GCN array (std ~1.0) or a wrong-dim array (e.g. 1024).",
+      "positive_test": "tests/test_data_loader.py::test_cifar10_real",
+      "negative_test": "tests/test_data_loader.py::test_cifar10_rejects_synthetic",
+      "requires_tools": "network (CIFAR-10 download from cs.toronto.edu)",
+      "status_note": "In this run the CIFAR download is truncated (cs.toronto.edu stalled; data/cifar-10-python.tar.gz is partial and load_cifar10 raises EOFError). The positive test skips with that reason and the cifar_conv_maxout arm is marked BLOCKED in measured.json rather than substituted with synthetic data. The negative test (fingerprint rejects synthetic) runs without the download."
     },
     {
-      "name": "grader_must_raise_on_empty",
-      "what_it_decides": "No-success-on-empty contract (SPEC \u00a711): a grader fed an EMPTY input set must RAISE, never return a vacuous 0.0/nan verdict that propagates as if it were a real number. Covers eval_clean, eval_clean_confidence_rbf, and the three eval_rubbish* graders (eval_rubbish / eval_rubbish_rbf / eval_rubbish_sigmoid). The negative arm proves each RAISES on a zero-length input; the positive arm proves a normal (non-empty) input still produces a real verdict. This is the contract the no-success-on-empty oracle exists to enforce \u2014 a fit/eval that silently emits OK/0.0/nan on nothing is indistinguishable from the method never having run.",
-      "positive_test": "tests/test_instruments.py::test_eval_metrics_positive_all_correct",
-      "negative_test": "tests/test_instruments.py::test_eval_clean_confidence_rbf_raises_on_empty"
+      "name": "numbers_gate",
+      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by=numbers_gate.py stamp. A blocked or failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict. claims_result.json is written BY the gate and never by hand -- its produced_by stamp exists for exactly this reason.",
+      "positive_test": "tests/test_numbers_gate.py::test_gate_positive_known_correct",
+      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong",
+      "additional_tests": [
+        "tests/test_numbers_gate.py::test_gate_blocked_metric_not_silent_pass",
+        "tests/test_numbers_gate.py::test_gate_raises_on_unusable_input"
+      ],
+      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate is exercised through sys.executable in an isolated temp dir (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here. The negative_test is the canonical known-wrong case (verdict 'fail'); the additional_tests cover the two other negative paths the contract names -- a blocked metric is never a silent 'pass' and a grader that cannot run raises a traceback rather than a verdict."
     },
     {
-      "name": "eval_fgsm_error_and_confidence",
-      "what_it_decides": "Adversarial error_rate (fraction of ALL examples misclassified on the model's own FGSM examples) and mean_confidence_on_errors (softmax prob of the predicted class, averaged over the MISCLASSIFIED subset only; 0.0 when none wrong). This is the metric behind every FGSM-error claim (M1/M2/M3/M6/M7).",
-      "positive_test": "tests/test_instruments.py::test_eval_metrics_positive_all_correct",
-      "negative_test": "tests/test_instruments.py::test_eval_metrics_negative_all_wrong_and_confidence_only_on_errors"
+      "name": "logreg_analytic_equivalence",
+      "what_it_decides": "c07: that FGSM is exact for logistic regression -- the analytic closed form zeta(y*(eps*||w||_1 - w.x - b)) equals the actual adversarial loss under the paper's perturbation eta = -eps*sign(w) (tex:407-411). The positive test asserts |FGSM-form loss - analytic-form loss| < 1e-3 on a fixed batch; the negative test asserts the WRONG-sign analytic form (+eps*||w||_1, which increases the margin) does NOT match, proving the check rejects a known-wrong closed form.",
+      "positive_test": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form",
+      "negative_test": "tests/test_invariants.py::test_logreg_analytic_wrong_sign_differs",
+      "requires_tools": "none"
     },
     {
-      "name": "eval_fgsm_attack",
-      "what_it_decides": "The FGSM attack+eval end-to-end: at eps=0 it equals the clean error (limiting case), at eps>0 it increases error (the paper's central phenomenon). Guards against an attack that ignores the perturbation.",
-      "positive_test": "tests/test_instruments.py::test_eval_fgsm_positive_eps0_equals_clean",
-      "negative_test": "tests/test_instruments.py::test_eval_fgsm_negative_eps_moves_error"
+      "name": "fgsm_inf_norm",
+      "what_it_decides": "That the FGSM perturbation satisfies ||eta||_inf == eps exactly (tex:309) with sign(0):=0 and NO clipping of x_adv (SPEC sec 4.9: x_adv may exceed [0,1]). The positive tests assert max|eta| == eps, every perturbed pixel is exactly eps, and x_adv is not clipped; the negative test asserts a clipping implementation and a scaled (0.5*eps) perturbation are both rejected by those assertions.",
+      "positive_test": "tests/test_invariants.py::test_fgsm_inf_norm_equals_eps",
+      "negative_test": "tests/test_invariants.py::test_fgsm_rejects_clipping_and_scaling",
+      "additional_tests": [
+        "tests/test_invariants.py::test_fgsm_no_clipping"
+      ],
+      "requires_tools": "none"
     },
     {
-      "name": "eval_transfer",
-      "what_it_decides": "Cross-model transfer: craft FGSM on a source model, score on a target. Self-transfer equals own FGSM (positive); an independent target gives a valid, separately-computed metric (negative proves the target is actually used). Backs the M6 transfer claims.",
-      "positive_test": "tests/test_instruments.py::test_eval_transfer_positive_self_transfer_equals_own_fgsm",
-      "negative_test": "tests/test_instruments.py::test_eval_transfer_negative_independent_target"
+      "name": "degeneracy_check",
+      "what_it_decides": "That the method at its no-op setting reproduces the baseline EXACTLY (bit-identical weights via torch.equal): adversarial eps=0, noise eps=0, and L1 coef=0 each reduce to plain training. The cheapest real correctness evidence -- catches a mis-wired adversarial/noise/L1 loop in seconds. The negative test asserts that with eps>0 (a genuinely non-degenerate run) the weights DIFFER from baseline, so the check is sensitive to a leak rather than a rubber stamp.",
+      "positive_test": "tests/test_degeneracy.py::test_adversarial_eps0_equals_baseline_exact",
+      "negative_test": "tests/test_degeneracy.py::test_degeneracy_detects_nonzero_eps",
+      "additional_tests": [
+        "tests/test_degeneracy.py::test_noise_eps0_equals_baseline_exact",
+        "tests/test_degeneracy.py::test_l1_coef0_equals_baseline_exact"
+      ],
+      "requires_tools": "none"
     },
     {
-      "name": "class_agreement",
-      "what_it_decides": "Cross-model class agreement (tex:679-688): over m1's FGSM-error subset, how often m2 picks m1's (wrong) class; and over the both-wrong subset. Identical models agree perfectly (positive); an independent model does not (negative). Backs the M8 agreement claims.",
-      "positive_test": "tests/test_instruments.py::test_class_agreement_positive_identical_models_agree_on_class",
-      "negative_test": "tests/test_instruments.py::test_class_agreement_negative_independent_model_not_perfect"
-    },
-    {
-      "name": "rbf_confidence_grader",
-      "what_it_decides": "RBF UNNORMALIZED per-class confidence exp(q_k) (SPEC \u00a76 item 9): high at a class centre, decaying toward 0 off-manifold. This is the only reading that can reproduce the paper's 1.2% conf-on-mistakes / 60.6% clean-confidence / 0% rubbish-error (a softmax reading is bounded below by 1/K and cannot). Backs the M8/M9 RBF claims.",
-      "positive_test": "tests/test_instruments.py::test_rbf_confidence_positive_decays_off_manifold",
-      "negative_test": "tests/test_instruments.py::test_rbf_confidence_positive_decays_off_manifold"
-    },
-    {
-      "name": "rubbish_sampler_and_fooling_step",
-      "what_it_decides": "Rubbish-example instrument (appendix, tex:905-954): sample_rubbish draws x~N(0,I_dim); fooling_sign_step takes a gradient-sign step raising a target class's probability. Standard-normal (positive, known mean 0 / var 1) vs non-constant (negative). Backs the M9 rubbish claims.",
-      "positive_test": "tests/test_instruments.py::test_sample_rubbish_positive_standard_normal",
-      "negative_test": "tests/test_instruments.py::test_sample_rubbish_negative_not_constant"
-    },
-    {
-      "name": "e6_closed_form_oracle",
-      "what_it_decides": "The closed-form worst-case adversarial logistic loss E6 = E zeta(y(eps*||w||_1 - w^T x - b)) (tex:410-412). Used as a constructed-truth oracle: it equals the empirical FGSM loss for y=+1 (positive, same-quantity-two-ways) and is >= the clean loss (negative, worst-case not best-case).",
-      "positive_test": "tests/test_instruments.py::test_e6_positive_matches_empirical_fgsm_positive_class",
-      "negative_test": "tests/test_instruments.py::test_e6_negative_is_worst_case_not_best_case"
-    },
-    {
-      "name": "degeneracy_equivalence_check",
-      "what_it_decides": "Equivalence: the FGSM adversarial-training method (E7) at its no-op eps=0 reproduces the baseline (clean training) EXACTLY at the cost level, the training-state level, and the CLI level. The cheapest real correctness evidence; a wrong implementation diverges here in seconds. The negative arm (dropout ON) shows the check is meaningful \u2014 with dropout the two DO diverge, so the no-op equality is not a tautology.",
-      "positive_test": "tests/test_degeneracy.py::test_train_degeneracy_eps0_equals_baseline_bitidentical",
-      "negative_test": "tests/test_degeneracy.py::test_train_degeneracy_drops_with_dropout_on"
-    },
-    {
-      "name": "fgsm_perturbation_invariants",
-      "what_it_decides": "Structural invariants of the FGSM attack itself: ||eta||_inf == eps, no clipping, eps=0 identity, sign(0)=0 convention. These are equivalence checks on the attack's own output, independent of any trained model.",
-      "positive_test": "tests/test_invariants.py::test_fgsm_perturbation_norm_equals_eps",
-      "negative_test": "tests/test_invariants.py::test_fgsm_no_clipping"
-    },
-    {
-      "name": "numbers_gate_scalar_evaluator",
-      "what_it_decides": "Whether a scalar claim (ordering/value/existence/invariant) holds: resolves measured.<arm>.<metric> tokens from measured.json at every seed and evaluates the claim arithmetic; missing data BLOCKS, never fabricates. A one-element [*] pointer collapses to a scalar; a multi-element [*] is ambiguous and BLOCKS. The gate's own clean run over the 34 scalar claims is an additional positive signal (claims_result.json: 34 pass / 3 annotated low fails, 19/19 high).",
-      "positive_test": "tests/test_measured_resolver.py::test_single_element_list_pointer_collapses_to_scalar",
-      "negative_test": "tests/test_measured_resolver.py::test_multi_element_list_pointer_is_blocked"
-    },
-    {
-      "name": "numbers_gate_curve_evaluator",
-      "what_it_decides": "Whether a figure 'curve' claim holds (a curve rises, crosses, stays above/below, matches): resolves quantity/against/x SEQUENCES from the arm's per-seed result files (results/_per_seed/), restricts to the figure-read x_range, evaluates the comparison at every seed, and BLOCKS on missing/non-sequence data. Backs the Figure-4 claims fc1..fc3. The module tests/test_curve_gate.py exercises crosses/below/increasing/matches and every-seed-must-pass plus missing-file-blocks; the named positive/negative pair below is the canonical known-correct/known-wrong pair for the crosses comparison (fc1).",
-      "positive_test": "tests/test_curve_gate.py::test_crosses_positive",
-      "negative_test": "tests/test_curve_gate.py::test_crosses_negative_no_crossing"
-    },
-    {
-      "name": "claims_quote_verifier",
-      "what_it_decides": "Whether every claim's quote is a VERBATIM substring of paper/source/iclr2015.tex starting at the line its citation names; whether claim kinds carry their required arithmetic fields; whether compute-invariance counts are truthful; whether every arm metric pointer resolves in the shipped results. A non-verbatim quote, a stale count, a shifted citation line, or an unresolvable pointer each fail loudly (never a silent negative verdict).",
-      "positive_test": "tests/test_claims_integrity.py::test_every_claim_quote_is_verbatim_at_cited_line",
-      "negative_test": "tests/test_claims_integrity.py::test_claims_verifier_rejects_bad_quote_count_line_pointer"
-    },
-    {
-      "name": "mp_dbm_generative_inference",
-      "what_it_decides": "Whether a generative model (the paper's MP-DBM, tex:827-833) is resistant to FGSM adversarial examples. Not implemented in this reproduction; the matching claim is settled as not-tested/BLOCKED in claims.json, not graded here.",
-      "not_applicable": {
-        "reason": "We do not implement MP-DBM inference, so no grader here judges a generative model's adversarial robustness; the tex:827-833 claim (97.5% on FGSM) is not_tested in claims.json. Exempted ON this instrument only — every other instrument above still runs."
-      },
-      "positive_test": null,
-      "negative_test": null
-    },
-    {
-      "name": "cifar10_loader",
-      "what_it_decides": "What CIFAR-10 dataset the conv-maxout arm (tex:341) and the CIFAR rubbish arm (tex:911-912) run on, and the fingerprints that would reject a synthetic substitute. Not implemented in this reproduction.",
-      "not_applicable": {
-        "reason": "CIFAR-10 arms are excluded by the scope fixed in SPEC §1; no CIFAR-10 loader or grader is implemented, and the CIFAR claims are not_tested in claims.json. Exempted ON this instrument only — every other instrument above still runs."
-      },
-      "positive_test": null,
-      "negative_test": null
+      "name": "rubbish_any_prob_threshold",
+      "what_it_decides": "Whether a model assigns any class probability > 0.5 to Gaussian rubbish inputs (tex:905-911). For softmax-top: max_k p_k > 0.5; for sigmoid-top / RBF (rows need not sum to 1): any p_k > 0.5 (equivalently max_k p_k > 0.5). The 0.5 threshold is load-bearing: a softmax scores ~100% rubbish error (the paper's result) while an RBF far from data scores ~0% -- the RBF-zero assertion is the oracle that proves the threshold is correct. The negative test shows a buggy threshold (>0.0, always true for exp-quadratic RBF) would mis-report the robust RBF as ~100% error, which the correct eval rejects.",
+      "positive_test": "tests/test_invariants.py::test_rubbish_eval_rbf_near_zero",
+      "negative_test": "tests/test_invariants.py::test_rubbish_rejects_wrong_threshold",
+      "additional_tests": [
+        "tests/test_invariants.py::test_rubbish_eval_softmax_in_range_and_shares_sum_to_100"
+      ],
+      "requires_tools": "none"
     }
   ]
 }

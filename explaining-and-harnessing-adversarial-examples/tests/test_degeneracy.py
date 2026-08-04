@@ -1,151 +1,105 @@
-"""Degeneracy test — the cheapest real correctness evidence.
+"""Degeneracy test (research-code skill): the method at its no-op setting must
+reproduce the baseline EXACTLY.
 
-The FGSM adversarial-training method (Algorithm B, E7) has a no-op setting:
-``eps = 0``.  There ``x + 0*sign(grad) == x`` exactly, so
+For FGSM adversarial training the no-op setting is eps=0: the adversarial
+example x_adv = x + 0*sign(g) = x, so the adversarial training loss
+J_tilde = alpha*J(x) + (1-alpha)*J(x) = J(x) — identical to plain training.
+A model trained with adversarial eps=0 must therefore match a model trained
+without adversarial training, bit-identically, given the same seed and data
+order.
 
-    J~(theta, x, y) = alpha J + (1-alpha) J(x) = J(theta, x, y)
-
-and the method MUST reproduce the baseline (clean training) EXACTLY.  This
-file asserts that at two levels:
-
-  1. Cost level: ``adversarial_train_cost(..., eps=0) == cross_entropy_cost``
-     bit-for-bit (E7 reduces to J).
-  2. Training level: ``train(adv_train=True, eps=0)`` and ``train(adv_train=False)``
-     produce bit-identical ``best_state_dict`` under the same seed (dropout OFF
-     so no mask divergence).
-  3. CLI level: ``run_experiment.py --lambda 0`` (the method at its no-op,
-     arm ``adversarial``) and ``run_experiment.py --baseline`` (clean
-     reference, arm ``baseline``) print lines whose accuracy VALUE is
-     identical (``FINAL adversarial=<v>`` == in value to ``FINAL baseline=<v>``;
-     the arm name differs by construction, the value must match bit-for-bit).
-
-If any of these fails the implementation is wrong — and we know in seconds,
-without a full paper-scale run.  (research-code skill: "the most valuable
-test in research code, and the one most often skipped".)
+This is the cheapest real correctness evidence: it catches a mis-wired
+adversarial-training loop (e.g. gradients leaking through sign, or the
+adversarial half using the wrong batch) in seconds, without a full run.
 """
-from __future__ import annotations
-
-import subprocess
+import os
 import sys
-from pathlib import Path
 
+import numpy as np
 import torch
 
-REPRO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPRO_ROOT / "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fgsm_repro.models import MaxoutMLP, SoftmaxRegression
-from fgsm_repro.objectives import adversarial_train_cost, cross_entropy_cost
-from fgsm_repro.train import TrainConfig, train
+import data, models, train
 
 
-def _tiny_data(n_train=200, n_valid=80, n_test=80, seed=0):
-    from fgsm_repro.data import MNISTData
-    g = torch.Generator().manual_seed(seed)
-    def make(n):
-        x = torch.rand(n, 784, generator=g, dtype=torch.float32)
-        y = torch.randint(0, 10, (n,), generator=g, dtype=torch.int64)
-        x[torch.arange(n), y] += 0.5
-        return x, y
-    return MNISTData(x_train=make(n_train)[0], y_train=make(n_train)[1],
-                     x_valid=make(n_valid)[0], y_valid=make(n_valid)[1],
-                     x_test=make(n_test)[0], y_test=make(n_test)[1])
+def _tiny_data():
+    d = data.load_mnist(0)
+    t = {k: torch.from_numpy(v) for k, v in d.items()}
+    t["x_train"] = t["x_train"][:600]
+    t["y_train"] = t["y_train"][:600]
+    t["x_val"] = t["x_val"][:300]
+    t["y_val"] = t["y_val"][:300]
+    return t
 
 
-def _state_equal(a, b):
-    if set(a.keys()) != set(b.keys()):
-        return False
-    for k in a:
-        ta, tb = a[k], b[k]
-        if ta.dtype != tb.dtype or ta.shape != tb.shape or not torch.equal(ta, tb):
-            return False
-    return True
+def _fresh(seed):
+    torch.manual_seed(seed)
+    return models.SoftmaxRegression()
 
 
-def test_cost_degeneracy_eps0_equals_clean():
-    """E7 at eps=0 must equal J exactly (bit-for-bit)."""
-    torch.manual_seed(0)
-    m = SoftmaxRegression(784, 10)
-    x = torch.rand(8, 784)
-    y = torch.randint(0, 10, (8,))
-    Jc = cross_entropy_cost(m, x, y)
-    Jadv = adversarial_train_cost(m, x, y, 0.0, 0.5)
-    assert torch.equal(Jc, Jadv), f"E7(eps=0)={Jadv} != J={Jc}"
+def test_adversarial_eps0_equals_baseline_exact():
+    """eps=0 adversarial training == plain training, bit-identical weights."""
+    d = _tiny_data()
+    cfg_base = {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 0, "momentum": 0.0}
+    m_base = _fresh(0)
+    h_base = train.train(m_base, d, dict(cfg_base))
+    m_adv = _fresh(0)
+    cfg_adv = dict(cfg_base)
+    cfg_adv["adversarial"] = {"alpha": 0.5, "eps": 0.0}
+    h_adv = train.train(m_adv, d, cfg_adv)
+    # weights must match exactly
+    for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_adv.state_dict().items()):
+        assert k1 == k2
+        assert torch.equal(v1, v2), f"weights differ at {k1} under eps=0 (degeneracy broken)"
+    # and the loss curves match
+    assert h_base["val_err"] == h_adv["val_err"], "val_err curves differ under eps=0"
 
 
-def test_train_degeneracy_eps0_equals_baseline_bitidentical():
-    """train(adv_train=True, eps=0) == train(adv_train=False) bit-identical.
-
-    Dropout OFF (include 1.0/1.0) so no mask divergence between the method's
-    extra forward and the clean forward.  This is the degeneracy the
-    run_experiment.py harness relies on (SPEC.md section 6 item 22).
-    """
-    data = _tiny_data()
-    common = dict(batch_size=32, lr=0.1, momentum=0.5, max_epochs=10, seed=0,
-                  max_steps=5, early_stop="clean", patience=100)
-    torch.manual_seed(0)
-    m_clean = MaxoutMLP(units=8, pieces=2, dropout_input_include=1.0,
-                        dropout_hidden_include=1.0, seed=0)
-    res_clean = train(m_clean, TrainConfig(adv_train=False, eps=0.25, **common), data)
-    torch.manual_seed(0)
-    m_adv = MaxoutMLP(units=8, pieces=2, dropout_input_include=1.0,
-                      dropout_hidden_include=1.0, seed=0)
-    res_adv = train(m_adv, TrainConfig(adv_train=True, eps=0.0, **common), data)
-    assert res_clean.steps_run == res_adv.steps_run == 5
-    assert _state_equal(res_clean.best_state_dict, res_adv.best_state_dict), (
-        "Degeneracy FAILED: method at eps=0 != baseline under same seed")
+def test_noise_eps0_equals_baseline_exact():
+    """eps=0 noise (rademacher/uniform) == plain training, bit-identical."""
+    d = _tiny_data()
+    cfg_base = {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 1, "momentum": 0.0}
+    m_base = _fresh(1)
+    train.train(m_base, d, dict(cfg_base))
+    for ntype in ("rademacher", "uniform"):
+        m_n = _fresh(1)
+        cfg_n = dict(cfg_base)
+        cfg_n["noise"] = {"type": ntype, "eps": 0.0}
+        train.train(m_n, d, cfg_n)
+        for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_n.state_dict().items()):
+            assert torch.equal(v1, v2), f"weights differ under {ntype} eps=0 at {k1}"
 
 
-def test_train_degeneracy_drops_with_dropout_on():
-    """Sanity (not a failure gate): with dropout ON the method's extra forward
-    draws a different mask, so eps=0 no longer reproduces the baseline
-    bit-for-bit.  This documents WHY run_experiment.py disables dropout by
-    default.  We assert the divergence is non-zero (the degeneracy mechanism
-    is dropout-mask divergence, not a no-op)."""
-    data = _tiny_data()
-    common = dict(batch_size=32, lr=0.1, momentum=0.5, max_epochs=10, seed=0,
-                  max_steps=5, early_stop="clean", patience=100)
-    torch.manual_seed(0)
-    m_clean = MaxoutMLP(units=8, pieces=2, dropout_input_include=0.8,
-                        dropout_hidden_include=0.5, seed=0)
-    res_clean = train(m_clean, TrainConfig(adv_train=False, eps=0.25, **common), data)
-    torch.manual_seed(0)
-    m_adv = MaxoutMLP(units=8, pieces=2, dropout_input_include=0.8,
-                      dropout_hidden_include=0.5, seed=0)
-    res_adv = train(m_adv, TrainConfig(adv_train=True, eps=0.0, **common), data)
-    assert not _state_equal(res_clean.best_state_dict, res_adv.best_state_dict), (
-        "Expected dropout-on eps=0 to diverge from baseline (mask divergence)")
+def test_l1_coef0_equals_baseline_exact():
+    """L1 coef=0 == plain training, bit-identical."""
+    d = _tiny_data()
+    cfg_base = {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 2, "momentum": 0.0}
+    m_base = _fresh(2)
+    train.train(m_base, d, dict(cfg_base))
+    m_l1 = _fresh(2)
+    cfg_l1 = dict(cfg_base)
+    cfg_l1["l1_first_layer"] = 0.0
+    train.train(m_l1, d, cfg_l1)
+    for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_l1.state_dict().items()):
+        assert torch.equal(v1, v2), f"weights differ under L1 coef=0 at {k1}"
 
 
-def test_run_experiment_cli_degeneracy():
-    """CLI: `run_experiment.py --lambda 0` (method at no-op, arm `adversarial`)
-    must print the SAME accuracy VALUE as `--baseline` (arm `baseline`).
-    The arm names differ by construction; the float value must match
-    bit-for-bit (eps=0 => x_tilde==x => J~==J => identical training)."""
-    runner = REPRO_ROOT / "run_experiment.py"
-    env = {"PYTHONPATH": str(REPRO_ROOT / "src")}
-    common = ["--steps", "5", "--units", "16", "--seed", "0"]
-    r1 = subprocess.run([sys.executable, str(runner), "--lambda", "0", *common],
-                        capture_output=True, text=True, cwd=str(REPRO_ROOT), env=env)
-    r2 = subprocess.run([sys.executable, str(runner), "--baseline", *common],
-                        capture_output=True, text=True, cwd=str(REPRO_ROOT), env=env)
-    assert r1.returncode == 0 and r2.returncode == 0, (r1.stderr, r2.stderr)
-    line1 = r1.stdout.strip().splitlines()[-1]
-    line2 = r2.stdout.strip().splitlines()[-1]
-    assert line1.startswith("FINAL adversarial="), line1
-    assert line2.startswith("FINAL baseline="), line2
-    v1 = line1.split("=", 1)[1]
-    v2 = line2.split("=", 1)[1]
-    assert v1 == v2, f"CLI degeneracy: method eps=0 value='{v1}' != baseline value='{v2}'"
-
-
-def test_run_experiment_cli_determinism():
-    """Same args twice -> identical output (seed control)."""
-    runner = REPRO_ROOT / "run_experiment.py"
-    env = {"PYTHONPATH": str(REPRO_ROOT / "src")}
-    args = ["--lambda", "0.25", "--steps", "5", "--units", "16", "--seed", "0"]
-    r1 = subprocess.run([sys.executable, str(runner), *args],
-                        capture_output=True, text=True, cwd=str(REPRO_ROOT), env=env)
-    r2 = subprocess.run([sys.executable, str(runner), *args],
-                        capture_output=True, text=True, cwd=str(REPRO_ROOT), env=env)
-    assert r1.stdout.strip() == r2.stdout.strip(), "non-deterministic CLI"
+def test_degeneracy_detects_nonzero_eps():
+    """negative (degeneracy_check instrument): with eps>0 the adversarial loop
+    is NOT a no-op (x_adv != x), so the trained weights MUST differ from the
+    baseline -- the degeneracy assertion (torch.equal) would reject it. Proves
+    the check is sensitive to a genuinely non-degenerate run (a loop that leaks
+    a perturbation even at its claimed no-op setting), not just a rubber stamp
+    that passes everything."""
+    d = _tiny_data()
+    cfg = {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 0, "momentum": 0.0}
+    m_base = _fresh(0)
+    train.train(m_base, d, dict(cfg))
+    m_adv = _fresh(0)
+    cfg_adv = dict(cfg)
+    cfg_adv["adversarial"] = {"alpha": 0.5, "eps": 0.05}  # genuinely perturbs
+    train.train(m_adv, d, cfg_adv)
+    differs = any(not torch.equal(v1, v2)
+                  for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_adv.state_dict().items()))
+    assert differs, "eps>0 adversarial training gave bit-identical weights -- degeneracy check cannot detect a leak"

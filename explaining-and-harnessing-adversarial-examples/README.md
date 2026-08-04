@@ -1,183 +1,124 @@
 # Reproduction: Explaining and Harnessing Adversarial Examples
 
-Reproduction of **"Explaining and Harnessing Adversarial Examples"** (Ian J.
-Goodfellow, Jonathon Shlens, Christian Szegedy; ICLR 2015, arXiv:1412.6572).
+Reproduction of **Goodfellow, Shlens & Szegedy, "Explaining and Harnessing
+Adversarial Examples", ICLR 2015** (arXiv:1412.6572v3).
 
-The paper's central method is the **Fast Gradient Sign Method (FGSM)**: given a
-model with training cost `J(θ, x, y)`, the worst-case max-norm-constrained
-perturbation of an input is, to first order,
+The paper introduces the **fast gradient sign method (FGSM)** —
 
 ```
-η = ε · sign( ∇ₓ J(θ, x, y) )        # the fast gradient sign method
-x̃ = x + η                            # NOT clipped back to the pixel range
+η = ε · sign(∇ₓ J(θ, x, y)) ,   x̃ = x + η
 ```
 
-so `||η||_∞ == ε` exactly. Applied to a trained model this turns clean
-inputs into adversarial inputs with high misclassification rate; mixed into
-training (`J̃ = α·J(θ,x,y) + (1−α)·J(θ, x+ε·sign(∇ₓJ(θ,x,y)))`, `α = 0.5`) it
-acts as a regularizer. We reproduce the MNIST core of the paper: softmax
-regression, logistic regression (3-vs-7), maxout networks, adversarial
-training, RBF networks, and the rubbish/fooling examples. See `SPEC.md` for
-the full specification (algorithms, shapes, equation citations, and the long
-list of choices the paper leaves unstated) and `REPRODUCTION.md` for the
-running log and target numbers.
+— and **FGSM adversarial training** —
 
-## What this repo contains
+```
+J̃(θ, x, y) = α J(θ, x, y) + (1 − α) J(θ, x + ε sign(∇ₓ J(θ, x, y)), y) ,   α = 0.5
+```
 
-- `src/fgsm_repro/` — the implementation (models, attacks, objectives,
-  train, eval). *(Added by the implementation step.)*
-- `run_experiment.py` — the graded-harness runner. `--baseline` (clean maxout
-  training) or `--lambda EPS` (FGSM adversarial training, Algorithm B); prints
-  exactly one line `FINAL <arm>=<clean test accuracy>`. `--lambda 0` (the method
-  at its no-op) prints the same accuracy VALUE as `--baseline` (the degeneracy
-  contract, tested by `tests/test_degeneracy.py`).
-- `arms.json` — the gate contract: a flat map `{"baseline": "<cmd>",
-  "adversarial": "<cmd>"}` from each arm the gate runs to the shell command
-  that produces it. The two arms are the paper's headline M4 comparison
-  (tex:492-494). The rich per-milestone metadata is in `arms_metadata.json`,
-  and the full 14-arm numbers-gate map (arm → `command_per_seed`, results file,
-  metric pointers) is `claims.json`.
-- `run_all_arms.sh` — runs **every arm** of `claims.json` (14 arms: M1–M9, E1,
-  the L1 control, F4 the Figure-4 eps-curve; m5 and m7 each contribute two arms
-  from one command) at
-  **every seed** in `claims.json['seeds']` (`[0, 1, 2]`), via `make_measured.py`.
-  It writes `measured.json` (`{arm: {seed: {metric: value}}}`) and prints exactly
-  one `FINAL <arm>=<value>` line per arm to stdout (BLOCKED if the environment
-  cannot produce it). m5's paper-full config (1600 units / patience 100 / 5
-  seeds) is infeasible on this CPU, so `make_measured.py` runs it at the
-  documented sub-scale (`--units 240 --epochs 12`); the m5 headline *magnitude*
-  (0.782%) is rated `compute_invariance=low` in claims.json, the HIGH m5 claim
-  is the *direction* (adversarial training ≤ baseline), which the sub-scale
-  reproduces at every seed. Runtime ~20–25 min on this CPU; real MNIST
-  throughout (no synthetic fallback).
-- `make_measured.py` — the harness `run_all_arms.sh` delegates to. Runs each
-  arm's `command_per_seed` at each seed (concurrent, writing per-seed result
-  files via `--out` so runs never clobber), resolves every metric from each
-  result via the `claims.json` `<results json>:<json path>` pointer (handles
-  dotted keys like `l1_0.0025` and the `per_seed[*]` array wildcard), and
-  writes `measured.json`. `--assemble-only` rebuilds it from the per-seed
-  files without re-running.
-- `smoke.sh` — the same code path at 200 steps (~3s); a path-prover only,
-  never evidence about the paper.
-- `experiments/` — one script per milestone: `m1_softmax.py`, `m2_logreg.py`,
-  `m3_maxout_fgsm.py`, `m4_adversarial.py`, `m5_large_advtrain.py`,
-  `m6_robustness_transfer.py`, `m7_noise_controls.py`, `m8_rbf.py`,
-  `m9_rubbish.py`, the L1 weight-decay control `m_l1_weight_decay.py`
-  (Section 5), and the extended `e1_ensemble.py`. `experiments/f4_eps_curve.py`
-  records the Figure-4 eps-sweep curve DATA (the gate settles the curve claims
-  fc1–fc3 against it) and `experiments/f4_plot.py` regenerates the Figure 4
-  panel from that committed data (no retraining). Each writes a parsed
-  result JSON to `results/` with the milestone id, all hyperparameters, seed,
-  and the grep-able paper target. Defaults are a documented **sub-scale** for
-  CPU feasibility; the CLI exposes the full-scale knobs (e.g.
-  `--units 1600 --epochs 100 --patience 100 --seeds 0,1,2,3,4` for M5).
-- `results/` — committed result JSONs (one per arm, the seed-0 mirror) plus
-  `results/_per_seed/` (every arm × every seed, the inputs to `measured.json`)
-  and `results/figures/` (the regenerated Figure-4 panels
-  `f4_eps_curve_repro{,_seed1,_seed2}.png` — for a reader to compare against
-  `paper/source/eps_curve.pdf`; NOT evidence, see REPRODUCTION.md). Results
-  are committed, not gitignored: a number whose output file is ignored
-  is a claim with its evidence deleted.
-- `tests/` — degeneracy, shape, invariant, constructed-truth, instrument, and
-  data-fingerprint tests (104 nodes). FGSM on a linear model must equal the
-  closed-form max-norm adversary; `||η||_∞ == ε`; `x̃ == x` when `ε == 0`; the
-  method at its no-op reproduces the baseline bit-for-bit; E6 is the brute-force
-  worst case; the MNIST loader is fingerprinted by sha/vocab/shape; the
-  regenerated Figure-4 panel's axis ranges/units are asserted against the
-  paper's figure (`tests/test_f4_figure.py`).
-- `instruments.json` / `mutations.json` — the instrument registry (every grader
-  with a positive+negative test) and the deliberate-defect suite (each defect
-  with a `must_fail` test node, all verified to fail under the defect and pass
-  on clean code). A top-level `not_applicable` is reserved for the single case
-  where nothing in the reproduction judges an output (one sentence); a
-  per-instrument exemption is put ON that instrument as
-  `"not_applicable": {"reason": ...}` so the rest still run (`mp_dbm_*` and
-  `cifar10_loader` are exempted this way).
-- `requirements.txt` — pinned dependencies (torch CPU, numpy, pytest, and the
-  full transitive closure).
-- `Dockerfile` — builds the environment from scratch.
-- `SPEC.md` / `REPRODUCTION.md` — specification and reproduction log.
-- `paper/paper.md` — the paper text (prose only; maths unreliable).
-- `paper/source/` — the authoritative arXiv LaTeX source (`iclr2015.tex`).
+This repo re-implements both from scratch (no usable author code exists — the
+paper's only code link is the dead, Theano/Pylearn2-based CIFAR preprocessing)
+and checks them against the paper's reported numbers on MNIST and CIFAR-10.
 
-## Environment
+> **Framework choice (ours, the paper is silent):** PyTorch (CPU). FGSM needs
+> the gradient of the cost w.r.t. the *input*; `torch.autograd.grad(loss, x)`
+> provides it. See `SPEC.md` §0 for why no upstream code is reused.
 
-- Python 3.12 or 3.13 (the Dockerfile builds on `python:3.13-slim`; verified in
-  two sandboxes: CPython 3.13.5 on 2026-07-30 and CPython 3.12.13 on 2026-08-04 —
-  the pinned wheels resolve identically and the full suite passes on both)
-- torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2, matplotlib 3.11.1
-  (figures only — regenerates the Figure-4 panel; Agg backend, no display)
-- CPU-only; no GPU required
+## What runs
+
+| Arm | Dataset | What it does | Status |
+|---|---|---|---|
+| `softmax_reg` | MNIST | linear softmax, FGSM ε=.25, rubbish | runs (3 seeds) |
+| `logreg_3v7` | MNIST 3v7 | logistic regression, FGSM, analytic-equivalence (c07) | runs (3 seeds) |
+| `maxout_naive` / `maxout_adv` | MNIST | 240-unit maxout MLP, ±FGSM adversarial training | runs (3 seeds) |
+| `maxout_large_naive` / `maxout_large_adv` | MNIST | 1600-unit maxout, ±adv training (5 seeds for adv) | runs (sub-scale: 6 epochs, no 60k retrain) |
+| `maxout_sigmoid` | MNIST | maxout + independent sigmoid top, rubbish | runs (3 seeds) |
+| `noise_rademacher` / `noise_uniform` | MNIST | ±ε / U(−ε,ε) noise controls | runs (3 seeds) |
+| `l1_maxout` | MNIST | L¹ weight-decay control (coef .0025, first layer) | runs (3 seeds) |
+| `rbf_shallow` | MNIST | 10 RBF units, FGSM, rubbish | runs (3 seeds) |
+| `ensemble12` | MNIST | 12-member mean-prob ensemble | runs (3 seeds) |
+| `agreement_mnist` | MNIST | cross-model label agreement on FGSM | runs (3 seeds) |
+| `transfer_mnist` | MNIST | FGSM transfer between large naive ↔ large adv | runs (3 seeds) |
+| `eps_trace` | MNIST | Figure 4 ε-sweep logit curve | runs (3 seeds) |
+| `cifar_conv_maxout` | CIFAR-10 | conv maxout, FGSM ε=.1, rubbish, fooling | **BLOCKED** (CIFAR download stalled) |
+
+Not built (see SPEC §9): MP-DBM, GoogLeNet/ImageNet Fig. 1 demo.
+
+## Numbers gate
+
+`numbers_gate.py` evaluates `claims.json` (70 claims, 19 high-invariance) against
+`measured.json` and writes `claims_result.json` (with a `produced_by` stamp —
+never hand-authored). Result on this run: **18/19 HIGH pass, 0 fail, 1 blocked**
+(the CIFAR arm). The gate is FAIL only because of the CIFAR download blocker;
+the 19 `low`/`medium` value fails are the tight claims (clean 0.94%, 0.782%)
+that need the paper's full GPU budget and are rated low/medium for this reason.
 
 ## Quickstart
 
-### With `uv` (recommended; matches the verified environment)
+You need Python 3.13 and [`uv`](https://github.com/astral-sh/uv) (Astral's
+Python package manager). On Debian/Ubuntu:
 
 ```bash
-# from this reproduction folder (.venv/ is gitignored — recreate it in every fresh sandbox,
-# otherwise `.venv/bin/python` does not exist)
+curl -fsSL https://astral.sh/uv/install.sh | sh
+```
+
+### 1. Create the environment (matches the gate exactly)
+
+```bash
 uv venv --python 3.13 .venv
 uv pip install --python .venv -r requirements.txt
-
-# verify the environment imports and the FGSM invariant holds
-.venv/bin/python -c "import torch,numpy,pytest; print('env OK', torch.__version__, numpy.__version__, pytest.__version__)"
-
-# run the tests
-.venv/bin/python -m pytest -q
-
-# run all 14 arms x 3 seeds and write measured.json (~18 min on CPU)
-./run_all_arms.sh          # prints one `FINAL <arm>=<headline value>` line per arm (14 lines)
-
-# adjudicate every claim against measured.json (writes claims_result.json)
-.venv/bin/python numbers_gate.py   # prints: FINAL gate=PASS  (HIGH 19/19)
-
-# smoke-prove the code path runs (~3s; NOT a paper result)
-./smoke.sh
-
-# run a milestone experiment, e.g. the softmax-regression FGSM arm (M1)
-.venv/bin/python experiments/m1_softmax.py
 ```
 
-### With plain pip + a system Python 3.13+
+### 2. Sanity-check the imports
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q
-.venv/bin/python experiments/m1_softmax.py
+.venv/bin/python -c "import torch, numpy, matplotlib, pytest; \
+print('torch', torch.__version__, '| numpy', numpy.__version__, \
+'| matplotlib', matplotlib.__version__, '| pytest', pytest.__version__)"
 ```
 
-### With Docker
+Expected (CPU torch):
+
+```
+torch 2.7.1+cpu | numpy 2.3.2 | matplotlib 3.11.1 | pytest 8.4.2
+```
+
+### 3. Run the tests
 
 ```bash
-docker build -t fgsm-repro .
-docker run --rm fgsm-repro                       # environment smoke test
-# once the implementation step wires the experiment runner:
-# docker run --rm fgsm-repro python experiments/m1_softmax.py
+.venv/bin/pytest -q
 ```
 
-## Target numbers (MNIST core)
+### 4. Run the arms and check the paper's numbers
 
-| Milestone | Experiment | Paper target |
-|-----------|------------|--------------|
-| M1 | Softmax regression, FGSM ε=0.25 | adv error 99.9%, mean conf 79.3% |
-| M2 | Logistic regression 3-vs-7, FGSM ε=0.25 | clean 1.6%, adv 99% |
-| M3 | Maxout 240×2 + dropout, FGSM ε=0.25 | adv error 89.4%, conf 97.6% |
-| M4 | Adversarial training of M3 (α=0.5, ε=0.25) | clean 0.94% → 0.84% |
-| M5 | Maxout 1600×2, adv-trained, 5 seeds | 1.14% → mean 0.782% |
-| M6 | Robustness/transfer of M5 model | 17.9% / 19.6% / 40.9%, conf 81.4% |
-| M7 | Noise-training controls | 86.2% / 90.4% |
-| M8 | Shallow RBF, FGSM ε=0.25 | adv 55.4%, conf-on-error 1.2% |
-| M9 | Rubbish examples N(0, I₇₈₄) | maxout 98.35%, softmax-reg 59.8%, RBF 0% |
-| M-L1 | L1 weight-decay control (Section 5) | coeff 0.0025 → >5% train error; smaller → no benefit |
-| F4 | Fig. 4 eps-sweep curve (ε ∈ [−15,15], naive maxout) | curve claims fc1–fc3: correct class crossed, wrong classification stable over ε∈[4,15], logits grow extreme (figure shape, not magnitudes) |
+```bash
+.venv/bin/python -m run_all_arms        # trains every arm x seed -> measured.json
+.venv/bin/python numbers_gate.py        # evaluates claims.json against measured.json
+```
 
-The RBF arms (M8/M9) use the paper's unnormalized per-class `exp(q)` form (a
-softmax over `q` is bounded below by 1/K and cannot reproduce the paper's
-1.2%/60.6%/0%); `β` is negative-definite by construction (the faithful reading
-of E8). The M9 sigmoid-top arm is **trained** (per-class BCE), not a frozen
-softmax-to-sigmoid swap. The E1 ensemble metric is the error of the ensemble's
-mean-prob prediction. See `SPEC.md` §6 for every unstated choice.
+Datasets (MNIST, CIFAR-10) download on first run into `./data/` (gitignored).
 
-Measured numbers land in `results/<milestone>.json` and are compared against
-the grep-able paper lines recorded in `SPEC.md` and `REPRODUCTION.md`.
+## Reproduce in Docker (no local tooling needed)
+
+```bash
+docker build -t eae-repro .
+docker run --rm -it eae-repro pytest -q
+docker run --rm -it eae-repro python -m run_all_arms
+```
+
+The image is CPU-only; the paper's MNIST / CIFAR-10 experiments are small
+enough to run on CPU.
+
+## Notes on reproducibility / our choices
+
+- **No clipping** of `x̃` back into `[0,1]` (the paper never states any; see
+  `SPEC.md` §4.9).
+- **sign(0) := 0** (`SPEC.md` §4.22).
+- Training hyperparameters the paper defers to the (dead) maxout-paper config
+  are filled in by us and logged in `SPEC.md` §4 — every such fill is marked
+  **our choice, not the paper's**.
+- Seeds: `seeds = [0, 1, 2]` for most arms; the 1600-unit adversarially-trained
+  maxout uses five seeds `[0..4]`, matching the paper's five runs
+  (`paper/source/iclr2015.tex:506-510`). Per seed there are three independent
+  RNG streams — weight init, minibatch order, dropout masks.
+
+See `REPRODUCTION.md` for the run log and `SPEC.md` for the full method spec.
