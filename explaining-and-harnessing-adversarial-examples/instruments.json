@@ -16,15 +16,15 @@
       "status_note": "In this run the CIFAR download is truncated (cs.toronto.edu stalled; data/cifar-10-python.tar.gz is partial and load_cifar10 raises EOFError). The positive test skips with that reason and the cifar_conv_maxout arm is marked BLOCKED in measured.json rather than substituted with synthetic data. The negative test (fingerprint rejects synthetic) runs without the download."
     },
     {
-      "name": "numbers_gate",
-      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by=numbers_gate.py stamp. A blocked or failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict. claims_result.json is written BY the gate and never by hand -- its produced_by stamp exists for exactly this reason.",
-      "positive_test": "tests/test_numbers_gate.py::test_gate_positive_known_correct",
-      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong",
+      "name": "selfcheck_claims",
+      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes selfcheck.json with a produced_by=selfcheck_claims.py stamp. A blocked or failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict. This is the reproduction's OWN self-check grader and writes selfcheck.json -- never claims_result.json, which the workflow's numbers gate owns (a script here writing that filename would collide with the gate and be refused).",
+      "positive_test": "tests/test_selfcheck_claims.py::test_gate_positive_known_correct",
+      "negative_test": "tests/test_selfcheck_claims.py::test_gate_negative_known_wrong",
       "additional_tests": [
-        "tests/test_numbers_gate.py::test_gate_blocked_metric_not_silent_pass",
-        "tests/test_numbers_gate.py::test_gate_raises_on_unusable_input"
+        "tests/test_selfcheck_claims.py::test_gate_blocked_metric_not_silent_pass",
+        "tests/test_selfcheck_claims.py::test_gate_raises_on_unusable_input"
       ],
-      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate is exercised through sys.executable in an isolated temp dir (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here. The negative_test is the canonical known-wrong case (verdict 'fail'); the additional_tests cover the two other negative paths the contract names -- a blocked metric is never a silent 'pass' and a grader that cannot run raises a traceback rather than a verdict."
+      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate is exercised through sys.executable in an isolated temp dir (tests/test_selfcheck_claims.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here. The negative_test is the canonical known-wrong case (verdict 'fail'); the additional_tests cover the two other negative paths the contract names -- a blocked metric is never a silent 'pass' and a grader that cannot run raises a traceback rather than a verdict."
     },
     {
       "name": "logreg_analytic_equivalence",

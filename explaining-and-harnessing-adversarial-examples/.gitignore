@@ -19,3 +19,8 @@ paper/source/*
 !paper/source/*.bib
 *.tar.gz
 eprint*
+
+# self-check grader output (reproducible via selfcheck_claims.py); the workflow
+# owns claims_result.json -- never commit either here.
+selfcheck.json
+claims_result.json

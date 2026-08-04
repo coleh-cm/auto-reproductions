@@ -91,8 +91,23 @@ def _primary(arm, m):
         "transfer_mnist": "err_orig_on_advfromnew",
         "eps_trace": "margin_seq",  # sequence; prints mean
         "cifar_conv_maxout": "adv_err",
+        # deliberately-not-built arms (SPEC §9): no claims reference them, but
+        # measured.json must cover every arm in claims.json with BLOCKED.
+        "mp_dbm": "adv_err",
+        "googlenet_imagenet": "adv_err",
     }
     return table.get(arm)
+
+
+# Arms in claims.json['arms'] that this reproduction deliberately does NOT build
+# (SPEC §9: MP-DBM needs a multi-prediction deep Boltzmann machine; Fig.1 needs
+# pretrained GoogLeNet + ImageNet). They carry no claims; recorded as BLOCKED at
+# every seed so measured.json covers every arm in claims.json honestly (never a
+# silent synthetic substitute).
+NOT_BUILT = {
+    "mp_dbm": "MP-DBM (multi-prediction deep Boltzmann machine) outside compute scope (SPEC §9)",
+    "googlenet_imagenet": "Fig.1 ImageNet demo needs pretrained GoogLeNet + ImageNet (SPEC §9)",
+}
 
 
 def _seeded(seeds, fn):
@@ -403,6 +418,8 @@ def arm_eps_trace(seed, maxout_naive_model=None):
 
 
 def arm_cifar_conv_maxout(seed):
+    if not data.cifar10_available():
+        raise RuntimeError("CIFAR-10 not available locally (download throttled/blocked)")
     d = _torch_data(data.load_cifar10(seed))
     m = models.ConvMaxoutCIFAR()
     train.train(m, d, {"lr": 0.05, "max_epochs": EPOCHS_CONV, "batch_size": 256,
@@ -465,6 +482,16 @@ def main():
         except Exception:
             measured = {}
     only = os.environ.get("EAE_ONLY")
+    # Register deliberately-not-built arms (SPEC §9) as BLOCKED at every seed so a
+    # fresh run still covers every arm in claims.json. They carry no claims; this
+    # only keeps measured.json complete and honest.
+    if not only:
+        for arm, why in NOT_BUILT.items():
+            print(f"\n=== arm {arm} (NOT BUILT: {why}) ===", flush=True)
+            measured.setdefault(arm, {})
+            for s in SEEDS:
+                measured[arm][str(s)] = "BLOCKED"
+            print(f"FINAL {arm}=BLOCKED", flush=True)
     for arm, (seeds, fn) in ARMS.items():
         if only and arm != only:
             continue
@@ -501,7 +528,6 @@ def main():
                 traceback.print_exc()
                 res = "BLOCKED"
             measured[arm][str(s)] = res
-            _print_final(arm, res if str(s) == str(seeds[-1]) else None) if False else None
             # print per-seed headline
             key = _primary(arm, None)
             if isinstance(res, dict) and key and key in res:

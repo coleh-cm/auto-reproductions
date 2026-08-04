@@ -61,7 +61,7 @@ What the suite covers:
 - **Data-loader instruments** (`tests/test_data_loader.py`): MNIST real passes;
   a synthetic corpus is rejected; CIFAR positive is skipped (download), CIFAR
   negative (rejects synthetic) runs.
-- **Numbers-gate instruments** (`tests/test_numbers_gate.py`): the grader
+- **Self-check-grader instruments** (`tests/test_selfcheck_claims.py`): the grader
   returns "pass" on a known-correct input, "fail" on a known-wrong input,
   "blocked" on an absent arm (never a silent pass), and **raises** on a
   malformed `measured.json` (never a silent negative verdict).
@@ -84,10 +84,10 @@ and is never reported as a result.
 | check | command | budget | found |
 |---|---|---|---|
 | all arms | `.venv/bin/python run_all_arms.py` (resume) | 15 MNIST arms × 3 seeds (5 for `maxout_large_adv`); 1600-unit maxout capped at **6 epochs** (no 60k retrain); conv 8 epochs | 15 arms produce real measured numbers in `measured.json`; `cifar_conv_maxout` BLOCKED |
-| numbers gate | `.venv/bin/python numbers_gate.py` | seconds | **pass=40 fail=19 blocked=11; HIGH: 18 pass / 0 fail / 1 blocked; gate=FAIL** |
+| self-check grader | `.venv/bin/python selfcheck_claims.py` | seconds | **pass=42 fail=20 blocked=8; HIGH: 18 pass / 0 fail / 1 blocked; gate=FAIL** |
 
 The gate is FAIL *only* because of the single HIGH block (c63, CIFAR-10). The
-19 fails are low/medium *value* claims that need the paper's full GPU budget;
+20 fails are low/medium *value* claims that need the paper's full GPU budget;
 their HIGH-invariance *ordering* counterparts pass. See REPRODUCTION.md for
 the full measured-vs-paper table.
 

@@ -260,6 +260,21 @@ def check_cifar10_fingerprint(d):
     assert abs(gstd - 0.5) < 0.04, f"x_train global std {gstd} not ~0.5 (GCN not applied?)"
 
 
+def cifar10_available():
+    """True iff the real CIFAR-10 tar is present and loadable, WITHOUT triggering
+    a network download. A missing dataset is a blocked result (the contract);
+    callers must not hang on a download that this environment throttles/drops, so
+    this checks the local tar only and never reaches the network."""
+    dest = os.path.join(DATA_DIR, "cifar-10-python.tar.gz")
+    if not os.path.exists(dest) or os.path.getsize(dest) < 1000:
+        return False
+    try:
+        _load_cifar_raw()  # reads the local tar; no download (dest exists)
+        return True
+    except Exception:
+        return False
+
+
 def load_cifar10(seed=0):
     """45k train / 5k val / 10k test, GCN-preprocessed to global std ~0.5, f32.
 

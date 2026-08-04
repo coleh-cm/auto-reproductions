@@ -93,12 +93,12 @@ def test_mnist_rejects_synthetic():
 # CIFAR-10
 # ---------------------------------------------------------------------------
 def _cifar_available():
-    """True iff the real CIFAR-10 tar is present and loadable (not truncated)."""
-    try:
-        data.load_cifar10(0)
-        return True
-    except Exception:
-        return False
+    """True iff the real CIFAR-10 tar is present and loadable (not truncated).
+
+    Uses data.cifar10_available() which checks the LOCAL tar only and never
+    reaches the network -- a missing dataset is a blocked result to report, not
+    a cue to hang on a download this environment throttles/drops."""
+    return data.cifar10_available()
 
 
 def test_cifar10_real():
