@@ -75,7 +75,6 @@ f
 (
 x
 ))
- 
 denote its predictive distribution
 for input
  
@@ -140,7 +139,7 @@ c
 s
 
 )
- 
+
 ,
  
 σ
@@ -190,7 +189,8 @@ y
  
 w
  
-˜p,
+˜
+p,
  
 ˜
 p
