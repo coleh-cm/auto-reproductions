@@ -220,34 +220,41 @@ class MaxoutSigmoid(nn.Module):
 # SPEC §4.4) and on training — our choices.
 # ---------------------------------------------------------------------------
 class RBFNet(nn.Module):
-    def __init__(self, K=10, D=784, rank=16, nu=1e-3):
+    def __init__(self, K=10, D=784, rank=16, nu=0.01, nu_trainable=False):
         super().__init__()
         self.D, self.K = D, K
         self.rank = rank
         self.mu = nn.Parameter(torch.zeros(K, D))
         nn.init.normal_(self.mu, std=0.1)
         self.psi = nn.Parameter(torch.randn(K, D, rank) * 0.01)
-        self.nu = nn.Parameter(torch.tensor(float(nu)))
-        # per-class temperature/scale so log p can be compared across classes
-        self.log_scale = nn.Parameter(torch.zeros(K))
+        # nu is a FLOOR on the quadratic decay (fixed by default). Without a
+        # positive floor the NLL training collapses: psi,nu -> 0, beta -> 0,
+        # quad -> 0, prob -> 1 everywhere (clean_conf ~100%, rubbish ~100%),
+        # which contradicts the paper's "naturally immune" RBF (clean conf 60.6%,
+        # mistake conf 1.2%, rubbish 0%). The paper never states the training
+        # procedure; fixing nu>0 is our choice (SPEC §4.4) to keep the units
+        # localized. nu=0.01 gives ~e^{-1} decay at ||x-mu||^2 ~ 100 (digit scale).
+        if nu_trainable:
+            self.nu = nn.Parameter(torch.tensor(float(nu)))
+        else:
+            self.register_buffer("nu", torch.tensor(float(nu)))
+        self.log_temp = nn.Parameter(torch.zeros(K))
 
     def _quad(self, x):
-        # x: [B, D] -> [B, K]  (x-mu_k)^T beta_k (x-mu_k), beta_k NSD
         x = _check(x)
         diff = x.unsqueeze(1) - self.mu.unsqueeze(0)  # [B, K, D]
-        # beta_k = -psi_k psi_k^T - nu I  =>  diff^T beta diff = -(psi^T diff)^2 - nu*||diff||^2
         psi = self.psi  # [K, D, rank]
         psi_d = torch.einsum("kdr,bkd->bkr", psi, diff)  # [B, K, rank]
-        quad = -(psi_d ** 2).sum(-1) - torch.relu(self.nu) * (diff ** 2).sum(-1)  # [B, K]
+        nu = self.nu if isinstance(self.nu, torch.Tensor) else torch.tensor(self.nu)
+        quad = -(psi_d ** 2).sum(-1) - float(nu) * (diff ** 2).sum(-1)  # [B, K] <= 0
         return quad
 
     def logits(self, x):
-        # raw exp-quadratic scores (the "argument to softmax"-like quantity)
-        quad = self._quad(x)  # [B, K]
-        return quad - self.log_scale.unsqueeze(0)  # subtract per-class scale (log)
+        quad = self._quad(x)  # [B, K] <= 0
+        return quad - torch.relu(self.log_temp).unsqueeze(0)  # <= 0
 
     def prob(self, x):
-        return torch.exp(self.logits(x))  # [B, K] rows need NOT sum to 1
+        return torch.exp(self.logits(x))  # [B, K] in (0, 1], rows need NOT sum to 1
 
     def loss(self, x, y):
         logp = self.logits(x)  # log of prob

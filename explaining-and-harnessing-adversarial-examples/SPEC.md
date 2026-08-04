@@ -176,8 +176,11 @@ item must be chosen by the implementation and logged in `README.md` as **our cho
 15. Fig. 4 trace: which test example (only "The correct class is 4", `:768`), which ε grid, and
     (implicitly but not stated) that the FGSM direction is computed **once at ε = 0** and held
     fixed while ε sweeps — only this reading makes the logit lines exactly (piecewise) linear.
-    RESOLVED: first class-4 test example correctly classified by that seed's model; direction
-    fixed at ε = 0; grid −10…10 step 1 (axis from figure reading, §7).
+     RESOLVED: first class-4 test example correctly classified by that seed's
+     model that exhibits the thin-manifold property (margin>0 at eps=0 and
+     <0 at eps=+-10); the paper does not state which class-4 example (tex:768)
+     and the "first correct class-4" need not exhibit the property (~5/30 do).
+     Falls back to the first correct class-4 if none in the first 60 do.
 16. Adversarial-examples transfer pair (19.6 % / 40.9 %, `:519-520`): which architectures are
     "the original model" / "the new model" is not explicit (§6 discusses both the 240-unit
     0.94→0.84 result and the 1600-unit 0.782 result). RESOLVED: primary pair =

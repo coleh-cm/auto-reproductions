@@ -1,0 +1,1868 @@
+{
+  "produced_by": "numbers_gate.py",
+  "summary": {
+    "total": 70,
+    "pass": 40,
+    "fail": 19,
+    "blocked": 11,
+    "high": {
+      "pass": 18,
+      "fail": 0,
+      "blocked": 1
+    },
+    "medium": {
+      "pass": 14,
+      "fail": 8,
+      "blocked": 4
+    },
+    "low": {
+      "pass": 8,
+      "fail": 11,
+      "blocked": 6
+    },
+    "high_total": 19,
+    "gate_pass": false,
+    "note": "The gate's load-bearing verdict is over compute_invariance == 'high'. low claims are informational; several are expected to fail at sub-scale (annotated in claims.json)."
+  },
+  "claims": [
+    {
+      "id": "c01",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:333",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 100.0,
+        "per_seed": [
+          100.0,
+          100.0,
+          100.0
+        ],
+        "claimed": 99.9,
+        "tolerance": 2.0,
+        "abs_diff": 0.09999999999999432
+      }
+    },
+    {
+      "id": "c02",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:334",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 99.15700554847717,
+        "per_seed": [
+          98.96577000617981,
+          99.29531216621399,
+          99.20993447303772
+        ],
+        "claimed": 79.3,
+        "tolerance": 8.0,
+        "abs_diff": 19.857005548477176
+      }
+    },
+    {
+      "id": "c03",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:331",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 90.990000218153,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 91.30000025033951,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 91.01999998092651,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c04",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:454",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 1.5374549974997838,
+        "per_seed": [
+          1.6192344948649406,
+          1.4720314182341099,
+          1.521099079400301
+        ],
+        "claimed": 1.6,
+        "tolerance": 0.8,
+        "abs_diff": 0.06254500250021633
+      }
+    },
+    {
+      "id": "c05",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:456",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 100.0,
+        "per_seed": [
+          100.0,
+          100.0,
+          100.0
+        ],
+        "claimed": 99.0,
+        "tolerance": 2.0,
+        "abs_diff": 1.0
+      }
+    },
+    {
+      "id": "c06",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:456",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 98.38076550513506,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 98.52796858176589,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 98.4789009205997,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c07",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:407",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c08",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:493",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 1.4699999863902729,
+        "per_seed": [
+          1.4499999582767487,
+          1.4499999582767487,
+          1.510000042617321
+        ],
+        "claimed": 0.94,
+        "tolerance": 0.3,
+        "abs_diff": 0.5299999863902729
+      }
+    },
+    {
+      "id": "c09",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:338",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 89.09333348274231,
+        "per_seed": [
+          87.44000196456909,
+          87.6800000667572,
+          92.15999841690063
+        ],
+        "claimed": 89.4,
+        "tolerance": 8.0,
+        "abs_diff": 0.3066665172576961
+      }
+    },
+    {
+      "id": "c10",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:339",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 92.77681509653728,
+        "per_seed": [
+          92.59529113769531,
+          93.93486380577087,
+          91.80029034614563
+        ],
+        "claimed": 97.6,
+        "tolerance": 8.0,
+        "abs_diff": 4.823184903462717
+      }
+    },
+    {
+      "id": "c11",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:493",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 1.2299999905129273,
+        "per_seed": [
+          1.2199999764561653,
+          1.209999993443489,
+          1.2600000016391277
+        ],
+        "claimed": 0.84,
+        "tolerance": 0.25,
+        "abs_diff": 0.38999999051292733
+      }
+    },
+    {
+      "id": "c12",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:493",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.22999998182058334,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.23999996483325958,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.2500000409781933,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c13",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:516",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 62.45000213384628,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 59.79999899864197,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 72.27999866008759,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c14",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:517",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "mean": 56.44600033760071,
+        "per_seed": [
+          56.050002574920654,
+          55.3600013256073,
+          56.08999729156494,
+          55.77999949455261,
+          58.95000100135803
+        ],
+        "claimed": 17.9,
+        "tolerance": 8.0,
+        "abs_diff": 38.54600033760071
+      }
+    },
+    {
+      "id": "c15",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:515",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 93.94333362579346,
+        "per_seed": [
+          94.42999958992004,
+          94.5900022983551,
+          92.80999898910522
+        ],
+        "claimed": 89.4,
+        "tolerance": 10.0,
+        "abs_diff": 4.543333625793451
+      }
+    },
+    {
+      "id": "c16",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:517",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 38.37999701499939,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 39.2300009727478,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 36.72000169754028,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c17",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:500",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 1.7966666569312413,
+        "per_seed": [
+          1.769999973475933,
+          1.6699999570846558,
+          1.9500000402331352
+        ],
+        "claimed": 1.14,
+        "tolerance": 0.3,
+        "abs_diff": 0.6566666569312414
+      }
+    },
+    {
+      "id": "c18",
+      "kind": "existence",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:509",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "eval error: disallowed name in expression: 'array'",
+        "seeds_evaluated": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "id": "c19",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:510",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "mean": 1.8740000203251839,
+        "per_seed": [
+          1.7899999395012856,
+          1.9099999219179153,
+          2.0400000736117363,
+          1.7000000923871994,
+          1.9300000742077827
+        ],
+        "claimed": 0.782,
+        "tolerance": 0.15,
+        "abs_diff": 1.0920000203251838
+      }
+    },
+    {
+      "id": "c20",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:523",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "mean": 70.53049087524414,
+        "per_seed": [
+          70.493483543396,
+          70.41739821434021,
+          71.6785192489624,
+          69.6746289730072,
+          70.38842439651489
+        ],
+        "claimed": 81.4,
+        "tolerance": 12.0,
+        "abs_diff": 10.869509124755865
+      }
+    },
+    {
+      "id": "c21",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:520",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 61.11666560173035,
+        "per_seed": [
+          59.039998054504395,
+          62.87999749183655,
+          61.4300012588501
+        ],
+        "claimed": 40.9,
+        "tolerance": 10.0,
+        "abs_diff": 20.216665601730348
+      }
+    },
+    {
+      "id": "c22",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:519",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 30.833332737286884,
+        "per_seed": [
+          31.069999933242798,
+          31.619998812675476,
+          29.809999465942383
+        ],
+        "claimed": 19.6,
+        "tolerance": 8.0,
+        "abs_diff": 11.233332737286883
+      }
+    },
+    {
+      "id": "c23",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:518",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 27.969998121261597,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 31.259998679161072,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 31.620001792907715,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c24",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:556",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 88.70000044504802,
+        "per_seed": [
+          89.13000226020813,
+          90.420001745224,
+          86.54999732971191
+        ],
+        "claimed": 86.2,
+        "tolerance": 8.0,
+        "abs_diff": 2.500000445048016
+      }
+    },
+    {
+      "id": "c25",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:557",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 89.09236987431844,
+        "per_seed": [
+          89.43570256233215,
+          88.99123072624207,
+          88.8501763343811
+        ],
+        "claimed": 97.3,
+        "tolerance": 8.0,
+        "abs_diff": 8.207630125681561
+      }
+    },
+    {
+      "id": "c26",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:557",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 88.09666832288106,
+        "per_seed": [
+          88.91000151634216,
+          88.45000267028809,
+          86.93000078201294
+        ],
+        "claimed": 90.4,
+        "tolerance": 8.0,
+        "abs_diff": 2.3033316771189476
+      }
+    },
+    {
+      "id": "c27",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:557",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 91.31591717402141,
+        "per_seed": [
+          90.86238145828247,
+          90.59133529663086,
+          92.49403476715088
+        ],
+        "claimed": 97.8,
+        "tolerance": 8.0,
+        "abs_diff": 6.484082825978589
+      }
+    },
+    {
+      "id": "c28",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:550",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 32.85999894142151,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 33.090001344680786,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 30.460000038146973,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c29",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:602",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 98.54000012079875,
+        "per_seed": [
+          98.28000068664551,
+          98.60000014305115,
+          98.73999953269958
+        ],
+        "claimed": 55.4,
+        "tolerance": 15.0,
+        "abs_diff": 43.14000012079875
+      }
+    },
+    {
+      "id": "c30",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:603",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 22.444283465544384,
+        "per_seed": [
+          22.49232977628708,
+          22.44327813386917,
+          22.397242486476898
+        ],
+        "claimed": 1.2,
+        "tolerance": 2.0,
+        "abs_diff": 21.244283465544385
+      }
+    },
+    {
+      "id": "c31",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:604",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 67.15097626050313,
+        "per_seed": [
+          67.16020703315735,
+          67.1851634979248,
+          67.10755825042725
+        ],
+        "claimed": 60.6,
+        "tolerance": 15.0,
+        "abs_diff": 6.550976260503127
+      }
+    },
+    {
+      "id": "c32",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:600",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 69.74629908800125,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 71.34755104780197,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 69.20081526041031,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c33",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:603",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 44.66787725687027,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 44.74188536405563,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 44.71031576395035,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c34",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:822",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 93.19666822751363,
+        "per_seed": [
+          93.30000281333923,
+          92.79000163078308,
+          93.50000023841858
+        ],
+        "claimed": 91.1,
+        "tolerance": 8.0,
+        "abs_diff": 2.096668227513632
+      }
+    },
+    {
+      "id": "c35",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:824",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 91.26000006993611,
+        "per_seed": [
+          89.99000191688538,
+          91.11999869346619,
+          92.66999959945679
+        ],
+        "claimed": 87.9,
+        "tolerance": 8.0,
+        "abs_diff": 3.360000069936106
+      }
+    },
+    {
+      "id": "c36",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:822",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 91.73000287264585,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 91.28000158816576,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 91.94000028073788,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c37",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:824",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 3.3100008964538574,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 1.6700029373168945,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.830000638961792,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c38",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:683",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 70.97327510515849,
+        "per_seed": [
+          70.12269496917725,
+          74.52626824378967,
+          68.27086210250854
+        ],
+        "claimed": 54.6,
+        "tolerance": 10.0,
+        "abs_diff": 16.37327510515849
+      }
+    },
+    {
+      "id": "c39",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:682",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 2.6569917177160582,
+        "per_seed": [
+          4.443461820483208,
+          2.85941231995821,
+          0.6681010127067566
+        ],
+        "claimed": 16.0,
+        "tolerance": 8.0,
+        "abs_diff": 13.343008282283941
+      }
+    },
+    {
+      "id": "c40",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:686",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 73.82663488388062,
+        "per_seed": [
+          74.8731255531311,
+          76.97175741195679,
+          69.63502168655396
+        ],
+        "claimed": 84.6,
+        "tolerance": 10.0,
+        "abs_diff": 10.773365116119379
+      }
+    },
+    {
+      "id": "c41",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:687",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 3.0383677687495947,
+        "per_seed": [
+          5.070635676383972,
+          3.2778356224298477,
+          0.7666320074349642
+        ],
+        "claimed": 54.3,
+        "tolerance": 12.0,
+        "abs_diff": 51.2616322312504
+      }
+    },
+    {
+      "id": "c42",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:688",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 1.2821958865970373,
+        "per_seed": [
+          0.778341805562377,
+          1.5002819709479809,
+          1.567963883280754
+        ],
+        "claimed": 53.6,
+        "tolerance": 12.0,
+        "abs_diff": 52.317804113402964
+      }
+    },
+    {
+      "id": "c43",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:683",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 65.67923314869404,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 71.66685592383146,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 67.60276108980179,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c44",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:686",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 69.80248987674713,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 73.69392178952694,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 68.86838967911899,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c45",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:686",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c46",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:908",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 97.21666773160298,
+        "per_seed": [
+          98.17000031471252,
+          96.3100016117096,
+          97.17000126838684
+        ],
+        "claimed": 98.35,
+        "tolerance": 5.0,
+        "abs_diff": 1.1333322683970124
+      }
+    },
+    {
+      "id": "c47",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:908",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 90.19724329312642,
+        "per_seed": [
+          91.55689477920532,
+          88.94159197807312,
+          90.09324312210083
+        ],
+        "claimed": 92.8,
+        "tolerance": 10.0,
+        "abs_diff": 2.6027567068735777
+      }
+    },
+    {
+      "id": "c48",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:909",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 11.219999690850576,
+        "per_seed": [
+          13.449999690055847,
+          13.689999282360077,
+          6.520000100135803
+        ],
+        "claimed": 68.0,
+        "tolerance": 15.0,
+        "abs_diff": 56.78000030914942
+      }
+    },
+    {
+      "id": "c49",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:910",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 81.20940725008647,
+        "per_seed": [
+          81.4827024936676,
+          82.46355056762695,
+          79.68196868896484
+        ],
+        "claimed": 87.9,
+        "tolerance": 10.0,
+        "abs_diff": 6.6905927499135345
+      }
+    },
+    {
+      "id": "c50",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:920",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 98.30666581789653,
+        "per_seed": [
+          97.89999723434448,
+          98.42000007629395,
+          98.60000014305115
+        ],
+        "claimed": 59.8,
+        "tolerance": 15.0,
+        "abs_diff": 38.50666581789653
+      }
+    },
+    {
+      "id": "c51",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:921",
+      "verdict": "fail",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 92.66907175381978,
+        "per_seed": [
+          91.72155261039734,
+          93.23351979255676,
+          93.05214285850525
+        ],
+        "claimed": 70.8,
+        "tolerance": 15.0,
+        "abs_diff": 21.86907175381978
+      }
+    },
+    {
+      "id": "c52",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:923",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "mean": 0.0,
+        "per_seed": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "claimed": 0.0,
+        "tolerance": 1.0,
+        "abs_diff": 0.0
+      }
+    },
+    {
+      "id": "c53",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:903",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 98.17000031471252,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 96.3100016117096,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 97.17000126838684,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "c54",
+      "kind": "existence",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:931",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.maxout_naive.rubbish_class_shares['8']",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c55",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:930",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.maxout_naive.rubbish_class_shares['5']",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c56",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:340",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.adv_err",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c57",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:341",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.adv_conf_mistakes",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c58",
+      "kind": "value",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:912",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.rubbish_err",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c59",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:912",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.rubbish_conf_mistakes",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c60",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:941",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.fool_success_avg",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c61",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:940",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.fool_success['0']",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c62",
+      "kind": "existence",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:939",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.fool_success['6']",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c63",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:940",
+      "verdict": "blocked",
+      "detail": {
+        "reason": "BLOCKED cell at seed 0: measured.cifar_conv_maxout.fool_success['0']",
+        "seeds_evaluated": []
+      }
+    },
+    {
+      "id": "c64",
+      "kind": "existence",
+      "compute_invariance": "medium",
+      "citation": "paper/source/iclr2015.tex:430",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "c65",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:764",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "above",
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": 11.983091354370117,
+            "q_last": 11.983091354370117
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": 20.606170654296875,
+            "q_last": 20.606170654296875
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": 13.539499282836914,
+            "q_last": 13.539499282836914
+          }
+        ]
+      }
+    },
+    {
+      "id": "c66",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:764",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "below",
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 2,
+            "q_first": 315.98443603515625,
+            "q_last": -575.5505981445312
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 2,
+            "q_first": -225.00408935546875,
+            "q_last": -199.69021606445312
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 2,
+            "q_first": 441.869384765625,
+            "q_last": -518.3582763671875
+          }
+        ]
+      }
+    },
+    {
+      "id": "c67",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "crosses",
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 11,
+            "q_first": 11.983091354370117,
+            "q_last": -575.5505981445312
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 11,
+            "q_first": 20.606170654296875,
+            "q_last": -199.69021606445312
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 11,
+            "q_first": 13.539499282836914,
+            "q_last": -518.3582763671875
+          }
+        ]
+      }
+    },
+    {
+      "id": "c68",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "increasing",
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 11,
+            "q_first": 6.471635341644287,
+            "q_last": 492.804443359375
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 11,
+            "q_first": 3.2954015731811523,
+            "q_last": 780.7518920898438
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 11,
+            "q_first": 4.849191665649414,
+            "q_last": 331.044921875
+          }
+        ]
+      }
+    },
+    {
+      "id": "c69",
+      "kind": "curve",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "matches",
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": 492.804443359375,
+            "q_last": 492.804443359375
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": 780.7518920898438,
+            "q_last": 780.7518920898438
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": 331.044921875,
+            "q_last": 331.044921875
+          }
+        ]
+      }
+    },
+    {
+      "id": "c70",
+      "kind": "curve",
+      "compute_invariance": "low",
+      "citation": "paper/source/iclr2015.tex:768",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "matches",
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": -575.5505981445312,
+            "q_last": -575.5505981445312
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": -199.69021606445312,
+            "q_last": -199.69021606445312
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 1,
+            "q_first": -518.3582763671875,
+            "q_last": -518.3582763671875
+          }
+        ]
+      }
+    }
+  ],
+  "not_tested": [
+    {
+      "what": "MP-DBM is vulnerable to FGSM eps=0.25 (error 97.5%); its clean error is 0.88%",
+      "citation": "paper/source/iclr2015.tex:794,800",
+      "reason": "requires training a multi-prediction deep Boltzmann machine; outside compute scope"
+    },
+    {
+      "what": "Fig.1 ImageNet demo: panda 57.7% -> gibbon 99.3% at eps=.007 on GoogLeNet",
+      "citation": "paper/source/iclr2015.tex:364-383",
+      "reason": "illustrative; needs pretrained GoogLeNet + ImageNet pipeline; not load-bearing"
+    },
+    {
+      "what": "Fig.3 weight-localization claim (adversarially trained weights more localized/interpretable)",
+      "citation": "paper/source/iclr2015.tex:523-525",
+      "reason": "qualitative; paper defines no metric"
+    },
+    {
+      "what": "rotational / scaled-gradient perturbation training weaker than FGSM adversarial training",
+      "citation": "paper/source/iclr2015.tex:559-565",
+      "reason": "no numbers reported"
+    },
+    {
+      "what": "hidden-layer vs input perturbation comparison",
+      "citation": "paper/source/iclr2015.tex:567-585",
+      "reason": "qualitative only"
+    },
+    {
+      "what": "maxout trained to 0% error on Gaussian rubbish with no clean-error benefit",
+      "citation": "paper/source/iclr2015.tex:963-968",
+      "reason": "tangential; stretch goal"
+    },
+    {
+      "what": "46.2% error rate for direction transferred across clean examples",
+      "citation": "paper/source/iclr2015.tex:776-779",
+      "reason": "commented out (%) by the authors in v3 - not a claim of the published paper"
+    },
+    {
+      "what": "quadratic/V1 model numbers (0.84% clean, 30.7% adversarial)",
+      "citation": "paper/source/iclr2015.tex:620-643",
+      "reason": "commented out (%) by the authors in v3"
+    }
+  ],
+  "generated_from": {
+    "claims": "claims.json",
+    "measured": "measured.json",
+    "canonical_tokens": [
+      "measured.cifar_conv_maxout.rubbish_conf_mistakes",
+      "measured.maxout_naive.rubbish_class_shares['8']",
+      "measured.maxout_naive.rubbish_class_shares['5']",
+      "measured.logreg_3v7.analytic_equiv_max_absdiff",
+      "measured.transfer_mnist.err_orig_on_advfromnew",
+      "measured.transfer_mnist.err_new_on_advfromorig",
+      "measured.agreement_mnist.agree_rbf_on_softmax",
+      "measured.maxout_sigmoid.rubbish_conf_mistakes",
+      "measured.ensemble12.adv_err_ensemble_crafted",
+      "measured.cifar_conv_maxout.adv_conf_mistakes",
+      "measured.cifar_conv_maxout.fool_success['0']",
+      "measured.cifar_conv_maxout.fool_success['6']",
+      "measured.cifar_conv_maxout.fool_success['9']",
+      "measured.maxout_large_adv.adv_conf_mistakes",
+      "measured.agreement_mnist.agree_softmax_cond",
+      "measured.maxout_naive.rubbish_conf_mistakes",
+      "measured.cifar_conv_maxout.fool_success_avg",
+      "measured.ensemble12.adv_err_single_crafted",
+      "measured.agreement_mnist.agree_softmax_all",
+      "measured.softmax_reg.rubbish_conf_mistakes",
+      "measured.cifar_conv_maxout.fool_success[c]",
+      "measured.maxout_naive.adv_conf_mistakes",
+      "measured.agreement_mnist.agree_rbf_cond",
+      "measured.noise_rademacher.adv_conf_all",
+      "measured.rbf_shallow.adv_conf_mistakes",
+      "measured.agreement_mnist.agree_rbf_all",
+      "measured.cifar_conv_maxout.rubbish_err",
+      "measured.maxout_large_naive.clean_err",
+      "measured.eps_trace.logit_maxwrong_seq",
+      "measured.eps_trace.logit_correct_seq",
+      "measured.maxout_large_naive.adv_err",
+      "measured.maxout_large_adv.clean_err",
+      "measured.noise_uniform.adv_conf_all",
+      "measured.rbf_shallow.clean_conf_all",
+      "measured.maxout_sigmoid.rubbish_err",
+      "measured.maxout_naive.adv_conf_all",
+      "measured.cifar_conv_maxout.adv_err",
+      "measured.softmax_reg.adv_conf_all",
+      "measured.maxout_large_adv.adv_err",
+      "measured.noise_rademacher.adv_err",
+      "measured.maxout_naive.rubbish_err",
+      "measured.softmax_reg.rubbish_err",
+      "measured.rbf_shallow.rubbish_err",
+      "measured.maxout_naive.clean_err",
+      "measured.softmax_reg.clean_err",
+      "measured.noise_uniform.adv_err",
+      "measured.logreg_3v7.clean_err",
+      "measured.maxout_naive.adv_err",
+      "measured.maxout_adv.clean_err",
+      "measured.ensemble12.clean_err",
+      "measured.softmax_reg.adv_err",
+      "measured.rbf_shallow.adv_err",
+      "measured.l1_maxout.train_err",
+      "measured.logreg_3v7.adv_err",
+      "measured.maxout_adv.adv_err"
+    ]
+  }
+}

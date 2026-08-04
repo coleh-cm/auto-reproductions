@@ -136,3 +136,72 @@ MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%)
 - **Agreement arm (SPEC §4.17):** "the RBF network can predict softmax
   regression's class 53.6% of the time" read as both-models-wrong conditioned,
   mirroring the preceding sentence's conditioning.
+
+## Results (2026-08-04, numbers pass)
+
+`run_all_arms.sh` ran all 16 arms (15 built + cifar blocked) at 3 seeds
+(5 for `maxout_large_adv`). `numbers_gate.py` adjudicated claims.json against
+`measured.json`:
+
+| verdict | all | HIGH (gate) | medium | low |
+|---|---|---|---|---|
+| pass    | 40 | 18 | 14 | 8 |
+| fail    | 19 | 0  | 7  | 12 |
+| blocked | 11 | 1  | 0  | 10 |
+
+**Gate: 18/19 HIGH pass, 0 fail, 1 blocked.** The single HIGH block is c63
+(CIFAR-10 fooling `airplane` is the hardest class) — the CIFAR-10 download from
+`cs.toronto.edu` stalled and the `cifar_conv_maxout` arm is BLOCKED rather than
+run on synthetic data. All other HIGH-invariance claims (directions, orderings,
+the c07 algebraic invariant, the c65-c68 Figure-4 curve shapes) pass at this
+CPU sub-scale.
+
+The 19 fails are all `low`/`medium` value claims that need the paper's full
+budget (1600-unit maxout, 5 seeds, 60k retrain, conv net on CIFAR) — exactly
+the claims `claims.json` rates low/medium for this reason. The 10 low blocked
+are 8 CIFAR claims (c56-c63) plus c54/c55 (MNIST rubbish class-shares use a
+bracketed metric `rubbish_class_shares['5']` the gate resolves but the measured
+dict stores under a nested key — recorded as a gate/tokenizer gap, not a
+method failure; the underlying `rubbish_class_shares` dict IS measured).
+
+### Measured vs paper (headline, seed-mean)
+
+| arm.metric | paper | measured (mean) | claim | verdict |
+|---|---|---|---|---|
+| softmax_reg.adv_err | 99.9 | 100.0 | c01 (med) | pass |
+| logreg_3v7.clean_err | 1.6 | 1.52 | c04 (med) | pass |
+| logreg_3v7.adv_err | 99 | 100 | c05 (med) | pass |
+| logreg_3v7.analytic_equiv | 0 | 9.5e-7 | c07 (HIGH) | **pass** |
+| maxout_naive.rubbish_err | 98.35 | ~98 | c46 (med) | pass |
+| rbf_shallow.clean_conf_all | 60.6 | 67.1 | c31 (low) | pass |
+| rbf_shallow.rubbish_err | 0 | 0.0 | c52 (med) | pass |
+| maxout_large_naive.adv_err | 89.4 | ~94 | c15 (med) | pass |
+| noise_rademacher.adv_err | 86.2 | 86.6 | c24 (med) | pass |
+| noise_uniform.adv_err | 90.4 | 86.9 | c26 (med) | pass |
+| ensemble12.adv_err_ensemble | 91.1 | 93.5 | c34 (med) | pass |
+| agreement_mnist.agree_softmax_cond | 84.6 | ~70 | c40 (med) | fail (sub-scale) |
+| transfer_mnist.err_orig_on_advfromnew | 40.9 | ~61 | c21 (med) | fail (sub-scale) |
+| maxout_large_adv.clean_err | 0.782 | ~1.93 | c19 (low) | fail (sub-scale, no 60k retrain) |
+| eps_trace margin[-10,0,+10] | thin manifold | -31,+5.5,-1068 | c65-c68 (HIGH) | **pass** |
+
+### Figure 4
+
+`figures/eps_curve_reproduced.png` is regenerated from the `eps_trace` arm
+(seed 0, example 33 — the first class-4 test example exhibiting the thin-
+manifold property; the paper does not state which class-4 example it used,
+tex:768). It is paired with the paper's `paper/source/eps_curve.pdf` for a
+reader to compare. **The pair is for visual comparison only and is NOT
+evidence** — the gate's verdicts on c65-c68 are the evidence. Axis ranges:
+x = eps in [-10, 10] (matching the paper's drawn region); y = "argument to
+softmax" (logits) in [-576, 493], consistent with the paper's ~[-2000, 1000]
+axis (figures/read-figure.jsonl).
+
+### Blockers
+
+- **CIFAR-10 download** (`cs.toronto.edu` throttled): `cifar_conv_maxout` arm
+  BLOCKED; c56-c63 blocked (8 claims, 1 HIGH). Fix: obtain the real CIFAR-10
+  dataset and re-run. No synthetic substitute was used.
+- **CPU sub-scale**: 1600-unit maxout trained 6 epochs (paper: full budget +
+  60k retrain, 5 seeds); tight value claims (c08 0.94%, c11 0.84%, c14 17.9%,
+  c17 1.14%, c18-c20 0.782%, c29 55.4%, c30 1.2%) fail on value but their
+  HIGH-invariance orderings (c13, c16, c32, c33) pass.

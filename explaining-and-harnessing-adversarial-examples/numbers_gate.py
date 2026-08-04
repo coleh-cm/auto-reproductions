@@ -105,13 +105,26 @@ def build_canonical_tokens(claims_doc: dict) -> dict:
     return dict(sorted(tokens.items(), key=lambda kv: len(kv[0]), reverse=True))
 
 
-def _safe_eval(expr: str) -> object:
+def _safe_eval(expr: str, aggregate: bool = False) -> object:
     """Eval an arithmetic/boolean expression with min/max/mean/abs/count only.
     measured tokens MUST already be substituted out. Only the contract's names
-    are in scope."""
-    allowed = {"min": min, "max": max, "mean": statistics.mean,
-               "abs": abs, "count": lambda it: len(list(it)),
-               "True": True, "False": False}
+    are in scope. When aggregate=True (cross-seed), tokens are numpy arrays and
+    count/mean/min/max use numpy so comparisons broadcast (e.g.
+    count(arr <= 0.9) sums the True elements)."""
+    import numpy as _np
+    if aggregate:
+        allowed = {
+            "min": lambda *a: _np.minimum.reduce(a[0]) if len(a) == 1 else _np.minimum(*a),
+            "max": lambda *a: _np.maximum.reduce(a[0]) if len(a) == 1 else _np.maximum(*a),
+            "mean": lambda x: float(_np.mean(x)),
+            "abs": _np.abs,
+            "count": lambda x: int(_np.sum(_np.asarray(x, dtype=bool))),
+            "True": True, "False": False,
+        }
+    else:
+        allowed = {"min": min, "max": max, "mean": statistics.mean,
+                   "abs": abs, "count": lambda it: len(list(it)),
+                   "True": True, "False": False}
     code = compile(expr, "<claim-expr>", "eval")
     for name in code.co_names:
         if name not in allowed:
@@ -135,11 +148,25 @@ def _substitute(expr: str, token_values: dict, canonical: dict) -> str:
 
 
 def is_aggregate(expr: str, canonical: dict) -> bool:
-    """True iff min/max/mean wraps a SINGLE canonical token (cross-seed agg)."""
-    for fn in ("min", "max", "mean"):
+    """True iff min/max/mean/count wraps a SINGLE canonical token (cross-seed
+    aggregation): forms ``fn(token)`` (exact) or ``fn(token <cmp> ...)`` where
+    the token is the sole argument (no comma before the closing paren). A
+    two-argument ``min(a, b)`` / ``max(a, b)`` is per-seed element-wise, NOT
+    a cross-seed aggregate."""
+    for fn in ("min", "max", "mean", "count"):
         for token in canonical:
+            # exact single-arg: fn(token)
             if f"{fn}({token})" in expr:
                 return True
+            # single-arg with comparison: fn(token <cmp> ...), no comma after token
+            prefix = f"{fn}({token}"
+            i = expr.find(prefix)
+            while i >= 0:
+                after = expr[i + len(prefix):]
+                # next char must start a comparison (<=, >=, ==, !=, <, >), not a comma
+                if after and after[0] in "<>=!":
+                    return True
+                i = expr.find(prefix, i + 1)
     return False
 
 
@@ -240,6 +267,15 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
     if not seeds:
         return {"verdict": "blocked", "reason": f"no seed data for arm {arm}",
                 "seeds_evaluated": []}
+    # Resolve the x-axis index labels: a curve claim's `x` holds SAMPLE POINTS
+    # (e.g. eps values), but the sequences are stored positionally. The arm's
+    # `eps_grid` (or generic `x_axis`/`grid` metric) gives the index labels; if
+    # absent, fall back to 0..n-1 (positional).
+    x_axis = None
+    for axis_key in ("eps_grid", "x_axis", "grid"):
+        if isinstance(_measured_value(measured, arm, axis_key, seeds[0]), list):
+            x_axis = _measured_value(measured, arm, axis_key, seeds[0])
+            break
     per_seed = []
     for s in seeds:
         q_raw = _measured_value(measured, arm, q_metric, s)
@@ -255,9 +291,11 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
             return {"verdict": "blocked",
                     "reason": f"{arm}.{r_metric} at seed {s} is not a sequence",
                     "seeds_evaluated": []}
-        # sample at x
-        q = _sample_at_x(q_raw, x_list, x_list)
-        r = _sample_at_x(r_raw, x_list, x_list) if r_tok else None
+        # x_full = the index labels (eps_grid if available, else 0..n-1)
+        x_full = x_axis if x_axis is not None else list(range(len(q_raw)))
+        # sample at the claim's x (sample points)
+        q = _sample_at_x(q_raw, x_full, x_list)
+        r = _sample_at_x(r_raw, x_full, x_list) if r_tok else None
         try:
             ok = _curve_verdict(comparison, q, r, claim.get("claimed"),
                                 float(claim.get("tolerance", 0.0)))
@@ -304,12 +342,13 @@ def evaluate_claim(claim, measured, top_seeds, canonical, claims_doc=None):
 
     try:
         if is_aggregate(expr, canonical):
+            import numpy as _np
             token_values = {}
             for t in tokens:
                 arm, metric = canonical[t]
-                token_values[t] = [_measured_value(measured, arm, metric, s) for s in seeds]
+                token_values[t] = _np.array([_measured_value(measured, arm, metric, s) for s in seeds], dtype=float)
             sub = _substitute(expr, token_values, canonical)
-            result = _safe_eval(sub)
+            result = _safe_eval(sub, aggregate=True)
             if is_bool:
                 return {"verdict": "pass" if bool(result) else "fail",
                         "seeds_evaluated": seeds, "aggregate_value": bool(result)}
