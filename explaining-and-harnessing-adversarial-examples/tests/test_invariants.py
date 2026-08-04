@@ -287,14 +287,16 @@ def test_rubbish_eval_softmax_in_range_and_shares_sum_to_100():
 
 def test_rubbish_eval_rbf_near_zero():
     """positive (rubbish_any_prob_threshold instrument): an RBF network far from
-    the data assigns every class prob ~ 0 (< 0.5) on Gaussian rubbish, so
+    the data assigns every class prob well below 0.5 on Gaussian rubbish, so
     rubbish_err ~ 0 (paper: 'RBF network ... error rate of 0%'). This is the
     oracle that proves the 0.5 'any class prob > 0.5' threshold is correct --
-    a softmax would score ~100% here; the RBF scores ~0."""
+    a softmax would score ~100% here; the RBF scores ~0%. (Shift of 0.5 keeps
+    the exp-quadratic probs positive but tiny -- no float underflow -- so the
+    threshold, not arithmetic, is what's exercised.)"""
     torch.manual_seed(0)
     m = models.RBFNet()
     with torch.no_grad():
-        m.mu.add_(5.0)  # shift means far from N(0, I_784) rubbish -> probs -> 0
+        m.mu.add_(0.5)  # means just far enough that max prob ~ 1e-5 (< 0.5, > 0)
     r = ev.rubbish_eval(m, 784, 256, seed=0)
     assert 0.0 <= r["rubbish_err"] <= 5.0, f"RBF rubbish_err not ~0: {r['rubbish_err']}"
     assert set(r["rubbish_class_shares"].keys()) == {str(k) for k in range(10)}
@@ -302,14 +304,16 @@ def test_rubbish_eval_rbf_near_zero():
 
 def test_rubbish_rejects_wrong_threshold():
     """negative (rubbish_any_prob_threshold instrument): a buggy threshold
-    ('any prob > 0.0', which is always true since exp(quad) > 0 for the RBF)
-    would report ~100% rubbish_err for the robust RBF that the correct eval
-    ('any prob > 0.5') scores ~0%. Proves the 0.5 threshold is load-bearing and
-    the instrument rejects the argmax-confidence-always-true bug."""
+    ('any prob > 0.0', which is always true for the exp-quadratic RBF whose
+    probs are positive) would report ~100% rubbish_err for the robust RBF that
+    the correct eval ('any prob > 0.5') scores ~0%. Proves the 0.5 threshold is
+    load-bearing and the instrument rejects the always-true-threshold bug.
+    (Shift of 0.5 keeps probs positive -- no underflow to exactly 0.0, which
+    would make even the buggy >0.0 threshold report 0% and hide the defect.)"""
     torch.manual_seed(0)
     m = models.RBFNet()
     with torch.no_grad():
-        m.mu.add_(5.0)
+        m.mu.add_(0.5)
     x = torch.from_numpy(data.rubbish(784, 256, seed=0))
     with torch.no_grad():
         prob = m.prob(x)
