@@ -356,3 +356,13 @@ exercised here; the from-scratch environment was instead verified via a fresh
   survives across two orders of magnitude of the unstated hyperparameter, and
   the magnitude claims survive within their (seed-widened) tolerances. The
   default `s=0.15` is retained as the calibrated, central value.
+
+- 2026-08-04: Fixed `mutations.json` schema. The file previously keyed the list
+  of deliberate defects under `defects`; the numbers gate expects either a
+  top-level list or an object whose list lives under the `mutations` key
+  (each entry carrying `covers`, `file`, `find`, `replace`, `must_fail`).
+  Renamed `defects` -> `mutations` in `mutations.json` and updated the one
+  reader in `tests/test_mutations.py` (`_load_defects` now reads the
+  `mutations` key). The four defects (M1–M4), their `must_fail` invariants,
+  and the test that breaks the suite on purpose are unchanged; `pytest -q`
+  still 41 passed.

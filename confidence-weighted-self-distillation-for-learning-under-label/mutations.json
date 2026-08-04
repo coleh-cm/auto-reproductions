@@ -1,6 +1,6 @@
 {
   "_comment": "Deliberate defects injected into run_experiment.py, each paired with the test node that MUST fail when the defect is present. A suite nobody has broken on purpose is not evidence; these defects exercise the suite's ability to catch real bugs. Each defect covers `core` (it is in the method core, run_experiment.py) and `degeneracy` (it is caught by the paper's own lambda=0==baseline verification gate). tests/test_mutations.py applies each find->replace to a fresh exec'd copy of run_experiment.py and asserts the must_fail invariant is VIOLATED (the test catches it), while the original holds.",
-  "defects": [
+  "mutations": [
     {
       "id": "M1-gate-weight-nonzero-at-lambda-zero",
       "covers": ["core", "degeneracy", "gate"],

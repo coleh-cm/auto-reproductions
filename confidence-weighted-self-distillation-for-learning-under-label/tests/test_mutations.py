@@ -110,7 +110,7 @@ _CHECKERS = {
 
 
 def _load_defects():
-    return json.loads(MUTATIONS.read_text())["defects"]
+    return json.loads(MUTATIONS.read_text())["mutations"]
 
 
 @pytest.mark.parametrize("defect", _load_defects(), ids=lambda d: d["id"])
