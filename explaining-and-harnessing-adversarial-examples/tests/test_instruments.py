@@ -37,6 +37,9 @@ from fgsm_repro.eval import (  # noqa: E402
     eval_clean_confidence_rbf,
     eval_fgsm,
     eval_fgsm_rbf,
+    eval_rubbish,
+    eval_rubbish_rbf,
+    eval_rubbish_sigmoid,
     eval_transfer,
 )
 from fgsm_repro.attacks import fgsm, fooling_sign_step, sample_rubbish  # noqa: E402
@@ -313,3 +316,35 @@ def test_eval_clean_raises_on_empty():
     m = SoftmaxRegression(784, 10)
     with pytest.raises(Exception):
         eval_clean(m, torch.zeros(0, 784), torch.zeros(0, dtype=torch.long))
+
+
+# A grader fed an EMPTY input must RAISE, never return a vacuous nan/0.0 verdict.
+# These were latent empty-input contract violations (adversarial review pass):
+# eval_clean_confidence_rbf returned nan; the three eval_rubbish* graders
+# returned AttackEval(error_rate=nan, ...). All now raise.
+def test_eval_clean_confidence_rbf_raises_on_empty():
+    from fgsm_repro.models import RBFNet
+    r = RBFNet(10, 784)
+    with pytest.raises(Exception):
+        eval_clean_confidence_rbf(r, torch.zeros(0, 784))
+
+
+def test_eval_rubbish_raises_on_empty():
+    from fgsm_repro.models import SoftmaxRegression
+    m = SoftmaxRegression(784, 10)
+    with pytest.raises(Exception):
+        eval_rubbish(m, 0, 784, 0)
+
+
+def test_eval_rubbish_rbf_raises_on_empty():
+    from fgsm_repro.models import RBFNet
+    r = RBFNet(10, 784)
+    with pytest.raises(Exception):
+        eval_rubbish_rbf(r, 0, 784, 0)
+
+
+def test_eval_rubbish_sigmoid_raises_on_empty():
+    from fgsm_repro.models import SigmoidTopMLP
+    m = SigmoidTopMLP(units=8, pieces=2, in_dim=784, n_classes=10)
+    with pytest.raises(Exception):
+        eval_rubbish_sigmoid(m, 0, 784, 0)

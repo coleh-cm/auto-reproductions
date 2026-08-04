@@ -377,6 +377,59 @@
         ],
         "loss": "cross_entropy + coeff*||layer0.W||_1 (L1 weight decay on the FIRST layer; tex:426-433)"
       }
+    },
+    {
+      "name": "f4_eps_curve",
+      "milestone": "F4 (Figure 4 eps-sweep)",
+      "script": "experiments/f4_eps_curve.py",
+      "results": "results/f4_eps_curve.json",
+      "model": {
+        "class": "MaxoutMLP",
+        "units": 240,
+        "pieces": 5,
+        "in_dim": 784,
+        "n_classes": 10,
+        "dropout_input_include": 0.8,
+        "dropout_hidden_include": 1.0,
+        "note": "naively trained (Fig 4 'was made from a naively trained maxout network', tex:766); identical recipe to m3_maxout240_clean"
+      },
+      "training": {
+        "adv_train": false,
+        "loss": "cross_entropy",
+        "optimizer": "SGD (external; paper states none)"
+      },
+      "evaluation": {
+        "type": "eps_sweep_curve",
+        "eps_range": [
+          -15.0,
+          15.0
+        ],
+        "eps_step": 0.5,
+        "example": "first MNIST test example of class 4 (deterministic)",
+        "direction": "sign of grad_x J at the clean example, computed once (the 1-D FGSM subspace, tex:664-665)",
+        "sequences": [
+          "eps_values",
+          "correct_logit",
+          "max_wrong_logit",
+          "top_class",
+          "predicted_is_correct",
+          "max_abs_logit",
+          "logits"
+        ]
+      },
+      "paper_target": {
+        "curve_claims": [
+          "fc1_fig4_correct_class_crossed_by_wrong",
+          "fc2_fig4_wrong_classification_stable_wide_region",
+          "fc3_fig4_predictions_become_extreme"
+        ],
+        "citation": "paper/source/iclr2015.tex:755-775",
+        "figure_reads": "paper/figure_transcripts.md"
+      },
+      "result_metric_paths": {
+        "eps_crossover_pos": "eps_crossover_pos",
+        "frac_correct_pos_4_15": "frac_correct_pos_4_15"
+      }
     }
   ],
   "excluded_arms": [

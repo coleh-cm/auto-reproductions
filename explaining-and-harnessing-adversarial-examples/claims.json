@@ -19,11 +19,12 @@
     "compute_invariance": {
       "policy": "rated honestly: high = the assertion already survives this reproduction's CPU sub-scale (240-unit maxout, ~10-epoch training, fewer ensemble members) which is strictly smaller than the paper's budget; medium = held at sub-scale but rests on a caveat recorded in the claim's note; low = exact magnitude that requires the paper's full scale (1600 units / patience 100 / 5 seeds / full ensembles) or is otherwise budget-fragile. The numbers gate checks the HIGH claims.",
       "counts": {
-        "high": 16,
+        "high": 19,
         "medium": 6,
         "low": 12
       }
-    }
+    },
+    "curve": "a figure claim: `quantity` (and `against` (the other curve, required by crosses and by two-curve above/below)) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
   },
   "arms": {
     "m1_softmax_regression": {
@@ -80,7 +81,8 @@
       "results": "results/m5_large_advtrain.json",
       "metrics": {
         "mean_test_error": "results/m5_large_advtrain.json:arms.adversarial.mean_test_error",
-        "per_seed_test_errors": "results/m5_large_advtrain.json:arms.adversarial.per_seed[*].test_error"
+        "per_seed_test_errors": "results/m5_large_advtrain.json:arms.adversarial.per_seed[*].test_error",
+        "per_seed_spread": "derived:spread_of_per_seed_test_errors"
       }
     },
     "m6_robustness_transfer_eval": {
@@ -91,7 +93,8 @@
         "own_fgsm_error": "results/m6_robustness_transfer.json:own_fgsm_on_adv_model.error_rate",
         "own_fgsm_mean_confidence_on_errors": "results/m6_robustness_transfer.json:own_fgsm_on_adv_model.mean_confidence_on_errors",
         "orig_to_adv_transfer_error": "results/m6_robustness_transfer.json:transfer_orig_to_adv.error_rate",
-        "adv_to_orig_transfer_error": "results/m6_robustness_transfer.json:transfer_adv_to_orig.error_rate"
+        "adv_to_orig_transfer_error": "results/m6_robustness_transfer.json:transfer_adv_to_orig.error_rate",
+        "min_noise_control_fgsm_error": "derived:min_of_m7_noise_sign_uniform_fgsm_error_rate"
       }
     },
     "m7_maxout_noise_sign": {
@@ -135,7 +138,8 @@
         "maxout_softmax_rubbish_error": "results/m9_rubbish.json:evals.maxout_softmax.error_rate",
         "sigmoid_top_rubbish_error": "results/m9_rubbish.json:evals.sigmoid_top.error_rate",
         "softmax_regression_rubbish_error": "results/m9_rubbish.json:evals.softmax_regression.error_rate",
-        "rbf_rubbish_error": "results/m9_rubbish.json:evals.rbf.error_rate"
+        "rbf_rubbish_error": "results/m9_rubbish.json:evals.rbf.error_rate",
+        "min_linear_rubbish_error": "derived:min_of_maxout_softmax_softmax_regression_rubbish_error"
       }
     },
     "e1_ensemble12_maxout": {
@@ -154,8 +158,23 @@
       "metrics": {
         "baseline_train_error": "results/m_l1_weight_decay.json:arms.baseline.clean_train_error",
         "baseline_test_error": "results/m_l1_weight_decay.json:arms.baseline.clean_test_error",
-        "l1_0.0025_train_error": "results/m_l1_weight_decay.json:arms.l1_0.0025.clean_train_error",
-        "l1_2.5e-05_test_error": "results/m_l1_weight_decay.json:arms.l1_2.5e-05.clean_test_error"
+        "l1_coeff0025_train_error": "results/m_l1_weight_decay.json:arms.l1_0.0025.clean_train_error",
+        "l1_coeff000025_test_error": "results/m_l1_weight_decay.json:arms.l1_2.5e-05.clean_test_error"
+      }
+    },
+    "f4_eps_curve": {
+      "script": "experiments/f4_eps_curve.py",
+      "command_per_seed": "python experiments/f4_eps_curve.py --seed {seed}",
+      "results": "results/f4_eps_curve.json",
+      "metrics": {
+        "eps_crossover_pos": "results/f4_eps_curve.json:eps_crossover_pos",
+        "frac_correct_pos_4_15": "results/f4_eps_curve.json:frac_correct_pos_4_15"
+      },
+      "curve_metrics": {
+        "eps_values": "results/f4_eps_curve.json:eps_values",
+        "correct_logit": "results/f4_eps_curve.json:correct_logit",
+        "max_wrong_logit": "results/f4_eps_curve.json:max_wrong_logit",
+        "predicted_is_correct": "results/f4_eps_curve.json:predicted_is_correct"
       }
     }
   },
@@ -282,7 +301,7 @@
       "compute_invariance": "low",
       "quote": "four trials that each had an error rate of 0.77\\% on the test set and one trial that had\nan error rate of 0.83\\%. The average of 0.782\\% is the best result reported on the permutation\ninvariant version of MNIST, though statistically indistinguishable from the result obtained\nby fine-tuning DBMs with dropout~\\citep{dropout} at 0.79\\%.",
       "citation": "paper/source/iclr2015.tex:509",
-      "quantity": "mean(measured.m5_maxout1600_advtrain.per_seed_test_errors)",
+      "quantity": "measured.m5_maxout1600_advtrain.mean_test_error",
       "claimed": 0.00782,
       "tolerance": 0.003,
       "seeds": [
@@ -292,7 +311,7 @@
         3,
         4
       ],
-      "note": "Requires the paper's full scale (1600 units, patience 100, 5 seeds, 60k retrain). `seeds` here overrides the top-level [0,1,2] to match the paper's five runs. Informational at sub-scale."
+      "note": "Requires the paper's full scale (1600 units, patience 100, 5 seeds, 60k retrain). `seeds` here overrides the top-level [0,1,2] to match the paper's five runs. Informational at sub-scale. Expression uses the per-seed scalar `mean_test_error` rather than `mean(per_seed_test_errors)` because the numbers gate's expression evaluator exposes no `mean`/`min`/`max` builtins; at sub-scale (one internal run per seed) `mean_test_error` equals that seed's `per_seed_test_errors`, so the per-seed comparison against 0.782% is the same magnitude assertion the paper makes."
     },
     {
       "id": "c13_m5_seed_spread_invariant",
@@ -300,7 +319,7 @@
       "compute_invariance": "low",
       "quote": "four trials that each had an error rate of 0.77\\% on the test set and one trial that had\nan error rate of 0.83\\%.",
       "citation": "paper/source/iclr2015.tex:509",
-      "predicate": "max(measured.m5_maxout1600_advtrain.per_seed_test_errors) - min(measured.m5_maxout1600_advtrain.per_seed_test_errors) <= 0.0006",
+      "predicate": "measured.m5_maxout1600_advtrain.per_seed_spread <= 0.0006",
       "seeds": [
         0,
         1,
@@ -308,7 +327,7 @@
         3,
         4
       ],
-      "note": "Seed-stability claim (spread 0.77%..0.83% = 6e-4). Paper-scale only; informational."
+      "note": "Seed-stability claim (spread 0.77%..0.83% = 6e-4). Paper-scale only; informational. Predicate uses the precomputed cross-seed scalar `per_seed_spread` (= max-min of `per_seed_test_errors` over the seeds that ran, written by make_measured.py's derived-metric step) because the gate's expression evaluator has no `max`/`min` builtins; the value is constant across seeds so the per-seed boolean is the same paper-scale spread assertion."
     },
     {
       "id": "c14_advtrained_robust_vs_naive",
@@ -345,9 +364,9 @@
       "compute_invariance": "high",
       "quote": "classification. As control experiments, we trained training a maxout network with noise based on randomly adding $\\pm \\eps$\nto each pixel, or adding noise in $U(-\\eps, \\eps)$ to each pixel. These obtained an error rate of 86.2\\% with confidence\n97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.",
       "citation": "paper/source/iclr2015.tex:555",
-      "quantity": "min(measured.m7_maxout_noise_sign.fgsm_error_rate, measured.m7_maxout_noise_uniform.fgsm_error_rate) - measured.m6_robustness_transfer_eval.own_fgsm_error",
+      "quantity": "measured.m6_robustness_transfer_eval.min_noise_control_fgsm_error - measured.m6_robustness_transfer_eval.own_fgsm_error",
       "direction": ">0",
-      "note": "The paper's \u00a710 control-experiment claim: random-noise training does NOT reproduce adversarial training's robustness (86.2%/90.4% fooled vs 17.9%). Sub-scale: 99.97%/99.98% vs 10.4%."
+      "note": "The paper's \u00a710 control-experiment claim: random-noise training does NOT reproduce adversarial training's robustness (86.2%/90.4% fooled vs 17.9%). Sub-scale: 99.97%/99.98% vs 10.4%. Expression uses the precomputed per-seed scalar `min_noise_control_fgsm_error` (= min of the two m7 noise-control FGSM error rates at that seed, written by make_measured.py's derived-metric step) because the gate's expression evaluator has no `min(a,b)` builtin."
     },
     {
       "id": "c18_noise_bernoulli_error_value",
@@ -377,9 +396,9 @@
       "compute_invariance": "medium",
       "quote": "adversarial training with $\\eps = .25$. When applying $L^1$ weight decay to the first layer, we found that even a coefficient of\n.0025 was too large, and caused the model to get stuck with over 5\\% error on\nthe training set.",
       "citation": "paper/source/iclr2015.tex:429",
-      "quantity": "measured.m_l1_weight_decay.l1_0.0025_train_error - 0.05",
+      "quantity": "measured.m_l1_weight_decay.l1_coeff0025_train_error - 0.05",
       "direction": ">0",
-      "note": "Held at sub-scale (88.6% train error -- stuck). Medium: the 'too large' threshold shifts DOWN at smaller scale (0.00025 is also stuck at sub-scale); the direction at coefficient 0.0025 is robust but the threshold location is not (SPEC \u00a76 item 28)."
+      "note": "Held at sub-scale (88.6% train error -- stuck). Medium: the 'too large' threshold shifts DOWN at smaller scale (0.00025 is also stuck at sub-scale); the direction at coefficient 0.0025 is robust but the threshold location is not (SPEC \u00a76 item 28). Metric renamed from `l1_0.0025_train_error` to `l1_coeff0025_train_error` (dot-free) because the numbers gate tokenizes `measured.<arm>.<metric>` by splitting on `.`; a metric name containing `0.0025` parsed as the invalid decimal literal `0025_train_error`. The JSON pointer `arms.l1_0.0025.clean_train_error` (the result-file key `l1_0.0025`) is unchanged; only the metric KEY is dot-free."
     },
     {
       "id": "c21_l1_small_coeff_no_benefit",
@@ -387,9 +406,9 @@
       "compute_invariance": "medium",
       "quote": "the training set. Smaller weight decay coefficients permitted succesful training\nbut conferred no regularization benefit.",
       "citation": "paper/source/iclr2015.tex:431",
-      "quantity": "measured.m_l1_weight_decay.l1_2.5e-05_test_error - measured.m_l1_weight_decay.baseline_test_error",
+      "quantity": "measured.m_l1_weight_decay.l1_coeff000025_test_error - measured.m_l1_weight_decay.baseline_test_error",
       "direction": ">0",
-      "note": "A small L1 coefficient trains but does not IMPROVE clean test error over baseline (paper's 'no regularization benefit'). Sub-scale: 3.06% vs 2.65%. Medium: close to noise at small budgets."
+      "note": "A small L1 coefficient trains but does not IMPROVE clean test error over baseline (paper's 'no regularization benefit'). Sub-scale: 3.06% vs 2.65%. Medium: close to noise at small budgets. Metric renamed from `l1_2.5e-05_test_error` to `l1_coeff000025_test_error` (dot-free) for the same tokenization reason as c20; the JSON pointer `arms.l1_2.5e-05.clean_test_error` is unchanged."
     },
     {
       "id": "c22_rbf_low_confidence_when_fooled",
@@ -517,9 +536,58 @@
       "compute_invariance": "high",
       "quote": "If we use instead an RBF network, which does not behave like a linear function,\nwe find an error rate of 0\\%.",
       "citation": "paper/source/iclr2015.tex:922",
-      "quantity": "measured.m9_rubbish_evals.rbf_rubbish_error - min(measured.m9_rubbish_evals.maxout_softmax_rubbish_error, measured.m9_rubbish_evals.softmax_regression_rubbish_error)",
+      "quantity": "measured.m9_rubbish_evals.rbf_rubbish_error - measured.m9_rubbish_evals.min_linear_rubbish_error",
       "direction": "<0",
-      "note": "RBF vs every linear-built model on identical rubbish draws. Sub-scale: 0.0% vs 82.1%/81.7%."
+      "note": "RBF vs every linear-built model on identical rubbish draws. Sub-scale: 0.0% vs 82.1%/81.7%. Expression uses the precomputed per-seed scalar `min_linear_rubbish_error` (= min of the maxout-softmax and softmax-regression rubbish error rates at that seed, written by make_measured.py's derived-metric step) because the gate's expression evaluator has no `min(a,b)` builtin."
+    },
+    {
+      "id": "fc1_fig4_correct_class_crossed_by_wrong",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "By tracing out different values of $\\eps$, we can see that adversarial examples occur reliably\nfor almost any sufficiently large value of $\\eps$ provided that we move in\nthe correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
+      "citation": "paper/source/iclr2015.tex:762",
+      "quantity": "measured.f4_eps_curve.correct_logit",
+      "against": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        0.0,
+        15.0
+      ],
+      "comparison": "crosses",
+      "note": "Figure 4 shape claim: along the FGSM direction the correct class (4) logit starts on top at eps=0 and ends below a wrong-class logit at large eps (the figure's own x-range is [-15,15], read via read-figure; transcript paper/figure_transcripts.md). Sub-scale seed 0: 12.27 vs 6.92 at eps=0, crossing at eps=0.5 (figure read: ~0.5-1), deeply crossed at eps=15. High: pure shape, no author numbers needed; needs only a fitted naive maxout at any budget."
+    },
+    {
+      "id": "fc2_fig4_wrong_classification_stable_wide_region",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "the wrong classifications are stable across a wide region of $\\eps$ values.",
+      "citation": "paper/source/iclr2015.tex:769",
+      "quantity": "measured.f4_eps_curve.correct_logit",
+      "against": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        4.0,
+        15.0
+      ],
+      "comparison": "below",
+      "tolerance": 0.0,
+      "note": "Wrong classification stable over a WIDE region, expressed curve-vs-curve: at every sample of the eps grid in [4,15] (23 points, step 0.5 -- 11/30 of the figure's positive axis) the correct-class logit sits strictly below the top wrong-class logit, i.e. the input is misclassified at all 23 points; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seeds 0-2: min margin correct_logit - max_wrong_logit in [4,15] = -1622.3 / -1094.6 / -954.3 (23/23 below at every seed; equivalently frac correct = 0.000). High: a stability/shape assertion that survives sub-scale budgets."
+    },
+    {
+      "id": "fc3_fig4_predictions_become_extreme",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "Moreover, the predictions become very extreme as we\nincrease $\\eps$ enough to move into the regime of rubbish inputs.",
+      "citation": "paper/source/iclr2015.tex:769",
+      "quantity": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        0.0,
+        15.0
+      ],
+      "comparison": "increasing",
+      "tolerance": 0.5,
+      "note": "The top wrong-class softmax argument rises monotonically (up to 0.5-logit local slack) along the FGSM ray from eps=0 to eps=15. Sub-scale seed 0: 6.92 -> 872.7, max dip below running max = 0.0. NOT a magnitude match: the figure reaches ~+400 at eps=10 on the paper's fully-trained net (read off the plot); only the increasing shape is asserted. High."
     }
   ],
   "not_tested": [
@@ -558,12 +626,6 @@
       "quote": "We also found that the weights of the learned model changed significantly,\nwith the weights of the adversarially trained model being significantly more localized and\ninterpretable (see Fig.~\\ref{fig:weights}).",
       "citation": "paper/source/iclr2015.tex:523",
       "reason": "Qualitative weight-visualization claim with no numeric target."
-    },
-    {
-      "id": "nt07_fig4_epsilon_sweep",
-      "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that\nthe wrong classifications are stable across a wide region of $\\eps$ values.",
-      "citation": "paper/source/iclr2015.tex:768",
-      "reason": "Visual claim from the plotting layer (Figure 4); the epsilon axis range exists only in the figure, not the text."
     },
     {
       "id": "nt08_rubbish_class_skew",

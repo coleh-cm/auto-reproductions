@@ -35,10 +35,11 @@ running log and target numbers.
   "adversarial": "<cmd>"}` from each arm the gate runs to the shell command
   that produces it. The two arms are the paper's headline M4 comparison
   (tex:492-494). The rich per-milestone metadata is in `arms_metadata.json`,
-  and the full 13-arm numbers-gate map (arm → `command_per_seed`, results file,
+  and the full 14-arm numbers-gate map (arm → `command_per_seed`, results file,
   metric pointers) is `claims.json`.
-- `run_all_arms.sh` — runs **every arm** of `claims.json` (13 arms: M1–M9, E1,
-  the L1 control; m5 and m7 each contribute two arms from one command) at
+- `run_all_arms.sh` — runs **every arm** of `claims.json` (14 arms: M1–M9, E1,
+  the L1 control, F4 the Figure-4 eps-curve; m5 and m7 each contribute two arms
+  from one command) at
   **every seed** in `claims.json['seeds']` (`[0, 1, 2]`), via `make_measured.py`.
   It writes `measured.json` (`{arm: {seed: {metric: value}}}`) and prints exactly
   one `FINAL <arm>=<value>` line per arm to stdout (BLOCKED if the environment
@@ -62,24 +63,36 @@ running log and target numbers.
   `m3_maxout_fgsm.py`, `m4_adversarial.py`, `m5_large_advtrain.py`,
   `m6_robustness_transfer.py`, `m7_noise_controls.py`, `m8_rbf.py`,
   `m9_rubbish.py`, the L1 weight-decay control `m_l1_weight_decay.py`
-  (Section 5), and the extended `e1_ensemble.py`. Each writes a parsed
+  (Section 5), and the extended `e1_ensemble.py`. `experiments/f4_eps_curve.py`
+  records the Figure-4 eps-sweep curve DATA (the gate settles the curve claims
+  fc1–fc3 against it) and `experiments/f4_plot.py` regenerates the Figure 4
+  panel from that committed data (no retraining). Each writes a parsed
   result JSON to `results/` with the milestone id, all hyperparameters, seed,
   and the grep-able paper target. Defaults are a documented **sub-scale** for
   CPU feasibility; the CLI exposes the full-scale knobs (e.g.
   `--units 1600 --epochs 100 --patience 100 --seeds 0,1,2,3,4` for M5).
 - `results/` — committed result JSONs (one per arm, the seed-0 mirror) plus
-  `results/_per_seed/` (every arm × every seed, the inputs to `measured.json`).
-  Results are committed, not gitignored: a number whose output file is ignored
+  `results/_per_seed/` (every arm × every seed, the inputs to `measured.json`)
+  and `results/figures/` (the regenerated Figure-4 panels
+  `f4_eps_curve_repro{,_seed1,_seed2}.png` — for a reader to compare against
+  `paper/source/eps_curve.pdf`; NOT evidence, see REPRODUCTION.md). Results
+  are committed, not gitignored: a number whose output file is ignored
   is a claim with its evidence deleted.
 - `tests/` — degeneracy, shape, invariant, constructed-truth, instrument, and
-  data-fingerprint tests (72 nodes). FGSM on a linear model must equal the
+  data-fingerprint tests (104 nodes). FGSM on a linear model must equal the
   closed-form max-norm adversary; `||η||_∞ == ε`; `x̃ == x` when `ε == 0`; the
   method at its no-op reproduces the baseline bit-for-bit; E6 is the brute-force
-  worst case; the MNIST loader is fingerprinted by sha/vocab/shape.
+  worst case; the MNIST loader is fingerprinted by sha/vocab/shape; the
+  regenerated Figure-4 panel's axis ranges/units are asserted against the
+  paper's figure (`tests/test_f4_figure.py`).
 - `instruments.json` / `mutations.json` — the instrument registry (every grader
   with a positive+negative test) and the deliberate-defect suite (each defect
   with a `must_fail` test node, all verified to fail under the defect and pass
-  on clean code).
+  on clean code). A top-level `not_applicable` is reserved for the single case
+  where nothing in the reproduction judges an output (one sentence); a
+  per-instrument exemption is put ON that instrument as
+  `"not_applicable": {"reason": ...}` so the rest still run (`mp_dbm_*` and
+  `cifar10_loader` are exempted this way).
 - `requirements.txt` — pinned dependencies (torch CPU, numpy, pytest, and the
   full transitive closure).
 - `Dockerfile` — builds the environment from scratch.
@@ -89,8 +102,11 @@ running log and target numbers.
 
 ## Environment
 
-- Python 3.13 (this sandbox: CPython 3.13.5; the Dockerfile builds on `python:3.13-slim`)
-- torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2
+- Python 3.12 or 3.13 (the Dockerfile builds on `python:3.13-slim`; verified in
+  two sandboxes: CPython 3.13.5 on 2026-07-30 and CPython 3.12.13 on 2026-08-04 —
+  the pinned wheels resolve identically and the full suite passes on both)
+- torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2, matplotlib 3.11.1
+  (figures only — regenerates the Figure-4 panel; Agg backend, no display)
 - CPU-only; no GPU required
 
 ## Quickstart
@@ -151,6 +167,7 @@ docker run --rm fgsm-repro                       # environment smoke test
 | M8 | Shallow RBF, FGSM ε=0.25 | adv 55.4%, conf-on-error 1.2% |
 | M9 | Rubbish examples N(0, I₇₈₄) | maxout 98.35%, softmax-reg 59.8%, RBF 0% |
 | M-L1 | L1 weight-decay control (Section 5) | coeff 0.0025 → >5% train error; smaller → no benefit |
+| F4 | Fig. 4 eps-sweep curve (ε ∈ [−15,15], naive maxout) | curve claims fc1–fc3: correct class crossed, wrong classification stable over ε∈[4,15], logits grow extreme (figure shape, not magnitudes) |
 
 The RBF arms (M8/M9) use the paper's unnormalized per-class `exp(q)` form (a
 softmax over `q` is bounded below by 1/K and cannot reproduce the paper's

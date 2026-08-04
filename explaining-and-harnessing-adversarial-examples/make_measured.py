@@ -83,10 +83,63 @@ HEADLINE_METRIC: dict[str, str] = {
     "m8_rbf_shallow": "rbf_fgsm_error_rate",
     "m9_rubbish_evals": "maxout_softmax_rubbish_error",
     "e1_ensemble12_maxout": "ensemble_targeted_error",
-    "m_l1_weight_decay": "l1_0.0025_train_error",
+    "m_l1_weight_decay": "l1_coeff0025_train_error",
+    "f4_eps_curve": "eps_crossover_pos",
 }
 
 BLOCKED = "BLOCKED"
+# Placeholder for ``derived:`` metric pointers; overwritten by _compute_derived.
+# Never reaches measured.json: the post-step replaces it (or BLOCKED on failure).
+DERIVED_PLACEHOLDER = "__DERIVED__"
+
+
+# Derived metrics: cross-arm or cross-seed aggregates the numbers gate cannot
+# express inline (its expression evaluator exposes no min/max/mean builtins, so
+# a claim that needs ``min(a, b)`` or ``max-min`` across seeds must reference a
+# precomputed scalar metric instead). Each entry computes one metric per seed
+# from already-assembled per-seed scalars; the value is stored on the named arm
+# at every seed (cross-seed aggregates are constant across seeds by design).
+#
+# ``spec`` strings (after ``derived:``) are matched here:
+#   spread_of_per_seed_test_errors          max-min of m5 advtrain per-seed errors
+#   min_of_m7_noise_sign_uniform_fgsm_error_rate   per-seed min of the two m7 controls
+#   min_of_maxout_softmax_softmax_regression_rubbish_error  per-seed min of the two linear arms
+def _compute_derived(measured: dict, seeds: list[int]) -> None:
+    def _num(v):
+        return v if isinstance(v, (int, float)) and v != DERIVED_PLACEHOLDER else None
+
+    # m5_maxout1600_advtrain.per_seed_spread = max-min across seeds of
+    # per_seed_test_errors (c13: paper's 5-seed spread 0.77%..0.83% = 6e-4).
+    errs = [
+        _num(measured.get("m5_maxout1600_advtrain", {}).get(s, {}).get("per_seed_test_errors"))
+        for s in seeds
+    ]
+    errs = [e for e in errs if e is not None]
+    spread = (max(errs) - min(errs)) if errs else BLOCKED
+    for s in seeds:
+        measured.setdefault("m5_maxout1600_advtrain", {}).setdefault(s, {})["per_seed_spread"] = spread
+
+    # m6.min_noise_control_fgsm_error = min(m7_sign.fgsm_error_rate,
+    # m7_uniform.fgsm_error_rate) at each seed (c17: noise controls weaker
+    # than adversarial training).
+    for s in seeds:
+        a = _num(measured.get("m7_maxout_noise_sign", {}).get(s, {}).get("fgsm_error_rate"))
+        b = _num(measured.get("m7_maxout_noise_uniform", {}).get(s, {}).get("fgsm_error_rate"))
+        vals = [v for v in (a, b) if v is not None]
+        measured.setdefault("m6_robustness_transfer_eval", {}).setdefault(s, {})["min_noise_control_fgsm_error"] = (
+            min(vals) if vals else BLOCKED
+        )
+
+    # m9.min_linear_rubbish_error = min(maxout_softmax_rubbish_error,
+    # softmax_regression_rubbish_error) at each seed (c34: RBF less fooled than
+    # every linear-built model on identical rubbish draws).
+    for s in seeds:
+        a = _num(measured.get("m9_rubbish_evals", {}).get(s, {}).get("maxout_softmax_rubbish_error"))
+        b = _num(measured.get("m9_rubbish_evals", {}).get(s, {}).get("softmax_regression_rubbish_error"))
+        vals = [v for v in (a, b) if v is not None]
+        measured.setdefault("m9_rubbish_evals", {}).setdefault(s, {})["min_linear_rubbish_error"] = (
+            min(vals) if vals else BLOCKED
+        )
 
 
 def _resolve_pointer(blob: dict, json_path: str):
@@ -179,6 +232,15 @@ def _metrics_for_arm(blob: dict, metrics: dict[str, str]) -> dict[str, object]:
     """
     out: dict[str, object] = {}
     for metric, pointer in metrics.items():
+        # ``derived:<spec>`` pointers are NOT read from the per-seed result
+        # file; they name a cross-arm / cross-seed aggregate computed by
+        # ``_compute_derived`` after every arm has been assembled. Mark them
+        # with a placeholder so the key is present (the post-step overwrites
+        # it; if the post-step never runs the gate sees BLOCKED, never a
+        # stale or missing value).
+        if pointer.startswith("derived:"):
+            out[metric] = DERIVED_PLACEHOLDER
+            continue
         _file, _, json_path = pointer.partition(":")
         try:
             val = _resolve_pointer(blob, json_path)
@@ -192,6 +254,36 @@ def _metrics_for_arm(blob: dict, metrics: dict[str, str]) -> dict[str, object]:
                 out[metric] = BLOCKED
         else:
             out[metric] = val
+    return out
+
+
+def _curve_metrics_for_arm(blob: dict, curve_metrics: dict[str, str]) -> dict[str, object]:
+    """Resolve every curve_metric pointer for one arm from one result blob.
+
+    Curve metrics are SEQUENCES (one value per x in the figure's sample grid);
+    they are stored verbatim as lists in ``measured.json`` so a ``curve`` claim
+    can read ``measured.<arm>.<curve_metric>`` directly. The numbers gate applies
+    its noise floor point by point, so the list must be the same length and
+    order at every seed. ``derived:`` pointers are not permitted for curve
+    metrics.
+    """
+    out: dict[str, object] = {}
+    for metric, pointer in curve_metrics.items():
+        if pointer.startswith("derived:"):
+            out[metric] = BLOCKED
+            continue
+        _file, _, json_path = pointer.partition(":")
+        try:
+            val = _resolve_pointer(blob, json_path)
+        except (KeyError, TypeError, IndexError):
+            out[metric] = BLOCKED
+            continue
+        if isinstance(val, list) and all(isinstance(v, (int, float)) for v in val):
+            out[metric] = [float(v) for v in val]
+        elif isinstance(val, (int, float)):
+            out[metric] = float(val)
+        else:
+            out[metric] = BLOCKED
     return out
 
 
@@ -289,10 +381,21 @@ def main(argv: list[str] | None = None) -> int:
                     blob = None
             for arm in arm_list:
                 metrics = arms[arm]["metrics"]
-                measured.setdefault(arm, {})[seed] = (
+                seed_block = (
                     _metrics_for_arm(blob, metrics) if blob is not None
                     else {m: BLOCKED for m in metrics}
                 )
+                # Curve metrics (sequences) are resolved alongside scalars and
+                # stored verbatim as lists so a ``curve`` claim can read its
+                # quantity/x/against sequences straight from measured.json.
+                curve_metrics = arms[arm].get("curve_metrics", {})
+                if curve_metrics:
+                    seed_block.update(
+                        _curve_metrics_for_arm(blob, curve_metrics)
+                        if blob is not None
+                        else {m: BLOCKED for m in curve_metrics}
+                    )
+                measured.setdefault(arm, {})[seed] = seed_block
             # Mirror the seed-0 result into the canonical results/ path so the
             # committed results/*.json files stay in sync with measured.json and
             # remain valid as the gate's <results json> pointers.
@@ -300,6 +403,18 @@ def main(argv: list[str] | None = None) -> int:
                 canonical = REPRO_ROOT / arms[arm_list[0]]["results"]
                 canonical.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(out_file, canonical)
+
+    # Fill the ``derived:`` metric placeholders now that every arm's scalars
+    # are assembled (cross-arm / cross-seed aggregates the gate cannot express
+    # inline because its expression evaluator has no min/max/mean builtins).
+    _compute_derived(measured, seeds)
+    # Any surviving placeholder (a derived metric whose inputs were missing)
+    # becomes BLOCKED so the gate treats the claim as blocked, not stale.
+    for arm in measured:
+        for s in measured[arm]:
+            for m, v in list(measured[arm][s].items()):
+                if v == DERIVED_PLACEHOLDER:
+                    measured[arm][s][m] = BLOCKED
 
     # Emit one FINAL line per arm (headline metric, mean over non-blocked seeds).
     final_lines = []

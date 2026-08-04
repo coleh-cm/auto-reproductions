@@ -61,8 +61,8 @@ at every seed.
 
 ## 2. Checks that ran, and what each found
 
-### 2.1 Unit / invariant test suite — 76 passed, 0 failed
-Command: `.venv/bin/python -m pytest tests/ -q` (this session, ~7.7 s).
+### 2.1 Unit / invariant test suite — 90 passed, 0 failed
+Command: `.venv/bin/python -m pytest tests/ -q` (this session, ~8.8 s).
 
 | File | # | What it checks |
 |------|---|----------------|
@@ -74,6 +74,8 @@ Command: `.venv/bin/python -m pytest tests/ -q` (this session, ~7.7 s).
 | `test_constructed_truth.py` (4) | 4 | the constructed-truth oracle categories (degeneracy, brute-force worst-case, same-quantity-two-ways, planted linear structure) map to a real enforcing test node |
 | `test_data_fingerprint.py` (3) | 3 | raw-file sha256, label vocabulary + canonical histogram, 50000/10000 split of real MNIST |
 | `test_measured_resolver.py` (4) | 4 | one-element `[*]` pointer collapses to scalar; multi-element `[*]` BLOCKS; scalar passthrough; `measured.json` holds no list values |
+| `test_curve_gate.py` (8) | 8 | the numbers-gate `curve` evaluator on known-correct and known-wrong synthetic sequences: crosses / below / increasing / matches each accepted when true and rejected when false; x_range restriction respected; every-seed-must-pass; missing per-seed file BLOCKS rather than fabricating |
+| `test_claims_integrity.py` (6) | 6 | every claim + not_tested quote is a VERBATIM substring of `paper/source/iclr2015.tex` starting at the cited line; claim kinds carry their arithmetic fields; compute-invariance counts truthful; every arm metric pointer resolves in the shipped results; SPEC.md's embedded claims.json is byte-identical to the file the gate enforces |
 
 ### 2.2 Mutation (defect) verification — 6/6 verified
 Command: `.venv/bin/python verify_mutations.py`. For each of the 6 deliberate
@@ -85,16 +87,19 @@ that fails when the property is removed (FGSM uses sign not raw gradient; no-op
 floor; confidence over errors-only; RBF unnormalized exp; E6 worst-case; empty
 grader raises).
 
-### 2.3 Numbers gate — 31 pass / 3 fail / 0 blocked; HIGH 16/16 pass
+### 2.3 Numbers gate — 34 pass / 3 fail / 0 blocked; HIGH 19/19 pass
 Command: `.venv/bin/python numbers_gate.py` (this session). Reads `claims.json`
 + `measured.json`, writes `claims_result.json`.
 
 | compute_invariance | pass | fail | blocked | total |
 |--------------------|------|------|---------|-------|
-| **high** (load-bearing) | **16** | 0 | 0 | 16 |
+| **high** (load-bearing) | **19** | 0 | 0 | 19 |
 | medium | 6 | 0 | 0 | 6 |
 | low (informational) | 9 | 3 | 0 | 12 |
-| **all** | **31** | **3** | **0** | **34** |
+| **all** | **34** | **3** | **0** | **37** |
+
+The 37 claims include the three `curve` claims fc1–fc3 (Figure 4, §2.3a below),
+all rated `high`, all passing at every seed.
 
 `FINAL gate=PASS` (gate passes iff every HIGH claim is adjudicated `pass` with
 none blocked). The 3 failures are all `low` and all **expected** at sub-scale,
@@ -103,11 +108,32 @@ each annotated in `claims.json`:
 - `c12_m5_advtrain_mean_magnitude` — paper 0.782 % mean over 5 seeds at 1600 units; measured 1.49 % mean over 3 seeds at 240 units. Needs the paper's full scale.
 - `c13_m5_seed_spread_invariant` — paper spread 0.0006 (0.77 %…0.83 %); measured spread 0.0010 over 3 sub-scale seeds. Needs the paper's full scale / 5 seeds.
 
-No `blocked` claims: every one of the 13 arms × 3 seeds = 117 metric cells
+No `blocked` claims: every one of the 14 arms × 3 seeds = 123 scalar metric cells
 resolves to a number (the dotted-key resolver bug that previously BLOCKED
-`m_l1` was fixed; `test_measured_resolver.py` guards it).
+`m_l1` was fixed; `test_measured_resolver.py` guards it), and the six curve
+sequence pointers (fc1–fc3's `quantity`/`x`) resolve in the per-seed result
+files for all three seeds.
 
-### 2.4 Full arm harness — 13 arms × 3 seeds, 0 BLOCKED
+### 2.3a Figure claims — the Fig. 4 eps-sweep curve (read via `read-figure`)
+
+Figure 4's claims live in the plotting layer (the ε axis range −15…15 exists
+only in the figure, not the text). The figure was read with `read-figure`
+(transcript committed at `paper/figure_transcripts.md`), the read was turned
+into three `curve` claims in `claims.json`, and a new arm
+(`experiments/f4_eps_curve.py`, naive maxout 240×2 — tex:766 "This plot was
+made from a naively trained maxout network") replays the sweep: logits along
+x₀ + ε·sign(∇ₓJ) for the first class-4 test example, ε ∈ [−15, 15] step 0.5.
+
+| Claim | Comparison | x_range | Result (seeds 0/1/2) |
+|-------|-----------|---------|----------------------|
+| fc1 correct-class logit crossed by a wrong class | `crosses` (correct vs max-wrong logit, `against`) | [0, 15] | PASS — correct on top at ε=0 (12.3/13.8/14.6 vs 6.9/5.3/6.2), crossing at ε=0.5, deeply below at ε=15 |
+| fc2 wrong classification stable over a wide ε region | `below` (correct-class logit strictly below max-wrong logit, `against`, at all 23 samples) | [4, 15] | PASS — 23/23 below at every seed; min margin −1622.3/−1094.6/−954.3 logits (equivalently 0/23 correct) |
+| fc3 predictions become very extreme with ε | `increasing` (max-wrong logit, tol 0.5) | [0, 15] | PASS — 6.9→872.7, 5.3→480.9, 6.2→467.6; max dip below running max = 0.0 |
+
+Gate evaluator: `numbers_gate.evaluate_curve_claim`, instrument-tested on
+synthetic known-correct/known-wrong sequences (`tests/test_curve_gate.py`).
+
+### 2.4 Full arm harness — 14 arms × 3 seeds, 0 BLOCKED
 Command: `.venv/bin/python make_measured.py` (the committed `measured.json` +
 `results/_per_seed/*.json` are its output; `--assemble-only` rebuilds from the
 per-seed files without recompute and reproduces them byte-identically).
@@ -128,6 +154,7 @@ FINAL m8_rbf_shallow=0.9504666527112325          (FGSM error, paper 55.4 %)
 FINAL m9_rubbish_evals=0.8860333363215128        (maxout+softmax rubbish error, paper 98.35 %)
 FINAL e1_ensemble12_maxout=0.9988333384195963   (ensemble-targeted error, paper 91.1 %)
 FINAL m_l1_weight_decay=0.8864400014281273      (L1 coeff 0.0025 train error, paper >5 %)
+FINAL f4_eps_curve=0.5                          (epsilon where a wrong class overtakes class 4; figure read: ~0.5–1)
 ```
 
 ### 2.5 Headline direction gate — `run_all_arms.sh`
@@ -169,19 +196,21 @@ reproduces `measured.json` byte-identically from the committed per-seed files.
 
 ## 4. What remains UNTESTED, and why
 
-### 4.1 Deliberately not tested (10 claims in `claims.json` `not_tested`)
+### 4.1 Deliberately not tested (9 claims in `claims.json` `not_tested`)
 These are claims the paper makes that this reproduction does not attempt, each
 with a recorded reason:
-- **GoogLeNet / ImageNet Fig 1** (tex:316–326) — needs the GoogLeNet model + ImageNet; out of this reproduction's scope (MNIST/CIFAR-scale CPU sandbox).
+- **GoogLeNet / ImageNet Fig 1** (tex:361-389) — needs the GoogLeNet model + ImageNet; out of this reproduction's scope (MNIST/CIFAR-scale CPU sandbox). (The clean/perturbed panda panels were read with read-figure and are visually indistinguishable — transcript `paper/figure_transcripts.md`.)
 - **CIFAR-10 arm** (convolutional maxout, ε=0.1, 87.15 %/96.6 %, tex:340–343) — CIFAR-10 + a conv maxout; not built here.
-- **MP-DBM generative-inference arm** (97.5 % FGSM error, tex:703–712) — differentiable generative model not implemented.
+- **MP-DBM generative-inference arm** (97.5 % FGSM error, tex:793-802) — differentiable generative model not implemented.
 - **"Best on permutation-invariant MNIST" cross-paper comparison** (tex:510–512, vs DBM-dropout 0.79 %) — a comparison to another paper's number, not a property of this method.
 - **Rotation-based adversarial examples** (tex:345–347) — a different attack family; the FGSM family is what this reproduction builds.
-- **Fig 3 weight-localization** (tex:526–528) — a qualitative visualization claim, not a number.
-- **Fig 4 ε-sweep visualization** (tex:742–760) — a visualization, not a number.
-- **MNIST rubbish class-skew** (45.3 % fives / no eights, tex:935–937) — a distributional statistic over fooling images; not gated.
-- **Train-to-zero-on-Gaussian-rubbish null result** (tex:953–958) — a negative result the paper itself calls not beneficial; not gated.
-- **CIFAR-10 target-specific fooling rates** (airplane 24.7 %, mean 75.3 %, tex:945–950) — CIFAR-10 + per-class fooling; not built here.
+- **Fig 3 weight-localization** (tex:523-525) — a qualitative visualization claim, not a number. (Both weight panels were read with read-figure: adversarially trained filters visibly more localized/sparse than naive ones — qualitative support only; no claim gated.)
+- **MNIST rubbish class-skew** (45.3 % fives / no eights, tex:929-933) — a distributional statistic over fooling images; not gated.
+- **Train-to-zero-on-Gaussian-rubbish null result** (tex:963-968) — a negative result the paper itself calls not beneficial; not gated.
+- **CIFAR-10 target-specific fooling rates** (airplane 24.7 %, mean 75.3 %, tex:935-941) — CIFAR-10 + per-class fooling; not built here. (Fig. 5's panels were read with read-figure — images are colorful static, not airplanes.)
+
+(The Fig. 4 ε-sweep visualization was previously listed here; it is now TESTED
+by the curve claims fc1–fc3, §2.3a.)
 
 ### 4.2 Tested but not reproduced at this scale (3 `low` claims, §2.3)
 `c03` (softmax FGSM confidence magnitude), `c12` (M5 mean magnitude 0.782 %),

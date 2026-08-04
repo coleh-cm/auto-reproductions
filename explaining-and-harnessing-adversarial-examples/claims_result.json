@@ -1,11 +1,11 @@
 {
   "summary": {
-    "total": 34,
-    "pass": 31,
+    "total": 37,
+    "pass": 34,
     "fail": 3,
     "blocked": 0,
     "high": {
-      "pass": 16,
+      "pass": 19,
       "fail": 0,
       "blocked": 0
     },
@@ -19,7 +19,7 @@
       "fail": 3,
       "blocked": 0
     },
-    "high_total": 16,
+    "high_total": 19,
     "gate_pass": true,
     "note": "The gate's load-bearing verdict is high (claims that survive this reproduction's CPU sub-scale). low claims are informational; several are expected to fail at sub-scale (annotated in claims.json)."
   },
@@ -394,15 +394,25 @@
           1,
           2
         ],
-        "aggregate_value": 0.014933327833811441,
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.014400005340576172,
+            "ok": false
+          },
+          {
+            "seed": 1,
+            "value": 0.014999985694885254,
+            "ok": false
+          },
+          {
+            "seed": 2,
+            "value": 0.0153999924659729,
+            "ok": false
+          }
+        ],
         "claimed": 0.00782,
-        "tolerance": 0.003,
-        "abs_diff": 0.007113327833811441,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "tolerance": 0.003
       }
     },
     {
@@ -417,11 +427,22 @@
           1,
           2
         ],
-        "aggregate_value": false,
-        "seeds": [
-          0,
-          1,
-          2
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": false,
+            "ok": false
+          },
+          {
+            "seed": 1,
+            "value": false,
+            "ok": false
+          },
+          {
+            "seed": 2,
+            "value": false,
+            "ok": false
+          }
         ]
       }
     },
@@ -1097,6 +1118,132 @@
         ],
         "direction": "<0"
       }
+    },
+    {
+      "id": "fc1_fig4_correct_class_crossed_by_wrong",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:762",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "crosses",
+        "x_range": [
+          0.0,
+          15.0
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 12.271561622619629,
+            "q_last": -749.56005859375
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 13.796883583068848,
+            "q_last": -613.7621459960938
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 14.588582992553711,
+            "q_last": -486.68316650390625
+          }
+        ]
+      }
+    },
+    {
+      "id": "fc2_fig4_wrong_classification_stable_wide_region",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "below",
+        "x_range": [
+          4.0,
+          15.0
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 23,
+            "q_first": -209.98573303222656,
+            "q_last": -749.56005859375
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 23,
+            "q_first": -170.7481231689453,
+            "q_last": -613.7621459960938
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 23,
+            "q_first": -135.1154022216797,
+            "q_last": -486.68316650390625
+          }
+        ]
+      }
+    },
+    {
+      "id": "fc3_fig4_predictions_become_extreme",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "increasing",
+        "x_range": [
+          0.0,
+          15.0
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 6.91758394241333,
+            "q_last": 872.70166015625
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 5.3113813400268555,
+            "q_last": 480.8585510253906
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 6.215456962585449,
+            "q_last": 467.60943603515625
+          }
+        ]
+      }
     }
   ],
   "not_tested": [
@@ -1137,12 +1284,6 @@
       "reason": "Qualitative weight-visualization claim with no numeric target."
     },
     {
-      "id": "nt07_fig4_epsilon_sweep",
-      "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that\nthe wrong classifications are stable across a wide region of $\\eps$ values.",
-      "citation": "paper/source/iclr2015.tex:768",
-      "reason": "Visual claim from the plotting layer (Figure 4); the epsilon axis range exists only in the figure, not the text."
-    },
-    {
       "id": "nt08_rubbish_class_skew",
       "quote": "On MNIST, 45.3\\% of a naively trained maxout network's false positives were classified as 5s,\nand none were classified as 8s.",
       "citation": "paper/source/iclr2015.tex:930",
@@ -1168,6 +1309,7 @@
       "measured.m6_robustness_transfer_eval.own_fgsm_mean_confidence_on_errors",
       "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_both_wrong",
       "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_m1_errors",
+      "measured.m6_robustness_transfer_eval.min_noise_control_fgsm_error",
       "measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_both_wrong",
       "measured.m8_rbf_shallow.agreement_rbf_pred_softmax_over_m1_errors",
       "measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_m1_errors",
@@ -1184,13 +1326,15 @@
       "measured.m9_rubbish_evals.maxout_softmax_rubbish_error",
       "measured.e1_ensemble12_maxout.ensemble_targeted_error",
       "measured.m5_maxout1600_advtrain.per_seed_test_errors",
+      "measured.m_l1_weight_decay.l1_coeff000025_test_error",
       "measured.m4_maxout240_advtrain.baseline_clean_error",
       "measured.m6_robustness_transfer_eval.own_fgsm_error",
       "measured.m9_rubbish_evals.sigmoid_top_rubbish_error",
+      "measured.m_l1_weight_decay.l1_coeff0025_train_error",
+      "measured.m9_rubbish_evals.min_linear_rubbish_error",
       "measured.m7_maxout_noise_uniform.fgsm_error_rate",
-      "measured.m_l1_weight_decay.l1_0.0025_train_error",
-      "measured.m_l1_weight_decay.l1_2.5e-05_test_error",
       "measured.m5_maxout1600_advtrain.mean_test_error",
+      "measured.m5_maxout1600_advtrain.per_seed_spread",
       "measured.m_l1_weight_decay.baseline_train_error",
       "measured.m1_softmax_regression.fgsm_error_rate",
       "measured.m_l1_weight_decay.baseline_test_error",
@@ -1200,10 +1344,16 @@
       "measured.m3_maxout240_clean.fgsm_error_rate",
       "measured.m8_rbf_shallow.rbf_fgsm_error_rate",
       "measured.m9_rubbish_evals.rbf_rubbish_error",
+      "measured.f4_eps_curve.frac_correct_pos_4_15",
       "measured.m1_softmax_regression.clean_error",
+      "measured.f4_eps_curve.predicted_is_correct",
       "measured.m2_logistic_3v7.fgsm_error_rate",
       "measured.m3_maxout240_clean.clean_error",
-      "measured.m2_logistic_3v7.clean_error"
+      "measured.f4_eps_curve.eps_crossover_pos",
+      "measured.f4_eps_curve.max_wrong_logit",
+      "measured.m2_logistic_3v7.clean_error",
+      "measured.f4_eps_curve.correct_logit",
+      "measured.f4_eps_curve.eps_values"
     ]
   }
 }
