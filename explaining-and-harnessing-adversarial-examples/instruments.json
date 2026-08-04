@@ -16,6 +16,12 @@
       "negative_test": "tests/test_instruments.py::test_eval_clean_negative_known_wrong"
     },
     {
+      "name": "grader_must_raise_on_empty",
+      "what_it_decides": "No-success-on-empty contract (SPEC \u00a711): a grader fed an EMPTY input set must RAISE, never return a vacuous 0.0/nan verdict that propagates as if it were a real number. Covers eval_clean, eval_clean_confidence_rbf, and the three eval_rubbish* graders (eval_rubbish / eval_rubbish_rbf / eval_rubbish_sigmoid). The negative arm proves each RAISES on a zero-length input; the positive arm proves a normal (non-empty) input still produces a real verdict. This is the contract the no-success-on-empty oracle exists to enforce \u2014 a fit/eval that silently emits OK/0.0/nan on nothing is indistinguishable from the method never having run.",
+      "positive_test": "tests/test_instruments.py::test_eval_metrics_positive_all_correct",
+      "negative_test": "tests/test_instruments.py::test_eval_clean_confidence_rbf_raises_on_empty"
+    },
+    {
       "name": "eval_fgsm_error_and_confidence",
       "what_it_decides": "Adversarial error_rate (fraction of ALL examples misclassified on the model's own FGSM examples) and mean_confidence_on_errors (softmax prob of the predicted class, averaged over the MISCLASSIFIED subset only; 0.0 when none wrong). This is the metric behind every FGSM-error claim (M1/M2/M3/M6/M7).",
       "positive_test": "tests/test_instruments.py::test_eval_metrics_positive_all_correct",

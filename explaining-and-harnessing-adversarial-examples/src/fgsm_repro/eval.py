@@ -144,7 +144,14 @@ def eval_clean_confidence_rbf(model: Classifier, x: torch.Tensor) -> float:
     """M8 RBF clean confidence = mean over ALL examples of max_k exp(q_k)
     (paper 60.6%, tex:603). Uses the UNNORMALIZED per-class exp(q) reading
     (SPEC §6 item 9); a softmax reading is bounded below by 1/K and cannot
-    reproduce the paper's number."""
+    reproduce the paper's number.
+
+    No-success-on-empty: an empty input set is a degenerate batch, not a valid
+    confidence of nan -- it must RAISE (the contract SPEC §11 names; a vacuous
+    nan propagating silently into claims c22/c23 is exactly the failure the
+    no-empty-success oracle exists to catch)."""
+    if int(x.shape[0]) == 0:
+        raise ValueError("eval_clean_confidence_rbf: empty input set; a grader must raise, not return a vacuous verdict")
     model.eval()
     with torch.no_grad():
         probs = _rbf_unnorm_probs(model, x)  # [B, K]
@@ -296,7 +303,13 @@ def eval_rubbish(
 
     Draw n ~ N(0, I_dim) samples; "error" := max_k p(y=k|x) > 0.5.
     Confidence = mean over the erroring subset of that max prob; 0.0 if none.
+
+    No-success-on-empty: n<=0 is a degenerate count (an empty synthetic batch),
+    not a valid verdict -- it must RAISE (SPEC §11 grader contract); returning
+    AttackEval(error_rate=nan, ...) would propagate a vacuous nan silently.
     """
+    if n <= 0:
+        raise ValueError("eval_rubbish: empty input set (n<=0); a grader must raise, not return a vacuous verdict")
     model.eval()
     gen = torch.Generator().manual_seed(seed)
     x = sample_rubbish(n, dim, gen)
@@ -325,7 +338,12 @@ def eval_rubbish_rbf(
     far from every mu_k on N(0,I) noise, so exp(q_k) -> 0 and the error rate is
     ~0 (paper 0%, tex:923) — the structural property a softmax reading cannot
     reproduce (a 10-way softmax max-prob is bounded below by 0.1).
+
+    No-success-on-empty: n<=0 is a degenerate count (an empty synthetic batch),
+    not a valid verdict -- it must RAISE (SPEC §11 grader contract).
     """
+    if n <= 0:
+        raise ValueError("eval_rubbish_rbf: empty input set (n<=0); a grader must raise, not return a vacuous verdict")
     model.eval()
     gen = torch.Generator().manual_seed(seed)
     x = sample_rubbish(n, dim, gen)
@@ -357,7 +375,12 @@ def eval_rubbish_sigmoid(
     says "Changing the top layer to independent sigmoids" (tex:908-909), whose
     natural reading is the architecture trained with the sigmoid-appropriate
     cost, evaluated on the same N(0,I) rubbish.
+
+    No-success-on-empty: n<=0 is a degenerate count (an empty synthetic batch),
+    not a valid verdict -- it must RAISE (SPEC §11 grader contract).
     """
+    if n <= 0:
+        raise ValueError("eval_rubbish_sigmoid: empty input set (n<=0); a grader must raise, not return a vacuous verdict")
     model.eval()
     gen = torch.Generator().manual_seed(seed)
     x = sample_rubbish(n, dim, gen)

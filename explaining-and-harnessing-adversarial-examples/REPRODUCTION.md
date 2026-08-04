@@ -87,3 +87,26 @@
   curve-gate tests (below/increasing/matches/every-seed/missing-file) remain in
   `tests/test_curve_gate.py` as additional coverage; the named pair is the canonical
   crosses pair (fc1). 93/93 tests pass; gate unaffected (34/3/0, HIGH 19/19 PASS).
+- **2026-08-04 (adversarial component review pass):** ran an orchestrated
+  adversarial review of all six components (data pipeline, attacks, objectives,
+  training loop, eval metrics, harness) against the paper's `iclr2015.tex`, each
+  finding independently verified by a referee subagent that tried to refute it.
+  5/6 components approved clean; the eval-metric component surfaced two CONFIRMED
+  latent no-success-on-empty contract violations (SPEC §11): `eval_clean_confidence_rbf`
+  returned `nan` on a zero-length input (no empty guard; the companion
+  `eval_fgsm_rbf` raised correctly via `_eval_from_probs_pred`), and the three
+  `eval_rubbish*` graders (`eval_rubbish` / `eval_rubbish_rbf` /
+  `eval_rubbish_sigmoid`) returned `AttackEval(error_rate=nan, n=0)` on `n<=0`.
+  These are LATENT — the real MNIST test set is non-empty so no reported M8/M9
+  number was affected — but a vacuous nan/0.0 verdict silently propagating is
+  exactly the failure the no-success-on-empty oracle exists to catch. Fixed:
+  all four graders now raise `ValueError` on empty input, matching `eval_clean`
+  and `_eval_from_probs_pred`. Added 5 tests
+  (`test_eval_clean_confidence_rbf_raises_on_empty`,
+  `test_eval_rubbish*_raises_on_empty`) and a `grader_must_raise_on_empty`
+  instrument entry. Verified empirically all four raise; verified the
+  regenerated per-seed result files (m1/m2/m3 × seeds 0,1,2) are BYTE-IDENTICAL
+  to the committed copies (the guards never fire on real data, so `measured.json`
+  is unchanged and current). 97/97 tests pass; gate unchanged (34/3/0, HIGH 19/19
+  PASS). The 3 low/magnitude fails (c03/c12/c13) remain the annotated
+  paper-scale claims, unchanged.
