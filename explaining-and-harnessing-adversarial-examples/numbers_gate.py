@@ -61,10 +61,17 @@ claims (the assertions that survive this reproduction's CPU sub-scale); the
 (they need the paper's full 1600-unit / 5-seed budget). All three verdict
 categories are reported so a reader can see which is which.
 
-Output: ``claims_result.json`` — ``{summary, claims, not_tested, generated_from}``.
+Output: ``claims_result.json`` —
+``{produced_by, summary, claims, not_tested, generated_from}``.
 Prints one ``FINAL <verdict>=<count>`` line per verdict category and one
 ``FINAL gate=PASS|FAIL`` line (gate passes iff every HIGH claim is adjudicated
 ``pass`` with none blocked).
+
+``produced_by`` stamps the file with the gate's own identity so a hand-authored
+table can be told apart from a gate-generated one. The contract requires that
+claims_result.json be written BY this gate and never by hand: a table authored
+by hand replaces four honest verdicts with pass/fail, which is the one report
+worse than a failure. The stamp is the cheap proof the file came from the gate.
 """
 from __future__ import annotations
 
@@ -429,6 +436,7 @@ def main() -> int:
     }
 
     out = {
+        "produced_by": "numbers_gate.py",
         "summary": summary,
         "claims": results,
         "not_tested": claims_doc.get("not_tested", []),

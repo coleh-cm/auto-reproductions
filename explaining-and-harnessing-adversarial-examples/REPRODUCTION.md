@@ -57,3 +57,36 @@ renders the epsilon as a small square that can be misread.
 **arXiv fetch.** Succeeded this run via plain `curl`; no GnuTLS/HTTP-2 failure.
 The repo clone (step 1) likewise succeeded shallow+blobless, so no tarball fallback
 was needed.
+
+## Implementation pass (this run)
+
+**Method.** This run decomposed the implementation into the five independent
+components the SPEC's frozen interfaces already fix — data pipeline, method
+core (FGSM + objectives), training loop, evaluation metric, and the baseline
+arm + harness — and ran an adversarial review of each against the paper's
+LaTeX (`paper/source/iclr2015.tex`) and the SPEC contract, with each flagged
+defect then independently verified by a second subagent whose job was to
+refute it. Only refutation-surviving findings were acted on. (See the
+orchestration run `eae-component-review` for the per-component verdicts.)
+
+**Gate-authorship fix (acted on this pass).** `claims_result.json` is the
+contract's evidence table and must be written BY the numbers gate, never by
+hand — a hand-authored table replaces four honest verdicts with pass/fail,
+which is the one report worse than a failure (two prior runs did exactly this
+and both tables were unusable). The gate (`numbers_gate.py`) did not stamp
+the file, so a gate-written and a hand-written table were indistinguishable.
+Fix: the gate now writes a top-level `produced_by: "numbers_gate.py"` stamp
+and its docstring records why. `tests/test_claims_integrity.py::
+test_claims_result_json_is_gate_authored_with_produced_by_stamp` asserts the
+shipped file carries the stamp AND that re-running the gate re-stamps it (so
+the on-disk file is not a stale hand-edit the gate would overwrite). Re-ran
+the gate this pass: 34 pass / 3 fail / 0 blocked, 19/19 HIGH pass, gate PASS
+— identical verdicts to before, now with the authorship stamp.
+
+**Status of the three `low`-invariance fails.** `c03_softmax_fgsm_confidence_value`,
+`c12_m5_advtrain_mean_magnitude`, `c13_m5_seed_spread_invariant` are all
+`compute_invariance=low` and fail at this run's CPU sub-scale (the M5 paper-full
+config is 1600 units / patience 100 / 5 seeds, infeasible here; `make_measured.py`
+runs M5 at 240 units / 12 epochs). They are informational and expected at
+sub-scale; the gate's load-bearing verdict is over HIGH claims (19/19 pass).
+This is recorded in `claims_result.json['summary']['note']` and in SPEC §9.
