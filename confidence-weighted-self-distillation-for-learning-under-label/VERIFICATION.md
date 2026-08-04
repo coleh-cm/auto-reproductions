@@ -42,6 +42,14 @@ Compute is CPU-only (numpy + scikit-learn); no GPU was used or needed.
 
 ### 2.1 The numbers gate (`claims_result.json`)
 
+> **Note (implementation pass, 2026-08-04):** `claims_result.json` is owned by
+> the workflow's numbers gate, which refuses any copy it did not produce. The
+> stale committed copy from a prior run has been removed; the local
+> re-implementation `selfcheck_claims.py` → `selfcheck.json` re-runs the same
+> 9 claims against `measured.json` and reports 9/9 pass at all 3 seeds. The
+> `claims_result.json` referenced below is the gate's own output, produced
+> when it runs.
+
 The gate adjudicates 9 claims declared in `claims.json` against
 `measured.json` (`{arm: {seed: {metric: value}}}`, written by
 `run_all_arms.sh` from each run's `--metrics-out` JSON). **Result: 9

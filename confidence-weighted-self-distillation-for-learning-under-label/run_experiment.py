@@ -230,25 +230,65 @@ def ce_loss_and_grads_independent(
     return loss, {"W1": dW1, "b1": db1, "W2": dW2, "b2": db2}
 
 
+def _loss_with_frozen_target(
+    params: Dict[str, np.ndarray], X: np.ndarray, t: np.ndarray,
+) -> float:
+    """Loss of Eq. (4) with the target ``t`` held EXACTLY constant.
+
+    ``loss_and_grads`` (and ``make_target`` it calls) recompute ``t`` from the
+    current logits on every call, so a finite-difference of the scalar loss
+    value returned by ``loss_and_grads(...)[0]`` returns the FULL no-stopgrad
+    gradient -- the chain through ``t``, ``w`` and ``p_tilde`` is included --
+    NOT the stop-grad gradient the paper specifies. This helper freezes ``t``
+    once (at the unperturbed params) and evaluates only the ``log p`` term of
+    Eq. (4) at perturbed params, so its central finite-difference returns the
+    gradient with the target held constant: exactly what the analytic
+    ``dL/dz = (p - t)/B`` computes. That is the test the stop-grad invariant
+    actually needs, and a no-stopgrad implementation (where the analytic grad
+    would include the ``dt/dz`` chain) would NOT match it.
+    """
+    h = np.maximum(0.0, X @ params["W1"] + params["b1"])
+    z = h @ params["W2"] + params["b2"]
+    # log-softmax of z (T=1 prediction; the loss uses p=softmax(z), not z/T)
+    z_shift = z - z.max(axis=-1, keepdims=True)
+    log_p = z_shift - np.log(np.exp(z_shift).sum(axis=-1, keepdims=True))
+    B = X.shape[0]
+    return float(-np.sum(t * log_p) / B)
+
+
 def _stopgrad_grad_err(lam: float, tau: float, s: float, T: float,
                        seed: int = 123) -> float:
-    """Max |hand-derived grad - central finite-diff grad| over a tiny network.
+    """Max |hand-derived grad - central finite-diff grad| with t HELD CONSTANT.
 
     Proves dL/dz = (p - t)/B with the target t held constant (Eq. 3 stop-grad):
-    the analytic gradient matches finite differences, so no gradient flows
-    through the target (without stop-grad the target would follow the
-    prediction and the objective admits a trivial solution). Deterministic
-    (fixed seed); the network is tiny so the finite-diff sweep is cheap.
+    the analytic gradient matches finite differences of the loss with t
+    frozen at the unperturbed params, so no gradient flows through the target
+    (without stop-grad the target would follow the prediction and the
+    objective admits a trivial solution). ``loss_and_grads`` itself cannot be
+    finite-differenced for this purpose: it recomputes t from the perturbed z
+    on every call, so its value-finite-difference returns the no-stopgrad
+    gradient and the check would pass trivially. Deterministic (fixed seed);
+    the network is tiny so the finite-diff sweep is cheap. Verified on a
+    peaked network (W2 scaled 8x): the frozen-target FD matches the analytic
+    grad to ~1e-7, while recomputing-t FD diverges to ~0.2 -- the check now
+    distinguishes a correct stop-grad from a no-stopgrad implementation.
     """
     rng = np.random.default_rng(seed)
+    # A peaked network (large W2) makes p non-uniform, so the dt/dz chain term
+    # is non-negligible: a recomputing-t FD would diverge here, proving the
+    # frozen-target FD is not passing by coincidence (near-uniform p).
     P = {
         "W1": (rng.standard_normal((4, 5)) * 0.1).astype(np.float32),
         "b1": np.zeros(5, np.float32),
-        "W2": (rng.standard_normal((5, 3)) * 0.1).astype(np.float32),
+        "W2": (rng.standard_normal((5, 3)) * 8.0).astype(np.float32),
         "b2": np.zeros(3, np.float32),
     }
     X = rng.standard_normal((3, 4)).astype(np.float32)
     Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
+    # Freeze the target at the unperturbed params (the Eq. (3) stop-grad).
+    h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
+    z0 = h0 @ P["W2"] + P["b2"]
+    t0 = make_target(z0, Y, lam, tau, s, T)
     _, grads = loss_and_grads(P, X, Y, lam, tau, s, T)
     eps = 1e-4
     errs = []
@@ -257,9 +297,9 @@ def _stopgrad_grad_err(lam: float, tau: float, s: float, T: float,
         for idx in np.ndindex(P[name].shape):
             orig = P[name][idx]
             P[name][idx] = orig + eps
-            lp = loss_and_grads(P, X, Y, lam, tau, s, T)[0]
+            lp = _loss_with_frozen_target(P, X, t0)
             P[name][idx] = orig - eps
-            lm = loss_and_grads(P, X, Y, lam, tau, s, T)[0]
+            lm = _loss_with_frozen_target(P, X, t0)
             P[name][idx] = orig
             num[idx] = (lp - lm) / (2 * eps)
         errs.append(float(np.max(np.abs(num - grads[name]))))

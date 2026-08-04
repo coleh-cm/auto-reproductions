@@ -105,16 +105,33 @@ def test_gate_open_target_equals_ptilde():
 
 
 def test_gradient_matches_finite_differences():
-    """Analytic dL/dz = (p-t)/B vs finite differences on W2, b2 (SPEC §7 gate d)."""
+    """Analytic dL/dz = (p-t)/B (with t held constant, Eq. 3 stop-grad) vs
+    central finite differences of the loss with t FROZEN at the unperturbed
+    params (SPEC §7 gate d).
+
+    Finite-differencing ``loss_and_grads(...)[0]`` directly is WRONG here: that
+    recomputes t from the perturbed z on every call, so its value-FD returns
+    the full no-stopgrad gradient (including the dt/dz chain) and the check
+    would pass against the stopgrad analytic grad only by coincidence on
+    near-uniform p. We freeze t via ``_loss_with_frozen_target`` and FD only
+    the log p term, which is the gradient the stop-grad actually produces.
+    A peaked network (large W2) is used so p is non-uniform: a no-stopgrad
+    implementation would diverge here (~6 vs the analytic grad), proving the
+    check is not vacuous.
+    """
     rng = np.random.default_rng(2)
     P = {
         "W1": (rng.standard_normal((4, 5)) * 0.1).astype(np.float32),
         "b1": np.zeros(5, np.float32),
-        "W2": (rng.standard_normal((5, 3)) * 0.1).astype(np.float32),
+        "W2": (rng.standard_normal((5, 3)) * 8.0).astype(np.float32),
         "b2": np.zeros(3, np.float32),
     }
     X = rng.standard_normal((3, 4)).astype(np.float32)
     Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
+    # Freeze the target at the unperturbed params (the Eq. (3) stop-grad).
+    h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
+    z0 = h0 @ P["W2"] + P["b2"]
+    t0 = r.make_target(z0, Y, 1.0, 0.9, 0.15, 2.0)
     _, grads = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)
     eps = 1e-4
     # check ALL four params, including W1/b1 (the ReLU backprop path — the most
@@ -124,9 +141,9 @@ def test_gradient_matches_finite_differences():
         for idx in np.ndindex(P[name].shape):
             orig = P[name][idx]
             P[name][idx] = orig + eps
-            lp = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)[0]
+            lp = r._loss_with_frozen_target(P, X, t0)
             P[name][idx] = orig - eps
-            lm = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)[0]
+            lm = r._loss_with_frozen_target(P, X, t0)
             P[name][idx] = orig
             num[idx] = (lp - lm) / (2 * eps)
         assert np.allclose(num, grads[name], atol=2e-3), name

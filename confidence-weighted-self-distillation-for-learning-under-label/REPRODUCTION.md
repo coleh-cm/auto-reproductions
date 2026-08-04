@@ -11,7 +11,9 @@
 
 ## Status
 
-Current rung: **comprehension** (SPEC re-derived and re-verified this run).
+Current rung: **numbers** (implementation re-verified this run; all 9 claims
+pass the local self-check at all 3 seeds; measured.json regenerated
+byte-identical on the accuracy arms).
 
 - [x] Reproductions repo cloned (shallow, blobless) into `$HOME`; workspace folder
       present at the slug name
@@ -20,8 +22,11 @@ Current rung: **comprehension** (SPEC re-derived and re-verified this run).
       created from `origin/main` and pushed
 - [x] Paper text saved to `paper/paper.md`
 - [x] Comprehension (SPEC)
-- [ ] Implementation / verification
-- [ ] Adversarial review rounds clean
+- [x] Implementation / verification (this pass: stop-grad check fixed + M6
+      mutation + self-check; 51 tests pass; arms re-run; measured.json
+      regenerated)
+- [ ] Adversarial review rounds clean (one review pass done; one confirmed
+      minor defect found and fixed)
 - [ ] Readiness gates
 - [ ] Publish
 
@@ -73,3 +78,32 @@ Current rung: **comprehension** (SPEC re-derived and re-verified this run).
   0.12→0.9593 … 0.18→0.9648; λ=0 bitwise s-independent. `pytest -q tests` →
   48 passed. SPEC.md rewritten with the single-pass verification note;
   claims.json unchanged (still correct per this pass).
+- 2026-08-04 — Implementation pass (adversarial review → fix). An orchestration
+  of 5 component reviewers (data pipeline, method core, training loop,
+  evaluation metric, baseline/degeneracy arm) against `paper/paper.md`, each
+  finding verified by a second refuter agent, surfaced ONE confirmed real
+  (minor, validation-only) defect: `_stopgrad_grad_err` and
+  `test_gradient_matches_finite_differences` finite-differenced the scalar loss
+  value, but `loss_and_grads` recomputes the target `t` from the perturbed `z`
+  on every call, so the value-FD returned the FULL no-stopgrad gradient — the
+  check passed only by coincidence on a near-uniform tiny net (p≈uniform ⇒ the
+  dt/dz chain term vanished). The core method (lines 130-198) was always
+  correct (stop-grad structural via the hand-derived `dz=(p-t)/B` with `t` a
+  plain detached array); only the validation check's evidentiary claim was
+  wrong. FIX: added `_loss_with_frozen_target` (freezes `t` at unperturbed
+  params, FDs only the log-p term); both checks now use it on a PEAKED net
+  (W2×8, p non-uniform) where the no-stopgrad gradient diverges by ~6.1 — so
+  the check now actually distinguishes a correct stop-grad from a no-stopgrad
+  implementation. Added `test_stopgrad_grad_err_is_nonvacuous` proving the
+  frozen-target FD matches the stopgrad analytic while the recomputing-t FD
+  diverges; added mutation M6 (a no-stopgrad gradient `dz=(p-t)/B +
+  lam*(p_tilde-p)/B` that is INVISIBLE to the λ=0 degeneracy gate by
+  construction, since the extra term is `0` at λ=0) caught by
+  `test_gradient_matches_finite_differences`. Suite 51 passed (was 48).
+  `measured.json` regenerated: accuracy arms byte-identical; `stopgrad_grad_err`
+  now 1.16e-3 (was 8.93e-4, both < 5e-3). Added `selfcheck_claims.py` →
+  `selfcheck.json` (local evaluator; deliberately NOT `claims_result.json`,
+  which the gate owns): 9/9 claims pass at all 3 seeds. Removed stale
+  `claims_result.json` committed by a prior run (the gate refuses any copy it
+  did not produce). All four other components cleared review with no confirmed
+  issues.

@@ -43,6 +43,11 @@ including every choice the paper leaves unstated (notably the gate sharpness
   gate adjudicates. The top level is keyed by arm only — no `_meta` or wrapper
   key (a non-seed-block top-level key makes the gate raise), so any
   documentation of the shape lives here, not in the JSON.
+- `selfcheck_claims.py` / `selfcheck.json` — a LOCAL self-evaluator that
+  re-runs every claim in `claims.json` against `measured.json` (deliberately
+  NOT `claims_result.json`, which the workflow's numbers gate owns and refuses
+  to accept from any other producer). 9/9 claims pass at all 3 seeds. Re-run
+  with `./selfcheck_claims.py` (or `--strict` to exit non-zero on any non-pass).
 - `claims.json` — the arms, seeds, per-arm metrics, and claims (with measured
   predicates for the structural invariants) the numbers gate evaluates.
 - `instruments.json` — every thing that decides whether an output is correct
@@ -83,7 +88,7 @@ knife-edge of `s` (see `SPEC.md` §4 item 1 and `REPRODUCTION.md`). Whether the
 CWSD arm's 0.0009 gap counts as a reproduction is not asserted; see
 `REPRODUCTION.md` for the measured-vs-claimed table. Run the tests to verify
 the no-op = baseline claim without trusting the implementation: `pytest -q`
-→ 48 passed.
+→ 51 passed.
 
 ## Quickstart
 
@@ -145,7 +150,7 @@ stdout contract is unchanged.
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 48 tests: degeneracy + invariants + structural-metrics + data + CLI + instruments + mutations
+.venv/bin/python -m pytest -q     # 51 tests: degeneracy + invariants + structural-metrics + data + CLI + instruments + mutations
 ```
 
 The mutation tests (`tests/test_mutations.py`) inject each defect in

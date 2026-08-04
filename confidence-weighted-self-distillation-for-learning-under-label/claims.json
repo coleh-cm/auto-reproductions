@@ -81,7 +81,7 @@
         "gate_w_max": "Max over a batch of w; <lambda=1 (sigmoid<1), so w<1 (paper/paper.md:113-124, 'maximum influence self-distillation may have').",
         "target_min": "Min t_ik over a batch (Eq. 3); >=0 (t is a convex combination of two distributions, both >=0).",
         "target_sum_err": "max|sum_k t_ik - 1| over a batch; ~1e-7 (t is a convex combination of two distributions, both summing to 1; paper/paper.md:171-174).",
-        "stopgrad_grad_err": "max|hand-derived grad - central finite-diff grad| on a tiny network; ~1e-3 (float32 finite-diff noise). Proves dL/dz=(p-t)/B with t constant (Eq. 3 stop-grad; paper/paper.md:213-214)."
+        "stopgrad_grad_err": "max|hand-derived grad - central finite-diff grad| with the target t FROZEN at the unperturbed params, on a peaked network (W2 scaled 8x so p is non-uniform); ~1.16e-3 (float32 finite-diff noise). Proves dL/dz=(p-t)/B with t held constant (Eq. 3 stop-grad; paper/paper.md:213-214). The frozen-target FD is essential: finite-differencing loss_and_grads(...)[0] directly recomputes t from the perturbed z and returns the no-stopgrad gradient, passing only by coincidence on near-uniform p; the M6 mutation (a no-stopgrad gradient invisible to the lambda=0 degeneracy gate) is caught by this check, proving it is non-vacuous."
       },
       "notes": "Paper Table 1 second row (tokens at paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-375); s=0.15 is calibrated because the paper never states the gate sharpness (SPEC.md section 4 item 1). The structural metrics (gate_w_*, target_*, stopgrad_grad_err, param_count) are the measured evidence for the paper's equation-invariants."
     }

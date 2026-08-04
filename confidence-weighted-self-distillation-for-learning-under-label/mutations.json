@@ -50,6 +50,16 @@
       "replace": "    t = (1.0 - wcol) * Y_onehot + 2.0 * wcol * p_tilde  # DEFECT M5",
       "must_fail": "tests/test_invariants.py::test_target_sums_to_one",
       "invariant": "the training target t lies in the probability simplex (sum_k t_ik = 1 for every example i), because t is a convex combination of y and p_tilde (both distributions) with per-example weights"
+    },
+    {
+      "id": "M6-stop-grad-removed-gradient-leaks-through-target",
+      "covers": ["core", "stopgrad"],
+      "description": "Remove the Eq. (3) stop-grad in the gradient: add a spurious `lam * (p_tilde - p) / B` term to dL/dz representing gradient flowing through the (un-detached) target toward matching p_tilde -- the trivial-solution direction the paper warns about. At lambda=0 the extra term is `0 * (...) = 0`, so the lambda=0 degeneracy gate sees plain CE and passes (this defect is INVISIBLE to the degeneracy check by construction); at lambda=1 the term is active and dL/dz no longer equals (p-t)/B with t held constant. Caught by the frozen-target finite-difference check (test_gradient_matches_finite_differences, which FDs the loss with t frozen and so computes exactly (p-t)/B; the mutated analytic diverges by |lam*(p_tilde-p)/B|, ~1e-2 on the peaked net it uses), and by the stopgrad_grad_err structural metric in measured.json.",
+      "file": "run_experiment.py",
+      "find": "    dz = (p - t) / B                                         # [B, K]",
+      "replace": "    _pt = softmax(z / T)                                     # [B, K] DEFECT M6: no stop-grad\n    dz = (p - t) / B + lam * (_pt - p) / B                  # gradient leaks through p_tilde",
+      "must_fail": "tests/test_invariants.py::test_gradient_matches_finite_differences",
+      "invariant": "dL/dz = (p - t)/B with the target t held constant (Eq. 3 stop-grad); no gradient flows through t, w, or p_tilde (paper/paper.md:213-214, 'the target follows the prediction and the objective admits a trivial solution')."
     }
   ]
 }

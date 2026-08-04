@@ -30,13 +30,21 @@ assertion was re-measured in this pass:
 - **Structural metrics re-measured** (`--metrics-out`, seeds 0/1/2): baseline `gate_w_max = 0.0`,
   `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0` (bitwise); CWSD `gate_w_min > 0`,
   `gate_w_max < 1`, `target_min > 0`, `target_sum_err = 1.19e-07 < 1e-6`,
-  `stopgrad_grad_err = 8.9e-04 < 5e-3` — every high claim's predicate passes.
+  `stopgrad_grad_err = 1.16e-03 < 5e-3` — every high claim's predicate passes.
+  (This pass fixed the stop-grad check: `_stopgrad_grad_err` previously finite-differenced
+  `loss_and_grads(...)[0]`, which recomputes the target `t` from the perturbed `z` on every
+  call, so its value-FD returned the FULL no-stopgrad gradient and passed only by coincidence
+  on a near-uniform tiny net. It now finite-differences a `_loss_with_frozen_target` helper
+  with `t` frozen at the unperturbed params, on a peaked net (W2 scaled 8×) where the
+  no-stopgrad gradient diverges by ~6.1 — so the check now actually distinguishes a correct
+  stop-grad from a no-stopgrad implementation. See §11.)
 - **Calibration evidence re-measured:** baseline RNG layouts `spawned` → 0.9315 and
   `noise-first` → 0.9426 (falsify themselves against Table 1's 0.9370; `init-first` reproduces
   it exactly); CWSD seed-0 sensitivity `s = 0.12→0.9593, 0.14→0.9593, 0.15→0.9611, 0.16→0.9611,
   0.17→0.9630, 0.18→0.9648, 0.20→0.9630`; the `λ = 0` arm is bitwise insensitive to `s`
   (s = 0.01 and s = 10.0 both → 0.9370), so the calibrated `s` cannot touch the degeneracy gate.
-- **Test suite:** `python -m pytest -q tests` → 48 passed.
+- **Test suite:** `python -m pytest -q tests` → 51 passed (48 prior + 3 this pass: a
+  non-vacuous stop-grad test, an M6 no-stopgrad mutation checker, and the M6 anchor).
 - **Figures:** `paper/` contains only `paper.md`; `grep -niE "figure|fig\.|curve|plot"
   paper/paper.md` matches nothing → no figures, no `curve` claims possible (§7).
 - **Upstream code:** paper URL/code grep → no matches; GitHub repository search
@@ -192,9 +200,9 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
     are corrupted (`paper/paper.md:327`); the test set stays clean.
 
 Implementation-side tolerances the paper also cannot state (recorded for honesty):
-`stopgrad_grad_err < 5e-3` accommodates float32 central-difference noise (~9e-4 measured,
-seed-independent on the fixed tiny check network at seed 123); the degeneracy `< 1e-12`
-bounds are met exactly (0.0, bitwise).
+`stopgrad_grad_err < 5e-3` accommodates float32 central-difference noise on a peaked net
+(~1.16e-3 measured, the frozen-target FD against the analytic `(p-t)/B` stop-grad); the
+degeneracy `< 1e-12` bounds are met exactly (0.0, bitwise).
 
 ## 5. Component interfaces (frozen)
 
@@ -363,12 +371,19 @@ by a constructed truth that does not depend on the 4000-step budget.
   known-non-degenerate (`λ = 1`, negative) input.
 - **Naive implementation agreeing with the fast one.** YES — the hand-derived
   analytic gradient `∂L/∂z = (p − t)/B` (with `t` held constant, the Eq. (3)
-  stop-grad made structural) is checked against a central finite-difference
-  sweep over all four parameters on a fixed tiny network
-  (`tests/test_invariants.py::test_gradient_matches_finite_differences`,
-  `stopgrad_grad_err ≈ 9e-4 < 5e-3`). The "slow" reference is finite
+  stop-grad made structural) is checked against a central finite-difference of
+  the loss with `t` **frozen at the unperturbed params** (`_loss_with_frozen_target`),
+  on a **peaked** network (W2 scaled 8×, so `p` is non-uniform) over all four
+  parameters (`tests/test_invariants.py::test_gradient_matches_finite_differences`,
+  `stopgrad_grad_err ≈ 1.16e-3 < 5e-3`). The "slow" reference is finite
   differences; the "fast" one is the analytic backprop. Their agreement is the
-  evidence that no gradient flows through the target.
+  evidence that no gradient flows through the target. **Non-vacuity is proven**:
+  `tests/test_structural_metrics.py::test_stopgrad_grad_err_is_nonvacuous` shows
+  that the OLD broken check (finite-differencing `loss_and_grads(...)[0]`, which
+  recomputes `t` from the perturbed `z` and so returns the no-stopgrad gradient)
+  diverges to ~6.1 on the same peaked net, and the M6 mutation
+  (`dz = (p-t)/B + lam*(p_tilde-p)/B`, a no-stopgrad gradient invisible to the
+  λ=0 degeneracy gate by construction) is caught by this check.
 - **The paper's standard baseline as a common-knowledge oracle.** YES — the
   baseline `0.9370` (Table 1) is common knowledge from the paper, and the
   `init-first` RNG layout (§4 item 7) was selected precisely because it is the

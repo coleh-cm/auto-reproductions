@@ -1,0 +1,108 @@
+{
+  "seeds": [
+    "0",
+    "1",
+    "2"
+  ],
+  "claims": [
+    {
+      "id": "cwsd-improves-over-baseline",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "baseline-accuracy-value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "cwsd-accuracy-value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "improvement-magnitude-2p5-points",
+      "kind": "value",
+      "compute_invariance": "low",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "lambda-zero-is-exact-cross-entropy",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "gate-weight-bounded-by-lambda",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "target-is-convex-combination",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "stop-gradient-holds-target-constant",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "single-network-no-extra-parameters",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    }
+  ]
+}

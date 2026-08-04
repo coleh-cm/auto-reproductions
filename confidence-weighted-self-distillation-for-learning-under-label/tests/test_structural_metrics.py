@@ -77,3 +77,64 @@ def test_structural_metrics_degeneracy_catches_active_gate():
     assert abs(loss_cw - loss_ce) > 0.0
     assert any(not np.array_equal(grads_cw[k], grads_ce[k])
                for k in ("W1", "b1", "W2", "b2"))
+
+
+def test_stopgrad_grad_err_is_nonvacuous():
+    """The stopgrad_grad_err check must DISTINGUISH a correct stop-grad from a
+    no-stopgrad implementation. The fixed check (_stopgrad_grad_err) finite-
+    differences the loss with t FROZEN at the unperturbed params, so it matches
+    the analytic dL/dz=(p-t)/B (with t constant) -- the Eq. (3) stop-grad.
+    A no-stopgrad analytic grad would include the dt/dz chain; against the
+    frozen-target FD it would DIVERGE. We simulate a no-stopgrad grad by
+    finite-differencing loss_and_grads(...)[0] directly (which recomputes t
+    from the perturbed z, i.e. the no-stopgrad gradient) on the SAME peaked
+    network the fixed check uses, and assert it does NOT match the stopgrad
+    analytic grad (it diverges by orders of magnitude). This proves the fixed
+    check is not passing by coincidence (near-uniform p): on the peaked net a
+    no-stopgrad implementation would be caught."""
+    rng = np.random.default_rng(123)
+    P = {
+        "W1": (rng.standard_normal((4, 5)) * 0.1).astype(np.float32),
+        "b1": np.zeros(5, np.float32),
+        "W2": (rng.standard_normal((5, 3)) * 8.0).astype(np.float32),
+        "b2": np.zeros(3, np.float32),
+    }
+    X = rng.standard_normal((3, 4)).astype(np.float32)
+    Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
+    _, grads = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)
+    eps = 1e-4
+    # The fixed check: FD of the loss with t FROZEN -- must MATCH the analytic
+    # stopgrad grad. (Re-derive here rather than call _stopgrad_grad_err so the
+    # test is independent of the production helper's internals.)
+    h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
+    z0 = h0 @ P["W2"] + P["b2"]
+    t0 = r.make_target(z0, Y, 1.0, 0.9, 0.15, 2.0)
+    frozen_errs = []
+    for name in ("W1", "b1", "W2", "b2"):
+        num = np.zeros_like(P[name])
+        for idx in np.ndindex(P[name].shape):
+            orig = P[name][idx]
+            P[name][idx] = orig + eps
+            lp = r._loss_with_frozen_target(P, X, t0)
+            P[name][idx] = orig - eps
+            lm = r._loss_with_frozen_target(P, X, t0)
+            P[name][idx] = orig
+            num[idx] = (lp - lm) / (2 * eps)
+        frozen_errs.append(float(np.max(np.abs(num - grads[name]))))
+    assert max(frozen_errs) < 5e-3, max(frozen_errs)   # correct stop-grad matches
+    # The OLD broken check: FD of loss_and_grads(...)[0] directly (recomputes
+    # t from perturbed z = the no-stopgrad gradient) -- must DIVERGE on the
+    # peaked net, proving the frozen-target check is non-vacuous here.
+    recomputed_errs = []
+    for name in ("W1", "b1", "W2", "b2"):
+        num = np.zeros_like(P[name])
+        for idx in np.ndindex(P[name].shape):
+            orig = P[name][idx]
+            P[name][idx] = orig + eps
+            lp = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)[0]
+            P[name][idx] = orig - eps
+            lm = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0)[0]
+            P[name][idx] = orig
+            num[idx] = (lp - lm) / (2 * eps)
+        recomputed_errs.append(float(np.max(np.abs(num - grads[name]))))
+    assert max(recomputed_errs) > 1.0, max(recomputed_errs)   # no-stopgrad diverges
