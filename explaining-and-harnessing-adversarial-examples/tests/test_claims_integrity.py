@@ -213,3 +213,31 @@ def test_claims_verifier_rejects_bad_quote_count_line_pointer():
         else:
             p = ""
     assert not resolved, "an unresolvable metric pointer must not resolve"
+
+
+def test_claims_result_json_is_gate_authored_with_produced_by_stamp():
+    """claims_result.json must be written BY the numbers gate, never by hand.
+
+    The contract: a hand-authored table replaces four honest verdicts with
+    pass/fail, which is the one report worse than a failure. The gate stamps the
+    file with ``produced_by`` so a hand-authored copy can be told apart from a
+    gate-generated one. This test asserts the stamp is present and names the
+    gate, AND that re-running the gate reproduces a file carrying the same stamp
+    (so the shipped file is not a stale hand-edit the gate would overwrite).
+    """
+    import subprocess
+    cr_path = REPRO_ROOT / "claims_result.json"
+    cr = json.loads(cr_path.read_text())
+    assert cr.get("produced_by") == "numbers_gate.py", (
+        "claims_result.json missing produced_by='numbers_gate.py' stamp — either "
+        "hand-authored (forbidden) or written by a stale gate that predates the stamp")
+    # The gate must still emit the stamp when re-run (no stale-on-disk divergence).
+    proc = subprocess.run(
+        [sys.executable, str(REPRO_ROOT / "numbers_gate.py")],
+        capture_output=True, text=True, cwd=str(REPRO_ROOT),
+    )
+    assert proc.returncode in (0, 1), proc.stderr  # gate may legitimately FAIL
+    cr2 = json.loads(cr_path.read_text())
+    assert cr2.get("produced_by") == "numbers_gate.py", (
+        "re-running the gate did not restamp produced_by: " + proc.stderr)
+

@@ -146,7 +146,7 @@ Per minibatch (x, y):
 Early stopping (M5): track ADVERSARIAL validation-set error (FGSM against the current model),
 NOT the clean valid error (tex:503-505). After choosing epochs, retrain on all 60,000 (tex:506).
 ```
-Equation: **J̃(θ,x,y) = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇ₓJ(θ,x,y)))** — tex:486-487 `\[ \tilde{J}(\vtheta, \vx, y) = \alpha J(\vtheta, \vx, y) + (1-\alpha) J(\vtheta,`; α=0.5 — tex:488 `we used $\alpha = 0.5$`. ε=0.25 for MNIST adversarial training — tex:428-429 `good results using adversarial training with $\eps = .25$`.
+Equation: **J̃(θ,x,y) = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇ₓJ(θ,x,y)))** — tex:486-487 `\[ \tilde{J}(\vtheta, \vx, y) = \alpha J(\vtheta, \vx, y) + (1-\alpha) J(\vtheta,`; α=0.5 — tex:488 `we used $\alpha = 0.5$`. ε=0.25 for MNIST adversarial training — tex:428-429, grep strings `obtained good results using` (tex:428) and `adversarial training with $\eps = .25$` (tex:429; the sentence wraps across the file's line break).
 
 ### Algorithm C — Closed-form adversarial logistic regression (3-vs-7)
 
@@ -276,14 +276,14 @@ milestone id, all hyperparams, seed, and the four fields above per eval.
 |---|----------|----------------------|
 | E1 | η = ε sign(∇ₓ J(θ,x,y)) | `paper/source/iclr2015.tex:309` — `\[ \veta = \eps \sign \left( \nabla_\vx J(\vtheta, \vx, y) \right). \]` |
 | E2 | x̃ = x + η; require ‖η‖∞ < ε | tex:235 `$\tilde{\vx} = \vx + \veta$`; tex:239 `$||\veta||_\infty < \eps$` |
-| E3 | wᵀx̃ = wᵀx + wᵀη; growth max with η=ε·sign(w) ⇒ εmn (n dims, avg weight magnitude m) | tex:243 `\[ \vw^\top \tilde{\vx} = \vw^\top \vx + \vw^\top \veta. \]`; tex:246-247 `by assigning $\eta = \text{sign}(\vw)$` / `the activation will grow by $\eps m n$` |
+| E3 | wᵀx̃ = wᵀx + wᵀη; growth max with η=ε·sign(w) ⇒ εmn (n dims, avg weight magnitude m) | tex:243 `\[ \vw^\top \tilde{\vx} = \vw^\top \vx + \vw^\top \veta. \]`; tex:246 `$\eta = \text{sign}(\vw)$` (sentence ends at tex:245 `by assigning`); tex:247 `the activation will grow by $\eps m n$` |
 | E4 | y∈{−1,1}, P(y=1)=σ(wᵀx+b) | tex:399 `with $P(y=1) = \sigma\left( \vw^\top \vx + b\right)$` |
 | E5 | logistic cost E ζ(−y(wᵀx+b)), ζ(z)=log(1+exp z) | tex:401-404 `\mathbb{E}_{\vx, y \sim p_\text{data}} \zeta( -y (\vw^\top \vx + b))` / `\zeta(z) = \log \left(1 + \exp(z) \right)` |
 | E6 | adversarial logistic cost E ζ(y(ε‖w‖₁ − wᵀx − b)) | tex:410-412 `\mathbb{E}_{\vx, y \sim p_\text{data}} \zeta( y (\eps ||\vw||_1 - \vw^\top \vx - b)).`; derivation tex:407 |
 | E7 | J̃ = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇ₓJ(θ,x,y))); α=0.5 | tex:486-487 (grep `tilde{J}`); tex:488 `$\alpha = 0.5$` |
 | E8 | RBF p(y=1\|x) = exp((x−μ)ᵀβ(x−μ)) | tex:595 `p(y=1 \mid \vx ) = \exp \left( (\vx - \mu)^\top \vbeta (\vx - \mu) \right)` |
 | E9 | targeted fooling x += ε∇ₓ p(y=i\|x) (sign-step per Fig.5 caption) | tex:936 `adding $\eps \nabla_\vx p(y = i \mid \vx)$ to a Gaussian sample`; tex:954 `taking a gradient sign step` |
-| E10 | noise controls: x + ε·b, b~Bernoulli{±1}; x + u, u~U(−ε,ε) | tex:555-556 `randomly adding $\pm \eps$ to each pixel, or adding noise in $U(-\eps, \eps)$` |
+| E10 | noise controls: x + ε·b, b~Bernoulli{±1}; x + u, u~U(−ε,ε) | tex:555 `randomly adding $\pm \eps$`; tex:556 `or adding noise in $U(-\eps, \eps)$ to each pixel` (the sentence wraps across the file's line break at "…$\pm \eps$" / "to each pixel, …") |
 
 Implied, not displayed: `J` = cross-entropy/NLL for softmax models (tex:305-306 defines J only
 as "the cost used to train the neural network"). Ensemble gradient for E1 = gradient of the
@@ -331,10 +331,17 @@ Model definitions:
    the softmax argmax) for the error rate (`eval.eval_fgsm_rbf`, `eval.eval_clean_confidence_rbf`,
    `eval.eval_rubbish_rbf`). The RBF training cost remains the softmax cross-entropy over q
    (the implied 10-way training cost, §6 item 8) — the argmax prediction is unchanged; only
-   the confidence/threshold metrics switch to the unnormalized form. β is a free parameter
-   with a negative-definite init (−0.01·I) — the faithful reading of E8 (the exp is a valid
-   probability only when β is neg-semi-definite); the metric fix is what restores the paper's
-   confidence-decay phenomenology, not the init.
+   the confidence/threshold metrics switch to the unnormalized form. β is NOT a free
+   parameter: it is `β_k = -diag(a_k)` with `a_k = softplus(raw_k) > 0`, i.e. diagonal
+   negative-definite BY CONSTRUCTION (models.py:298-323, table above). A free β with a
+   negative-definite init (−0.01·I) drifts positive under softmax-CE training (verified),
+   leaving the RBF family and breaking the off-manifold confidence-decay mechanism that
+   underlies the paper's immunity claim (tex:600-604, architectural, not learned). The
+   construction constraint (a = softplus(raw) > 0 ⇒ β neg-def) is what holds `exp(q_k) ≤ 1`
+   and makes the 0%-rubbish / confidence-collapse phenomenology structurally reachable; the
+   metric fix (unnormalized per-class exp(q)) is what makes it the *measured* form. Both
+   are recorded as unpapered choices (commit 38cb5a0; this §6 item 9; §6 item 31 documents
+   the inert `q.clamp(max=80)` overflow guard that never fires once β is neg-def).
 10. **Conv maxout for CIFAR-10**: architecture entirely external (cifar10.yaml); preprocessing
     described only as "yields a standard deviation of roughly 0.5" via a hyperlink (tex:343-345).
 11. **Ensemble combination rule** (mean probs vs mean logits) and the exact attack objective for
@@ -889,7 +896,7 @@ Semantics:
       "quote": "We find that this method reliably causes a wide variety of models to misclassify their input.",
       "citation": "paper/source/iclr2015.tex:331",
       "predicate": "measured.m1_softmax_regression.fgsm_error_rate > 0.5 and measured.m2_logistic_3v7.fgsm_error_rate > 0.5 and measured.m3_maxout240_clean.fgsm_error_rate > 0.5",
-      "note": "The load-bearing phenomenon the paper explains. At sub-scale: 100.0% / 99.1% / 99.8%."
+      "note": "The load-bearing phenomenon the paper explains. FGSM error rate per-seed — softmax regression: 99.99/100.00/99.99%; logistic 3-vs-7: 99.12/98.82/99.80%; maxout-240: 97.55/96.09/96.33% (mean 96.66%). All three models misclassify the large majority of adversarial inputs at every seed, far above the 0.5 existence threshold."
     },
     {
       "id": "c02_softmax_fgsm_error_value",
@@ -954,7 +961,7 @@ Semantics:
       "quantity": "measured.m3_maxout240_clean.fgsm_error_rate",
       "claimed": 0.894,
       "tolerance": 0.15,
-      "note": "Magnitude is budget-sensitive: the paper's 89.4% comes from a fully-converged net; less-converged nets are fooled MORE (sub-scale 99.8%). Informational; the robust content of this claim is c01."
+      "note": "Magnitude is budget-sensitive: the paper's 89.4% comes from a fully-converged net; our less-converged 240-unit net is fooled MORE. Measured fgsm error per-seed 97.55/96.09/96.33% (mean 96.66%). Informational (low invariance, tol 0.15); the robust content of this claim is c01."
     },
     {
       "id": "c08_maxout_fgsm_confidence_value",
@@ -965,7 +972,7 @@ Semantics:
       "quantity": "measured.m3_maxout240_clean.fgsm_mean_confidence_on_errors",
       "claimed": 0.976,
       "tolerance": 0.2,
-      "note": "Sub-scale 88.7%. Confidence magnitudes drift with convergence; informational."
+      "note": "Measured mean confidence-on-errors per-seed 91.33/91.92/91.27% (mean 91.51%). Confidence magnitudes drift with convergence; informational (low invariance, tol 0.20)."
     },
     {
       "id": "c09_advtrain_reduces_clean_error",
@@ -975,7 +982,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:492",
       "quantity": "measured.m4_maxout240_advtrain.adversarial_clean_error - measured.m4_maxout240_advtrain.baseline_clean_error",
       "direction": "<0",
-      "note": "The paper's headline claim. Held at BOTH sub-scales already run: gate (dropout off) 2.12% -> 1.71%, milestone arm (dropout 0.8) 1.98% -> 1.64%."
+      "note": "The paper's headline claim. Per-seed (M4, 240 units, 20 epochs, dropout 0.8): baseline 1.78% -> adv 1.47% (seed0), 1.82% -> 1.25% (seed1), 1.48% -> 1.43% (seed2); adv-base = -0.31/-0.57/-0.05 pp, direction (<0) holds at 3/3 seeds (the spec'd per-seed ordering). Power caveat: the per-seed margins are ~31/57/5 test examples of 10k (mean -0.31 pp, sd 0.26, t~-2.1, df=2); the effect is consistent in direction but small — comparable in size to the paper's own ~0.10 pp effect (~10 test examples of the 10k test set), so the claim is settled by its spec'd per-seed ordering rather than by a margin large relative to seed noise."
     },
     {
       "id": "c10_advtrain_m4_adversarial_magnitude",
@@ -996,7 +1003,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:499",
       "quantity": "measured.m5_maxout1600_advtrain.mean_test_error - measured.m5_maxout1600_clean.mean_test_error",
       "direction": "<0",
-      "note": "Headline large-model claim (adv-trained model both fixes the large model's overfit and beats its own baseline). Sub-scale (240 units, single seed): 1.44% vs 1.82%."
+      "note": "Headline large-model claim (adv-trained model both fixes the large model's overfit and beats its own baseline). Per-seed: clean 1.82/1.80/2.22% vs adv 1.44/1.50/1.54%; adv-clean = -0.38/-0.30/-0.68 pp, direction (<0) at 3/3 seeds. Arm-name caveat: the arms are named `m5_maxout1600_*` after the paper's 1600-unit configuration, but this sub-scale run actually used `--units 240 --epochs 12` (recorded in measured.json `_meta.subscale_overrides`; the 1600-unit / patience-100 / 5-seed / 60k-retrain configuration is paper-scale, not run here). The name is retained for stable claim/metric pointers; the actual configuration lives in measured.json `_meta.subscale_overrides` and the per-seed result files."
     },
     {
       "id": "c12_m5_advtrain_mean_magnitude",
@@ -1080,7 +1087,7 @@ Semantics:
       "quantity": "measured.m7_maxout_noise_sign.fgsm_error_rate",
       "claimed": 0.862,
       "tolerance": 0.15,
-      "note": "Sub-scale 99.97% (noise training conferred even less robustness at low budget; directionally consistent with c17). Informational."
+      "note": "Measured per-seed 99.58/99.88/99.62% (mean 99.69%). Passes only via the wide tol 0.15 against the paper\u2019s 86.2% \u2014 the value assertion is content-free at this scale; the robust content is the ordering c17 (noise training < adversarial training). Informational (low invariance)."
     },
     {
       "id": "c19_noise_uniform_error_value",
@@ -1091,7 +1098,7 @@ Semantics:
       "quantity": "measured.m7_maxout_noise_uniform.fgsm_error_rate",
       "claimed": 0.904,
       "tolerance": 0.15,
-      "note": "Sub-scale 99.98%. Informational."
+      "note": "Measured per-seed 99.98/99.97/99.92% (mean 99.96%). Passes only via the wide tol 0.15 against the paper\u2019s 90.4% \u2014 value assertion content-free; robust content is the ordering c17. Informational (low invariance)."
     },
     {
       "id": "c20_l1_coeff0025_too_large",
@@ -1111,7 +1118,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:431",
       "quantity": "measured.m_l1_weight_decay.l1_coeff000025_test_error - measured.m_l1_weight_decay.baseline_test_error",
       "direction": ">0",
-      "note": "A small L1 coefficient trains but does not IMPROVE clean test error over baseline (paper's 'no regularization benefit'). Sub-scale: 3.06% vs 2.65%. Medium: close to noise at small budgets. Metric renamed from `l1_2.5e-05_test_error` to `l1_coeff000025_test_error` (dot-free) for the same tokenization reason as c20; the JSON pointer `arms.l1_2.5e-05.clean_test_error` is unchanged."
+      "note": "A small L1 coefficient trains but does not IMPROVE clean test error over baseline (paper's 'no regularization benefit'). Per-seed: l1-small - baseline = +0.04/+0.08/+0.32 pp, direction (>0) holds at 3/3 seeds (the spec'd per-seed ordering). Power caveat: the margins are ~4/8/32 test examples of 10k; the effect is consistent in direction but small, settled by the spec'd per-seed ordering rather than by a margin large relative to seed noise. Metric renamed from `l1_2.5e-05_test_error` to `l1_coeff000025_test_error` (dot-free) for the same tokenization reason as c20; the JSON pointer `arms.l1_2.5e-05.clean_test_error` is unchanged."
     },
     {
       "id": "c22_rbf_low_confidence_when_fooled",
@@ -1132,7 +1139,7 @@ Semantics:
       "quantity": "measured.m8_rbf_shallow.rbf_fgsm_mean_confidence_on_errors",
       "claimed": 0.012,
       "tolerance": 0.25,
-      "note": "The paper never states the RBF multiclass normalization/structure (SPEC \u00a76 item 9); the exact 1.2% magnitude is implementation-dependent. Informational."
+      "note": "Measured per-seed 24.89/24.93/24.93% (mean 24.92%). Passes only via the wide tol 0.25 against the paper\u2019s 1.2% (gap 0.237, ~20\u00d7 the target) \u2014 the value assertion is content-free; the robust content is the ordering c22 (RBF confidence when fooled << its clean confidence). The paper never states the RBF multiclass normalization/structure (SPEC \u00a76 item 9); the magnitude is implementation-dependent. Informational (low invariance)."
     },
     {
       "id": "c24_rbf_fgsm_error_value",
@@ -1143,7 +1150,7 @@ Semantics:
       "quantity": "measured.m8_rbf_shallow.rbf_fgsm_error_rate",
       "claimed": 0.554,
       "tolerance": 0.45,
-      "note": "Capacity/budget-bound magnitude (sub-scale 95.0% -- a weaker RBF is fooled more often, still at reduced confidence, cf. c22). Informational."
+      "note": "Capacity/budget-bound magnitude: measured per-seed 94.99/95.08/95.07% (mean 95.05%). Passes only via the wide tol 0.45 against the paper\u2019s 55.4% (gap 0.396, nearly half the [0,1] scale) \u2014 the value assertion is content-free; the robust content is c22 (a weaker RBF is fooled more often but at reduced confidence). Informational (low invariance)."
     },
     {
       "id": "c25_softmax_agrees_more_than_rbf_all_errors",
@@ -1153,7 +1160,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:681",
       "quantity": "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_m1_errors - measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_m1_errors",
       "direction": ">0",
-      "note": "Section 8's evidence that cross-model generalization is linear-like: the LINEAR model agrees with the maxout attacker's class far more than the RBF does. Sub-scale: 62.8% vs 30.5%."
+      "note": "Section 8's evidence that cross-model generalization is linear-like: the LINEAR model agrees with the maxout attacker's class far more than the RBF does. Per-seed softmax-vs-RBF agreement over m1 errors: 62.77/63.46/60.63% vs 30.50/30.25/27.92% (means 62.29% vs 29.55%)."
     },
     {
       "id": "c26_softmax_agrees_more_than_rbf_both_wrong",
@@ -1163,7 +1170,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:684",
       "quantity": "measured.m8_rbf_shallow.agreement_softmax_pred_maxout_over_both_wrong - measured.m8_rbf_shallow.agreement_rbf_pred_maxout_over_both_wrong",
       "direction": ">0",
-      "note": "Same claim restricted to the both-models-wrong subset (controlling for differing error rates). Sub-scale: 64.5% vs 47.3%."
+      "note": "Same claim restricted to the both-models-wrong subset (controlling for differing error rates). Per-seed softmax-vs-RBF agreement over both-wrong: 64.48/64.81/62.55% vs 47.34/46.11/44.15% (means 63.95% vs 45.87%)."
     },
     {
       "id": "c27_rbf_has_linear_component",
@@ -1172,7 +1179,7 @@ Semantics:
       "quote": "class only 54.3\\% of the time. For comparison, the RBF network can predict softmax regression's\nclass 53.6\\% of the time, so it does have a strong linear component to its own behavior.",
       "citation": "paper/source/iclr2015.tex:687",
       "predicate": "measured.m8_rbf_shallow.agreement_rbf_pred_softmax_over_m1_errors > 0.25",
-      "note": "Threshold 0.25 is well above the ~0.1 ten-class chance floor (paper 53.6%, sub-scale 38.7%). Medium: the paper is ambiguous about which generated set this number uses; we adopt the maxout-generated set with softmax as reference (SPEC \u00a76 item 29)."
+      "note": "Threshold 0.25 is well above the ~0.1 ten-class chance floor (paper 53.6%; measured per-seed 38.69/37.23/36.12%, mean 37.35%). Medium: the paper is ambiguous about which generated set this number uses; we adopt the maxout-generated set with softmax as reference (SPEC \u00a76 item 29)."
     },
     {
       "id": "c28_ensemble_not_resistant",
@@ -1181,7 +1188,7 @@ Semantics:
       "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed\nto perturb the entire ensemble with $\\epsilon = .25$.",
       "citation": "paper/source/iclr2015.tex:822",
       "predicate": "measured.e1_ensemble12_maxout.ensemble_targeted_error > 0.5",
-      "note": "Summary claim 'Ensembles are not resistant to adversarial examples' (\u00a710). Sub-scale (4 members): 99.76%."
+      "note": "Summary claim 'Ensembles are not resistant to adversarial examples' (\u00a710). Sub-scale (12 members, ~5 epochs/member): ensemble-targeted FGSM error 99.87% (seed0), 99.89% (seed1/seed2); >0.5 at 3/3 seeds."
     },
     {
       "id": "c29_ensemble_targeted_vs_single",
@@ -1191,7 +1198,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:823",
       "quantity": "measured.e1_ensemble12_maxout.ensemble_targeted_error - measured.e1_ensemble12_maxout.single_member_targeted_error",
       "direction": ">0",
-      "note": "Whole-ensemble attack fools 91.1% > 87.9% single-member attack. At sub-scale both arms saturate (~99.8%) and the small gap REVERSED (99.76 vs 99.79); this ordering is budget-fragile, hence low. c28 carries the load for 'ensembles are not resistant'."
+      "note": "Whole-ensemble attack fools 91.1% > 87.9% single-member attack. Per-seed: ensemble-targeted - single-member = +0.16/+0.19/+0.19 pp (99.87 vs 99.71 / 99.89 vs 99.70 / 99.89 vs 99.70), direction (>0) holds at 3/3 seeds -- NOT reversed. Budget caveat: both arms saturate near 100% at this sub-scale (12 members, ~5 epochs/member), so the gap is thin (a few test examples of 10k) and budget-fragile, hence low; c28 carries the load for 'ensembles are not resistant'."
     },
     {
       "id": "c30_maxout_fooled_by_gaussian_rubbish",
@@ -1200,7 +1207,7 @@ Semantics:
       "quote": "class to be an error. A naively trained maxout network with a softmax layer on top had an error rate\nof 98.35\\% on Gaussian rubbish examples with an average confidence of 92.8\\% on mistakes.",
       "citation": "paper/source/iclr2015.tex:907",
       "predicate": "measured.m9_rubbish_evals.maxout_softmax_rubbish_error > 0.5",
-      "note": "Appendix claim: linear-built models confidently classify most N(0,I) noise. Sub-scale: 82.1%."
+      "note": "Appendix claim: linear-built models confidently classify most N(0,I) noise. Measured maxout-softmax rubbish error per-seed 89.12/88.45/88.24% (mean 88.60%)."
     },
     {
       "id": "c31_softmax_regression_fooled_by_gaussian_rubbish",
@@ -1209,7 +1216,7 @@ Semantics:
       "quote": "A softmax regression model has an error rate of 59.8\\%\non the rubbish examples, with an average confidence on mistakes of 70.8\\%.",
       "citation": "paper/source/iclr2015.tex:920",
       "predicate": "measured.m9_rubbish_evals.softmax_regression_rubbish_error > 0.5",
-      "note": "Shallow linear models have the same problem (the paper's point against Nguyen et al.'s deep-only framing). Sub-scale: 81.7%."
+      "note": "Shallow linear models have the same problem (the paper's point against Nguyen et al.'s deep-only framing). Measured softmax-regression rubbish error per-seed 83.15/85.76/85.87% (mean 84.93%)."
     },
     {
       "id": "c32_sigmoid_top_rubbish_value",
@@ -1220,7 +1227,7 @@ Semantics:
       "quantity": "measured.m9_rubbish_evals.sigmoid_top_rubbish_error",
       "claimed": 0.68,
       "tolerance": 0.25,
-      "note": "Sub-scale 79.2%. Whether the sigmoid-top net is retrained or shares the trunk is unstated; we retrain with per-class BCE (SPEC \u00a76 item 25). Informational."
+      "note": "Measured sigmoid-top rubbish error per-seed 67.57/67.46/69.58% (mean 68.20%, vs paper 68% \u2014 genuinely close, not saved by the tolerance). Whether the sigmoid-top net is retrained or shares the trunk is unstated; we retrain with per-class BCE (SPEC \u00a76 item 25). Informational (low invariance, tol 0.25)."
     },
     {
       "id": "c33_rbf_immune_to_gaussian_rubbish",

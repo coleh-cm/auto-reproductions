@@ -125,8 +125,11 @@ uv pip install --python .venv -r requirements.txt
 # run the tests
 .venv/bin/python -m pytest -q
 
-# run the gate (both arms of the paper's headline M4 comparison; ~1-2 min)
-./run_all_arms.sh          # prints: FINAL baseline=<acc>  and  FINAL adversarial=<acc>
+# run all 14 arms x 3 seeds and write measured.json (~18 min on CPU)
+./run_all_arms.sh          # prints one `FINAL <arm>=<headline value>` line per arm (14 lines)
+
+# adjudicate every claim against measured.json (writes claims_result.json)
+.venv/bin/python numbers_gate.py   # prints: FINAL gate=PASS  (HIGH 19/19)
 
 # smoke-prove the code path runs (~3s; NOT a paper result)
 ./smoke.sh
