@@ -1,17 +1,4 @@
 {
-  "_meta": {
-    "schema": "measured.<arm>.<seed>.<metric>; arm keys are exactly claims.json['arms']; this _meta key is reserved and ignored by the gate.",
-    "blocked_sentinel": "BLOCKED",
-    "seeds": [
-      0,
-      1,
-      2
-    ],
-    "headline_metric": {
-      "baseline": "accuracy",
-      "cwsd": "accuracy"
-    }
-  },
   "baseline": {
     "0": {
       "accuracy": 0.937,

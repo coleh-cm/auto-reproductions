@@ -148,7 +148,7 @@
       "check": "pytest -q tests/"
     }
   ],
-  "figures": "The paper contains no figures - only Table 1 (paper/paper.md:399-427). arxiv_id is unknown so no LaTeX source or figure assets exist on disk (paper/ contains only paper.md). There are therefore no curve claims.",
+  "figures": [],
   "not_tested": [
     {
       "quote": "We attribute the gain to the gate suppressing the gradient contribution of examples whose labels disagree with a confident prediction, which are disproportionately the corrupted ones.",

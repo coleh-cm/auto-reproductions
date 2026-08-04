@@ -13,13 +13,15 @@
 # the gate can adjudicate the structural claims as well as the accuracy ones.
 #
 # measured.json shape (exactly as the numbers gate consumes it):
-#   {
-#     "_meta": { "schema": ..., "blocked_sentinel": "BLOCKED",
-#                "seeds": [...], "headline_metric": {<arm>: <metric>} },
-#     "<arm>": { "<seed>": { "<metric>": <value>, ... }, ... }, ...
-#   }
-# The top level is keyed by arm (the _meta key is reserved and ignored by the
-# gate). Any documentation of the shape belongs in REPRODUCTION.md, not in the
+#   { "<arm>": { "<seed>": { "<metric>": <value>, ... }, ... }, ... }
+# The top level is keyed by arm ONLY — no "_meta", no "_comment", no wrapper.
+# The actual workflow gate iterates the top-level keys treating each as an arm
+# and calls .get on each arm's per-seed value; any extra top-level key that is
+# not a {seed: {metric: value}} dict (a string comment, a list, a meta dict
+# whose own values are not seed-blocks) makes it raise
+# `AttributeError: '<type>' object has no attribute 'get'` and marks every
+# claim unevaluable. So this script writes exactly the arm keys and nothing
+# else. Any documentation of the shape belongs in REPRODUCTION.md, not in the
 # JSON. A run that fails, prints no FINAL accuracy= line, or writes no metrics
 # JSON is BLOCKED (every declared metric for that arm-seed set to "BLOCKED");
 # a number is never fabricated.
@@ -92,19 +94,7 @@ with open(sys.argv[1]) as f:
 c = json.load(open("claims.json"))
 arms = list(c["arms"].keys())
 seeds = [int(s) for s in c["seeds"]]
-out = {
-    "_meta": {
-        "schema": "measured.<arm>.<seed>.<metric>; arm keys are exactly "
-                  "claims.json['arms']; this _meta key is reserved and "
-                  "ignored by the gate.",
-        "blocked_sentinel": "BLOCKED",
-        "seeds": seeds,
-        "headline_metric": {
-            a: next(iter(spec.get("metrics", {})))
-            for a, spec in c["arms"].items()
-        },
-    }
-}
+out = {}
 for arm in arms:
     out[arm] = {}
     declared = list(c["arms"][arm].get("metrics", {}))

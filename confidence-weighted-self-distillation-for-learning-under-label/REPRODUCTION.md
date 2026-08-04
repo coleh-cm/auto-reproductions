@@ -420,9 +420,12 @@ exercised here; the from-scratch environment was instead verified via a fresh
      `measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1`), so the
      gate adjudicates them from numbers; the pytest `check` fields are kept so
      a gate that runs `check` also adjudicates `pass`. Either path works.
-  3. **`_meta` block** in `measured.json` (schema, `blocked_sentinel`,
-     `seeds`, `headline_metric`) — the gate ignores the reserved `_meta` key;
-     arm keys are exactly `claims.json['arms']`. `run_all_arms.sh` rewritten to
+   3. **`_meta` block** in `measured.json` (schema, `blocked_sentinel`,
+      `seeds`, `headline_metric`) — the 278-line proxy ignores the reserved
+      `_meta` key; arm keys are exactly `claims.json['arms']`. (The actual
+      workflow gate iterates top-level keys and trips on `_meta`; the block
+      was therefore **removed** in the next changelog entry below.)
+      `run_all_arms.sh` rewritten to
      pass `--metrics-out <tmpfile>`, read the per-run JSON, and assemble
      measured.json; a failed run marks every declared metric `BLOCKED` (never
      fabricates a number).
@@ -450,3 +453,44 @@ exercised here; the from-scratch environment was instead verified via a fresh
   value is seed-independent, `0.000893`, because the check runs on a fixed
   tiny network at seed 123); `5e-3` is the honest floor-plus-margin and still
   catches any real gradient bug (`O(1)` error).
+
+- 2026-08-04: Removed the `_meta` block from `measured.json` and changed
+  `claims.json`'s `figures` field from a descriptive **string** to an empty
+  **list** `[]`. Two independent gate-crash defects, both in the JSON the
+  numbers gate consumes:
+
+  1. `measured.json` previously carried a top-level `_meta` key (a dict of
+     schema/blocked_sentinel/seeds/headline_metric). The actual workflow gate
+     iterates the **top-level** keys of `measured.json` treating each as an
+     arm (the earlier `AttributeError: 'str' object has no attribute 'get'`
+     was this same iteration hitting the even-older `_comment` string). A
+     reserved `_meta` dict is provably harmless to the 278-line gate proxy
+     (which resolves `measured[arm][str(seed)][metric]` by arm name from
+     `claims.json['arms']` and never touches other top-level keys — the proxy
+     returns `gate=PASS` with or without `_meta`), but it is an extra
+     top-level key the real gate walks past on its way to the arm blocks. The
+     task spec's literal shape is `{arm: {seed: {metric: value}}}` with no
+     extra keys, so the file is now exactly that — `baseline` and `cwsd` at
+     the top, nothing else. `run_all_arms.sh` was updated to emit this bare
+     shape (no `_meta`, no `_comment`, no `arms` wrapper).
+
+  2. `claims.json`'s `figures` field was a prose **string** ("The paper
+     contains no figures ..."). The sibling reproduction that passes the
+     workflow gate (`explaining-and-harnessing-adversarial-examples`) has
+     **no** `figures` key; the gate reads `claims['figures']` as a **list**
+     of figure/curve-claim objects (a curve claim needs its sequence in
+     `measured.json` under the arm, one value per `x`). A string there makes
+     the gate take its curve-claim path and `.get` a scalar metric value,
+     raising `AttributeError: 'float' object has no attribute 'get'` after
+     `arms declared: ['baseline', 'cwsd']` — the exact feedback this pass
+     received. The paper has no figures (only Table 1) and no curve claims,
+     so `figures` is now the honest empty list `[]`. The prose explanation
+     lives here, not in the JSON.
+
+  Verification: re-ran `run_all_arms.sh` → identical numbers (baseline
+  0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556), now in the bare
+  `{arm:{seed:{metric}}}` shape. The 278-line gate proxy → `FINAL gate=PASS`
+  (9 pass / 6 high pass / 0 blocked). A 329-gate behaviour simulator (top-
+  level arm iteration + `figures`-as-curve-list + per-seed scalar
+  resolution) reports `ALL SAFE` against the new files. `pytest -q` → 47
+  passed. `smoke.sh` → `FINAL smoke=0.8370`.
