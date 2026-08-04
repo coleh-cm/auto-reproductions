@@ -289,3 +289,22 @@ exercised here; the from-scratch environment was instead verified via a fresh
   reference — its maths must be treated as potentially lossy. Header (title,
   date, Status section) confirmed; this entry is this pass's setup record.
 
+- 2026-08-04: SPEC step executed for the current reproduction pass (same
+  paper_ref `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id
+  `d7735ece-02c4-4228-985c-00834c92b8f3`). Re-verified every SPEC.md citation
+  against `paper/paper.md` on disk (all 27 grep anchors resolve at the cited
+  lines: Eq. (1) 96–108, Eq. (2) 109–169, Eq. (3) 172–212, Eq. (4) 215–252,
+  degeneracy 253–280, hyperparameters 344–389, Table 1 393–427, output
+  contract 466–470). Re-ran the upstream check: link grep on the paper still
+  zero matches; GitHub repo searches (`confidence-weighted self-distillation`,
+  `cwsd label noise`, `"Institute for Applied Learning Systems"`) all
+  `total_count: 0` — no upstream code. Confirmed the paper has no figures
+  (`paper/` holds only `paper.md`), so no curve claims exist. Added §6 Arms
+  (the paper's two Table-1 arms with exact commands/configs) and §7 to
+  SPEC.md; wrote `claims.json` at the folder root: seeds [0,1,2], 9 claims
+  (6 high compute-invariance: ordering + 4 invariants + 1 existence; 3 low:
+  the Table-1 magnitudes and the 2.5-point gap, tolerances widened to the
+  measured seed spread), plus a `not_tested` list (the §4 attribution claim,
+  and Table-1 magnitudes at seeds ≠ 0). Measured this pass at seeds 0/1/2:
+  baseline 0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — ordering holds
+  at all three seeds; `pytest -q` → 24 passed.

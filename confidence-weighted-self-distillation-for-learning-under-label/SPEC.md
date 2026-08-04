@@ -219,14 +219,55 @@ the baseline within ±0.004, which is the evidence for picking `init-first`.
 (Documenting silence #7: `init-first` is the arrangement that passes the paper's
 own verification gate, not a claim it is *the* paper's exact stream.)
 
-## 6. Upstream code
+## 6. Arms
+
+The paper compares exactly two arms (Table 1, paper.md:393–427): one method against one
+baseline. Both are the same program under a different `--lambda` (paper.md:449–462,
+grep `run_experiment.py`), so the configurations differ in exactly one flag.
+
+| Arm | λ | Command | Config |
+|---|---|---|---|
+| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --seed {seed}` | Paper-stated: τ=0.9, T=2, lr 0.1, batch 64, 4000 steps, 20% symmetric noise. τ/s/T are **inert** at λ=0 (w ≡ 0, paper.md:253–280). Defaults per §4: s=0.15 (inert here), init=he, noise-mode=uniform-all, batch-mode=epoch-permutation, rng-layout=init-first. |
+| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --seed {seed}` | Paper-stated: λ=1, τ=0.9, T=2 (paper.md:361–377), same optimiser/steps/noise as baseline. s=0.15 (**unstated**, calibrated per §4 item 1), rest identical to `baseline`. |
+
+Metric for both arms: held-out test accuracy parsed from the single stdout line
+`FINAL accuracy=<float>` (paper.md:466–470).
+
+## 7. `claims.json`
+
+Written to `claims.json` at the reproduction-folder root (also what the numbers gate
+settles). It carries: the two arms of §6; seeds `[0, 1, 2]` (the paper uses only seed 0
+— paper.md:385 — so seeds 1/2 are our own budget-reduction check); and the claims below.
+Verbatim quotes use whitespace-normalised PDF text; every citation is a `paper/paper.md`
+line range plus a grep anchor. **High compute-invariance claims** (survive a smaller
+budget; the gate settles on these): the ordering `cwsd-improves-over-baseline` (the
+paper's central claim, Table 1 caption) and the five structural/existence claims
+(`lambda-zero-is-exact-cross-entropy`, `gate-weight-bounded-by-lambda`,
+`target-is-convex-combination`, `stop-gradient-holds-target-constant`,
+`single-network-no-extra-parameters`) — the last five need no more compute than the test
+suite. **Low**: the three magnitude claims (both Table-1 values and the exact 2.5-point
+gap) — exact magnitudes do not survive seed changes; tolerances were widened to cover
+the measured spread across seeds 0–2 rather than asserted as knife-edge matches.
+
+The paper contains **no figures** — only Table 1 — and arxiv_id is unknown so no LaTeX
+source or figure assets exist (`paper/` holds only `paper.md`); there are therefore no
+`curve` claims. Evidence this pass (2026-08-04, seeds 0/1/2, defaults): baseline
+0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — the ordering holds at all three seeds
+(+0.0241, +0.0074, +0.0241).
+
+Deliberately not tested (recorded in `claims.json.not_tested`): the attribution claim
+("We attribute the gain to the gate suppressing…", paper.md:443–447), which needs
+per-example gate-weight logging the paper's own output contract does not expose; and the
+Table-1 magnitudes at seeds ≠ 0, which the paper never commits to.
+
+## 8. Upstream code
 
 Searched; none found.
 
 - **In the paper**: no URLs, DOIs, footnotes, or code-availability statements anywhere
   in `paper/paper.md` (verified by `grep -niE "http|www\.|github|arxiv|doi|available at"`,
   zero matches) — §5 "Reproducing" (paper.md:449–470) gives commands only.
-- **GitHub repository search** (`api.github.com/search/repositories`, re-run 2026-07-29):
+- **GitHub repository search** (`api.github.com/search/repositories`, re-run 2026-08-04):
   `confidence-weighted self-distillation` → `total_count: 0`; `cwsd label noise` → 0;
   `self-distillation label noise` → 0 (no CWSD among generic results);
   `Bergstrom cwsd` → 0; `"Institute for Applied Learning Systems"` → 0.
@@ -239,7 +280,7 @@ Searched; none found.
 
 Conclusion: **no usable upstream implementation exists; implement from scratch** per §1/§5.
 
-## 7. Validation targets
+## 9. Validation targets
 
 | Method | λ | Paper accuracy (Table 1, paper.md:399–414) | Acceptance |
 |---|---|---|---|
