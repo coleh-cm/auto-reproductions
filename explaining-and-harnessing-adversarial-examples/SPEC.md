@@ -350,10 +350,16 @@ not tested.
 
 The gate: claims with `compute_invariance: "high"` are the gating set (they survive a budget
 smaller than the paper's — directions, orderings with wide margins, curve shapes, and the §1.3
-algebraic invariant). `quantity` expressions over `measured.<arm>.<metric>` are evaluated at
+algebraic invariant). Seeds: the top-level `seeds: [0, 1, 2]` is the claims default; the
+`maxout_large_adv` claims (c14, c18–c20) override to five seeds `[0..4]`, matching the paper's
+five runs (`iclr2015.tex:506-510`); per seed, three RNG streams are used — weight init,
+minibatch order, dropout masks (`iclr2015.tex:506-508`). `quantity` expressions over
+`measured.<arm>.<metric>` are evaluated at
 **every seed listed in the claim**; value claims compare the **mean over seeds** against
-`claimed` within `tolerance`; ordering claims must hold at every seed; curve comparisons:
-`above`/`below` = all sampled points >0/<0, `crosses` = first >0 and last <0,
+`claimed` within `tolerance`; ordering claims must hold at every seed; curve comparisons
+sample `quantity` — and for `above`/`below`/`crosses` also the other curve named by
+`against` — at `x`, with diffs = quantity − against: `above`/`below` = all sampled diffs
+> 0 / < 0, `crosses` = first sampled diff > 0 and last < 0,
 `increasing` = last > first with ≥80 % of consecutive diffs ≥ 0, `matches` = elementwise
 within `tolerance`. `claims.json` at the repo root is byte-identical to this block.
 
@@ -362,6 +368,7 @@ within `tolerance`. `claims.json` at the repo root is byte-identical to this blo
   "paper": "Goodfellow, Shlens & Szegedy, Explaining and Harnessing Adversarial Examples, ICLR 2015 (arXiv:1412.6572v3)",
   "source_of_truth": "paper/source/iclr2015.tex; every citation is grep-verified <file>:<line>",
   "metric_convention": "all errors/confidences/agreements are percents in [0,100], matching the paper's printed numbers",
+  "seeds": [0, 1, 2],
   "seed_protocol": {
     "seeds_default": [0, 1, 2],
     "maxout_large_adv": [0, 1, 2, 3, 4],
@@ -373,7 +380,7 @@ within `tolerance`. `claims.json` at the repo root is byte-identical to this blo
     "ordering": "the quantity expression must satisfy direction at EVERY seed of the claim",
     "invariant": "the boolean predicate must be true at every seed",
     "existence": "the boolean predicate must be true (at every seed unless the predicate says otherwise)",
-    "curve": "quantity is a sequence stored by the arm; sample it at x; above/below = all sampled >0/<0; crosses = first>0 and last<0; increasing = last>first with >=80% of consecutive diffs >=0; matches = elementwise |sampled-claimed| <= tolerance",
+    "curve": "quantity is a sequence stored by the arm; sample it at x; for above/below/crosses the field against names the other curve, sampled at the same x, and diffs = quantity - against: above = all sampled diffs >0; below = all sampled diffs <0; crosses = first sampled diff >0 and last sampled diff <0; increasing = last>first with >=80% of consecutive diffs >=0; matches = elementwise |sampled-claimed| <= tolerance",
     "gate": "only claims with compute_invariance == \"high\" gate the reproduction; medium/low are reported"
   },
   "arms": {
@@ -461,9 +468,9 @@ within `tolerance`. `claims.json` at the repo root is byte-identical to this blo
     {"id": "c62", "kind": "existence", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "medium", "predicate": "measured.cifar_conv_maxout.fool_success['6'] >= 99 and measured.cifar_conv_maxout.fool_success['9'] >= 99", "note": "class 6 = frog, 9 = truck; paper: 100% per-step success for both", "quote": "with variable runtime. On CIFAR-10, we found that one sampling step had a 100\\% success rate for", "citation": "paper/source/iclr2015.tex:939"},
     {"id": "c63", "kind": "existence", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "high", "predicate": "measured.cifar_conv_maxout.fool_success['0'] <= min(measured.cifar_conv_maxout.fool_success[c] for c in 0..9)", "note": "airplane is the hardest class: its success rate is the minimum over classes", "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling", "citation": "paper/source/iclr2015.tex:940"},
     {"id": "c64", "kind": "existence", "arm": "l1_maxout", "seeds": [0,1,2], "compute_invariance": "medium", "predicate": "measured.l1_maxout.train_err > 5.0", "quote": ".0025 was too large, and caused the model to get stuck with over 5\\% error on", "citation": "paper/source/iclr2015.tex:430"},
-    {"id": "c65", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.margin_seq", "x": [0], "comparison": "above", "note": "margin = logit of correct class (4) minus max wrong-class logit; at eps=0 the unperturbed model is correct", "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.", "citation": "paper/source/iclr2015.tex:764"},
-    {"id": "c66", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.margin_seq", "x": [-10, 10], "comparison": "below", "note": "at BOTH tails the correct class is not top - the thin-manifold claim; figure read: class-4 curve at ~+200 vs wrong classes up to ~+800 at eps=-10; ~-350 vs ~+420 at eps=+10 (figures/read-figure.jsonl)", "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.", "citation": "paper/source/iclr2015.tex:764"},
-    {"id": "c67", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.margin_seq", "x": [0,1,2,3,4,5,6,7,8,9,10], "comparison": "crosses", "note": "margin starts >0 and ends <0, crossing near eps of order 1 (vision read: at eps=+5 correct class already below top wrong class)", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
+    {"id": "c65", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_correct_seq", "against": "measured.eps_trace.logit_maxwrong_seq", "x": [0], "comparison": "above", "note": "at eps=0 the example is unperturbed and correctly classified as 4, so the correct-class curve sits above the max wrong-class curve (equivalently margin_seq > 0)", "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.", "citation": "paper/source/iclr2015.tex:764"},
+    {"id": "c66", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_correct_seq", "against": "measured.eps_trace.logit_maxwrong_seq", "x": [-10, 10], "comparison": "below", "note": "at BOTH tails the correct-class curve sits under the max wrong-class curve - the thin-manifold claim; figure read: class-4 curve at ~+200 vs wrong classes up to ~+800 at eps=-10; ~-350 vs ~+420 at eps=+10 (figures/read-figure.jsonl)", "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.", "citation": "paper/source/iclr2015.tex:764"},
+    {"id": "c67", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_correct_seq", "against": "measured.eps_trace.logit_maxwrong_seq", "x": [0,1,2,3,4,5,6,7,8,9,10], "comparison": "crosses", "note": "correct-class curve starts above the max wrong-class curve at eps=0 and ends below it at eps=10, crossing near eps of order 1 (vision read: at eps=+5 correct class already below top wrong class)", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
     {"id": "c68", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_maxwrong_seq", "x": [0,1,2,3,4,5,6,7,8,9,10], "comparison": "increasing", "note": "predictions become very extreme moving into the rubbish regime", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
     {"id": "c69", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.eps_trace.logit_maxwrong_seq", "x": [10], "comparison": "matches", "claimed": [420], "tolerance": 400, "note": "value read off Figure 4 left by the vision model (top wrong-class logit ~ +400..430 at eps=+10); tolerance covers reading error and reproduction spread - anchor only", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
     {"id": "c70", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.eps_trace.logit_correct_seq", "x": [10], "comparison": "matches", "claimed": [-350], "tolerance": 350, "note": "class-4 logit read as ~ -350 at eps=+10 (figures/read-figure.jsonl); anchor only", "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that", "citation": "paper/source/iclr2015.tex:768"}
