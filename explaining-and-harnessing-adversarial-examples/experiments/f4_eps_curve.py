@@ -81,7 +81,79 @@ def _build_parser() -> argparse.ArgumentParser:
                    default=str(REPRO_ROOT / "data"))
     p.add_argument("--out", dest="out", type=str,
                    default=str(REPRO_ROOT / "results" / "f4_eps_curve.json"))
+    p.add_argument("--fig-dir", dest="fig_dir", type=str,
+                   default=str(REPRO_ROOT / "results" / "figures"),
+                   help="directory for the regenerated Figure-4 curve panel PNG")
+    p.add_argument("--no-plot", dest="plot", action="store_false",
+                   default=True,
+                   help="skip regenerating the Figure-4 curve panel PNG")
     return p
+
+
+def _plot_figure4(record: dict, fig_dir: Path, fname: str | None = None) -> Path:
+    """Regenerate Figure 4's LEFT panel (logits vs eps) beside the paper's
+    ``paper/source/eps_curve.pdf``.
+
+    The paper's figure (read with the vision tool, transcript
+    ``paper/figure_transcripts.md``) uses:
+      * x-axis: eps in [-15, 15], ticks -15,-10,-5,0,5,10,15, label "epsilon"
+      * y-axis: "argument to softmax" (i.e. the RAW pre-softmax logits, units
+        identical to ours; the paper's numeric y-range [-2000, 1000] reflects a
+        fully-trained maxout, ours is smaller-magnitude at sub-scale — the
+        curve CLAIMS fc1..fc3 are SHAPE claims (crosses/below/increasing) and
+        are scale-invariant, so the magnitude mismatch is expected and noted
+        in REPRODUCTION.md, not hidden).
+
+    We assert the x-range and y UNITS match the paper's figure exactly so a
+    right-shaped curve on a different scale cannot read as a match.
+    """
+    import matplotlib
+    matplotlib.use("Agg")  # noqa: E402  headless
+    import matplotlib.pyplot as plt  # noqa: E402
+
+    eps = list(record["eps_values"])
+    logits = [list(row) for row in record["logits"]]  # [n_eps][10]
+    correct = record["correct_class"]
+
+    # Axis-range / units assertion against the paper's Figure 4.
+    assert record["figure"]["x_axis_range_read"] == [-15.0, 15.0], (
+        "Figure 4 x-axis must be eps in [-15, 15] (paper/source/eps_curve.pdf); "
+        f"got {record['figure']['x_axis_range_read']}")
+    assert record["figure"]["y_axis_label"] == "argument to softmax", (
+        "Figure 4 y-axis must be the raw 'argument to softmax' (pre-softmax "
+        f"logits); got {record['figure']['y_axis_label']}")
+    assert eps[0] == -15.0 and eps[-1] == 15.0, (
+        f"eps sweep must span [-15, 15]; got [{eps[0]}, {eps[-1]}]")
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    n_classes = len(logits[0])
+    for c in range(n_classes):
+        ys = [row[c] for row in logits]
+        if c == correct:
+            ax.plot(eps, ys, linewidth=2.6, label=f"class {c} (correct)",
+                    color="magenta")
+        else:
+            ax.plot(eps, ys, linewidth=1.0, linestyle="--", label=f"{c}",
+                    alpha=0.8)
+    # Match the paper's x-axis exactly.
+    ax.set_xlim(-15.0, 15.0)
+    ax.set_xticks([-15, -10, -5, 0, 5, 10, 15])
+    ax.set_xlabel(r"$\epsilon$")
+    ax.set_ylabel("argument to softmax")  # exact paper y-label
+    ax.set_title(
+        f"Reproduction of Figure 4 (left): softmax logits vs eps along the "
+        f"FGSM direction\nnaive maxout {record['hyperparams']['units']}x2, "
+        f"class-{correct} test example (seed {record['seed']}). "
+        f"Sub-scale: logit magnitude is NOT the paper's [-2000,1000] range.")
+    ax.axhline(0.0, color="black", linewidth=0.5)
+    ax.axvline(0.0, color="black", linewidth=0.5)
+    ax.legend(loc="best", fontsize=7, ncol=2)
+    fig.tight_layout()
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    out = fig_dir / (fname if fname is not None else "f4_eps_curve_repro.png")
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -195,11 +267,22 @@ def main(argv: list[str] | None = None) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(record, indent=2, sort_keys=True))
 
+    fig_path = None
+    if args.plot:
+        try:
+            fig_path = _plot_figure4(record, Path(args.fig_dir))
+        except ImportError:
+            print("[F4] matplotlib not installed; skipping figure regeneration "
+                  "(curve DATA in results/f4_eps_curve.json is the gate evidence)",
+                  file=sys.stderr)
+
     print(f"[F4] clean pred={clean_predicted} (true {CORRECT_CLASS}, idx {example_index})  "
           f"crossover eps+={crossed}  frac correct in [4,15]={frac_correct_pos_4_15:.3f}  "
           f"max_wrong_logit eps=0 -> {max_wrong_logit[len(eps_values)//2]:.2f}, "
           f"eps=15 -> {max_wrong_logit[-1]:.2f}")
     print(f"[F4] wrote {out_path}")
+    if fig_path is not None:
+        print(f"[F4] regenerated Figure 4 panel -> {fig_path}")
     return 0
 
 

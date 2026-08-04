@@ -44,3 +44,11 @@ fi
 
 # Run all arms x all seeds, write measured.json, print one FINAL line per arm.
 python make_measured.py --jobs 5 --omp 2
+
+# Regenerate the Figure-4 (eps-sweep) curve panels from the committed curve
+# DATA (no retraining) so the figure a curve claim (fc1..fc3) came from sits
+# beside the paper's paper/source/eps_curve.pdf for a reader to compare.
+# The PNG is NOT evidence (REPRODUCTION.md); the gate's verdicts on the curve
+# data are. Axis ranges/units are asserted against the paper's figure inside
+# the plotter (tests/test_f4_figure.py). Idempotent; safe to re-run.
+python experiments/f4_plot.py || echo "[run_all_arms] f4 figure regen skipped (matplotlib missing)" >&2

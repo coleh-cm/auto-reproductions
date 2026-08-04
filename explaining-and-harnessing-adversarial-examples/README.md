@@ -63,20 +63,28 @@ running log and target numbers.
   `m3_maxout_fgsm.py`, `m4_adversarial.py`, `m5_large_advtrain.py`,
   `m6_robustness_transfer.py`, `m7_noise_controls.py`, `m8_rbf.py`,
   `m9_rubbish.py`, the L1 weight-decay control `m_l1_weight_decay.py`
-  (Section 5), and the extended `e1_ensemble.py`. Each writes a parsed
+  (Section 5), and the extended `e1_ensemble.py`. `experiments/f4_eps_curve.py`
+  records the Figure-4 eps-sweep curve DATA (the gate settles the curve claims
+  fc1–fc3 against it) and `experiments/f4_plot.py` regenerates the Figure 4
+  panel from that committed data (no retraining). Each writes a parsed
   result JSON to `results/` with the milestone id, all hyperparameters, seed,
   and the grep-able paper target. Defaults are a documented **sub-scale** for
   CPU feasibility; the CLI exposes the full-scale knobs (e.g.
   `--units 1600 --epochs 100 --patience 100 --seeds 0,1,2,3,4` for M5).
 - `results/` — committed result JSONs (one per arm, the seed-0 mirror) plus
-  `results/_per_seed/` (every arm × every seed, the inputs to `measured.json`).
-  Results are committed, not gitignored: a number whose output file is ignored
+  `results/_per_seed/` (every arm × every seed, the inputs to `measured.json`)
+  and `results/figures/` (the regenerated Figure-4 panels
+  `f4_eps_curve_repro{,_seed1,_seed2}.png` — for a reader to compare against
+  `paper/source/eps_curve.pdf`; NOT evidence, see REPRODUCTION.md). Results
+  are committed, not gitignored: a number whose output file is ignored
   is a claim with its evidence deleted.
 - `tests/` — degeneracy, shape, invariant, constructed-truth, instrument, and
-  data-fingerprint tests (72 nodes). FGSM on a linear model must equal the
+  data-fingerprint tests (104 nodes). FGSM on a linear model must equal the
   closed-form max-norm adversary; `||η||_∞ == ε`; `x̃ == x` when `ε == 0`; the
   method at its no-op reproduces the baseline bit-for-bit; E6 is the brute-force
-  worst case; the MNIST loader is fingerprinted by sha/vocab/shape.
+  worst case; the MNIST loader is fingerprinted by sha/vocab/shape; the
+  regenerated Figure-4 panel's axis ranges/units are asserted against the
+  paper's figure (`tests/test_f4_figure.py`).
 - `instruments.json` / `mutations.json` — the instrument registry (every grader
   with a positive+negative test) and the deliberate-defect suite (each defect
   with a `must_fail` test node, all verified to fail under the defect and pass
@@ -97,7 +105,8 @@ running log and target numbers.
 - Python 3.12 or 3.13 (the Dockerfile builds on `python:3.13-slim`; verified in
   two sandboxes: CPython 3.13.5 on 2026-07-30 and CPython 3.12.13 on 2026-08-04 —
   the pinned wheels resolve identically and the full suite passes on both)
-- torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2
+- torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2, matplotlib 3.11.1
+  (figures only — regenerates the Figure-4 panel; Agg backend, no display)
 - CPU-only; no GPU required
 
 ## Quickstart

@@ -28,6 +28,12 @@
 - [x] Numbers gate re-run: `make_measured.py` (f4 arm × seeds 0,1,2) + `--assemble-only` +
   `numbers_gate.py` → **34 pass / 3 fail / 0 blocked; HIGH 19/19 pass; gate=PASS**
   (the 3 fails are the annotated low/magnitude claims c03/c12/c13 needing paper scale)
+- [x] Figure a curve claim came from regenerated beside the paper's
+  (`experiments/f4_plot.py` → `results/figures/f4_eps_curve_repro{,_seed1,_seed2}.png`
+  from the committed curve DATA in `results/f4_eps_curve.json` + per-seed files; axis
+  ranges ε∈[-15,15] and y-unit "argument to softmax" asserted against the paper's
+  figure inside the plotter, `tests/test_f4_figure.py`). The pair is for a reader to
+  compare and is NOT evidence — the gate's verdicts on the curve data are.
 - [ ] Implementation runs smallest end-to-end case
 - [ ] Adversarial review rounds clean
 - [ ] Readiness gates walked and recorded
@@ -109,6 +115,34 @@
   "0.782", "45.3%", "accidental steganography"). LaTeX remains authoritative for
   every equation, table and number; resolve preamble `\def`/`\newcommand` macros
   before quoting.
+- **2026-08-04 (figure-regeneration pass):** the contract requires that any
+  figure a curve claim came from be regenerated beside the paper's, with axis
+  ranges and units asserted against the paper's figure. Figure 4 (the eps-sweep
+  panel, fc1–fc3) was the gap: `experiments/f4_eps_curve.py` recorded the curve
+  DATA (and the gate settles the claims against that data) but never drew the
+  panel. This pass added `matplotlib==3.11.1` (+8 transitive wheels, pinned in
+  `requirements.txt`) — figures only, Agg backend, NOT on the numbers path —
+  and a plotter (`experiments/f4_eps_curve._plot_figure4`, surfaced via
+  `experiments/f4_plot.py`) that regenerates the Figure 4 LEFT panel from the
+  COMMITTED curve data (no retraining): x-axis ε∈[-15,15] with ticks
+  -15,-10,-5,0,5,10,15 and label "ε"; y-axis "argument to softmax" (the raw
+  pre-softmax logits — the SAME units the paper plots; the paper's numeric
+  y-range [-2000,1000] reflects a fully-trained maxout, this sub-scale run is
+  smaller-magnitude — the curve claims are SHAPE claims (crosses/below/
+  increasing) and scale-invariant, so the magnitude gap is expected and noted
+  here, not hidden). The plotter ASSERTS the x-range and y-unit match the
+  paper's figure before drawing, so a right-shaped curve on a different scale
+  cannot read as a match. Three seed panels committed
+  (`results/figures/f4_eps_curve_repro{,_seed1,_seed2}.png`); the paper's panel
+  is `paper/source/eps_curve.pdf` (gitignored as a non-reproduced-from binary,
+  present on disk). `run_all_arms.sh` now regenerates the panel after
+  `make_measured.py` (idempotent, safe to re-run). 7 new tests
+  (`tests/test_f4_figure.py`): positive (axis-match writes a real PNG), four
+  negatives (tampered x-range / y-unit / eps-span / wrong-data raise loudly),
+  custom-filename, and committed-PNG-present + committed-data-axis-contract.
+  104/104 tests pass; gate unchanged (34/3/0, HIGH 19/19 PASS). The PNG is for
+  a reader to compare and is NOT evidence — the gate's verdicts on the curve
+  data are the evidence.
 - **2026-08-04 (adversarial component review pass):** ran an orchestrated
   adversarial review of all six components (data pipeline, attacks, objectives,
   training loop, eval metrics, harness) against the paper's `iclr2015.tex`, each
