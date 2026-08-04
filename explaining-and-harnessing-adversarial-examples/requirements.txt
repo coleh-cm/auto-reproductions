@@ -1,0 +1,47 @@
+# Reproduction of "Explaining and Harnessing Adversarial Examples"
+# (Goodfellow, Shlens, Szegedy; ICLR 2015, arXiv:1412.6572v3).
+#
+# Method dependencies (direct):
+#   torch  — every model (softmax / logistic / maxout / RBF nets) and the
+#            FGSM attack are implemented in PyTorch so that the input
+#            gradient ∇ₓJ(θ,x,y) needed by η = ε·sign(∇ₓJ) comes from
+#            autodiff. Installed from the +cpu wheel; the paper's MNIST /
+#            CIFAR-10 experiments run on CPU here.
+#   numpy  — array utilities and IDX MNIST / CIFAR-10 pickle loading.
+#   matplotlib — figures only: regenerates the Figure 4 (ε-sweep) curve
+#                panel beside the paper's `paper/source/eps_curve.pdf`.
+#                Agg backend, no display needed. NOT on the numbers path;
+#                the curve DATA the gate settles lives in JSON.
+# Test runner: pytest.
+#
+# The full transitive closure is pinned below for reproducibility — this is
+# exactly what `uv pip freeze` reports for this install on CPython 3.13.
+# Re-freeze with: `uv pip freeze --python .venv` after any dep bump.
+
+torch==2.7.1
+numpy==2.3.2
+pytest==8.4.2
+matplotlib==3.11.1
+
+# --- transitive dependencies (pinned to the resolved versions) ---
+contourpy==1.3.3
+cycler==0.12.1
+filelock==3.32.2
+fonttools==4.63.0
+fsspec==2026.7.0
+iniconfig==2.3.0
+jinja2==3.1.6
+kiwisolver==1.5.0
+markupsafe==3.0.3
+mpmath==1.3.0
+networkx==3.6.1
+packaging==26.2
+pillow==12.3.0
+pluggy==1.6.0
+pygments==2.20.0
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+setuptools==83.0.0
+six==1.17.0
+sympy==1.14.0
+typing-extensions==4.16.0

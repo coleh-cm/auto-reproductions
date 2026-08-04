@@ -12,7 +12,11 @@
 - [x] arXiv LaTeX source fetched (https://arxiv.org/e-print/1412.6572) and unpacked to `paper/source/`
 - [x] `paper/source/iclr2015.tex` and `paper/source/iclr2015.bbl` committed (no separate `.bib` in the e-print; the `.bbl` is the compiled bibliography). Figures, `.sty`/`.bst` files and the tarball are gitignored — see `.gitignore`.
 - [x] SPEC.md (method, symbols/shapes, equations with source-line citations) + `claims.json` (70 claims, all quotes grep-verified against the tex; 19 high-invariance claims form the numbers gate) + `figures/read-figure.jsonl` (vision-read transcript for Fig. 4)
-- [ ] Environment
+- [x] Environment — `requirements.txt` (pinned full closure), `Dockerfile`, `README.md`
+      (quickstart); `.venv` rebuilt from scratch against `requirements.txt` on
+      CPython 3.13.5, imports (torch 2.7.1+cpu, numpy 2.3.2, matplotlib 3.11.1,
+      pytest 8.4.2) resolve and the FGSM input-gradient autograd path works;
+      `uv pip freeze` matches `requirements.txt` exactly.
 - [ ] Implementation
 - [ ] Verification against paper numbers
 - [ ] Readiness gates
@@ -49,3 +53,12 @@ MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%)
   pylearn2 CIFAR preprocessing; nothing runnable — implement fresh); SPEC.md + claims.json
   written; Figure 4 read via `read-figure` (eps_curve.pdf rasterized first); all 70 claim
   quotes audited as substrings of their cited tex lines (0 mismatches).
+- 2026-08-04 — Environment pass: chose PyTorch (CPU) as the array/autograd stack (paper
+  silent; FGSM needs ∇ₓJ via autodiff). Wrote `requirements.txt` (direct deps torch 2.7.1,
+  numpy 2.3.2, pytest 8.4.2, matplotlib 3.11.1 + the full pinned transitive closure),
+  `Dockerfile` (python:3.13-slim + uv install, CPU-only, `pytest -q` default CMD), and
+  `README.md` (quickstart: `uv venv --python 3.13 .venv && uv pip install --python .venv
+  -r requirements.txt`). Rebuilt `.venv` from scratch against `requirements.txt` on
+  CPython 3.13.5; verified `import torch, numpy, matplotlib, pytest` and the FGSM
+  input-gradient path (`torch.autograd.grad(loss, x)` → `ε·sign(g)`); `uv pip freeze`
+  matches `requirements.txt` exactly.
