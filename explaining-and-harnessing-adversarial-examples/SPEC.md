@@ -652,7 +652,9 @@ aborting.
 ## 10. claims.json — the numbers-gate contract
 
 The claims below are what the numbers gate settles. They live machine-readably in **`claims.json`**
-at the repo root (byte-identical to the JSON embedded here). Semantics:
+at the repo root (identical to the JSON embedded here modulo the markdown fence's framing — the
+disk file carries a trailing newline the fence cannot; verified `embedded + "\n" == claims.json`).
+Semantics:
 
 - **Quotes are verbatim substrings** of `paper/source/iclr2015.tex` (the arXiv LaTeX, authoritative
   for numbers), preserving the file's own line breaks; `citation` is `file:line` where the quote
