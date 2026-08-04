@@ -52,3 +52,51 @@
   claims. Key unstated item confirmed: the gate sharpness `s` in Eq. (2) has
   no value anywhere in the paper; `s = 0.15` stands as the calibrated default
   with the sensitivity sweep recorded in SPEC §4 item 1.
+
+- 2026-08-04 — Implementation/verification pass (this run): re-ran the
+  implementation end to end against the paper rather than trusting the prior
+  run's claims.
+  - **Re-verified for real** (not from memory): `pytest -q tests` = 47 passed;
+    `./smoke.sh` prints `FINAL smoke=0.8370` (~0.5s); `./run_all_arms.sh`
+    (2 arms × 3 seeds × 4000 steps, ~5.5s) regenerates `measured.json`
+    byte-identically to the committed file: `baseline` 0.9370 / 0.9407 /
+    0.9315, `cwsd` 0.9611 / 0.9481 / 0.9556. Baseline seed 0 reproduces the
+    paper's Table-1 0.9370 exactly (506/540); CWSD seed 0 = 0.9611, within
+    ±0.004 of the paper's 0.9620. `git diff measured.json` is empty after a
+    fresh run, so the committed numbers are reproducible, not hand-written.
+  - **Ordering claim holds at every seed**: cwsd − baseline = +0.0241 /
+    +0.0074 / +0.0241 > 0 at seeds 0/1/2 — the one high sign-only claim the
+    gate settles on.
+  - **Mutation suite actually catches defects**:
+    `pytest tests/test_mutations.py` = 10 passed (5 defects injected, each
+    paired with the `must_fail` test node that catches it; 5 anchor-uniqueness
+    checks). A suite nobody has broken on purpose is not evidence; these
+    defects exercise the suite's ability to catch real bugs.
+  - **Instruments exercised on known-correct + known-wrong inputs** via
+    `sys.executable` (data-loader fingerprint positive/negative, accuracy
+    scorer positive/negative + must-raise-on-empty, final-line parser
+    positive/negative, degeneracy-equivalence positive/negative). A grader
+    that cannot run raises rather than returning a negative verdict
+    (`test_accuracy_scorer_must_raise_on_empty`).
+  - **Gaps fixed this pass**: (1) SPEC.md had no `## Constructed truth`
+    section (the README even claimed it was §10, but §10 is "Validation
+    targets") — added SPEC §11 listing which constructed-truth strategies
+    apply (degeneracy, same-quantity-two-ways, naive-vs-fast finite-diff,
+    baseline-as-oracle) and which are honestly N/A (closed-form brute force,
+    exact/convex reference) or instrument-only (planted structure). (2)
+    README claimed `measured.json` carries a reserved `_meta` key, but the
+    actual file and `run_all_arms.sh` deliberately have none (a non-seed-block
+    top-level key makes the gate raise) — corrected the README to match the
+    actual `{<arm>: {<seed>: {<metric>}}}` shape.
+  - **No curve claims / no figures**: the paper has only Table 1
+    (`grep -niE "figure|fig\.|curve|plot" paper/paper.md` → no matches), so
+    there is nothing to regenerate beside the paper's; REPRODUCTION.md notes
+    that the absence of figures means there are no curve claims and no
+    figure-pair to compare. This is a "not applicable" rather than a blocker.
+  - **Unstated `s` sweep**: recorded in SPEC §4 item 1 — at the chosen
+    `init-first` RNG layout, `s ∈ {0.12,0.14}` → 0.9593, `{0.15,0.16}` →
+    0.9611, `{0.17,0.20}` → 0.9630, `0.18` → 0.9648; the ordering over the
+    baseline survives across this range, so the central claim does not hinge
+    on the single unstated value. (An earlier implementer's `s = 0.15` was
+    suspiciously equal to a paper number; the sweep here confirms the verdict
+    survives away from it.)
