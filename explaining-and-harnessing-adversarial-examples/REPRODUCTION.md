@@ -41,7 +41,14 @@
       must_fail test).
 - [x] `instruments.json` — 7 instruments (data loader fingerprint, numbers gate,
       logreg analytic equivalence, FGSM inf-norm, degeneracy check, rubbish
-      threshold) with positive/negative tests.
+      threshold) with positive/negative tests. The numbers gate (the grader) is
+      exercised on a known-correct and a known-wrong input by
+      `tests/test_numbers_gate.py` via `sys.executable`; a malformed
+      `measured.json` crashes the gate with a traceback (raises, never a silent
+      negative verdict). No top-level `not_applicable` — instruments here DO
+      judge outputs; the "bare-`python` grader" failure mode is recorded as a
+      `requires_tools` note ON the numbers_gate instrument, not as a
+      whole-repro exemption.
 - [x] `mutations.json` — 9 deliberate defects, each with `covers`, `find`,
       `replace`, `must_fail`; all caught.
 
@@ -102,6 +109,19 @@ maxout FGSM error 89.4% (conf 97.6%) without adversarial training → 17.9% with
 transfer: 19.6% / 40.9%; RBF: 55.4% error but 1.2% confidence on mistakes; ensemble of 12: 91.1%/87.9%;
 MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%), softmax regression
 59.8% (70.8%), RBF 0%; logistic regression 3-vs-7: 1.6% clean → 99% FGSM @ ε=.25.
+
+- 2026-08-04 — instruments.json fix: removed the top-level `not_applicable`
+  list (a list-form `not_applicable` reads as exempting the whole reproduction
+  or all instruments; instruments here DO judge outputs, so there is no
+  whole-repro exemption). The "no grader shells out to bare `python`" point is
+  preserved as a `requires_tools` note ON the numbers_gate instrument, where it
+  belongs. Added `tests/test_numbers_gate.py` (4 tests) exercising the grader on
+  a known-correct input (c03 → pass), a known-wrong input (c03 → fail), an
+  absent arm (→ blocked, never a silent pass), and a malformed `measured.json`
+  (→ the gate raises a traceback and exits non-zero, never a silent negative
+  verdict). Suite now 20/20. The gate re-run on the real `measured.json` is
+  byte-identical to the committed `claims_result.json` (18/19 HIGH pass, 1
+  CIFAR-blocked; produced_by=numbers_gate.py).
 
 ## Log
 

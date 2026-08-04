@@ -17,10 +17,10 @@
     },
     {
       "name": "numbers_gate",
-      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by stamp.",
-      "positive_test": "A measured.json where measured.softmax_reg.adv_err = 99.9 (matching c01's claimed 99.9 within tolerance) is verdicted pass for c01; a curve claim c65 (logit_correct above logit_maxwrong at eps=0) with measured sequences satisfying the ordering is verdicted pass.",
-      "negative_test": "A measured.json where measured.softmax_reg.adv_err = 50.0 (outside c01's tolerance) is verdicted fail; a curve claim with the wrong sign at eps=0 is verdicted fail. A missing/BLOCKED metric is verdicted blocked (never a silent pass).",
-      "requires_tools": "none (pure python; reads claims.json + measured.json)"
+      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by stamp. A blocked HIGH claim makes the gate exit non-zero; a failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict.",
+      "positive_test": "tests/test_numbers_gate.py::test_gate_positive_known_correct runs the gate (via sys.executable, in an isolated temp dir) on a measured.json where HIGH claim c03 holds and asserts c03 is verdicted pass and claims_result.json is stamped produced_by=numbers_gate.py.",
+      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong runs the gate on a measured.json where c03 fails and asserts c03 is verdicted fail (not pass, not blocked); ::test_gate_blocked_metric_not_silent_pass asserts an absent arm yields verdict blocked, never a silent pass; ::test_gate_raises_on_unusable_input asserts a malformed measured.json crashes the gate with a traceback and non-zero exit and writes no claims_result.json (a grader that cannot run must raise, never return a negative verdict).",
+      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate runs in-process and is exercised through sys.executable (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here."
     },
     {
       "name": "logreg_analytic_equivalence",
@@ -49,12 +49,6 @@
       "positive_test": "eval.rubbish_eval on a softmax model: rubbish_err in [0,100]; class_shares keys '0'..'9' sum to 100 (when mistakes exist). On an RBF net far from data, rubbish_err ~ 0.",
       "negative_test": "A bug that used argmax-confidence > 0.5 on a softmax (always true, since max prob >= 0.1) would report ~100% rubbish_err for a well-trained model that is actually robust — caught by the RBF-zero assertion.",
       "requires_tools": "none"
-    }
-  ],
-  "not_applicable": [
-    {
-      "what": "A grader/scorer that invokes an external `python` (rather than sys.executable)",
-      "reason": "No such grader exists in this reproduction. The numbers gate and all evaluators are pure-python (torch/numpy) invoked via the same interpreter that runs the suite, so the 'bare python vs python3' failure mode does not apply. tests/ invoke modules directly, never shell out to `python`."
     }
   ]
 }
