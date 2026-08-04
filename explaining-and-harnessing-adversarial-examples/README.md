@@ -91,8 +91,8 @@ torch 2.7.1+cpu | numpy 2.3.2 | matplotlib 3.11.1 | pytest 8.4.2
 ### 4. Run the arms and check the paper's numbers
 
 ```bash
-.venv/bin/python -m run_all_arms        # trains every arm x seed -> results/
-.venv/bin/python numbers_gate.py        # evaluates claims.json against results/
+.venv/bin/python -m run_all_arms        # trains every arm x seed -> measured.json
+.venv/bin/python numbers_gate.py        # evaluates claims.json against measured.json
 ```
 
 Datasets (MNIST, CIFAR-10) download on first run into `./data/` (gitignored).

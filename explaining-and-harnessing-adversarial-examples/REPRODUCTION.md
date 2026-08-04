@@ -6,7 +6,14 @@
 
 ## Status
 
-**Implementation pass complete; arms running.**
+**Arms run; numbers gate adjudicated; result committed.** The numbers gate
+(`numbers_gate.py`) reports **gate = FAIL**: 18/19 HIGH-invariance claims pass,
+0 HIGH fail, 1 HIGH **blocked** (c63, the CIFAR-10 "airplane is the hardest
+fooling class" claim — the `cifar_conv_maxout` arm is BLOCKED because the
+CIFAR-10 download from `cs.toronto.edu` stalled at ~11 MB of ~170 MB; no
+synthetic substitute was used). All other gates below are green. The rung
+reached is therefore **correctness**, not **numbers** — see
+[Blockers](#blockers) and `VERIFICATION.md`.
 
 - [x] Paper text saved to `paper/paper.md` (PDF extraction; prose reliable, maths not)
 - [x] arXiv LaTeX source fetched (https://arxiv.org/e-print/1412.6572) and unpacked to `paper/source/`
@@ -84,12 +91,97 @@ Net: the suite is now deterministic across consecutive runs without cache cleari
 (verified 10× consecutive `pytest tests/` → 16/16), and recovers automatically
 from a poisoned tree.
 - [x] SPEC.md `## Constructed truth` section.
-- [ ] `measured.json` — in progress (arms running).
-- [ ] `claims_result.json` — written by the gate after arms finish.
-- [ ] Figure 4 regenerated beside the paper's.
-- [ ] Final readiness gates + publish.
+- [x] `measured.json` — all 15 MNIST arms run (3 seeds; 5 for `maxout_large_adv`);
+      `cifar_conv_maxout` BLOCKED (CIFAR download stalled).
+- [x] `claims_result.json` — written by `numbers_gate.py` (`produced_by` stamp);
+      18/19 HIGH pass, 0 HIGH fail, 1 HIGH blocked; gate = FAIL on the CIFAR block.
+- [x] Figure 4 regenerated beside the paper's (`figures/eps_curve_reproduced.png`).
+- [x] Final readiness gates + `VERIFICATION.md` (see below).
 
-## Reference notes for later steps
+## Data provenance (read this before any number below)
+
+- **MNIST** — the real canonical IDX corpus, downloaded on first run from the
+  ossci-datasets S3 mirror into `./data/` (gitignored). `data.load_mnist` calls
+  `data.check_mnist_fingerprint`, which asserts size (50k/10k/10k × 784),
+  label vocabulary exactly {0..9}, pixel range [0,1] f32, **and a pixel-sum
+  checksum** (x_train 5133683.0, x_val 1012586.25, x_test 1038914.5). The
+  checksum is what rejects an all-zeros / synthetic substitute — a closed-book
+  run that fell back to a 65-token corpus passed every downstream gate and meant
+  nothing; this fingerprint exists to prevent exactly that. The 3-vs-7 subset
+  is fingerprinted too (only {-1,+1}, +1 == digit 3 by count). **Every MNIST
+  number below is measured on the real corpus.**
+- **CIFAR-10** — the `cifar_conv_maxout` arm is **BLOCKED**. The download from
+  `cs.toronto.edu` stalled at ~11 MB of the ~170 MB tarball (connection
+  throttled to a few MB per minute; no S3 mirror of the pickle format was
+  reachable in this environment). The arm was marked BLOCKED in `measured.json`
+  rather than run on a synthetic stand-in — a closed-book run that substituted
+  a synthetic corpus passed every gate and meant nothing, and this gate exists
+  to prevent exactly that. **No CIFAR-10 number is reported below; claims
+  c56-c63 are blocked, not adjudicated.**
+
+## Horizon / within-noise caveat (read this before any comparison below)
+
+The training horizon was **shortened to fit a CPU**: 1600-unit maxout trained
+**6 epochs** (paper: full budget + retrain on all 60k, 5 seeds, early-stop on
+adversarial validation error); 240-unit maxout 25 epochs; conv 8 epochs;
+ensemble members 8 epochs. Recording this honestly is necessary but **not
+sufficient**: a number produced at a horizon too short to separate the arms is
+not evidence about the paper's claim.
+
+The paper's headline **regularization** claim is that adversarial training
+*reduces clean test error* (0.94% → 0.84% → 0.782% avg for the 1600-unit
+maxout). At our sub-scale this comparison **does not separate the arms**:
+
+| model | naive clean_err (mean ± spread) | adv clean_err (mean ± spread) |
+|---|---|---|
+| 240-unit maxout (3 seeds) | 1.47 ± 0.06 | 1.23 ± 0.05 |
+| 1600-unit maxout (3/5 seeds) | 1.80 ± 0.28 | 1.87 ± 0.34 |
+
+For the **1600-unit** model the two arms are **within noise**: the per-arm
+seed spread (0.28 / 0.34) dwarfs the naive→adv difference (−0.08, and in the
+*wrong* direction). A measurement that cannot tell the arms apart has not
+tested the paper's comparison, whatever else it shows. The 240-unit model does
+show a small naive→adv drop (1.47→1.23, larger than its spread), so the
+*direction* is weakly present there, but the magnitude (0.24) is far below the
+paper's reported effect and the horizon is too short to call it the paper's
+result. **The paper's clean-error regularization claim is not reproduced at
+this horizon.**
+
+What *does* separate clearly at sub-scale is the **adversarial-error**
+reduction from adversarial training (240-unit: 89.1 → 24.3; 1600-unit: 93.9 →
+56.4) and the **FGSM destroys linear/shallow models** results (softmax 100%,
+logreg-3v7 100%). Those are reported below as measured.
+
+## Exact commands that produced every number
+
+All commands run from the repo root with the pinned venv on PATH. The arms
+write `measured.json`; the gate reads `measured.json` + `claims.json` and
+writes `claims_result.json`.
+
+```bash
+# one-time environment (matches the gate exactly)
+uv venv --python 3.13 .venv && uv pip install --python .venv -r requirements.txt
+
+# the full arms run (resume: skips seeds already in measured.json)
+.venv/bin/python run_all_arms.py            # or: bash run_all_arms.sh
+# one arm only:
+EAE_ONLY=softmax_reg .venv/bin/python run_all_arms.py
+
+# the numbers gate (MUST use the venv python — it imports numpy/torch)
+.venv/bin/python numbers_gate.py
+
+# the test suite (correctness gate)
+.venv/bin/python -m pytest tests/ -q
+
+# the fast path (proves the path runs; NOT evidence about the paper)
+bash smoke.sh
+```
+
+The single FINAL line each arm prints (`FINAL <arm>=<value>`, captured this run
+in `/tmp/arms.log`) and the gate's count line are the authoritative outputs; the
+tables below transcribe them.
+
+
 
 The LaTeX preamble defines math macros that must be resolved when quoting equations:
 `\eps` → `\epsilon`, `\sign` → `\text{sign}`, `\veta` → `\bm{\eta}`, `\vtheta` → `\bm{\theta}`,
@@ -122,6 +214,28 @@ MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%)
   verdict). Suite now 20/20. The gate re-run on the real `measured.json` is
   byte-identical to the committed `claims_result.json` (18/19 HIGH pass, 1
   CIFAR-blocked; produced_by=numbers_gate.py).
+
+## Research-readiness gates
+
+Walked per the `research-readiness` skill; `partial` is used where the honest
+answer is neither pass nor fail.
+
+| # | gate | verdict | evidence |
+|---|---|---|---|
+| 1 | Builds from scratch | **partial** | `Dockerfile` (python:3.13-slim + uv, CPU-only, `pytest -q` CMD) is present and well-formed; `.venv` rebuilt from `requirements.txt` (pinned full closure) imports torch 2.7.1+cpu / numpy 2.3.2 / matplotlib 3.11.1 / pytest 8.4.2 and the FGSM autograd path works. `docker build` was **not** executed here — docker is unavailable in this sandbox — so the image itself is unverified. |
+| 2 | README accurate | **pass** | Quickstart run verbatim in a clean checkout: `uv venv --python 3.13 .venv && uv pip install --python .venv -r requirements.txt`, then `.venv/bin/python -c "import torch, numpy, matplotlib, pytest"` prints the expected versions, `.venv/bin/python -m pytest -q` → 29 passed / 1 skipped, `.venv/bin/python -m run_all_arms` runs (resume), `.venv/bin/python numbers_gate.py` writes `claims_result.json`. Fixed a stale "results/" comment → `measured.json`. |
+| 3 | Packages clear | **pass** | `requirements.txt` pins every direct dep + full transitive closure; `uv pip freeze` matches it exactly; install from clean succeeds and no import then dies. |
+| 4 | Entrypoint obvious | **pass** | One command: `bash run_all_arms.sh` (or `.venv/bin/python run_all_arms.py`); per-arm via `EAE_ONLY=<arm>`; gate via `.venv/bin/python numbers_gate.py`. No source edits needed. |
+| 5 | Fast path | **pass** | `bash smoke.sh` runs the full softmax+FGSM path end-to-end in ~1.5 s and prints one FINAL line. Documented as proof-of-path, not paper evidence. |
+| 6 | Deterministic / noise quantified | **partial** | Same seed → same number (three seeded RNG streams per seed: weights, minibatch order, dropout). Run-to-run spread is quantified per arm in the results table ("spread" = max−min over seeds). `partial` because the headline 1600-unit clean-error arms have spread (0.28–0.34) larger than the effect they are meant to show — see the within-noise caveat. |
+| 7 | Degeneracy test in repo | **pass** | `tests/test_degeneracy.py` asserts `torch.equal` weights: adversarial eps=0, noise eps=0, L1 coef=0 are true no-ops (bit-identical to baseline), and `test_degeneracy_detects_nonzero_eps` asserts eps>0 is bit-different. Runs in the suite. |
+| 8 | Data provenance stated | **pass** | `data.py` downloads MNIST (S3 mirror) and CIFAR-10 (cs.toronto.edu) on first run; `check_mnist_fingerprint` / `check_cifar10_fingerprint` assert size + vocabulary + dtype + checksum (rejects synthetic). [Data provenance](#data-provenance-read-this-before-any-number-below) above states it for a reader. |
+| 9 | Recorded number reproducible | **partial** | Re-running `run_all_arms.py` in resume mode reproduces the committed `measured.json` FINAL lines (verified this run; captured in `/tmp/arms.log`); the gate re-run is byte-identical to the committed `claims_result.json` when run with the venv python. `partial` because the gate **silently blocks every value claim if run with bare `python`** (no numpy) — it MUST be invoked as `.venv/bin/python numbers_gate.py`; this is documented in README/REPRODUCTION but is a footgun a reader can hit. |
+| 10 | Nothing depends on hidden local state | **pass** | Fresh clone + `requirements.txt` + first-run dataset download reproduces; `.venv/`, `data/`, `__pycache__/`, `.pytest_cache/` are gitignored; no tracked scratch files. |
+
+**Net: 5 pass, 5 partial, 0 fail.** The partials are honest: docker build not
+run here (gate 1); the headline comparison is within-noise at sub-scale (gate
+6); the gate must use the venv python (gate 9). None is dressed up as a pass.
 
 ## Log
 
@@ -190,11 +304,12 @@ MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%)
   regression's class 53.6% of the time" read as both-models-wrong conditioned,
   mirroring the preceding sentence's conditioning.
 
-## Results (2026-08-04, numbers pass)
+## Results (2026-08-04, numbers gate run)
 
-`run_all_arms.sh` ran all 16 arms (15 built + cifar blocked) at 3 seeds
-(5 for `maxout_large_adv`). `numbers_gate.py` adjudicated claims.json against
-`measured.json`:
+`run_all_arms.py` ran all 16 arms (15 built + cifar blocked) at 3 seeds
+(5 for `maxout_large_adv`); `numbers_gate.py` adjudicated `claims.json` against
+`measured.json` (run with the venv python — bare `python` lacks numpy and
+blocks every value claim):
 
 | verdict | all | HIGH (gate) | medium | low |
 |---|---|---|---|---|
@@ -217,25 +332,64 @@ bracketed metric `rubbish_class_shares['5']` the gate resolves but the measured
 dict stores under a nested key — recorded as a gate/tokenizer gap, not a
 method failure; the underlying `rubbish_class_shares` dict IS measured).
 
-### Measured vs paper (headline, seed-mean)
+### Measured vs paper (headline, seed-mean; difference = measured − paper)
 
-| arm.metric | paper | measured (mean) | claim | verdict |
-|---|---|---|---|---|
-| softmax_reg.adv_err | 99.9 | 100.0 | c01 (med) | pass |
-| logreg_3v7.clean_err | 1.6 | 1.52 | c04 (med) | pass |
-| logreg_3v7.adv_err | 99 | 100 | c05 (med) | pass |
-| logreg_3v7.analytic_equiv | 0 | 9.5e-7 | c07 (HIGH) | **pass** |
-| maxout_naive.rubbish_err | 98.35 | ~98 | c46 (med) | pass |
-| rbf_shallow.clean_conf_all | 60.6 | 67.1 | c31 (low) | pass |
-| rbf_shallow.rubbish_err | 0 | 0.0 | c52 (med) | pass |
-| maxout_large_naive.adv_err | 89.4 | ~94 | c15 (med) | pass |
-| noise_rademacher.adv_err | 86.2 | 86.6 | c24 (med) | pass |
-| noise_uniform.adv_err | 90.4 | 86.9 | c26 (med) | pass |
-| ensemble12.adv_err_ensemble | 91.1 | 93.5 | c34 (med) | pass |
-| agreement_mnist.agree_softmax_cond | 84.6 | ~70 | c40 (med) | fail (sub-scale) |
-| transfer_mnist.err_orig_on_advfromnew | 40.9 | ~61 | c21 (med) | fail (sub-scale) |
-| maxout_large_adv.clean_err | 0.782 | ~1.93 | c19 (low) | fail (sub-scale, no 60k retrain) |
-| eps_trace margin[-10,0,+10] | thin manifold | -31,+5.5,-1068 | c65-c68 (HIGH) | **pass** |
+State the numbers and the difference; the reader judges. "spread" is the
+max−min over seeds. Data source for every row: the real MNIST IDX corpus
+(see [Data provenance](#data-provenance-read-this-before-any-number-below));
+CIFAR rows are BLOCKED, not measured. Command for every row:
+`EAE_ONLY=<arm> .venv/bin/python run_all_arms.py` then
+`.venv/bin/python numbers_gate.py`.
+
+| arm.metric | paper | measured (mean) | spread | diff | claim | verdict |
+|---|---|---|---|---|---|---|
+| softmax_reg.adv_err | 99.9 | 100.00 | 0.00 | +0.10 | c01 (med) | pass |
+| logreg_3v7.clean_err | 1.6 | 1.54 | 0.15 | −0.06 | c04 (med) | pass |
+| logreg_3v7.adv_err | 99 | 100.00 | 0.00 | +1.00 | c05 (med) | pass |
+| logreg_3v7.analytic_equiv (max absdiff) | 0 | 9.5e-7 | — | +9.5e-7 | c07 (HIGH) | **pass** |
+| maxout_naive.clean_err | 0.94 | 1.47 | 0.06 | +0.53 | c08 (low) | fail (sub-scale) |
+| maxout_adv.clean_err | 0.84 | 1.23 | 0.05 | +0.39 | c11 (low) | fail (sub-scale) |
+| maxout_naive.adv_err | 89.4 | 89.09 | 4.72 | −0.31 | c15 (med) | pass |
+| maxout_adv.adv_err | 17.9 | 24.25 | 8.00 | +6.35 | c14 (low) | fail (sub-scale) |
+| c13 ordering: naive.adv − adv.adv > 0 | yes | 62.45/59.80/72.28 (per seed) | — | direction ok | c13 (HIGH) | **pass** |
+| maxout_large_naive.clean_err | 1.14 | 1.80 | 0.28 | +0.66 | c17 (low) | fail (sub-scale) |
+| maxout_large_adv.clean_err | 0.782 | 1.87 | 0.34 | +1.09 | c19 (low) | fail (sub-scale) |
+| maxout_large_naive.adv_err | 89.4 | 93.94 | 1.78 | +4.54 | c15 (med) | pass |
+| maxout_large_adv.adv_err | 17.9 | 56.45 | 3.59 | +38.55 | c14 (low) | fail (sub-scale) |
+| c16 ordering: large_naive.adv − large_adv.adv > 0 | yes | 38.38/39.23/36.72 (per seed) | — | direction ok | c16 (HIGH) | **pass** |
+| noise_rademacher.adv_err | 86.2 | 88.70 | 3.87 | +2.50 | c24 (med) | pass |
+| noise_uniform.adv_err | 90.4 | 88.10 | 1.98 | −2.30 | c26 (med) | pass |
+| l1_maxout.train_err (coef .0025 too large) | >5 | 6.27 (mean) | 1.60 | — | c27 (low) | pass |
+| rbf_shallow.clean_conf_all | 60.6 | 67.15 | 0.08 | +6.55 | c31 (low) | pass |
+| rbf_shallow.adv_err | 55.4 | 98.54 | 0.46 | +43.14 | c29 (med) | fail (RBF impl gap) |
+| rbf_shallow.adv_conf_mistakes | 1.2 | 22.44 | 0.10 | +21.24 | c30 (low) | fail (RBF impl gap) |
+| c32 ordering: maxout_naive.adv_conf − rbf.adv_conf > 0 | yes | 44.67/44.74/44.71 (per seed) | — | direction ok | c32 (HIGH) | **pass** |
+| c33 ordering: rbf.clean_conf − rbf.adv_conf > 0 | yes | (per-seed >0) | — | direction ok | c33 (HIGH) | **pass** |
+| ensemble12.adv_err_ensemble | 91.1 | 93.20 | 0.71 | +2.10 | c34 (med) | pass |
+| ensemble12.adv_err_single | 87.9 | 91.26 | 2.68 | +3.36 | c35 (med) | pass |
+| agreement_mnist.agree_softmax_cond | 84.6 | 73.83 | 7.34 | −10.77 | c40 (med) | fail (sub-scale) |
+| c44 ordering: softmax_cond − rbf_cond > 0 | yes | 71.87/73.69/68.86 per-seed deltas | — | direction ok | c44 (HIGH) | **pass** |
+| transfer_mnist.err_orig_on_advfromnew | 40.9 | 61.12 | 3.84 | +20.22 | c21 (med) | fail (sub-scale) |
+| transfer_mnist.err_new_on_advfromorig | 19.6 | 30.83 | 1.81 | +11.23 | c22 (med) | fail (sub-scale) |
+| maxout_naive.rubbish_err | 98.35 | 97.22 | 1.83 | −1.13 | c46 (med) | pass |
+| rbf_shallow.rubbish_err | 0 | 0.00 | 0.00 | 0.00 | c52 (med) | pass |
+| cifar_conv_maxout.* (all CIFAR metrics) | (various) | BLOCKED | — | — | c56-c63 | blocked |
+| eps_trace margin at ε=-10,0,+10 | thin manifold | -31.2, +5.5, -1068.4 (seed 0) | — | shape matches | c65-c68 (HIGH) | **pass** |
+
+**Within-noise arms (not evidence about the paper's claim):** the 1600-unit
+maxout clean-error comparison (naive 1.80 ± 0.28 vs adv 1.87 ± 0.34) — see the
+[Horizon / within-noise caveat](#horizon--within-noise-caveat-read-this-before-any-comparison-below).
+The paper's headline regularization claim (clean error 0.94→0.84→0.782) is
+**not reproduced** at this 6-epoch horizon; the arms cannot be told apart.
+
+**RBF value gap (a real implementation difference, not just sub-scale):** our
+shallow RBF reaches 98.5% FGSM error at 22.4% confidence, where the paper
+reports 55.4% error at 1.2% confidence. The HIGH *ordering* claims (c32, c33:
+RBF is far less confident than the maxout net on mistakes, and less confident
+away from data than on clean inputs) **pass** — the qualitative point the
+paper makes (RBF is resistant *by being low-confidence*) is reproduced; the
+tight value claims (c29/c30) fail and are rated medium/low. The gap is the
+RBF β/μ parametrization (SPEC §4.4), which the paper does not specify.
 
 ### Figure 4
 
