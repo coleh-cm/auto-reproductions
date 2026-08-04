@@ -16,7 +16,12 @@
 - [x] Reproduction workspace set up from `main`, branch
       `repro/confidence-weighted-self-distillation-for-learning-under-label` pushed
 - [x] Paper text saved to `paper/paper.md`
-- [ ] Comprehension (SPEC)
+- [x] Comprehension (SPEC) — 2026-08-04: SPEC.md and claims.json re-verified
+      independently against `paper/paper.md` (all citations re-grepped, all 11
+      quotes verbatim-checked, `s`-has-no-value re-confirmed, both arms and all
+      three seeds re-executed: seed 0 baseline 0.9370 exactly / CWSD 0.9611;
+      `48 passed`; no upstream code found on GitHub). See SPEC.md's second
+      re-verification note for the command-level evidence.
 - [ ] Implementation / verification of existing code against the paper
 - [ ] Adversarial review rounds clean
 - [ ] Readiness gates

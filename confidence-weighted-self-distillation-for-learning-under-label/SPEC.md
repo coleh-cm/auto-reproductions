@@ -33,6 +33,27 @@ tests` → `48 passed`; SPEC §5 interfaces diffed clean against `run_experiment
 --noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels, init_params,
 forward, make_target, loss_and_grads, batches, evaluate, train`); `measured.json` values match §8's numbers.
 
+**Re-verified again this pass (2026-08-04, comprehension step).** Re-run from the paper, not
+from the notes above: Eq. (2)'s `s` confirmed valueless by exhausting the file's two lone `s`
+tokens (`grep -n '^s$' paper/paper.md` → only :139 inside Eq. (2) and :162 in the prose — no
+assignment anywhere; the §3 hyperparameter sentence at :361-375 lists exactly `λ = 1`,
+`τ = 0.9`, `T = 2` and stops); Eq. (2)'s stacked layout `τ` (:138) over `s` (:139) inside the
+parentheses confirms the fractional reading `(c − τ)/s` used throughout. Arms re-executed on
+the pinned env (numpy 2.5.1, sklearn 1.9.0, Python 3.12.13): seed 0 → baseline `0.9370`
+(matches Table 1 *exactly*, 506/540), CWSD `0.9611` (Table 1: 0.9620, gap 0.0009); seeds 1,2 →
+baseline `0.9407`/`0.9315`, CWSD `0.9481`/`0.9556` — all identical to `measured.json` and §8;
+ordering `cwsd > baseline` holds at every seed. `--metrics-out` re-run at seed 0:
+baseline `gate_w_max = 0.0`, `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0`
+(bitwise); CWSD `gate_w_min = 0.0126 > 0`, `gate_w_max = 0.5379 < 1`, `target_min > 0`,
+`target_sum_err = 1.19e-07 < 1e-6`, `stopgrad_grad_err = 8.9e-04 < 5e-3` — every high claim's
+predicate verified as measured evidence. `python -m pytest -q tests` → `48 passed`. All 11
+quotes re-verified verbatim (11/11 PASS under the §8 normalization); every grep anchor cited
+below re-executed and resolving to the stated line; `paper/` confirmed to contain only
+`paper.md` (no figures/LaTeX → no `curve` claims); paper URL/code grep → no matches; GitHub
+repository searches re-run (`confidence-weighted self-distillation`, `self-distillation label
+noise`, `cwsd label noise`, `"Institute for Applied Learning Systems"`) → `total_count: 0`
+throughout; GitHub user search on the author trio → `total_count: 0`.
+
 ## 1. The method as an explicit algorithm
 
 **Inputs**
