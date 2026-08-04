@@ -174,3 +174,60 @@ is already documented (`claims.json` c33 note; SPEC items 9/31). The optional
 `nt08` MNIST rubbish per-class tally (45.3% classified as 5s / 0% as 8s,
 tex:924-926) is implementable from the existing M9 machinery but was left for a
 later pass to avoid destabilizing the gate.
+
+## Second review-pass fix (this run)
+
+A follow-up adversarial re-read (faithful + metric + divergence) confirmed the
+implementation math and the gate-authored `claims_result.json` were correct
+(re-running `.venv/bin/python numbers_gate.py` against the shipped
+`measured.json` reproduces the committed file byte-for-byte: 34 pass / 3 fail /
+0 blocked, 19/19 HIGH, `gate_pass: true`; `measured.json` vs HEAD differs only
+in run-log timing strings, zero metric drift; suite 105/105; mutations 6/6
+verified). It flagged only stale `claims.json` notes that predated the latest
+re-run and misstated measured values (verdicts unaffected — the gate reads
+`measured.json`, not the notes), plus an epoch count and tolerance-inflation
+disclosures. All acted on this pass.
+
+**Stale notes refreshed (seven claims).** The notes are documentation; the
+gate verdicts are unchanged. Each note now states the current per-seed
+measured values and the 3-seed mean:
+
+- `c01` — "100.0% / 99.1% / 99.8%" → per-seed FGSM error softmax
+  99.99/100.00/99.99%, logistic 99.12/98.82/99.80%, maxout 97.55/96.09/96.33%
+  (mean 96.66%); all far above the 0.5 existence threshold.
+- `c07` — "sub-scale 99.8%" → fgsm error per-seed 97.55/96.09/96.33% (mean
+  96.66%).
+- `c08` — "Sub-scale 88.7%" → mean confidence-on-errors per-seed
+  91.33/91.92/91.27% (mean 91.51%).
+- `c30` — "Sub-scale: 82.1%" → maxout-softmax rubbish error per-seed
+  89.12/88.45/88.24% (mean 88.60%).
+- `c31` — "Sub-scale: 81.7%" → softmax-regression rubbish error per-seed
+  83.15/85.76/85.87% (mean 84.93%).
+- `c32` — "Sub-scale 79.2%" → sigmoid-top rubbish error per-seed
+  67.57/67.46/69.58% (mean 68.20%, vs paper 68% — genuinely close, not saved
+  by the tolerance).
+- `c09` — "12 epochs" corrected to "20 epochs" (the M4 run used
+  `max_epochs=20`, `epochs_run=20` at all 3 seeds, per
+  `results/_per_seed/m4_adversarial__seed{0,1,2}.json`); the per-seed M4
+  error numbers in the note were already correct.
+
+**Cross-model agreement notes refreshed (three claims).** `c25`/`c26`/`c27`
+notes quoted seed-0 values where the gate evaluates per-seed; replaced with
+the per-seed ranges and means (c25: 62.77/63.46/60.63% vs 30.50/30.25/27.92%,
+means 62.29% vs 29.55%; c26: 64.48/64.81/62.55% vs 47.34/46.11/44.15%, means
+63.95% vs 45.87%; c27: 38.69/37.23/36.12%, mean 37.35%).
+
+**Tolerance-inflation disclosed (four `low` value claims).** `c18`/`c19`/
+`c23`/`c24` pass only because their tolerances are wide relative to the gap
+from the paper's value at this sub-scale; their notes now say so explicitly
+and point to the load-bearing ordering claims that carry the real content
+(c17 for the noise controls; c22 for the RBF). c18 measured 99.69% mean vs
+paper 86.2% (tol 0.15); c19 99.96% vs 90.4% (tol 0.15); c23 24.92% vs 1.2%
+(tol 0.25, gap 0.237 ≈ 20× the target); c24 95.05% vs 55.4% (tol 0.45, gap
+0.396 ≈ half the [0,1] scale). All four are `compute_invariance: low`
+(informational, off the load-bearing gate); the direction claims they
+support (c17, c22) hold with real margins.
+
+**SPEC.md re-embedded.** `SPEC.md`'s section-10 embedded `claims.json` was
+re-synced to the updated file; `test_spec_embedded_claims_json_is_byte_identical`
+passes (suite 105/105).
