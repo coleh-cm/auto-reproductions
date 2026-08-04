@@ -111,6 +111,20 @@ sub-scale. Two independent reviewers' full verdicts are in `selfcheck.json`.
   stated, tex:488). The RBF ν floor is the one value the paper never states that a
   HIGH claim could depend on; ν is fixed (not gated by a HIGH claim) and the RBF
   value claims are rated low/medium precisely because RBF training is unstated.
+- **Mutation gate vs. conftest auto-restore:** `tests/conftest.py` used to
+  `git checkout` every mutation-target file at collection time. That recovered
+  the tree after an interrupted `tests/test_mutations.py` run, but it also
+  reverted *any* planted defect before the must_fail test ran — including the
+  defects the external mutation gate plants directly in a source file (the gate
+  does not set our `EAE_SKIP_RESTORE` flag). The gate's must_fail tests then ran
+  on clean code, PASSED, and the gate reported the mutations as SURVIVED. The
+  auto-restore is now **opt-in** (`EAE_AUTO_RESTORE=1`, default OFF): the gate's
+  planted defect now reaches the test, and `tests/test_mutations.py` still
+  reverts via its own `finally: git checkout` (it sets `EAE_SKIP_RESTORE=1`).
+  All 9 mutations are now CAUGHT under the gate's style (apply defect → run
+  must_fail without `EAE_SKIP_RESTORE`). Also fixed `mut_logreg_analytic_sign`:
+  its `find` string appeared twice in `tests/test_invariants.py`; it now
+  includes the following `margin_analytic` line so the match is unique.
 
 ## Constructed truth (see SPEC §8.5)
 

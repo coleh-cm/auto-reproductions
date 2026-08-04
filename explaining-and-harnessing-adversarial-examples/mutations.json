@@ -36,8 +36,8 @@
       "id": "mut_logreg_analytic_sign",
       "covers": ["core"],
       "file": "tests/test_invariants.py",
-      "find": "    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b",
-      "replace": "    margin_fgsm = (x + eps * sign_w.unsqueeze(0)) @ w + b",
+      "find": "    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b\n    margin_analytic = eps * w1 - (x @ w + b)",
+      "replace": "    margin_fgsm = (x + eps * sign_w.unsqueeze(0)) @ w + b\n    margin_analytic = eps * w1 - (x @ w + b)",
       "must_fail": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form"
     },
     {

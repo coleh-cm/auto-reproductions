@@ -1,13 +1,19 @@
 """conftest.py — pin determinism for the test suite.
 
-Also restores a clean working tree at import time. test_mutations.py mutates
-real source files (train.py, attack.py, models.py, tests/test_invariants.py)
-and reverts them in a `finally`; if a previous run was interrupted (kill/timeout)
-the reverted file never came back and the repo shipped the planted defect
-permanently. We restore at conftest import time — BEFORE pytest collects the
-test modules and imports `train`/`models` — so the in-memory modules never see
-a leftover defect. This runs before any test, so a poisoned tree from an
-interrupted mutation run can never reach the suite.
+Tree-restore is OPT-IN (default OFF). It used to run on every conftest import
+to recover from an interrupted mutation run, but that auto-restore reverts
+*any* planted defect at collection time — including the deliberate defects the
+external mutation gate plants directly into a source file before running the
+must_fail test node. The gate does not set EAE_SKIP_RESTORE (that flag is local
+to our own tests/test_mutations.py subprocess), so the auto-restore silently
+undid the gate's defect, the must_fail test ran on clean code, PASSED, and the
+gate reported the mutation as SURVIVED. Making restore opt-in lets the gate's
+planted defect reach the test.
+
+Recovery from an interrupted mutation run is now handled by
+tests/test_mutations.py's own `finally: git checkout` (robust to normal
+interruption) plus the committed-clean tree. To force a clean-tree reset on
+import (e.g. after a hard-killed mutation run), set EAE_AUTO_RESTORE=1.
 """
 import json
 import os
@@ -35,11 +41,23 @@ def _mutation_files():
 
 def _restore_clean_tree():
     """Reset every mutation-target file from git and drop stray .mutbak backups.
-    Idempotent: a no-op on a clean tree. Runs at conftest import (before the
-    test modules are collected/imported) so in-memory modules see clean source.
-    Skipped when EAE_SKIP_RESTORE is set — the mutation test sets this in its
-    subprocess so the deliberately-planted defect survives to be caught."""
+
+    Opt-in via EAE_AUTO_RESTORE=1 (default OFF). When enabled, runs at conftest
+    import (before the test modules are collected/imported) so in-memory modules
+    see clean source. Always skipped when EAE_SKIP_RESTORE is set (our own
+    tests/test_mutations.py sets that so its deliberately-planted defect survives
+    to be caught).
+
+    Why opt-in / default OFF: the external mutation gate plants a defect
+    directly in a source file and then runs the must_fail test node WITHOUT
+    EAE_SKIP_RESTORE. An unconditional restore here would revert the gate's
+    defect at collection time, the must_fail test would run on clean code, PASS,
+    and the gate would report the mutation as SURVIVED. Default-off lets the
+    gate's planted defect reach the test; the gate reverts via git itself
+    between mutations."""
     if os.environ.get("EAE_SKIP_RESTORE"):
+        return
+    if not os.environ.get("EAE_AUTO_RESTORE"):
         return
     files = _mutation_files()
     for f in files:
@@ -59,6 +77,7 @@ def _restore_clean_tree():
 
 
 # Runs at conftest import — before pytest collects imports of train/models.
+# Opt-in (see _restore_clean_tree docstring); a no-op unless EAE_AUTO_RESTORE=1.
 _restore_clean_tree()
 
 
