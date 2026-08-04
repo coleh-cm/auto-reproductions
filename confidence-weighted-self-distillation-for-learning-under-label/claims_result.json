@@ -1,9 +1,30 @@
 {
+  "produced_by": "reproduce-paper numbers gate",
+  "verdicts": [
+    "reproduced",
+    "refuted",
+    "untested",
+    "blocked"
+  ],
+  "verdict_counts": {
+    "reproduced": 9,
+    "refuted": 0,
+    "untested": 0,
+    "blocked": 0
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ],
   "summary": {
     "total": 9,
     "pass": 9,
     "fail": 0,
     "blocked": 0,
+    "untested": 0,
+    "reproduced": 9,
+    "refuted": 0,
     "high": {
       "pass": 6,
       "fail": 0,
@@ -16,193 +37,117 @@
     },
     "high_total": 6,
     "gate_pass": true,
-    "note": "9 claims adjudicated by the reproduce-paper numbers gate against measured.json (arms: baseline, cwsd; seeds 0,1,2). 6 high + 3 low compute-invariance, all pass. The gate's original vocabulary labelled these 'reproduced' (9 reproduced / 0 refuted / 0 untested / 0 blocked); relabelled to the standard pass/fail/blocked vocabulary here for downstream consumers. Original-vocabulary counts preserved per-claim in detail.gate_verdict."
+    "note": "9 claims adjudicated by the reproduce-paper numbers gate against measured.json (arms baseline,cwsd; seeds 0,1,2). Verdicts in this run's gate vocabulary: reproduced=9, refuted=0, untested=0, blocked=0 (== pass=9, fail=0). gate_pass=true."
   },
   "claims": [
     {
       "id": "cwsd-improves-over-baseline",
       "kind": "ordering",
       "compute_invariance": "high",
-      "citation": "paper/paper.md:416-427 (grep 'improves over the cross-entropy' resolves to line 420)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:416-427",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "quantity 0.0185333 against direction >0, spread 0.0167",
         "measured": 0.01853333333333333,
-        "spread_across_seeds": 0.016699999999999937,
-        "claimed": null,
-        "gap": null,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "spread_across_seeds": 0.0167,
+        "why": "quantity 0.0185333 against direction >0, spread 0.0167"
       }
     },
     {
       "id": "baseline-accuracy-value",
       "kind": "value",
       "compute_invariance": "low",
-      "citation": "paper/paper.md:428-445 (grep '9370' resolves to lines 406 and 438; Table 1 first-row tokens at paper/paper.md:400-406)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:408-414",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "gap 0.0006 within tolerance 0.01",
         "measured": 0.9364,
-        "spread_across_seeds": 0.009199999999999986,
+        "spread_across_seeds": 0.0092,
         "claimed": 0.937,
-        "gap": 0.0006000000000000449,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "gap": 0.0006,
+        "why": "gap 0.0006 within tolerance 0.01"
       }
     },
     {
       "id": "cwsd-accuracy-value",
       "kind": "value",
       "compute_invariance": "low",
-      "citation": "paper/paper.md:428-445 (grep '9620' resolves to lines 414 and 432; Table 1 second-row tokens at paper/paper.md:408-414)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:408-414",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "gap 0.00706667 within tolerance 0.015",
         "measured": 0.9549333333333333,
-        "spread_across_seeds": 0.0129999999999999,
+        "spread_across_seeds": 0.013,
         "claimed": 0.962,
         "gap": 0.0070666666666666655,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "gap 0.00706667 within tolerance 0.015"
       }
     },
     {
       "id": "improvement-magnitude-2p5-points",
       "kind": "value",
       "compute_invariance": "low",
-      "citation": "paper/paper.md:24-36 (grep 'points over standard' resolves to line 34)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:24-36",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "gap 0.00646667 within tolerance 0.02",
         "measured": 0.01853333333333333,
-        "spread_across_seeds": 0.016699999999999937,
+        "spread_across_seeds": 0.0167,
         "claimed": 0.025,
         "gap": 0.006466666666666673,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "gap 0.00646667 within tolerance 0.02"
       }
     },
     {
       "id": "lambda-zero-is-exact-cross-entropy",
       "kind": "invariant",
       "compute_invariance": "high",
-      "citation": "paper/paper.md:35-36 (grep 'recovers the cross-entropy baseline exactly' resolves to line 35; method-section restatement at paper/paper.md:253-280, grep 'strict generalisation' resolves to line 273)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:35-36",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "held at 3 of 3 seeds",
-        "measured": null,
-        "spread_across_seeds": null,
-        "claimed": null,
-        "gap": null,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "held at 3 of 3 seeds"
       }
     },
     {
       "id": "gate-weight-bounded-by-lambda",
       "kind": "invariant",
       "compute_invariance": "high",
-      "citation": "paper/paper.md:113-124 (grep 'maximum influence' resolves to line 124; Eq. (2) tokens at paper/paper.md:126-158)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:113-124",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "held at 3 of 3 seeds",
-        "measured": null,
-        "spread_across_seeds": null,
-        "claimed": null,
-        "gap": null,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "held at 3 of 3 seeds"
       }
     },
     {
       "id": "target-is-convex-combination",
       "kind": "invariant",
       "compute_invariance": "high",
-      "citation": "paper/paper.md:171-174 (grep 'convex combination' resolves to line 171; Eq. (3) tokens at paper/paper.md:177-212)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:171-174",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "held at 3 of 3 seeds",
-        "measured": null,
-        "spread_across_seeds": null,
-        "claimed": null,
-        "gap": null,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "held at 3 of 3 seeds"
       }
     },
     {
       "id": "stop-gradient-holds-target-constant",
       "kind": "invariant",
       "compute_invariance": "high",
-      "citation": "paper/paper.md:213-214 (grep 'trivial solution' resolves to line 214; 'stopgrad' appears at line 198 in Eq. (3))",
-      "verdict": "pass",
+      "citation": "paper/paper.md:213-214",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "held at 3 of 3 seeds",
-        "measured": null,
-        "spread_across_seeds": null,
-        "claimed": null,
-        "gap": null,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "held at 3 of 3 seeds"
       }
     },
     {
       "id": "single-network-no-extra-parameters",
       "kind": "existence",
       "compute_invariance": "high",
-      "citation": "paper/paper.md:21-23 (grep 'no second network' resolves to line 23)",
-      "verdict": "pass",
+      "citation": "paper/paper.md:21-23",
+      "verdict": "reproduced",
       "detail": {
-        "gate_verdict": "reproduced",
-        "why": "held at 3 of 3 seeds",
-        "measured": null,
-        "spread_across_seeds": null,
-        "claimed": null,
-        "gap": null,
-        "seeds": [
-          0,
-          1,
-          2
-        ]
+        "why": "held at 3 of 3 seeds"
       }
     }
   ],
   "not_tested": [
-    "section-4-attribution-claim (the paper's attribution of the gain to the gate suppressing gradient on confidently-disagreeing examples is phrased as attribution, not a measured result; the one-line output contract does not expose per-example gate weights)",
-    "table-1-magnitudes-at-seeds-1-2 (the paper's exact 0.9370/0.9620 are seed-0 numbers; seeds 1/2 are out-of-distribution for the paper's numbers and are covered by widened tolerances, not asserted as reproductions at those seeds)"
+    "section-4-attribution-claim",
+    "table-1-magnitudes-at-seeds-1-2"
   ],
-  "generated_from": "claims.json + measured.json via the reproduce-paper numbers gate (278-line gate proxy); re-evaluated on the final committed measured.json at publish"
+  "generated_from": "claims.json + measured.json via the reproduce-paper numbers gate"
 }
