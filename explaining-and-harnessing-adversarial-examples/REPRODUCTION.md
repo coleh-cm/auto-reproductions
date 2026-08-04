@@ -90,3 +90,87 @@ config is 1600 units / patience 100 / 5 seeds, infeasible here; `make_measured.p
 runs M5 at 240 units / 12 epochs). They are informational and expected at
 sub-scale; the gate's load-bearing verdict is over HIGH claims (19/19 pass).
 This is recorded in `claims_result.json['summary']['note']` and in SPEC §9.
+
+## Review-pass fix (this run)
+
+The consolidated adversarial review (faithful + metric + divergence) found the
+implementation math faithful to the paper at every equation traced, but flagged
+one blocking artifact-integrity defect and several non-blocking doc/notes
+issues. All acted on this pass; verdicts unchanged (34 pass / 3 fail / 0
+blocked, 19/19 HIGH pass, gate PASS).
+
+**BLOCKER fixed: `claims_result.json` re-authored by the gate.** The working
+tree had a hand-/outer-tool-rewritten `claims_result.json` (stamp
+`produced_by: "reproduce-paper numbers gate"`, foreign verdict vocabulary
+`reproduced/refuted/untested`, dropped `summary`/`not_tested` blocks) that the
+repo's own provenance test
+(`tests/test_claims_integrity.py::test_claims_result_json_is_gate_authored_with_produced_by_stamp`)
+rejected (suite 104/105). Fix: re-ran `.venv/bin/python numbers_gate.py` against
+the shipped `measured.json` and committed its verbatim output (stamp
+`produced_by: "numbers_gate.py"`, 34 pass / 3 fail / 0 blocked, 19/19 HIGH,
+`gate_pass: true`, full `summary` + 9-entry `not_tested` ledger). This restores
+the four verdicts the rewrite had mis-adjudicated: `c09` and `c21` (downgraded
+to "untested" under a mean-vs-cross-seed-spread rule absent from the spec —
+both are pure orderings whose direction holds at 3/3 seeds) and the Fig. 4
+curve claims `fc2`/`fc3` (marked "refuted" at grid indices 29/30 = ε=−0.5/0.0,
+outside/at the boundary of the claims' declared `x_range`; the gate's
+`_restrict` correctly restricts and passes both at 3/3 seeds). The working-tree
+`measured.json` differed from HEAD only in run-log timing lines, not in any
+metric value (verified leaf-key by leaf-key); the per-seed `results/_per_seed/`
+files were untouched. Suite back to 105/105.
+
+**Non-blocking fixes (this pass):**
+
+- *Stale claim notes corrected.* `c09` cited old single-run numbers
+  (2.12→1.71 / 1.98→1.64); replaced with the current per-seed M4 values
+  (1.78→1.47 / 1.82→1.25 / 1.48→1.43, adv−base = −0.31/−0.57/−0.05 pp) plus an
+  explicit power caveat (the per-seed margins are ~31/57/5 test examples of 10k,
+  t≈−2.1, df=2 — consistent in direction, small, comparable to the paper's own
+  ~0.10 pp effect; settled by the spec'd per-seed ordering, not by a margin
+  large vs seed noise). `c28` said "Sub-scale (4 members): 99.76%" but the run
+  used 12 members; corrected to the per-seed ensemble-targeted FGSM error
+  (99.87 / 99.89 / 99.89%). `c29` predicted the ordering "REVERSED (99.76 vs
+  99.79)" but the measured per-seed gaps are +0.16/+0.19/+0.19 pp — positive at
+  3/3 seeds, in the paper's direction; corrected the note (the gap is thin at
+  saturation, hence `low`, but not reversed).
+- *`c21` power caveat added.* The small-coefficient L1 benefit ordering holds at
+  3/3 seeds (+0.04/+0.08/+0.32 pp, ~4/8/32 test examples of 10k) but the margins
+  are small; recorded that the claim is settled by the spec'd per-seed ordering
+  rather than by a margin large relative to seed noise.
+- *SPEC §6 item 9 free-β paragraph corrected.* The paragraph described the
+  superseded design ("β is a free parameter with a negative-definite init
+  (−0.01·I)"), contradicting `models.py:298-323`, the SPEC table, and item 31
+  (β is `−diag(a_k)`, `a_k = softplus(raw_k) > 0`, negative-definite BY
+  CONSTRUCTION). A free β with neg-def init drifts positive under softmax-CE
+  training (verified), leaving the RBF family and breaking the off-manifold
+  confidence-decay mechanism; the construction constraint is what makes the
+  paper's RBF immunity phenomenology structurally reachable. The paragraph now
+  matches the code.
+- *`c11` (M5) arm-name cross-reference added.* The arms are named
+  `m5_maxout1600_*` after the paper's 1600-unit configuration, but the sub-scale
+  run used `--units 240 --epochs 12` (recorded in `measured.json
+  _meta.subscale_overrides`). The note now states this explicitly so a
+  name-only reader is not misled; the name is retained for stable claim/metric
+  pointers.
+
+**M5 early-stopping horizon caveat (sub-scale limit).** The paper's M5
+protocol (tex:501-512) selects the number of epochs by early stopping on the
+*adversarial* validation error, then retrains on all 60k. At this sub-scale
+(`select_max_epochs=12`), the adversarial-validation early-stopper reaches the
+epoch cap rather than plateauing: the adversarial arm's best adv-valid epoch is
+index 11/12 at seeds 0 and 1 (the final epoch) and 9/12 at seed 2. The
+directional claim (c11) still measures — the arms genuinely diverge (adv−clean
+= −0.38/−0.30/−0.68 pp at 3/3 seeds) — but the protocol's signature feature
+(plateau-driven early stopping) is only partially exercised at this 12-epoch
+horizon; at the paper's patience-100 scale it would fire well before the cap.
+
+**Untouched (intentionally).** The review's strongest divergence objection —
+that the RBF β negative-definite-by-construction "manufactures" the paper's RBF
+phenomenology — was dismissed as not a divergence: E8 (tex:595) prints a decaying
+probability that is valid only for neg-semi-definite β, the paper's immunity
+claim is expressly architectural (tex:600-604), and a free β drifting positive
+leaves the RBF family entirely. The structural nature of the 0%-rubbish result
+is already documented (`claims.json` c33 note; SPEC items 9/31). The optional
+`nt08` MNIST rubbish per-class tally (45.3% classified as 5s / 0% as 8s,
+tex:924-926) is implementable from the existing M9 machinery but was left for a
+later pass to avoid destabilizing the gate.

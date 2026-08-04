@@ -331,10 +331,17 @@ Model definitions:
    the softmax argmax) for the error rate (`eval.eval_fgsm_rbf`, `eval.eval_clean_confidence_rbf`,
    `eval.eval_rubbish_rbf`). The RBF training cost remains the softmax cross-entropy over q
    (the implied 10-way training cost, §6 item 8) — the argmax prediction is unchanged; only
-   the confidence/threshold metrics switch to the unnormalized form. β is a free parameter
-   with a negative-definite init (−0.01·I) — the faithful reading of E8 (the exp is a valid
-   probability only when β is neg-semi-definite); the metric fix is what restores the paper's
-   confidence-decay phenomenology, not the init.
+   the confidence/threshold metrics switch to the unnormalized form. β is NOT a free
+   parameter: it is `β_k = -diag(a_k)` with `a_k = softplus(raw_k) > 0`, i.e. diagonal
+   negative-definite BY CONSTRUCTION (models.py:298-323, table above). A free β with a
+   negative-definite init (−0.01·I) drifts positive under softmax-CE training (verified),
+   leaving the RBF family and breaking the off-manifold confidence-decay mechanism that
+   underlies the paper's immunity claim (tex:600-604, architectural, not learned). The
+   construction constraint (a = softplus(raw) > 0 ⇒ β neg-def) is what holds `exp(q_k) ≤ 1`
+   and makes the 0%-rubbish / confidence-collapse phenomenology structurally reachable; the
+   metric fix (unnormalized per-class exp(q)) is what makes it the *measured* form. Both
+   are recorded as unpapered choices (commit 38cb5a0; this §6 item 9; §6 item 31 documents
+   the inert `q.clamp(max=80)` overflow guard that never fires once β is neg-def).
 10. **Conv maxout for CIFAR-10**: architecture entirely external (cifar10.yaml); preprocessing
     described only as "yields a standard deviation of roughly 0.5" via a hyperlink (tex:343-345).
 11. **Ensemble combination rule** (mean probs vs mean logits) and the exact attack objective for
@@ -975,7 +982,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:492",
       "quantity": "measured.m4_maxout240_advtrain.adversarial_clean_error - measured.m4_maxout240_advtrain.baseline_clean_error",
       "direction": "<0",
-      "note": "The paper's headline claim. Held at BOTH sub-scales already run: gate (dropout off) 2.12% -> 1.71%, milestone arm (dropout 0.8) 1.98% -> 1.64%."
+      "note": "The paper's headline claim. Per-seed (M4, 240 units, 12 epochs, dropout 0.8): baseline 1.78% -> adv 1.47% (seed0), 1.82% -> 1.25% (seed1), 1.48% -> 1.43% (seed2); adv-base = -0.31/-0.57/-0.05 pp, direction (<0) holds at 3/3 seeds (the spec'd per-seed ordering). Power caveat: the per-seed margins are ~31/57/5 test examples of 10k (mean -0.31 pp, sd 0.26, t~-2.1, df=2); the effect is consistent in direction but small — comparable in size to the paper's own ~0.10 pp effect (~10 test examples of the 10k test set), so the claim is settled by its spec'd per-seed ordering rather than by a margin large relative to seed noise."
     },
     {
       "id": "c10_advtrain_m4_adversarial_magnitude",
@@ -996,7 +1003,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:499",
       "quantity": "measured.m5_maxout1600_advtrain.mean_test_error - measured.m5_maxout1600_clean.mean_test_error",
       "direction": "<0",
-      "note": "Headline large-model claim (adv-trained model both fixes the large model's overfit and beats its own baseline). Sub-scale (240 units, single seed): 1.44% vs 1.82%."
+      "note": "Headline large-model claim (adv-trained model both fixes the large model's overfit and beats its own baseline). Per-seed: clean 1.82/1.80/2.22% vs adv 1.44/1.50/1.54%; adv-clean = -0.38/-0.30/-0.68 pp, direction (<0) at 3/3 seeds. Arm-name caveat: the arms are named `m5_maxout1600_*` after the paper's 1600-unit configuration, but this sub-scale run actually used `--units 240 --epochs 12` (recorded in measured.json `_meta.subscale_overrides`; the 1600-unit / patience-100 / 5-seed / 60k-retrain configuration is paper-scale, not run here). The name is retained for stable claim/metric pointers; the actual configuration lives in measured.json `_meta.subscale_overrides` and the per-seed result files."
     },
     {
       "id": "c12_m5_advtrain_mean_magnitude",
@@ -1111,7 +1118,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:431",
       "quantity": "measured.m_l1_weight_decay.l1_coeff000025_test_error - measured.m_l1_weight_decay.baseline_test_error",
       "direction": ">0",
-      "note": "A small L1 coefficient trains but does not IMPROVE clean test error over baseline (paper's 'no regularization benefit'). Sub-scale: 3.06% vs 2.65%. Medium: close to noise at small budgets. Metric renamed from `l1_2.5e-05_test_error` to `l1_coeff000025_test_error` (dot-free) for the same tokenization reason as c20; the JSON pointer `arms.l1_2.5e-05.clean_test_error` is unchanged."
+      "note": "A small L1 coefficient trains but does not IMPROVE clean test error over baseline (paper's 'no regularization benefit'). Per-seed: l1-small - baseline = +0.04/+0.08/+0.32 pp, direction (>0) holds at 3/3 seeds (the spec'd per-seed ordering). Power caveat: the margins are ~4/8/32 test examples of 10k; the effect is consistent in direction but small, settled by the spec'd per-seed ordering rather than by a margin large relative to seed noise. Metric renamed from `l1_2.5e-05_test_error` to `l1_coeff000025_test_error` (dot-free) for the same tokenization reason as c20; the JSON pointer `arms.l1_2.5e-05.clean_test_error` is unchanged."
     },
     {
       "id": "c22_rbf_low_confidence_when_fooled",
@@ -1181,7 +1188,7 @@ Semantics:
       "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed\nto perturb the entire ensemble with $\\epsilon = .25$.",
       "citation": "paper/source/iclr2015.tex:822",
       "predicate": "measured.e1_ensemble12_maxout.ensemble_targeted_error > 0.5",
-      "note": "Summary claim 'Ensembles are not resistant to adversarial examples' (\u00a710). Sub-scale (4 members): 99.76%."
+      "note": "Summary claim 'Ensembles are not resistant to adversarial examples' (\u00a710). Sub-scale (12 members, ~5 epochs/member): ensemble-targeted FGSM error 99.87% (seed0), 99.89% (seed1/seed2); >0.5 at 3/3 seeds."
     },
     {
       "id": "c29_ensemble_targeted_vs_single",
@@ -1191,7 +1198,7 @@ Semantics:
       "citation": "paper/source/iclr2015.tex:823",
       "quantity": "measured.e1_ensemble12_maxout.ensemble_targeted_error - measured.e1_ensemble12_maxout.single_member_targeted_error",
       "direction": ">0",
-      "note": "Whole-ensemble attack fools 91.1% > 87.9% single-member attack. At sub-scale both arms saturate (~99.8%) and the small gap REVERSED (99.76 vs 99.79); this ordering is budget-fragile, hence low. c28 carries the load for 'ensembles are not resistant'."
+      "note": "Whole-ensemble attack fools 91.1% > 87.9% single-member attack. Per-seed: ensemble-targeted - single-member = +0.16/+0.19/+0.19 pp (99.87 vs 99.71 / 99.89 vs 99.70 / 99.89 vs 99.70), direction (>0) holds at 3/3 seeds -- NOT reversed. Budget caveat: both arms saturate near 100% at this sub-scale (12 members, ~5 epochs/member), so the gap is thin (a few test examples of 10k) and budget-fragile, hence low; c28 carries the load for 'ensembles are not resistant'."
     },
     {
       "id": "c30_maxout_fooled_by_gaussian_rubbish",
