@@ -261,6 +261,26 @@ is left to the reader; no tolerance is asserted.
 
 ## 6. Bottom line
 
+**Rung reached: `review`** (not `numbers`). The numbers gate, evaluated on the
+final committed files, passes 9/9 — both the 278-line gate proxy and a faithful
+329-line gate simulator return `FINAL gate=PASS` (9 pass / 6 high / 0 blocked)
+with no crash. However `$HOME/.build_attempts` records **7 build attempts**,
+i.e. the numbers-gate build budget was **spent**: the build step exhausted its
+retries resolving a sequence of numbers-gate infrastructure crashes (the
+`measured.json` container shape, the `figures`-key curve pre-build crash,
+per-arm `metrics` blocks, structural metrics emitted as measured evidence).
+The last failing output of the numbers gate during those build attempts was
+`AttributeError: 'float' object has no attribute 'get'`, raised immediately
+after `arms declared: ['baseline', 'cwsd']`, caused by `claims.json`'s
+`figures: []` key entering the gate's curve pre-build block and calling
+`.get("y", val)` on a plain-float metric value. Removing the `figures` key
+(the final build-attempt fix) makes the gate pass 9/9 on disk, but the budget
+was exhausted reaching that fix, so per the workflow's build-budget accounting
+the `numbers` rung was **not cleanly reached within budget**. The rung
+actually reached is `review`: the adversarial component review approved all
+five components with file:line evidence. The on-disk gate passing 9/9 is
+recorded for the reader; this report does not claim the `numbers` rung.
+
 What was checked: the method's equations (Eqs. 1–4) and their invariants; the
 λ=0==baseline degeneracy (the paper's own verification gate, bitwise against
 an independent CE routine, swept over `s`); the single-network / no-extra-

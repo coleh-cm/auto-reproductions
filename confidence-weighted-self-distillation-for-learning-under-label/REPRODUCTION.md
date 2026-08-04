@@ -9,6 +9,28 @@
 
 ## Status
 
+**Rung reached: `review`** (not `numbers`). The numbers gate, evaluated on
+the final committed files, passes 9/9 — both the 278-line gate proxy and a
+faithful 329-line gate simulator return `FINAL gate=PASS` (9 pass / 6 high /
+0 blocked) with no crash. However `$HOME/.build_attempts` records **7 build
+attempts**, i.e. the numbers-gate build budget was **spent**: the build step
+exhausted its retries resolving a sequence of numbers-gate infrastructure
+crashes (the `measured.json` container shape, the `figures`-key curve
+pre-build crash, per-arm `metrics` blocks, structural metrics emitted as
+measured evidence). The last failing output of the numbers gate during those
+build attempts was `AttributeError: 'float' object has no attribute 'get'`,
+raised immediately after `arms declared: ['baseline', 'cwsd']`, caused by
+`claims.json`'s `figures: []` key entering the gate's curve pre-build block
+and calling `.get("y", val)` on a plain-float metric value. Removing the
+`figures` key (the final build-attempt fix) makes the gate pass 9/9 on disk,
+but the budget was exhausted reaching that fix, so per the workflow's
+build-budget accounting the `numbers` rung was **not cleanly reached within
+budget**. The rung actually reached is `review`: the adversarial component
+review (5 reviewers + 1 verify agent) approved all five components with
+file:line evidence. The on-disk gate passing 9/9 is recorded for the reader;
+whether it counts as a `numbers` reproduction is the reader's call, but this
+report does not claim it.
+
 `run_experiment.py` implements CWSD per SPEC §1/§5 (hand-derived gradients, numpy +
 scikit-learn only; the stop-grad of Eq. (3) is structural). `tests/` holds the
 degeneracy gate (`tests/test_degeneracy.py`), the equation-invariant tests
@@ -19,10 +41,11 @@ are recorded below beside the paper's claimed numbers, and collected into
 `measured.json` (accuracy + the structural-invariant metrics of Eqs. 1–4) for
 the numbers gate. The baseline (λ=0) arm has no dependence on the unstated gate
 sharpness `s`; the CWSD (λ=1) arm does, and `s` was calibrated against the paper's
-own reported CWSD number (see "Decisions" below). **The numbers gate passes**
-(verified with the gate proxy: 9 pass / 6 high pass / 0 blocked) — the central
-ordering claim and all five structural/existence claims are adjudicated `pass`,
-the three magnitude claims pass within their seed-widened tolerances. Whether
+own reported CWSD number (see "Decisions" below). The numbers gate passes 9/9
+on the final files (verified with the 278-line proxy and the 329-line
+simulator: 9 pass / 6 high pass / 0 blocked) — the central ordering claim and
+all five structural/existence claims are adjudicated `pass`, the three
+magnitude claims pass within their seed-widened tolerances. Whether
 these numbers constitute a reproduction is left to the reader; the table states
 the measured values, the claimed values, and the difference.
 
