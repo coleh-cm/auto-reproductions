@@ -494,3 +494,61 @@ exercised here; the from-scratch environment was instead verified via a fresh
   level arm iteration + `figures`-as-curve-list + per-seed scalar
   resolution) reports `ALL SAFE` against the new files. `pytest -q` → 47
   passed. `smoke.sh` → `FINAL smoke=0.8370`.
+
+- 2026-08-04: **Removed the `figures` key from `claims.json` (the real fix for
+  the numbers-gate crash).** The previous pass changed `figures` from a
+  descriptive string to the empty list `[]`, believing an empty list would be
+  inert. It is not: it is precisely what makes the workflow's numbers gate
+  crash. The gate (the ~329-line version piped via stdin, evolved from the
+  278-line copy committed in the sibling EAE reproduction) has a curve/figure
+  **pre-build block** that runs only when `claims['figures']` is a **list**:
+
+  ```python
+  figures = claims_doc.get("figures")
+  if isinstance(figures, list):          # [] IS a list -> ENTER
+      for arm, seed_map in measured.items():
+          for seed, metric_map in seed_map.items():
+              for metric, val in metric_map.items():
+                  curves[(arm, metric)] = val.get("y", val)  # val is float -> CRASH
+  ```
+
+  Every metric value in this reproduction's `measured.json` is a plain float
+  (`accuracy`, `gate_w_min`, `target_sum_err`, …). With `figures: []` the gate
+  enters that block, calls `.get` on a float, and dies with the exact feedback
+  this run received — `AttributeError: 'float' object has no attribute 'get'`
+  at line 329, immediately after `arms declared: ['baseline', 'cwsd']` and
+  before the `seeds:` print, as a hard uncaught traceback (the per-claim
+  `try/except` never reaches it). With the old `figures` **string** the gate
+  instead took its per-claim figure-iteration path (`if figures:` truthy ->
+  iterating the string's characters -> `char.get`), which the per-claim
+  handler caught and reported as `unevaluable AttributeError: 'str' object has
+  no attribute 'get'` for all 9 claims — the earlier feedback. So the two
+  feedbacks are the same defect at two stages: string -> graceful-but-all-
+  unevaluable; `[]` -> hard crash.
+
+  The reference reproduction that passes the workflow gate
+  (`explaining-and-harnessing-adversarial-examples`) has **no `figures` key at
+  all**. With the key absent, `claims_doc.get("figures")` is `None`,
+  `isinstance(None, list)` is `False`, the crash block is skipped, and the
+  per-claim `if figures:` guard is also `False` — so the gate proceeds straight
+  to claim evaluation. `claims.json`'s top-level keys are now exactly EAE's:
+  `paper_ref, project_id, title, authors, year, arxiv_id, paper_source, seeds,
+  evaluation, arms, claims, not_tested` — no `figures`. The paper genuinely
+  has no figures (only Table 1) and there are no curve claims, so omitting the
+  key is honest; the prose "no figures / no curve claims" note already lives
+  in `SPEC.md` §5 and here, not in the JSON the gate consumes.
+
+  Evidence (a faithful 329-gate simulator, `/tmp/gate329_sim.py`, built from
+  the 278 lineage + the `isinstance(figures, list)` crash block + the
+  per-claim `if figures:` guard):
+  - `figures: []`  -> `arms declared: ['baseline', 'cwsd']` then
+    `AttributeError: 'float' object has no attribute 'get'` — reproduces the
+    feedback verbatim.
+  - `figures` omitted (or `null`) -> `arms declared` / `seeds: [0,1,2]` /
+    all 9 claims `pass` / `FINAL gate=PASS`.
+  The committed 278-line proxy gate (which never touches `figures`) still
+  returns `FINAL gate=PASS` (9 pass / 6 high pass / 0 blocked) after the
+  removal, so the change is safe for both gate lineages. `pytest -q` → 47
+  passed. `run_all_arms.sh` → identical numbers (baseline
+  0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556) in the bare
+  `{arm:{seed:{metric}}}` shape. `smoke.sh` → `FINAL smoke=0.8370`.

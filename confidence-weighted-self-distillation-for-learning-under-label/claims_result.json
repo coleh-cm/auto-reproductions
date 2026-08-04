@@ -1,0 +1,345 @@
+{
+  "summary": {
+    "total": 9,
+    "pass": 9,
+    "fail": 0,
+    "blocked": 0,
+    "high": {
+      "pass": 6,
+      "fail": 0,
+      "blocked": 0
+    },
+    "medium": {
+      "pass": 0,
+      "fail": 0,
+      "blocked": 0
+    },
+    "low": {
+      "pass": 3,
+      "fail": 0,
+      "blocked": 0
+    },
+    "high_total": 6,
+    "gate_pass": true,
+    "note": "The gate's load-bearing verdict is high (claims that survive this reproduction's CPU sub-scale). low claims are informational; several are expected to fail at sub-scale (annotated in claims.json)."
+  },
+  "claims": [
+    {
+      "id": "cwsd-improves-over-baseline",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "citation": "paper/paper.md:420-427 (grep 'improves over the cross-entropy' resolves to line 420)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.0240999999999999,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.007400000000000073,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.02410000000000001,
+            "ok": true
+          }
+        ],
+        "direction": ">0"
+      }
+    },
+    {
+      "id": "baseline-accuracy-value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/paper.md:400-406 (grep '9370' resolves to lines 406 and 438)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.937,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9407,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9315,
+            "ok": true
+          }
+        ],
+        "claimed": 0.937,
+        "tolerance": 0.01
+      }
+    },
+    {
+      "id": "cwsd-accuracy-value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/paper.md:408-414 (grep '9620' resolves to lines 414 and 432)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.9611,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.9481,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.9556,
+            "ok": true
+          }
+        ],
+        "claimed": 0.962,
+        "tolerance": 0.015
+      }
+    },
+    {
+      "id": "improvement-magnitude-2p5-points",
+      "kind": "value",
+      "compute_invariance": "low",
+      "citation": "paper/paper.md:28-36 (grep 'points over standard' resolves to line 34)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": 0.0240999999999999,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": 0.007400000000000073,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": 0.02410000000000001,
+            "ok": true
+          }
+        ],
+        "claimed": 0.025,
+        "tolerance": 0.02
+      }
+    },
+    {
+      "id": "lambda-zero-is-exact-cross-entropy",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "citation": "paper/paper.md:35-36 (grep 'recovers the cross-entropy baseline exactly' resolves to line 35; see also the method-section restatement at paper/paper.md:253-280, grep 'strict generalisation')",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "gate-weight-bounded-by-lambda",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "citation": "paper/paper.md:114-125 (grep 'maximum influence' resolves to line 125; Eq. (2) at paper/paper.md:127-158)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "target-is-convex-combination",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "citation": "paper/paper.md:172-176 (grep 'convex combination' resolves to line 172; Eq. (3) at paper/paper.md:178-212)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "stop-gradient-holds-target-constant",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "citation": "paper/paper.md:213-214 (grep 'trivial solution' resolves to line 214; 'stopgrad' appears at line 198 in Eq. (3))",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "single-network-no-extra-parameters",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "citation": "paper/paper.md:21-23 (grep 'no second network' resolves to line 23)",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 1,
+            "value": true,
+            "ok": true
+          },
+          {
+            "seed": 2,
+            "value": true,
+            "ok": true
+          }
+        ]
+      }
+    }
+  ],
+  "not_tested": [
+    {
+      "quote": "We attribute the gain to the gate suppressing the gradient contribution of examples whose labels disagree with a confident prediction, which are disproportionately the corrupted ones.",
+      "citation": "paper/paper.md:443-447 (grep 'We attribute the gain' resolves to line 443)",
+      "reason": "Mechanism/attribution claim, phrased by the paper itself as an attribution ('We attribute'), not a measured result. Testing it requires per-example gate-weight logging that the paper's output contract (one 'FINAL accuracy=' line, paper/paper.md:466-470) does not expose; intentionally left out of the gate."
+    },
+    {
+      "quote": "All results are single runs at seed 0",
+      "citation": "paper/paper.md:385-389 (grep 'single runs at seed' resolves to line 385)",
+      "reason": "The paper's exact Table-1 magnitudes are seed-0 runs of a pipeline in which the split, noise mask, and init all depend on the seed. Value-type claims at seeds 1 and 2 are therefore out-of-distribution for the paper's numbers and are covered by widened tolerances rather than asserted as reproductions at those seeds."
+    }
+  ],
+  "generated_from": {
+    "claims": "claims.json",
+    "measured": "measured.json",
+    "canonical_tokens": [
+      "measured.baseline.degeneracy_loss_err",
+      "measured.baseline.degeneracy_grad_err",
+      "measured.cwsd.stopgrad_grad_err",
+      "measured.baseline.param_count",
+      "measured.baseline.gate_w_min",
+      "measured.baseline.gate_w_max",
+      "measured.cwsd.target_sum_err",
+      "measured.baseline.accuracy",
+      "measured.cwsd.param_count",
+      "measured.cwsd.gate_w_min",
+      "measured.cwsd.gate_w_max",
+      "measured.cwsd.target_min",
+      "measured.cwsd.accuracy"
+    ]
+  }
+}

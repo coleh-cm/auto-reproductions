@@ -148,7 +148,6 @@
       "check": "pytest -q tests/"
     }
   ],
-  "figures": [],
   "not_tested": [
     {
       "quote": "We attribute the gain to the gate suppressing the gradient contribution of examples whose labels disagree with a confident prediction, which are disproportionately the corrupted ones.",

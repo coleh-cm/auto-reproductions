@@ -295,9 +295,12 @@ than asserted as knife-edge matches.
 
 The paper contains **no figures** — only Table 1 — and arxiv_id is unknown so no LaTeX
 source or figure assets exist (`paper/` holds only `paper.md`); there are therefore no
-`curve` claims. Evidence this pass (2026-08-04, seeds 0/1/2, defaults): baseline
-0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — the ordering holds at all three seeds
-(+0.0241, +0.0074, +0.0241).
+`curve` claims, and `claims.json` carries **no `figures` key** (omitted, matching the
+sibling reproduction that passes the workflow gate; an empty list `[]` would enter the
+gate's curve pre-build and crash on this reproduction's float metric values — see
+REPRODUCTION.md 2026-08-04 entry). Evidence this pass (2026-08-04, seeds 0/1/2, defaults):
+baseline 0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — the ordering holds at all three
+seeds (+0.0241, +0.0074, +0.0241).
 
 Deliberately not tested (recorded in `claims.json.not_tested`): the attribution claim
 ("We attribute the gain to the gate suppressing…", paper.md:443–447), which needs
