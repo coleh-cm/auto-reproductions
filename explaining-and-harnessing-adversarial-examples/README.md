@@ -80,7 +80,11 @@ running log and target numbers.
 - `instruments.json` / `mutations.json` — the instrument registry (every grader
   with a positive+negative test) and the deliberate-defect suite (each defect
   with a `must_fail` test node, all verified to fail under the defect and pass
-  on clean code).
+  on clean code). A top-level `not_applicable` is reserved for the single case
+  where nothing in the reproduction judges an output (one sentence); a
+  per-instrument exemption is put ON that instrument as
+  `"not_applicable": {"reason": ...}` so the rest still run (`mp_dbm_*` and
+  `cifar10_loader` are exempted this way).
 - `requirements.txt` — pinned dependencies (torch CPU, numpy, pytest, and the
   full transitive closure).
 - `Dockerfile` — builds the environment from scratch.

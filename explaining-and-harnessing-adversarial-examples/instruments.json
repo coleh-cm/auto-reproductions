@@ -1,5 +1,5 @@
 {
-  "_doc": "Every instrument that decides whether an output is correct: a grader, scorer, equivalence check, or data loader. Each has a positive_test (proves it accepts a known-correct input) and a negative_test (proves it rejects a known-wrong one). Test commands use sys.executable (the venv interpreter at .venv/bin/python); any subprocess inside a test also uses sys.executable, never bare `python`. A grader that cannot run MUST raise, never return a false verdict. Run a single node: `.venv/bin/python -m pytest <node> -q`. If nothing here judges an output it is listed under not_applicable with a reason.",
+  "_doc": "Every instrument that decides whether an output is correct: a grader, scorer, equivalence check, or data loader. Each has a positive_test (proves it accepts a known-correct input) and a negative_test (proves it rejects a known-wrong one). Test commands use sys.executable (the venv interpreter at .venv/bin/python); any subprocess inside a test also uses sys.executable, never bare `python`. A grader that cannot run MUST raise, never return a false verdict. Run a single node: `.venv/bin/python -m pytest <node> -q`. A top-level `not_applicable` is reserved for the single case where NOTHING in this reproduction judges an output; when present it is one sentence saying why. A per-instrument exemption is NOT put there — it is put ON the instrument itself, as `\"not_applicable\": {\"reason\": ...}`, so the other instruments still run.",
   "_run_command_template": "{sys.executable} -m pytest {node} -q   (in this sandbox: .venv/bin/python -m pytest {node} -q)",
   "instruments": [
     {
@@ -86,16 +86,24 @@
       "what_it_decides": "Whether every claim's quote is a VERBATIM substring of paper/source/iclr2015.tex starting at the line its citation names; whether claim kinds carry their required arithmetic fields; whether compute-invariance counts are truthful; whether every arm metric pointer resolves in the shipped results.",
       "positive_test": "tests/test_claims_integrity.py::test_every_claim_quote_is_verbatim_at_cited_line (and the field/kind/pointer tests in the same module)",
       "negative_test": "tests/test_claims_integrity.py (a non-verbatim quote, a stale count, a shifted citation line, or an unresolvable pointer each fail loudly)"
-    }
-  ],
-  "not_applicable": [
+    },
     {
       "name": "mp_dbm_generative_inference",
-      "reason": "The paper's generative-resistance test (tex:827-833, MP-DBM 97.5% on FGSM) is in claims.json not_tested: we do not implement MP-DBM inference, so no instrument here judges a generative model's adversarial robustness. Settled as BLOCKED/not-tested, not by a grader."
+      "what_it_decides": "Whether a generative model (the paper's MP-DBM, tex:827-833) is resistant to FGSM adversarial examples. Not implemented in this reproduction; the matching claim is settled as not-tested/BLOCKED in claims.json, not graded here.",
+      "not_applicable": {
+        "reason": "We do not implement MP-DBM inference, so no grader here judges a generative model's adversarial robustness; the tex:827-833 claim (97.5% on FGSM) is not_tested in claims.json. Exempted ON this instrument only — every other instrument above still runs."
+      },
+      "positive_test": null,
+      "negative_test": null
     },
     {
       "name": "cifar10_loader",
-      "reason": "CIFAR-10 arms (tex:341 conv-maxout 87.15%, tex:911-912 rubbish) are excluded by the scope fixed in SPEC \u00a71; no CIFAR-10 grader or loader is implemented. Claims are in not_tested."
+      "what_it_decides": "What CIFAR-10 dataset the conv-maxout arm (tex:341) and the CIFAR rubbish arm (tex:911-912) run on, and the fingerprints that would reject a synthetic substitute. Not implemented in this reproduction.",
+      "not_applicable": {
+        "reason": "CIFAR-10 arms are excluded by the scope fixed in SPEC §1; no CIFAR-10 loader or grader is implemented, and the CIFAR claims are not_tested in claims.json. Exempted ON this instrument only — every other instrument above still runs."
+      },
+      "positive_test": null,
+      "negative_test": null
     }
   ]
 }

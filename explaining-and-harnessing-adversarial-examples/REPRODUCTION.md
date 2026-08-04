@@ -57,3 +57,15 @@
   claims-integrity tests (every quote is verbatim at its cited line) and curve-evaluator
   instrument tests, and updated SPEC/VERIFICATION/README/arms_metadata/instruments
   coherently. Gate: 34 pass / 3 fail / 0 blocked; HIGH 19/19 PASS.
+- **2026-08-04 (instruments.json `not_applicable` fix):** the prior
+  `instruments.json` carried a top-level `not_applicable` *list* naming the two
+  out-of-scope instruments (MP-DBM generative inference, CIFAR-10 loader). That
+  shape is the global "nothing here judges an output" marker, so a list there can
+  be misread as excusing the whole reproduction. Per the contract a top-level
+  `not_applicable` must be one sentence for the global-N/A case (absent here,
+  because 14 instruments DO judge outputs), and a per-instrument exemption goes
+  ON the instrument itself as `"not_applicable": {"reason": ...}` so the other
+  instruments still run. Moved `mp_dbm_generative_inference` and `cifar10_loader`
+  into `instruments` with `positive_test`/`negative_test` = null and their reason
+  inline; removed the top-level list; updated `_doc` and README. 92/92 tests pass;
+  gate unaffected (no consumer parsed the field).
