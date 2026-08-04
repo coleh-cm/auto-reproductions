@@ -24,6 +24,7 @@ figure. We reproduce the **MNIST core**; the rest is graded below.
 | M8 | Shallow RBF on MNIST; FGSM ε=0.25; cross-model class agreement (§8) | adv error 55.4%, conf-on-mistakes 1.2%, clean conf 60.6%; agreement 16.0% / 54.6% / 84.6% / 54.3% / 53.6% | tex:600-604; tex:679-688 |
 | M9 | Rubbish examples, MNIST: 10,000 samples ∼ N(0, I₇₈₄) | maxout+softmax 98.35% (conf 92.8%); sigmoid top 68% (87.9%); softmax reg 59.8% (70.8%); RBF 0% | tex:905-909; tex:919-924 |
 | E1 (extended) | Ensemble of 12 maxout nets | 91.1% (ensemble-targeted), 87.9% (single-targeted) | tex:819-825 |
+| F4 (figure) | Fig. 4 eps-sweep on a naive maxout (M3 config), class-4 example, eps ∈ [−15, 15] | curve claims fc1–fc3 (crosses / below / increasing) | tex:755-775 caption + `paper/figure_transcripts.md` (axis range exists only in the figure) |
 | E2 (extended) | CIFAR-10 conv maxout, ε=0.1; rubbish N(0,I₃₀₇₂) 1,000 samples; targeted fooling | adv 87.15% (96.6%); rubbish 93.4% (84.4%); fooling avg 75.3%/step (frogs+trucks 100%, airplanes 24.7%) | tex:340-341; tex:911-912; tex:936-941 |
 | — (excluded) | GoogLeNet/ImageNet Fig. 1 (ε=0.007) | qualitative | tex:381. Reason: 2014-era DistBelief GoogLeNet weights unavailable. |
 | — (excluded) | MP-DBM FGSM ε=0.25 → 97.5% | tex:793-800 | Reason: requires implementing the multi-prediction deep Boltzmann machine (Goodfellow et al. 2013a), a separate paper's model; out of budget. |
@@ -33,11 +34,13 @@ Dockerfile pins `python:3.13-slim` — the pinned wheels resolve identically on 
 M5 (5 seeds × 2 arms) and E1 (12 nets) are
 the expensive items; seeds/ensemble members run as parallel processes.
 
-The numbers-gate contract for the table above is **`claims.json`** (§10): 34 claims over 13 named
+The numbers-gate contract for the table above is **`claims.json`** (§10): 37 claims over 14 named
 arms with ≥3 seeds, each with a verbatim paper quote, an exact file:line citation into
-`paper/source/iclr2015.tex`, a kind, an honest compute-invariance rating (16 high / 6 medium /
+`paper/source/iclr2015.tex`, a kind, an honest compute-invariance rating (19 high / 6 medium /
 12 low — gating settles the **high** ones), and the settling arithmetic over `measured.<arm>.<metric>`,
-plus 10 claims the paper makes that this reproduction deliberately does NOT test, with reasons.
+plus 9 claims the paper makes that this reproduction deliberately does NOT test, with reasons.
+Three of the 37 are **`curve` claims** settled against Figure 4 (read off the figure with
+`read-figure`, transcript in `paper/figure_transcripts.md` — see §12).
 
 ### 1.A. The comparison arms (machine-readable mirror: `arms_metadata.json`; gate map: `arms.json`)
 
@@ -67,6 +70,7 @@ results file, metric paths) are in `arms_metadata.json` at the repo root.
 | `m7_maxout_noise_uniform` | train (control) | `m3` model trained on x+u, u∼U(−ε,ε) iid (E10) | FGSM ε=0.25 | adv err 90.4%, conf 97.8% (tex:555-557) |
 | `m8_rbf_shallow` | train | RBFNet (10 quad. forms; multiclass norm unstated, §6 item 9) | FGSM ε=0.25 + §8 class-agreement evals | adv err 55.4%, conf-on-mistakes 1.2%, clean conf 60.6% (tex:600-604); agreement 16.0/54.6/84.6/54.3/53.6% (tex:679-688) |
 | `e1_ensemble12_maxout` | train (12×) | 12× `m3` config, distinct RNG seeds | FGSM ε=0.25 vs ensemble (mean-loss grad; rule unstated §6 item 11) and vs single member | 91.1% / 87.9% (tex:822-825) |
+| `f4_eps_curve` | train + curve eval | naive `m3` maxout 240×2 (Fig. 4 was "made from a naively trained maxout network", tex:766) | logits at x₀ + ε·sign(∇ₓJ) for 61 ε ∈ [−15, 15] step 0.5, x₀ = first class-4 test example | Fig. 4 shape claims fc1–fc3 (§10), tex:755-775 |
 | `m6_robustness_transfer_eval` | eval-only over arms 3 & 6 | — | own-FGSM; cross-transfer both directions, ε=0.25 | 17.9% / 19.6% / 40.9%, conf 81.4% (tex:514-523) |
 | `m9_rubbish_evals` | eval-only over arms 1, 3 (×sigmoid-top), 8 | — | 10,000 samples ∼ N(0,I₇₈₄); error := max p > 0.5 (tex:905-906) | maxout+softmax 98.35% (92.8%); sigmoid-top 68% (87.9%); softmax-reg 59.8% (70.8%); RBF 0% (tex:906-909, 919-924) |
 
@@ -358,8 +362,16 @@ Evaluation protocol:
 16. **Num. rubbish samples**: MNIST 10,000 stated (tex:905); CIFAR-10 1,000 stated (tex:911). ✓ stated.
 17. **Fooling-image ε** for appendix algorithm D unstated; prose says raw-gradient step (tex:936),
     Fig. 5 caption says gradient-sign step (tex:954) — internally inconsistent, both recorded.
-18. **ε-sweep details for Fig. 4** (single example of class 4; axis range from the PDF figure,
-    not the text): optional, not a numbered claim.
+ 18. **ε-sweep details for Fig. 4**: NOW TESTED as curve claims fc1–fc3 (§10). Still unstated and
+     chosen by us: *which* class-4 example (the paper says only "a single input example", tex:767 —
+     we take the first class-4 test example, deterministic); the sampled grid (the figure's x-axis
+     is ε ∈ [−15, 15] — read off `paper/source/eps_curve.pdf` via `read-figure`, transcript in
+     `paper/figure_transcripts.md`, the axis range exists only in the figure, not the text — we
+     sample every 0.5); and that the FGSM direction is computed ONCE at the clean example (the
+     caption's "1-D subspace defined by the fast gradient sign method", tex:664-665). The claim
+     that the eps-sweep shows piecewise-linear logit curves follows from maxout being piecewise
+     linear in its input along any fixed direction, so it is not separately gated (it holds by
+     construction in any faithful implementation).
 19. **3-vs-7 logistic regression protocol**: which examples train/test, optimizer, stopping
     — all unstated; only clean 1.6% (tex:454) and adv 99% (tex:456) reported.
 20. **MNIST preprocessing**: [0,1] scaling IS stated (footnote, tex:334-337). Nothing else (no
@@ -528,16 +540,17 @@ milestone scripts set input 0.8 / hidden 1.0 to match the recipe's input-only dr
 ## 7. Upstream code search (recorded)
 
 - **Paper's only code link**: tex:344 — `https://github.com/lisa-lab/pylearn2/tree/master/pylearn2/scripts/papers/maxout`
-  Verified live 2026-07-29, re-verified 2026-07-30 (HTTP 200): contains the **maxout 2013 paper's**
-  configs (mnist_pi.yaml, cifar10.yaml, …), used *here only for CIFAR-10 preprocessing* (footnote 2).
-  No adversarial-example code.
+  Verified live 2026-07-29, re-verified 2026-07-30 and 2026-08-04 (HTTP 200): contains the
+  **maxout 2013 paper's** configs (mnist_pi.yaml, cifar10.yaml, …), used *here only for CIFAR-10
+  preprocessing* (footnote 2). No adversarial-example code.
 - **GitHub search, repo name/title** (`explaining and harnessing adversarial examples`; 2026-07-29,
-  re-run 2026-07-30, same result):
+  re-run 2026-07-30 and 2026-08-04, same result):
   13 repos, all third-party partial re-implementations (e.g. `Harry24k/FGSM-pytorch` — attack only,
-  none of the paper's experiments; `rodgzilla/machine_learning_adversarial_examples`; a Cambridge
+  none of the paper's experiments; `rodgzilla/machine_learning_adversarial_examples` — FGSM only;
+  `weichin11/Keras_adversarial_attack`; `Minakamiii/adversarial_examples`; a Cambridge
   course repo). None usable as the paper's implementation.
 - **Author-owned code**: GitHub search `adversarial examples goodfellow user:goodfeli` → **0 repos**
-  (re-run 2026-07-30, unchanged).
+  (re-run 2026-07-30 and 2026-08-04, unchanged).
   No official implementation of this paper was ever released (CleverHans is a later, different library).
 - **Decision: implement from scratch.** pylearn2/Theano itself is unmaintained since ~2016 and cannot
   run on a modern Python (3.12+); the external yaml is used as *documentation of defaults* only.
@@ -658,15 +671,31 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
   budget); these are what the gate checks. **medium** = held at sub-scale but rests on a caveat
   recorded in the claim note. **low** = an exact magnitude that needs the paper's full scale
   (1600 units / patience 100 / 5 seeds) or is otherwise budget-fragile; informational only.
-  Dry-run against the committed seed-0 sub-scale results (`results/*.json`): **all 16 high claims
-  PASS**; the two low claims that fail at sub-scale (c12 M5 mean magnitude, c29 ensemble-targeted >
-  single-targeted) are exactly the ones annotated as needing paper scale / saturation-fragile.
+  Full 3-seed gate run (`make_measured.py` + `numbers_gate.py`, committed as `measured.json` /
+  `claims_result.json`): **34 pass / 3 fail / 0 blocked; all 19 high claims PASS**; the three
+  low failures (c03 softmax FGSM confidence magnitude, c12 M5 mean magnitude, c13 M5 seed spread)
+  are exactly the exact-magnitude claims annotated as needing the paper's full scale — the gate
+  contracts on the high claims only.
+- **`curve` claims** (fc1–fc3, added 2026-08-04 for Figure 4): `quantity` is an expression yielding
+  a SEQUENCE (resolved through the arm's `curve_metrics` pointers from the per-seed result files
+  `results/_per_seed/<arm>__seed<seed>.json` — `measured.json` stays scalar-only per
+  `test_measured_resolver.py`); `x` is the sample grid; `x_range` restricts to the figure's axis
+  region; `comparison` is one of `increasing`, `decreasing`, `above`, `below`, `crosses`,
+  `matches` (`above`/`below` against a second sequence in `reference`, or the scalar `claimed`;
+  `crosses` = `(q−r)` changes strict sign between the first and last sampled x; `increasing` =
+  ends higher with no drop beyond `tolerance` below the running max; `matches` = elementwise
+  within `tolerance` of the `claimed` sequence). Shape comparisons need nothing from the authors
+  and survive a small budget, so fc1–fc3 are rated **high**; we include no `matches` claim because
+  the figure's absolute logit values (~±400–2000) belong to the paper's fully-trained net, not a
+  claim on any reproducing model. The gate's curve evaluator is instrument-tested on known-correct
+  and known-wrong sequences (`tests/test_curve_gate.py`).
 - **Claims the paper makes that this reproduction deliberately does not test** are listed in
-  `not_tested` (10 entries, each with quote, citation, and reason): the GoogLeNet/ImageNet figure,
+  `not_tested` (9 entries, each with quote, citation, and reason): the GoogLeNet/ImageNet figure,
   the CIFAR-10 arm, the MP-DBM arm, the cross-paper "best on permutation-invariant MNIST" comparison,
-  rotation-based adversarial examples, the Fig. 3 weight-localization claim, the Fig. 4
-  epsilon-sweep visualization, the MNIST rubbish class-skew statistic (45.3% fives / no eights),
-  the train-to-zero-on-rubbish null result, and the CIFAR-10 target-specific fooling rates.
+  rotation-based adversarial examples, the Fig. 3 weight-localization claim, the MNIST rubbish
+  class-skew statistic (45.3% fives / no eights), the train-to-zero-on-rubbish null result, and
+  the CIFAR-10 target-specific fooling rates. (The Fig. 4 epsilon-sweep was previously listed here;
+  it is now TESTED by fc1–fc3.)
 
 ```json
 {
@@ -690,11 +719,12 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
     "compute_invariance": {
       "policy": "rated honestly: high = the assertion already survives this reproduction's CPU sub-scale (240-unit maxout, ~10-epoch training, fewer ensemble members) which is strictly smaller than the paper's budget; medium = held at sub-scale but rests on a caveat recorded in the claim's note; low = exact magnitude that requires the paper's full scale (1600 units / patience 100 / 5 seeds / full ensembles) or is otherwise budget-fragile. The numbers gate checks the HIGH claims.",
       "counts": {
-        "high": 16,
+        "high": 19,
         "medium": 6,
         "low": 12
       }
-    }
+    },
+    "curve": "a figure claim: `quantity` (and optional `reference`) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
   },
   "arms": {
     "m1_softmax_regression": {
@@ -827,6 +857,21 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
         "baseline_test_error": "results/m_l1_weight_decay.json:arms.baseline.clean_test_error",
         "l1_0.0025_train_error": "results/m_l1_weight_decay.json:arms.l1_0.0025.clean_train_error",
         "l1_2.5e-05_test_error": "results/m_l1_weight_decay.json:arms.l1_2.5e-05.clean_test_error"
+      }
+    },
+    "f4_eps_curve": {
+      "script": "experiments/f4_eps_curve.py",
+      "command_per_seed": "python experiments/f4_eps_curve.py --seed {seed}",
+      "results": "results/f4_eps_curve.json",
+      "metrics": {
+        "eps_crossover_pos": "results/f4_eps_curve.json:eps_crossover_pos",
+        "frac_correct_pos_4_15": "results/f4_eps_curve.json:frac_correct_pos_4_15"
+      },
+      "curve_metrics": {
+        "eps_values": "results/f4_eps_curve.json:eps_values",
+        "correct_logit": "results/f4_eps_curve.json:correct_logit",
+        "max_wrong_logit": "results/f4_eps_curve.json:max_wrong_logit",
+        "predicted_is_correct": "results/f4_eps_curve.json:predicted_is_correct"
       }
     }
   },
@@ -1191,6 +1236,55 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
       "quantity": "measured.m9_rubbish_evals.rbf_rubbish_error - min(measured.m9_rubbish_evals.maxout_softmax_rubbish_error, measured.m9_rubbish_evals.softmax_regression_rubbish_error)",
       "direction": "<0",
       "note": "RBF vs every linear-built model on identical rubbish draws. Sub-scale: 0.0% vs 82.1%/81.7%."
+    },
+    {
+      "id": "fc1_fig4_correct_class_crossed_by_wrong",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "By tracing out different values of $\\eps$, we can see that adversarial examples occur reliably\nfor almost any sufficiently large value of $\\eps$ provided that we move in\nthe correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
+      "citation": "paper/source/iclr2015.tex:762",
+      "quantity": "measured.f4_eps_curve.correct_logit",
+      "reference": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        0.0,
+        15.0
+      ],
+      "comparison": "crosses",
+      "note": "Figure 4 shape claim: along the FGSM direction the correct class (4) logit starts on top at eps=0 and ends below a wrong-class logit at large eps (the figure's own x-range is [-15,15], read via read-figure; transcript paper/figure_transcripts.md). Sub-scale seed 0: 12.27 vs 6.92 at eps=0, crossing at eps=0.5 (figure read: ~0.5-1), deeply crossed at eps=15. High: pure shape, no author numbers needed; needs only a fitted naive maxout at any budget."
+    },
+    {
+      "id": "fc2_fig4_wrong_classification_stable_wide_region",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "the wrong classifications are stable across a wide region of $\\eps$ values.",
+      "citation": "paper/source/iclr2015.tex:769",
+      "quantity": "measured.f4_eps_curve.predicted_is_correct",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        4.0,
+        15.0
+      ],
+      "comparison": "below",
+      "claimed": 0.5,
+      "tolerance": 0.0,
+      "note": "Every sample of the eps grid in [4,15] (23 points, step 0.5 -- a WIDE region, 11/30 of the figure's positive axis) is classified wrong; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seed 0: frac correct in [4,15] = 0.000. High: a stability/shape assertion that survives sub-scale budgets."
+    },
+    {
+      "id": "fc3_fig4_predictions_become_extreme",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "Moreover, the predictions become very extreme as we\nincrease $\\eps$ enough to move into the regime of rubbish inputs.",
+      "citation": "paper/source/iclr2015.tex:769",
+      "quantity": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        0.0,
+        15.0
+      ],
+      "comparison": "increasing",
+      "tolerance": 0.5,
+      "note": "The top wrong-class softmax argument rises monotonically (up to 0.5-logit local slack) along the FGSM ray from eps=0 to eps=15. Sub-scale seed 0: 6.92 -> 872.7, max dip below running max = 0.0. NOT a magnitude match: the figure reaches ~+400 at eps=10 on the paper's fully-trained net (read off the plot); only the increasing shape is asserted. High."
     }
   ],
   "not_tested": [
@@ -1229,12 +1323,6 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
       "quote": "We also found that the weights of the learned model changed significantly,\nwith the weights of the adversarially trained model being significantly more localized and\ninterpretable (see Fig.~\\ref{fig:weights}).",
       "citation": "paper/source/iclr2015.tex:523",
       "reason": "Qualitative weight-visualization claim with no numeric target."
-    },
-    {
-      "id": "nt07_fig4_epsilon_sweep",
-      "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that\nthe wrong classifications are stable across a wide region of $\\eps$ values.",
-      "citation": "paper/source/iclr2015.tex:768",
-      "reason": "Visual claim from the plotting layer (Figure 4); the epsilon axis range exists only in the figure, not the text."
     },
     {
       "id": "nt08_rubbish_class_skew",
@@ -1346,3 +1434,37 @@ generative-resistance test, tex:827-833, is in `not_tested` — we do not
 implement MP-DBM inference); and no CIFAR-10 arm (the CIFAR-10 numbers, tex:341,
 tex:911-912, are in `not_tested` — the dataset/preprocessing is excluded by the
 scope fixed in §1).
+
+## 12. Figure reading (read-figure — `paper/figure_transcripts.md`)
+
+The paper's figures carry claims its prose does not (the Fig. 4 x-axis range exists ONLY in the
+figure, not the text). Every figure PNG/PDF shipped with the arXiv source under `paper/source/`
+was read with `read-figure <png> "<question>"` (the vision model; my own read tool cannot see
+images). Each question+answer exchange is appended to the committed transcript
+**`paper/figure_transcripts.md`** (JSONL; 11 exchanges on 2026-08-04). `eps_curve.pdf` was
+rendered to PNG (`paper/source/eps_curve_render.png`, 200 dpi) before reading.
+
+**Figure 4 (`eps_curve.pdf`)** — the one figure with gateable claims. Read results:
+x-axis ε ∈ [−15, 15] (ticks −15,−10,−5,0,5,10,15); y-axis "argument to softmax" ∈ [−2000, 1000];
+the correct class (4, thick solid) is on top at ε=0 and is overtaken almost immediately
+(crossing ≈ ε 0.5–1); a wrong class (cyan, ~class 5) tops at ≈ +400 at ε=10 and a wrong class
+tops at ≈ +800 at ε=−10; per-class curves are piecewise linear in ε; the wrong prediction is
+stable across the wide region |ε| ≳ 4. These become the three `curve` claims fc1 (crosses),
+fc2 (below: all-wrong over ε ∈ [4, 15]), fc3 (increasing: top wrong-class logit over
+ε ∈ [0, 15]) in `claims.json` — all rated high (shape comparisons needing no author numbers),
+all PASS at every seed. Our sub-scale curve reproduces the shape exactly: crossing at ε=0.5,
+0/23 correct samples in [4, 15], top-wrong logit 5.3–6.9 → 468–873 depending on seed, and the
+top class at ε=+15 differs from ε=−15 (paper-consistent: direction matters, not the endpoint).
+
+**Other figures (read, recorded in the transcript; claims already in prose or qualitative):**
+- Fig. 2 (`logreg_clean.png`, `logreg_adv.png`): adversarial examples at eps=.25 still look like
+  plausible 3s/7s, heavily speckled — matches caption "not readily recognizable … as having
+  anything to do with the relationship between 3s and 7s" (tex:450-453).
+- Fig. 3 (`naive_weights.png` vs `adv_weights.png`): adversarially trained filters are visibly
+  more localized/sparse ("closer to noisy stroke parts") than naive filters ("diffuse/static-like")
+  — the paper's qualitative localization claim (tex:523-525); no numeric target, stays qualitative.
+- Fig. 5 (`airplane.png`): CIFAR-10 fooling images look like colorful static; ~24.7% yellow-boxed
+  per the caption's airplane success rate (tex:939-941); CIFAR arm excluded (§1).
+- Fig. 1 (`panda_577.png`, `gibbon_993.png`): clean vs ε=0.007-perturbed panda are visually
+  indistinguishable ("a human would still call it a panda") — the GoogLeNet demonstration arm is
+  excluded for want of the 2014 DistBelief weights (§1).

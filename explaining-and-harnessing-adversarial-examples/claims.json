@@ -19,11 +19,12 @@
     "compute_invariance": {
       "policy": "rated honestly: high = the assertion already survives this reproduction's CPU sub-scale (240-unit maxout, ~10-epoch training, fewer ensemble members) which is strictly smaller than the paper's budget; medium = held at sub-scale but rests on a caveat recorded in the claim's note; low = exact magnitude that requires the paper's full scale (1600 units / patience 100 / 5 seeds / full ensembles) or is otherwise budget-fragile. The numbers gate checks the HIGH claims.",
       "counts": {
-        "high": 16,
+        "high": 19,
         "medium": 6,
         "low": 12
       }
-    }
+    },
+    "curve": "a figure claim: `quantity` (and optional `reference`) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
   },
   "arms": {
     "m1_softmax_regression": {
@@ -156,6 +157,21 @@
         "baseline_test_error": "results/m_l1_weight_decay.json:arms.baseline.clean_test_error",
         "l1_0.0025_train_error": "results/m_l1_weight_decay.json:arms.l1_0.0025.clean_train_error",
         "l1_2.5e-05_test_error": "results/m_l1_weight_decay.json:arms.l1_2.5e-05.clean_test_error"
+      }
+    },
+    "f4_eps_curve": {
+      "script": "experiments/f4_eps_curve.py",
+      "command_per_seed": "python experiments/f4_eps_curve.py --seed {seed}",
+      "results": "results/f4_eps_curve.json",
+      "metrics": {
+        "eps_crossover_pos": "results/f4_eps_curve.json:eps_crossover_pos",
+        "frac_correct_pos_4_15": "results/f4_eps_curve.json:frac_correct_pos_4_15"
+      },
+      "curve_metrics": {
+        "eps_values": "results/f4_eps_curve.json:eps_values",
+        "correct_logit": "results/f4_eps_curve.json:correct_logit",
+        "max_wrong_logit": "results/f4_eps_curve.json:max_wrong_logit",
+        "predicted_is_correct": "results/f4_eps_curve.json:predicted_is_correct"
       }
     }
   },
@@ -520,6 +536,55 @@
       "quantity": "measured.m9_rubbish_evals.rbf_rubbish_error - min(measured.m9_rubbish_evals.maxout_softmax_rubbish_error, measured.m9_rubbish_evals.softmax_regression_rubbish_error)",
       "direction": "<0",
       "note": "RBF vs every linear-built model on identical rubbish draws. Sub-scale: 0.0% vs 82.1%/81.7%."
+    },
+    {
+      "id": "fc1_fig4_correct_class_crossed_by_wrong",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "By tracing out different values of $\\eps$, we can see that adversarial examples occur reliably\nfor almost any sufficiently large value of $\\eps$ provided that we move in\nthe correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
+      "citation": "paper/source/iclr2015.tex:762",
+      "quantity": "measured.f4_eps_curve.correct_logit",
+      "reference": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        0.0,
+        15.0
+      ],
+      "comparison": "crosses",
+      "note": "Figure 4 shape claim: along the FGSM direction the correct class (4) logit starts on top at eps=0 and ends below a wrong-class logit at large eps (the figure's own x-range is [-15,15], read via read-figure; transcript paper/figure_transcripts.md). Sub-scale seed 0: 12.27 vs 6.92 at eps=0, crossing at eps=0.5 (figure read: ~0.5-1), deeply crossed at eps=15. High: pure shape, no author numbers needed; needs only a fitted naive maxout at any budget."
+    },
+    {
+      "id": "fc2_fig4_wrong_classification_stable_wide_region",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "the wrong classifications are stable across a wide region of $\\eps$ values.",
+      "citation": "paper/source/iclr2015.tex:769",
+      "quantity": "measured.f4_eps_curve.predicted_is_correct",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        4.0,
+        15.0
+      ],
+      "comparison": "below",
+      "claimed": 0.5,
+      "tolerance": 0.0,
+      "note": "Every sample of the eps grid in [4,15] (23 points, step 0.5 -- a WIDE region, 11/30 of the figure's positive axis) is classified wrong; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seed 0: frac correct in [4,15] = 0.000. High: a stability/shape assertion that survives sub-scale budgets."
+    },
+    {
+      "id": "fc3_fig4_predictions_become_extreme",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quote": "Moreover, the predictions become very extreme as we\nincrease $\\eps$ enough to move into the regime of rubbish inputs.",
+      "citation": "paper/source/iclr2015.tex:769",
+      "quantity": "measured.f4_eps_curve.max_wrong_logit",
+      "x": "measured.f4_eps_curve.eps_values",
+      "x_range": [
+        0.0,
+        15.0
+      ],
+      "comparison": "increasing",
+      "tolerance": 0.5,
+      "note": "The top wrong-class softmax argument rises monotonically (up to 0.5-logit local slack) along the FGSM ray from eps=0 to eps=15. Sub-scale seed 0: 6.92 -> 872.7, max dip below running max = 0.0. NOT a magnitude match: the figure reaches ~+400 at eps=10 on the paper's fully-trained net (read off the plot); only the increasing shape is asserted. High."
     }
   ],
   "not_tested": [
@@ -558,12 +623,6 @@
       "quote": "We also found that the weights of the learned model changed significantly,\nwith the weights of the adversarially trained model being significantly more localized and\ninterpretable (see Fig.~\\ref{fig:weights}).",
       "citation": "paper/source/iclr2015.tex:523",
       "reason": "Qualitative weight-visualization claim with no numeric target."
-    },
-    {
-      "id": "nt07_fig4_epsilon_sweep",
-      "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that\nthe wrong classifications are stable across a wide region of $\\eps$ values.",
-      "citation": "paper/source/iclr2015.tex:768",
-      "reason": "Visual claim from the plotting layer (Figure 4); the epsilon axis range exists only in the figure, not the text."
     },
     {
       "id": "nt08_rubbish_class_skew",

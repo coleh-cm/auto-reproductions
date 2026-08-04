@@ -41,7 +41,7 @@
     },
     {
       "name": "rbf_confidence_grader",
-      "what_it_decides": "RBF UNNORMALIZED per-class confidence exp(q_k) (SPEC §6 item 9): high at a class centre, decaying toward 0 off-manifold. This is the only reading that can reproduce the paper's 1.2% conf-on-mistakes / 60.6% clean-confidence / 0% rubbish-error (a softmax reading is bounded below by 1/K and cannot). Backs the M8/M9 RBF claims.",
+      "what_it_decides": "RBF UNNORMALIZED per-class confidence exp(q_k) (SPEC \u00a76 item 9): high at a class centre, decaying toward 0 off-manifold. This is the only reading that can reproduce the paper's 1.2% conf-on-mistakes / 60.6% clean-confidence / 0% rubbish-error (a softmax reading is bounded below by 1/K and cannot). Backs the M8/M9 RBF claims.",
       "positive_test": "tests/test_instruments.py::test_rbf_confidence_positive_decays_off_manifold",
       "negative_test": "tests/test_instruments.py::test_rbf_confidence_positive_decays_off_manifold"
     },
@@ -59,7 +59,7 @@
     },
     {
       "name": "degeneracy_equivalence_check",
-      "what_it_decides": "Equivalence: the FGSM adversarial-training method (E7) at its no-op eps=0 reproduces the baseline (clean training) EXACTLY at the cost level, the training-state level, and the CLI level. The cheapest real correctness evidence; a wrong implementation diverges here in seconds. The negative arm (dropout ON) shows the check is meaningful — with dropout the two DO diverge, so the no-op equality is not a tautology.",
+      "what_it_decides": "Equivalence: the FGSM adversarial-training method (E7) at its no-op eps=0 reproduces the baseline (clean training) EXACTLY at the cost level, the training-state level, and the CLI level. The cheapest real correctness evidence; a wrong implementation diverges here in seconds. The negative arm (dropout ON) shows the check is meaningful \u2014 with dropout the two DO diverge, so the no-op equality is not a tautology.",
       "positive_test": "tests/test_degeneracy.py::test_train_degeneracy_eps0_equals_baseline_bitidentical",
       "negative_test": "tests/test_degeneracy.py::test_train_degeneracy_drops_with_dropout_on"
     },
@@ -68,6 +68,24 @@
       "what_it_decides": "Structural invariants of the FGSM attack itself: ||eta||_inf == eps, no clipping, eps=0 identity, sign(0)=0 convention. These are equivalence checks on the attack's own output, independent of any trained model.",
       "positive_test": "tests/test_invariants.py::test_fgsm_perturbation_norm_equals_eps",
       "negative_test": "tests/test_invariants.py::test_fgsm_no_clipping"
+    },
+    {
+      "name": "numbers_gate_scalar_evaluator",
+      "what_it_decides": "Whether a scalar claim (ordering/value/existence/invariant) holds: resolves measured.<arm>.<metric> tokens from measured.json at every seed and evaluates the claim arithmetic; missing data BLOCKS, never fabricates.",
+      "positive_test": "tests/test_measured_resolver.py::test_single_element_list_pointer_collapses_to_scalar (plus the gate's own clean run over the 34 scalar claims: claims_result.json 31 pass / 3 annotated low fails)",
+      "negative_test": "tests/test_measured_resolver.py::test_multi_element_list_pointer_is_blocked"
+    },
+    {
+      "name": "numbers_gate_curve_evaluator",
+      "what_it_decides": "Whether a figure 'curve' claim holds (a curve rises, crosses, stays above/below, matches): resolves quantity/reference/x SEQUENCES from the arm's per-seed result files (results/_per_seed/), restricts to the figure-read x_range, evaluates the comparison at every seed, and BLOCKS on missing/non-sequence data. Backs the Figure-4 claims fc1..fc3.",
+      "positive_test": "tests/test_curve_gate.py::{test_crosses_positive,test_below_positive_and_negative,test_increasing_positive_and_negative,test_matches_with_tolerance}",
+      "negative_test": "tests/test_curve_gate.py::{test_crosses_negative_no_crossing,test_below_positive_and_negative,test_increasing_positive_and_negative,test_every_seed_must_pass,test_missing_per_seed_file_blocks}"
+    },
+    {
+      "name": "claims_quote_verifier",
+      "what_it_decides": "Whether every claim's quote is a VERBATIM substring of paper/source/iclr2015.tex starting at the line its citation names; whether claim kinds carry their required arithmetic fields; whether compute-invariance counts are truthful; whether every arm metric pointer resolves in the shipped results.",
+      "positive_test": "tests/test_claims_integrity.py::test_every_claim_quote_is_verbatim_at_cited_line (and the field/kind/pointer tests in the same module)",
+      "negative_test": "tests/test_claims_integrity.py (a non-verbatim quote, a stale count, a shifted citation line, or an unresolvable pointer each fail loudly)"
     }
   ],
   "not_applicable": [
@@ -77,7 +95,7 @@
     },
     {
       "name": "cifar10_loader",
-      "reason": "CIFAR-10 arms (tex:341 conv-maxout 87.15%, tex:911-912 rubbish) are excluded by the scope fixed in SPEC §1; no CIFAR-10 grader or loader is implemented. Claims are in not_tested."
+      "reason": "CIFAR-10 arms (tex:341 conv-maxout 87.15%, tex:911-912 rubbish) are excluded by the scope fixed in SPEC \u00a71; no CIFAR-10 grader or loader is implemented. Claims are in not_tested."
     }
   ]
 }

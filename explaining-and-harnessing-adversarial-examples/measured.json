@@ -3,6 +3,7 @@
     "blocked_sentinel": "BLOCKED",
     "headline_metric": {
       "e1_ensemble12_maxout": "ensemble_targeted_error",
+      "f4_eps_curve": "eps_crossover_pos",
       "m1_softmax_regression": "fgsm_error_rate",
       "m2_logistic_3v7": "fgsm_error_rate",
       "m3_maxout240_clean": "fgsm_error_rate",
@@ -44,6 +45,20 @@
     "2": {
       "ensemble_targeted_error": 0.9988999962806702,
       "single_member_targeted_error": 0.9969999939203262
+    }
+  },
+  "f4_eps_curve": {
+    "0": {
+      "eps_crossover_pos": 0.5,
+      "frac_correct_pos_4_15": 0.0
+    },
+    "1": {
+      "eps_crossover_pos": 0.5,
+      "frac_correct_pos_4_15": 0.0
+    },
+    "2": {
+      "eps_crossover_pos": 0.5,
+      "frac_correct_pos_4_15": 0.0
     }
   },
   "m1_softmax_regression": {

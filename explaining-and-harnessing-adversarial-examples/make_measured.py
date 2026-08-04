@@ -84,6 +84,7 @@ HEADLINE_METRIC: dict[str, str] = {
     "m9_rubbish_evals": "maxout_softmax_rubbish_error",
     "e1_ensemble12_maxout": "ensemble_targeted_error",
     "m_l1_weight_decay": "l1_0.0025_train_error",
+    "f4_eps_curve": "eps_crossover_pos",
 }
 
 BLOCKED = "BLOCKED"

@@ -1,11 +1,11 @@
 {
   "summary": {
-    "total": 34,
-    "pass": 31,
+    "total": 37,
+    "pass": 34,
     "fail": 3,
     "blocked": 0,
     "high": {
-      "pass": 16,
+      "pass": 19,
       "fail": 0,
       "blocked": 0
     },
@@ -19,7 +19,7 @@
       "fail": 3,
       "blocked": 0
     },
-    "high_total": 16,
+    "high_total": 19,
     "gate_pass": true,
     "note": "The gate's load-bearing verdict is high (claims that survive this reproduction's CPU sub-scale). low claims are informational; several are expected to fail at sub-scale (annotated in claims.json)."
   },
@@ -1097,6 +1097,132 @@
         ],
         "direction": "<0"
       }
+    },
+    {
+      "id": "fc1_fig4_correct_class_crossed_by_wrong",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:762",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "crosses",
+        "x_range": [
+          0.0,
+          15.0
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 12.271561622619629,
+            "q_last": -749.56005859375
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 13.796883583068848,
+            "q_last": -613.7621459960938
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 14.588582992553711,
+            "q_last": -486.68316650390625
+          }
+        ]
+      }
+    },
+    {
+      "id": "fc2_fig4_wrong_classification_stable_wide_region",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "below",
+        "x_range": [
+          4.0,
+          15.0
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 23,
+            "q_first": 0.0,
+            "q_last": 0.0
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 23,
+            "q_first": 0.0,
+            "q_last": 0.0
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 23,
+            "q_first": 0.0,
+            "q_last": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "id": "fc3_fig4_predictions_become_extreme",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "citation": "paper/source/iclr2015.tex:769",
+      "verdict": "pass",
+      "detail": {
+        "seeds_evaluated": [
+          0,
+          1,
+          2
+        ],
+        "comparison": "increasing",
+        "x_range": [
+          0.0,
+          15.0
+        ],
+        "per_seed": [
+          {
+            "seed": 0,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 6.91758394241333,
+            "q_last": 872.70166015625
+          },
+          {
+            "seed": 1,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 5.3113813400268555,
+            "q_last": 480.8585510253906
+          },
+          {
+            "seed": 2,
+            "ok": true,
+            "n_samples": 31,
+            "q_first": 6.215456962585449,
+            "q_last": 467.60943603515625
+          }
+        ]
+      }
     }
   ],
   "not_tested": [
@@ -1135,12 +1261,6 @@
       "quote": "We also found that the weights of the learned model changed significantly,\nwith the weights of the adversarially trained model being significantly more localized and\ninterpretable (see Fig.~\\ref{fig:weights}).",
       "citation": "paper/source/iclr2015.tex:523",
       "reason": "Qualitative weight-visualization claim with no numeric target."
-    },
-    {
-      "id": "nt07_fig4_epsilon_sweep",
-      "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that\nthe wrong classifications are stable across a wide region of $\\eps$ values.",
-      "citation": "paper/source/iclr2015.tex:768",
-      "reason": "Visual claim from the plotting layer (Figure 4); the epsilon axis range exists only in the figure, not the text."
     },
     {
       "id": "nt08_rubbish_class_skew",
@@ -1200,10 +1320,16 @@
       "measured.m3_maxout240_clean.fgsm_error_rate",
       "measured.m8_rbf_shallow.rbf_fgsm_error_rate",
       "measured.m9_rubbish_evals.rbf_rubbish_error",
+      "measured.f4_eps_curve.frac_correct_pos_4_15",
       "measured.m1_softmax_regression.clean_error",
+      "measured.f4_eps_curve.predicted_is_correct",
       "measured.m2_logistic_3v7.fgsm_error_rate",
       "measured.m3_maxout240_clean.clean_error",
-      "measured.m2_logistic_3v7.clean_error"
+      "measured.f4_eps_curve.eps_crossover_pos",
+      "measured.f4_eps_curve.max_wrong_logit",
+      "measured.m2_logistic_3v7.clean_error",
+      "measured.f4_eps_curve.correct_logit",
+      "measured.f4_eps_curve.eps_values"
     ]
   }
 }

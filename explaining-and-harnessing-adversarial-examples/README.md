@@ -35,10 +35,11 @@ running log and target numbers.
   "adversarial": "<cmd>"}` from each arm the gate runs to the shell command
   that produces it. The two arms are the paper's headline M4 comparison
   (tex:492-494). The rich per-milestone metadata is in `arms_metadata.json`,
-  and the full 13-arm numbers-gate map (arm → `command_per_seed`, results file,
+  and the full 14-arm numbers-gate map (arm → `command_per_seed`, results file,
   metric pointers) is `claims.json`.
-- `run_all_arms.sh` — runs **every arm** of `claims.json` (13 arms: M1–M9, E1,
-  the L1 control; m5 and m7 each contribute two arms from one command) at
+- `run_all_arms.sh` — runs **every arm** of `claims.json` (14 arms: M1–M9, E1,
+  the L1 control, F4 the Figure-4 eps-curve; m5 and m7 each contribute two arms
+  from one command) at
   **every seed** in `claims.json['seeds']` (`[0, 1, 2]`), via `make_measured.py`.
   It writes `measured.json` (`{arm: {seed: {metric: value}}}`) and prints exactly
   one `FINAL <arm>=<value>` line per arm to stdout (BLOCKED if the environment
@@ -89,7 +90,9 @@ running log and target numbers.
 
 ## Environment
 
-- Python 3.13 (this sandbox: CPython 3.13.5; the Dockerfile builds on `python:3.13-slim`)
+- Python 3.12 or 3.13 (the Dockerfile builds on `python:3.13-slim`; verified in
+  two sandboxes: CPython 3.13.5 on 2026-07-30 and CPython 3.12.13 on 2026-08-04 —
+  the pinned wheels resolve identically and the full suite passes on both)
 - torch 2.7.1 (CPU build), numpy 2.3.2, pytest 8.4.2
 - CPU-only; no GPU required
 
@@ -151,6 +154,7 @@ docker run --rm fgsm-repro                       # environment smoke test
 | M8 | Shallow RBF, FGSM ε=0.25 | adv 55.4%, conf-on-error 1.2% |
 | M9 | Rubbish examples N(0, I₇₈₄) | maxout 98.35%, softmax-reg 59.8%, RBF 0% |
 | M-L1 | L1 weight-decay control (Section 5) | coeff 0.0025 → >5% train error; smaller → no benefit |
+| F4 | Fig. 4 eps-sweep curve (ε ∈ [−15,15], naive maxout) | curve claims fc1–fc3: correct class crossed, wrong classification stable over ε∈[4,15], logits grow extreme (figure shape, not magnitudes) |
 
 The RBF arms (M8/M9) use the paper's unnormalized per-class `exp(q)` form (a
 softmax over `q` is bounded below by 1/K and cannot reproduce the paper's

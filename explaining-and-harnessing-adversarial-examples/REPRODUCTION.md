@@ -14,8 +14,20 @@
 - [x] arXiv LaTeX source fetched from `https://arxiv.org/e-print/1412.6572` and unpacked
   to `paper/source/`; `iclr2015.tex` and `iclr2015.bbl` committed (identical to the
   previously committed copies), figures/style files gitignored per folder `.gitignore`
-- [ ] Paper read properly; `SPEC.md` written (algorithm, symbol shapes, equation citations, unstated details)
-- [ ] Upstream code search recorded
+- [x] Paper read properly (full `iclr2015.tex` re-read this run); `SPEC.md` written
+  (algorithm, symbol shapes, equation citations, unstated details — carried over from the
+  prior completed run on this branch and extended this run, see below)
+- [x] Upstream code search recorded (re-run 2026-08-04: 13 third-party partial repos,
+  author search 0 repos, pylearn2 link HTTP 200 — unchanged; SPEC.md §7)
+- [x] Figures read with `read-figure` and transcript committed (`paper/figure_transcripts.md`);
+  Figure-4 reads turned into `curve` claims fc1–fc3 (SPEC.md §12); new arm
+  `experiments/f4_eps_curve.py`; `numbers_gate.py` gained curve evaluation; claims.json grew
+  34 → 37 claims / 13 → 14 arms / 16 → 19 high; not_tested 10 → 9 (Fig. 4 now tested)
+- [x] Environment rebuilt this sandbox (`uv venv .venv` + pinned requirements on CPython
+  3.12.13); MNIST downloaded; **89/89 tests pass**
+- [x] Numbers gate re-run: `make_measured.py` (f4 arm × seeds 0,1,2) + `--assemble-only` +
+  `numbers_gate.py` → **34 pass / 3 fail / 0 blocked; HIGH 19/19 pass; gate=PASS**
+  (the 3 fails are the annotated low/magnitude claims c03/c12/c13 needing paper scale)
 - [ ] Implementation runs smallest end-to-end case
 - [ ] Adversarial review rounds clean
 - [ ] Readiness gates walked and recorded
@@ -34,3 +46,14 @@
   `REPRODUCTION.md` log (see git history of this branch — it was replaced by this file
   at this run's ingest commit). This run re-uses and re-verifies that work rather than
   redoing it from scratch.
+- **2026-08-04 (this run):** the prior SPEC's figure coverage was the gap — every figure
+  claim sat in `not_tested` and no read-figure transcript existed. This run read all six
+  figures with the vision tool (`paper/figure_transcripts.md`, 12 exchanges), extracted
+  Figure 4's axis semantics (ε ∈ [−15, 15], "argument to softmax", class 4 overtaken at
+  ε≈0.5), added the `f4_eps_curve` arm (naive maxout, FGSM-direction logits sweep, 61
+  sample points), taught `numbers_gate.py` the `curve` kind (crosses/above/below/
+  increasing/decreasing/matches over per-seed sequences; measured.json stays scalar-only),
+  added three high-invariance curve claims (fc1–fc3, all pass at every seed), added
+  claims-integrity tests (every quote is verbatim at its cited line) and curve-evaluator
+  instrument tests, and updated SPEC/VERIFICATION/README/arms_metadata/instruments
+  coherently. Gate: 34 pass / 3 fail / 0 blocked; HIGH 19/19 PASS.

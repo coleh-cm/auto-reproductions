@@ -3,7 +3,7 @@
 #
 # Paper: Goodfellow, Shlens, Szegedy, "Explaining and Harnessing Adversarial
 # Examples" (ICLR 2015, arXiv:1412.6572v3). The arms and metrics are claims.json's
-# (13 arms: M1-M9, E1, the L1 control; m5 contributes two arms from one command,
+# (14 arms: M1-M9, E1, the L1 control, F4 the Figure-4 eps-curve; m5 contributes two arms from one command,
 # m7 contributes two). Seeds are claims.json's: [0, 1, 2].
 #
 # This delegates to make_measured.py, which:
@@ -13,7 +13,7 @@
 #     writes measured.json as {arm: {seed: {metric: value}}};
 #   * prints exactly one `FINAL <arm>=<headline value>` line per arm to STDOUT
 #     (the value a reader sees in the log; BLOCKED if the environment cannot
-#     produce it). Progress goes to STDERR only, so stdout is exactly the 13
+#     produce it). Progress goes to STDERR only, so stdout is exactly the 14
 #     gate lines, paired to arms by name.
 #
 # Sub-scale: m5's paper-full config (1600 units / patience 100 / 5 seeds,
