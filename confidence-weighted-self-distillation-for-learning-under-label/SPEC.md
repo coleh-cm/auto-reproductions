@@ -16,7 +16,7 @@ was rewritten independently from `paper/paper.md`; every number it asserts was r
 2026-08-04 with the existing code (`requirements.txt` pins: numpy 2.5.1, scikit-learn 1.9.0,
 Python 3.12): baseline 0.9370 (seed 0), CWSD 0.9611 (seed 0), cross-seed spot-checks
 baseline/seed1 0.9407 and cwsd/seed2 0.9556 — all matching `measured.json` and Table 1 within
-the stated tolerances; the 47-test suite passes (`python -m pytest -q tests` → `47 passed`).
+the stated tolerances; the 48-test suite passes (`python -m pytest -q tests` → `48 passed`).
 The frozen interfaces in §5 were diffed against the actual argparse/function signatures of
 `run_experiment.py`.
 
@@ -28,7 +28,7 @@ GitHub repo/search re-run (`confidence-weighted self-distillation`, `self-distil
 noise`, `"Institute for Applied Learning Systems"`, author trio) → `total_count: 0` throughout;
 `grep -niE "http|www\.|github|arxiv|doi|available at" paper/paper.md` → no matches;
 `requirements.txt` re-installed (numpy 2.5.1, scikit-learn 1.9.0) and `python -m pytest -q
-tests` → `47 passed`; SPEC §5 interfaces diffed clean against `run_experiment.py`
+tests` → `48 passed`; SPEC §5 interfaces diffed clean against `run_experiment.py`
 (`--lambda --s --tau --temperature --seed --steps --lr --batch-size --init --noise-mode
 --noise-rate --batch-mode --rng-layout --metrics-out`; `load_data, corrupt_labels, init_params,
 forward, make_target, loss_and_grads, batches, evaluate, train`); `measured.json` values match §8's numbers.
@@ -312,7 +312,7 @@ code search `"Confidence-Weighted Self-Distillation"` → 0.)
 | Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 | ✅ exact (506/540) |
 | CWSD | 1.0 | 0.9620 | 0.9611 | ✅ (gap 0.0009) |
 
-Structural gates (all implemented in `tests/`, 47 tests, passing 2026-08-04):
+Structural gates (all implemented in `tests/`, 48 tests, passing 2026-08-04):
 (a) `λ = 0` path is exact CE, asserted bitwise (per-step loss+grads and a 300-step SGD loop)
 against an independently written CE routine, swept over `s ∈ {0.01…10.0}` so the gate cannot be
 fit through the one unstated hyperparameter; (b) `t = y` at `w = 0`; (c) Eq. (4) at `t = p̃`
