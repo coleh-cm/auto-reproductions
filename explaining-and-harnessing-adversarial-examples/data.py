@@ -81,18 +81,86 @@ def _load_mnist_raw():
     return x_train, y_train, x_test, y_test
 
 
+# Fingerprint checksums of the canonical MNIST IDX files from the
+# ossci-datasets S3 mirror (the standard 60k/10k split). These are aggregate
+# sums over the float32 [0,1] pixels, used by check_mnist_fingerprint to reject
+# a synthetic / wrong corpus (the closed-book failure mode: a 65-token
+# vocabulary corpus has a different shape AND a different pixel sum). Tolerances
+# absorb float32 pairwise-summation order differences across numpy builds.
+_MNIST_X_TRAIN_SUM = 5133683.0   # sum over x_train[:50000]
+_MNIST_X_VAL_SUM = 1012586.25   # sum over x_train[50000:]
+_MNIST_X_TEST_SUM = 1038914.5   # sum over x_test
+
+
+def check_mnist_fingerprint(d):
+    """Assert d is the real MNIST split by fingerprint: size (shapes), vocabulary
+    (label set exactly {0..9}), pixel range ([0,1] f32), and a checksum (pixel
+    sums) that a synthetic / all-zeros / wrong-corpus substitute cannot match.
+
+    A closed-book run once fell back to a 65-token synthetic corpus and passed
+    every downstream gate; this fingerprint (size + vocabulary + checksum) is
+    what prevents that. Raises AssertionError on any mismatch -- never returns
+    a boolean, so a loader that cannot verify its data fails loudly."""
+    for k in ("x_train", "x_val", "x_test"):
+        assert k in d, f"check_mnist_fingerprint: missing {k}"
+        assert d[k].ndim == 2 and d[k].shape[1] == 784, f"{k} shape {d[k].shape} != [N,784]"
+        assert d[k].dtype == np.float32, f"{k} dtype {d[k].dtype} != float32"
+    assert d["x_train"].shape == (50000, 784), f"x_train shape {d['x_train'].shape}"
+    assert d["x_val"].shape == (10000, 784), f"x_val shape {d['x_val'].shape}"
+    assert d["x_test"].shape == (10000, 784), f"x_test shape {d['x_test'].shape}"
+    for k in ("y_train", "y_val", "y_test"):
+        assert d[k].dtype == np.int64, f"{k} dtype {d[k].dtype} != int64"
+        labels = set(np.unique(d[k]).tolist())
+        assert labels == set(range(10)), f"{k} labels {labels} != {{0..9}}"
+    for k, arr in (("x_train", d["x_train"]), ("x_val", d["x_val"]), ("x_test", d["x_test"])):
+        assert arr.min() >= 0.0, f"{k} min {arr.min()} < 0"
+        assert arr.max() <= 1.0 + 1e-6, f"{k} max {arr.max()} > 1"
+    # checksum: rejects an all-zeros / synthetic substitute that passed shape+range
+    assert abs(float(d["x_train"].sum()) - _MNIST_X_TRAIN_SUM) < 200.0, \
+        f"x_train sum {float(d['x_train'].sum())} != {_MNIST_X_TRAIN_SUM} (synthetic corpus?)"
+    assert abs(float(d["x_val"].sum()) - _MNIST_X_VAL_SUM) < 50.0, \
+        f"x_val sum {float(d['x_val'].sum())} != {_MNIST_X_VAL_SUM}"
+    assert abs(float(d["x_test"].sum()) - _MNIST_X_TEST_SUM) < 50.0, \
+        f"x_test sum {float(d['x_test'].sum())} != {_MNIST_X_TEST_SUM}"
+
+
+def check_mnist_3v7_fingerprint(d3, d_full):
+    """Assert d3 is the 3-vs-7 subset of d_full: only labels {-1,+1}, and the
+    +1 count equals the digit-3 count in the full split (+1 == digit 3)."""
+    for k in ("x_train", "x_val", "x_test"):
+        assert k in d3, f"3v7 missing {k}"
+        assert d3[k].dtype == np.float32
+    ys = set(np.unique(np.concatenate([d3["y_train"], d3["y_val"], d3["y_test"]])).tolist())
+    assert ys <= {-1, 1} and -1 in ys and 1 in ys, f"3v7 labels {ys} not subset of {{-1,+1}}"
+    for k in ("y_train", "y_val", "y_test"):
+        assert d3[k].dtype == np.int64
+    # +1 == digit 3: the count of +1 in the 3v7 split equals the count of digit 3
+    # in the corresponding full split (within the 3&7 mask).
+    for k in ("y_train", "y_val", "y_test"):
+        mask37 = (d_full[k] == 3) | (d_full[k] == 7)
+        n3 = int((d_full[k] == 3).sum())
+        n_pos = int((d3[k] == 1).sum())
+        assert n3 == n_pos, f"+1 != digit 3 on {k}: {n3} vs {n_pos}"
+        assert d3[k].shape[0] == int(mask37.sum()), f"3v7 {k} size != 3&7 count"
+
+
 def load_mnist(seed=0):
-    """50k train / 10k val / 10k test, pixels [0,1] f32, labels int64."""
+    """50k train / 10k val / 10k test, pixels [0,1] f32, labels int64.
+
+    Runs the fingerprint check on the loaded data so a synthetic substitute
+    is rejected at the source rather than silently producing chance-level arms."""
     x_train, y_train, x_test, y_test = _load_mnist_raw()
     x_val = x_train[50000:]
     y_val = y_train[50000:]
     x_tr = x_train[:50000]
     y_tr = y_train[:50000]
-    return {
+    out = {
         "x_train": x_tr, "y_train": y_tr,
         "x_val": x_val, "y_val": y_val,
         "x_test": x_test, "y_test": y_test,
     }
+    check_mnist_fingerprint(out)
+    return out
 
 
 def load_mnist_full(seed=0):
@@ -122,11 +190,13 @@ def load_mnist_3v7(seed=0):
     x_tr, y_tr = _to_3v7(d["x_train"], d["y_train"])
     x_val, y_val = _to_3v7(d["x_val"], d["y_val"])
     x_te, y_te = _to_3v7(d["x_test"], d["y_test"])
-    return {
+    out = {
         "x_train": x_tr, "y_train": y_tr,
         "x_val": x_val, "y_val": y_val,
         "x_test": x_te, "y_test": y_te,
     }
+    check_mnist_3v7_fingerprint(out, d)
+    return out
 
 
 def _load_cifar_raw():
@@ -169,19 +239,45 @@ def _gcn_preprocess(x_train, x_test):
     return (x_train - mu) * s, (x_test - mu) * s, {"per_pixel_mean": mu, "scale": s, "global_std": global_std}
 
 
+def check_cifar10_fingerprint(d):
+    """Assert d is the real CIFAR-10 split (post-GCN): size (45k/5k/10k x 3072),
+    vocabulary (labels {0..9} int64), dtype float32, and GLOBAL std of x_train
+    ~0.5 (within 0.04) -- the GCN preprocessing target (paper footnote 2,
+    tex:343-345). A non-GCN array (std ~1.0) or a wrong-dim array (e.g. 1024)
+    is rejected. Raises AssertionError on mismatch."""
+    for k in ("x_train", "x_val", "x_test"):
+        assert k in d, f"check_cifar10_fingerprint: missing {k}"
+        assert d[k].ndim == 2 and d[k].shape[1] == 3072, f"{k} shape {d[k].shape} != [N,3072]"
+        assert d[k].dtype == np.float32, f"{k} dtype {d[k].dtype} != float32"
+    assert d["x_train"].shape == (45000, 3072), f"x_train shape {d['x_train'].shape}"
+    assert d["x_val"].shape == (5000, 3072), f"x_val shape {d['x_val'].shape}"
+    assert d["x_test"].shape == (10000, 3072), f"x_test shape {d['x_test'].shape}"
+    for k in ("y_train", "y_val", "y_test"):
+        assert d[k].dtype == np.int64, f"{k} dtype {d[k].dtype} != int64"
+        labels = set(np.unique(d[k]).tolist())
+        assert labels == set(range(10)), f"{k} labels {labels} != {{0..9}}"
+    gstd = float(d["x_train"].std())
+    assert abs(gstd - 0.5) < 0.04, f"x_train global std {gstd} not ~0.5 (GCN not applied?)"
+
+
 def load_cifar10(seed=0):
-    """45k train / 5k val / 10k test, GCN-preprocessed to global std ~0.5, f32."""
+    """45k train / 5k val / 10k test, GCN-preprocessed to global std ~0.5, f32.
+
+    Runs the fingerprint check on the loaded data so a non-GCN or wrong-dim
+    substitute is rejected at the source."""
     x_train, y_train, x_test, y_test = _load_cifar_raw()
     x_train, x_test, _info = _gcn_preprocess(x_train, x_test)
     x_val = x_train[45000:]
     y_val = y_train[45000:]
     x_tr = x_train[:45000]
     y_tr = y_train[:45000]
-    return {
+    out = {
         "x_train": x_tr, "y_train": y_tr,
         "x_val": x_val, "y_val": y_val,
         "x_test": x_test, "y_test": y_test,
     }
+    check_cifar10_fingerprint(out)
+    return out
 
 
 def rubbish(dim, n, seed=0):

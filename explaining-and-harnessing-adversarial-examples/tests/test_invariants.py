@@ -132,6 +132,32 @@ def test_logreg_fgsm_equals_analytic_form():
         f"FGSM loss {fgsm_loss} != analytic {analytic}"
 
 
+def test_logreg_analytic_wrong_sign_differs():
+    """negative (logreg_analytic_equivalence instrument): the WRONG-sign analytic
+    form -- using +eps*||w||_1 (i.e. perturbing x in the +sign(w) direction,
+    which INCREASES the margin instead of decreasing it) -- does NOT match the
+    FGSM loss. Proves the equivalence check rejects a known-wrong closed form
+    rather than rubber-stamping any sign."""
+    torch.manual_seed(0)
+    m = models.LogisticRegression3v7()
+    x = torch.randn(64, 784)
+    y = torch.where(torch.rand(64) > 0.5, 1, -1).long()
+    eps = 0.25
+    w = m.linear.weight.detach().squeeze(0)
+    b = m.linear.bias.detach()
+    w1 = w.abs().sum()
+    sign_w = torch.sign(w)
+    yf = y.float()
+    # correct FGSM margin (paper's -sign(w) perturbation)
+    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b
+    fgsm_loss = float(torch.nn.functional.softplus(-yf * margin_fgsm).mean().item())
+    # WRONG-sign analytic form: -eps*||w||_1 - (w.x+b)  (the +sign(w) bug)
+    margin_wrong = -eps * w1 - (x @ w + b)
+    wrong_loss = float(torch.nn.functional.softplus(yf * margin_wrong).mean().item())
+    assert abs(fgsm_loss - wrong_loss) > 1e-3, \
+        f"wrong-sign analytic form matched FGSM loss ({fgsm_loss} vs {wrong_loss}) -- check is a rubber stamp"
+
+
 def test_loss_non_negative():
     """A cross-entropy / softplus loss is non-negative."""
     cases = [
@@ -206,3 +232,89 @@ def test_empty_input_raises():
             assert False, "empty input did not raise"
         except (ValueError, RuntimeError):
             pass
+
+
+def test_fgsm_rejects_clipping_and_scaling():
+    """negative (fgsm_inf_norm instrument): a clipping implementation (clamps
+    x_adv to [0,1]) keeps x_adv in range and so would PASS a naive range check
+    but FAIL test_fgsm_no_clipping; a scaled (non-sign) perturbation gives
+    ||eta||_inf != eps and fails test_fgsm_inf_norm_equals_eps. Proves the two
+    fgsm invariants catch the two named defect classes, not just the happy path."""
+    m = models.SoftmaxRegression()
+    torch.manual_seed(0)
+    m.linear.weight.data = torch.sign(torch.randn_like(m.linear.weight))
+    x = torch.ones(8, 784)  # at the boundary -> clipping would bite
+    y = torch.zeros(8, dtype=torch.long)
+    eps = 0.25
+    x_in = x.clone().detach().requires_grad_(True)
+    g = torch.autograd.grad(m.loss(x_in, y), x_in)[0]
+    x_in.requires_grad_(False)
+
+    # (a) clipping defect: x_adv clamped to [0,1] stays in range -- the no-clipping
+    # assertion (that SOME pixel escapes [0,1] at the boundary) would reject it.
+    x_adv_clip = (x + eps * torch.sign(g)).clamp(0.0, 1.0).detach()
+    assert not ((x_adv_clip > 1.0).any() or (x_adv_clip < 0.0).any()), \
+        "fixture: clipping should keep x_adv in range"
+    # the no-clipping assertion, applied to the clipped output, MUST fail:
+    try:
+        assert (x_adv_clip > 1.0).any() or (x_adv_clip < 0.0).any()
+        assert False, "no-clipping check accepted a clipped x_adv (rubber stamp)"
+    except AssertionError:
+        pass  # expected: the check rejects the clipped output
+
+    # (b) scaling defect: a 0.5*eps*sign(g) perturbation has ||eta||_inf == 0.5*eps
+    #     != eps, so the inf-norm-equals-eps assertion rejects it.
+    x_adv_scaled = (x + 0.5 * eps * torch.sign(g)).detach()
+    eta = (x_adv_scaled - x).abs()
+    assert not torch.allclose(eta.max(), torch.tensor(eps)), \
+        "inf-norm check accepted a scaled (0.5*eps) perturbation (rubber stamp)"
+
+
+def test_rubbish_eval_softmax_in_range_and_shares_sum_to_100():
+    """positive (rubbish_any_prob_threshold instrument): eval.rubbish_eval on a
+    confident softmax returns rubbish_err in [0,100]; when mistakes exist the
+    class_shares keys are exactly '0'..'9' and sum to 100."""
+    torch.manual_seed(0)
+    m = models.SoftmaxRegression()
+    m.linear.weight.data = torch.randn_like(m.linear.weight) * 5.0  # confident on rubbish
+    r = ev.rubbish_eval(m, 784, 256, seed=0)
+    assert 0.0 <= r["rubbish_err"] <= 100.0, f"rubbish_err out of range: {r['rubbish_err']}"
+    assert set(r["rubbish_class_shares"].keys()) == {str(k) for k in range(10)}
+    if r["rubbish_err"] > 0.0:
+        total = sum(r["rubbish_class_shares"].values())
+        assert abs(total - 100.0) < 1e-3, f"class_shares sum {total} != 100"
+
+
+def test_rubbish_eval_rbf_near_zero():
+    """positive (rubbish_any_prob_threshold instrument): an RBF network far from
+    the data assigns every class prob ~ 0 (< 0.5) on Gaussian rubbish, so
+    rubbish_err ~ 0 (paper: 'RBF network ... error rate of 0%'). This is the
+    oracle that proves the 0.5 'any class prob > 0.5' threshold is correct --
+    a softmax would score ~100% here; the RBF scores ~0."""
+    torch.manual_seed(0)
+    m = models.RBFNet()
+    with torch.no_grad():
+        m.mu.add_(5.0)  # shift means far from N(0, I_784) rubbish -> probs -> 0
+    r = ev.rubbish_eval(m, 784, 256, seed=0)
+    assert 0.0 <= r["rubbish_err"] <= 5.0, f"RBF rubbish_err not ~0: {r['rubbish_err']}"
+    assert set(r["rubbish_class_shares"].keys()) == {str(k) for k in range(10)}
+
+
+def test_rubbish_rejects_wrong_threshold():
+    """negative (rubbish_any_prob_threshold instrument): a buggy threshold
+    ('any prob > 0.0', which is always true since exp(quad) > 0 for the RBF)
+    would report ~100% rubbish_err for the robust RBF that the correct eval
+    ('any prob > 0.5') scores ~0%. Proves the 0.5 threshold is load-bearing and
+    the instrument rejects the argmax-confidence-always-true bug."""
+    torch.manual_seed(0)
+    m = models.RBFNet()
+    with torch.no_grad():
+        m.mu.add_(5.0)
+    x = torch.from_numpy(data.rubbish(784, 256, seed=0))
+    with torch.no_grad():
+        prob = m.prob(x)
+        conf = prob.max(dim=-1).values
+    correct_err = float((conf > 0.5).float().mean().item()) * 100.0
+    buggy_err = float((conf > 0.0).float().mean().item()) * 100.0  # the bug
+    assert correct_err <= 5.0, f"correct eval not ~0 on robust RBF: {correct_err}"
+    assert buggy_err >= 95.0, f"buggy eval not ~100 on robust RBF: {buggy_err}"

@@ -83,3 +83,23 @@ def test_l1_coef0_equals_baseline_exact():
     train.train(m_l1, d, cfg_l1)
     for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_l1.state_dict().items()):
         assert torch.equal(v1, v2), f"weights differ under L1 coef=0 at {k1}"
+
+
+def test_degeneracy_detects_nonzero_eps():
+    """negative (degeneracy_check instrument): with eps>0 the adversarial loop
+    is NOT a no-op (x_adv != x), so the trained weights MUST differ from the
+    baseline -- the degeneracy assertion (torch.equal) would reject it. Proves
+    the check is sensitive to a genuinely non-degenerate run (a loop that leaks
+    a perturbation even at its claimed no-op setting), not just a rubber stamp
+    that passes everything."""
+    d = _tiny_data()
+    cfg = {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 0, "momentum": 0.0}
+    m_base = _fresh(0)
+    train.train(m_base, d, dict(cfg))
+    m_adv = _fresh(0)
+    cfg_adv = dict(cfg)
+    cfg_adv["adversarial"] = {"alpha": 0.5, "eps": 0.05}  # genuinely perturbs
+    train.train(m_adv, d, cfg_adv)
+    differs = any(not torch.equal(v1, v2)
+                  for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_adv.state_dict().items()))
+    assert differs, "eps>0 adversarial training gave bit-identical weights -- degeneracy check cannot detect a leak"

@@ -2,52 +2,52 @@
   "instruments": [
     {
       "name": "data_loader_mnist",
-      "what_it_decides": "Whether the MNIST dataset loaded by data.load_mnist matches the paper's own dataset (size, shape, label set, pixel range). A closed-book run that fell back to a synthetic corpus passed every gate and meant nothing; this fingerprint prevents that.",
-      "positive_test": "data.load_mnist(0) returns x_train[50000,784] f32, y_train[50000] int64, x_val/x_test[10000,*], pixels in [0,1], labels exactly {0..9}, and the 3-vs-7 subset (load_mnist_3v7) contains only labels 3 and 7 mapped to y in {-1,+1} with +1==digit 3.",
-      "negative_test": "A synthetic 65-vocabulary corpus or a wrong-shaped array (e.g. x_train[50000,784] of all-zeros, or labels missing class 8) would fail the shape/label-set/range assertions and be rejected.",
+      "what_it_decides": "Whether the MNIST dataset loaded by data.load_mnist matches the paper's own dataset by fingerprint -- size (50k/10k/10k x 784), vocabulary (labels exactly {0..9}), pixel range ([0,1] f32), and a checksum (pixel sums) that a synthetic / all-zeros / wrong-corpus substitute cannot match. A closed-book run that fell back to a 65-token synthetic corpus passed every downstream gate and meant nothing; this fingerprint prevents that. data.check_mnist_fingerprint (called inside load_mnist) raises AssertionError on any mismatch, never returns a boolean. data.check_mnist_3v7_fingerprint verifies the 3-vs-7 subset (only {-1,+1}, +1 == digit 3).",
+      "positive_test": "tests/test_data_loader.py::test_mnist_real",
+      "negative_test": "tests/test_data_loader.py::test_mnist_rejects_synthetic",
       "requires_tools": "network (MNIST IDX download from ossci-datasets S3 mirror)"
     },
     {
       "name": "data_loader_cifar10",
-      "what_it_decides": "Whether CIFAR-10 loaded by data.load_cifar10 is the real dataset (50000+10000 images, 3072 dims after flatten, GCN-preprocessed to global std ~0.5).",
-      "positive_test": "load_cifar10(0) returns x_train[45000,3072], x_val[5000,3072], x_test[10000,3072], labels {0..9}, and global std of x_train ~0.5 (within 0.04).",
-      "negative_test": "A non-GCN-preprocessed array (global std ~ 1.0) or a wrong-dim array (e.g. 1024) fails the shape/std assertion.",
+      "what_it_decides": "Whether CIFAR-10 loaded by data.load_cifar10 is the real dataset by fingerprint -- size (45k/5k/10k x 3072), vocabulary (labels {0..9} int64), dtype float32, and GLOBAL std of x_train ~0.5 (within 0.04), the GCN preprocessing target (paper footnote 2, tex:343-345). data.check_cifar10_fingerprint (called inside load_cifar10) raises on a non-GCN array (std ~1.0) or a wrong-dim array (e.g. 1024).",
+      "positive_test": "tests/test_data_loader.py::test_cifar10_real",
+      "negative_test": "tests/test_data_loader.py::test_cifar10_rejects_synthetic",
       "requires_tools": "network (CIFAR-10 download from cs.toronto.edu)",
-      "status_note": "In this run the CIFAR download stalled (cs.toronto.edu throttled the connection); the cifar_conv_maxout arm is marked BLOCKED rather than substituted with synthetic data."
+      "status_note": "In this run the CIFAR download is truncated (cs.toronto.edu stalled; data/cifar-10-python.tar.gz is partial and load_cifar10 raises EOFError). The positive test skips with that reason and the cifar_conv_maxout arm is marked BLOCKED in measured.json rather than substituted with synthetic data. The negative test (fingerprint rejects synthetic) runs without the download."
     },
     {
       "name": "numbers_gate",
-      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by stamp. A blocked HIGH claim makes the gate exit non-zero; a failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict.",
-      "positive_test": "tests/test_numbers_gate.py::test_gate_positive_known_correct runs the gate (via sys.executable, in an isolated temp dir) on a measured.json where HIGH claim c03 holds and asserts c03 is verdicted pass and claims_result.json is stamped produced_by=numbers_gate.py.",
-      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong runs the gate on a measured.json where c03 fails and asserts c03 is verdicted fail (not pass, not blocked); ::test_gate_blocked_metric_not_silent_pass asserts an absent arm yields verdict blocked, never a silent pass; ::test_gate_raises_on_unusable_input asserts a malformed measured.json crashes the gate with a traceback and non-zero exit and writes no claims_result.json (a grader that cannot run must raise, never return a negative verdict).",
-      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate runs in-process and is exercised through sys.executable (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here."
+      "what_it_decides": "For each claim in claims.json, whether the measured value (or sequence, for curve claims) satisfies the claim's assertion (value/ordering/existence/invariant/curve) at every seed. Renders pass/fail/blocked and writes claims_result.json with a produced_by=numbers_gate.py stamp. A blocked or failed HIGH claim makes the gate exit non-zero; a grader that cannot run (malformed measured.json) raises a traceback rather than emitting a verdict. claims_result.json is written BY the gate and never by hand -- its produced_by stamp exists for exactly this reason.",
+      "positive_test": "tests/test_numbers_gate.py::test_gate_positive_known_correct",
+      "negative_test": "tests/test_numbers_gate.py::test_gate_negative_known_wrong, tests/test_numbers_gate.py::test_gate_blocked_metric_not_silent_pass, tests/test_numbers_gate.py::test_gate_raises_on_unusable_input",
+      "requires_tools": "none (pure python; reads claims.json + measured.json). The gate is exercised through sys.executable in an isolated temp dir (tests/test_numbers_gate.py), never by shelling out to bare `python` -- the 'python vs python3' mis-grading failure mode does not apply here."
     },
     {
       "name": "logreg_analytic_equivalence",
-      "what_it_decides": "c07: that FGSM is exact for logistic regression — the analytic closed form zeta(y*(eps*||w||_1 - w.x - b)) equals the actual adversarial loss under the paper's perturbation eta = -eps*sign(w) (tex:407-411).",
-      "positive_test": "On a trained LogisticRegression3v7, |FGSM-form loss - analytic-form loss| < 1e-5 on a fixed batch (tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form).",
-      "negative_test": "If the analytic form used the wrong sign (e.g. +eps*||w||_1 instead of the paper's -sign(w) perturbation), the difference would be >> 1e-5 and the test/assertion fails.",
+      "what_it_decides": "c07: that FGSM is exact for logistic regression -- the analytic closed form zeta(y*(eps*||w||_1 - w.x - b)) equals the actual adversarial loss under the paper's perturbation eta = -eps*sign(w) (tex:407-411). The positive test asserts |FGSM-form loss - analytic-form loss| < 1e-3 on a fixed batch; the negative test asserts the WRONG-sign analytic form (+eps*||w||_1, which increases the margin) does NOT match, proving the check rejects a known-wrong closed form.",
+      "positive_test": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form",
+      "negative_test": "tests/test_invariants.py::test_logreg_analytic_wrong_sign_differs",
       "requires_tools": "none"
     },
     {
       "name": "fgsm_inf_norm",
-      "what_it_decides": "That the FGSM perturbation satisfies ||eta||_inf == eps exactly (tex:309) with sign(0):=0 and no clipping (SPEC §4.9).",
-      "positive_test": "attack.fgsm produces x_adv with max|eta| == eps and every perturbed pixel exactly eps (tests/test_invariants.py::test_fgsm_inf_norm_equals_eps, test_fgsm_no_clipping).",
-      "negative_test": "A clipping implementation that clamps x_adv to [0,1] would fail test_fgsm_no_clipping; a scaled (non-sign) perturbation would fail the exact-eps assertion.",
+      "what_it_decides": "That the FGSM perturbation satisfies ||eta||_inf == eps exactly (tex:309) with sign(0):=0 and NO clipping of x_adv (SPEC sec 4.9: x_adv may exceed [0,1]). The positive tests assert max|eta| == eps, every perturbed pixel is exactly eps, and x_adv is not clipped; the negative test asserts a clipping implementation and a scaled (0.5*eps) perturbation are both rejected by those assertions.",
+      "positive_test": "tests/test_invariants.py::test_fgsm_inf_norm_equals_eps, tests/test_invariants.py::test_fgsm_no_clipping",
+      "negative_test": "tests/test_invariants.py::test_fgsm_rejects_clipping_and_scaling",
       "requires_tools": "none"
     },
     {
       "name": "degeneracy_check",
-      "what_it_decides": "That the method at its no-op setting (adversarial eps=0, noise eps=0, L1 coef=0) reproduces the baseline training EXACTLY (bit-identical weights). The cheapest real correctness evidence: catches a mis-wired adversarial/noise loop in seconds.",
-      "positive_test": "tests/test_degeneracy.py: a model trained with adversarial eps=0 has weights bit-identical to the baseline (torch.equal), and identical val_err curves.",
-      "negative_test": "An adversarial-training loop that leaks gradients through sign, or consumes RNG even at eps=0, produces different weights and the degeneracy assertion fails.",
+      "what_it_decides": "That the method at its no-op setting reproduces the baseline EXACTLY (bit-identical weights via torch.equal): adversarial eps=0, noise eps=0, and L1 coef=0 each reduce to plain training. The cheapest real correctness evidence -- catches a mis-wired adversarial/noise/L1 loop in seconds. The negative test asserts that with eps>0 (a genuinely non-degenerate run) the weights DIFFER from baseline, so the check is sensitive to a leak rather than a rubber stamp.",
+      "positive_test": "tests/test_degeneracy.py::test_adversarial_eps0_equals_baseline_exact, tests/test_degeneracy.py::test_noise_eps0_equals_baseline_exact, tests/test_degeneracy.py::test_l1_coef0_equals_baseline_exact",
+      "negative_test": "tests/test_degeneracy.py::test_degeneracy_detects_nonzero_eps",
       "requires_tools": "none"
     },
     {
       "name": "rubbish_any_prob_threshold",
-      "what_it_decides": "Whether a model assigns any class probability > 0.5 to Gaussian rubbish inputs (tex:905-911). For softmax-top: max_k p_k > 0.5; for sigmoid-top / RBF (rows need not sum to 1): any p_k > 0.5.",
-      "positive_test": "eval.rubbish_eval on a softmax model: rubbish_err in [0,100]; class_shares keys '0'..'9' sum to 100 (when mistakes exist). On an RBF net far from data, rubbish_err ~ 0.",
-      "negative_test": "A bug that used argmax-confidence > 0.5 on a softmax (always true, since max prob >= 0.1) would report ~100% rubbish_err for a well-trained model that is actually robust — caught by the RBF-zero assertion.",
+      "what_it_decides": "Whether a model assigns any class probability > 0.5 to Gaussian rubbish inputs (tex:905-911). For softmax-top: max_k p_k > 0.5; for sigmoid-top / RBF (rows need not sum to 1): any p_k > 0.5 (equivalently max_k p_k > 0.5). The 0.5 threshold is load-bearing: a softmax scores ~100% rubbish error (the paper's result) while an RBF far from data scores ~0% -- the RBF-zero assertion is the oracle that proves the threshold is correct. The negative test shows a buggy threshold (>0.0, always true for exp-quadratic RBF) would mis-report the robust RBF as ~100% error, which the correct eval rejects.",
+      "positive_test": "tests/test_invariants.py::test_rubbish_eval_softmax_in_range_and_shares_sum_to_100, tests/test_invariants.py::test_rubbish_eval_rbf_near_zero",
+      "negative_test": "tests/test_invariants.py::test_rubbish_rejects_wrong_threshold",
       "requires_tools": "none"
     }
   ]

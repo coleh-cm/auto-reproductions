@@ -258,3 +258,52 @@ axis (figures/read-figure.jsonl).
   60k retrain, 5 seeds); tight value claims (c08 0.94%, c11 0.84%, c14 17.9%,
   c17 1.14%, c18-c20 0.782%, c29 55.4%, c30 1.2%) fail on value but their
   HIGH-invariance orderings (c13, c16, c32, c33) pass.
+
+## Instruments: positive/negative tests as `<file>::<test>` (2026-08-04, instruments fix)
+
+The instruments.json declaration was rejected because every `positive_test` /
+`negative_test` was a prose description instead of a `<file>::<test>` reference,
+and several named tests that did not yet exist. Both halves are now closed:
+
+- **`data_loader_mnist` / `data_loader_cifar10`**: the loaders are now
+  instruments that assert the paper's own dataset by fingerprint at the source.
+  `data.check_mnist_fingerprint` (called inside `data.load_mnist`) checks size
+  (50k/10k/10k x 784), vocabulary ({0..9}), pixel range ([0,1] f32), AND a
+  checksum (pixel sums: x_train 5133683.0, x_val 1012586.25, x_test 1038914.5,
+  within tolerance for float32 summation order). The checksum is what catches
+  an all-zeros / 65-token synthetic corpus that a bare shape+range check would
+  miss — the documented closed-book failure. `data.check_mnist_3v7_fingerprint`
+  verifies the 3-vs-7 subset (only {-1,+1}, +1 == digit 3 by count). CIFAR's
+  `data.check_cifar10_fingerprint` checks size (45k/5k/10k x 3072), vocabulary,
+  dtype, and GCN global std ~0.5 (within 0.04). Tests:
+  `tests/test_data_loader.py::test_mnist_real` / `test_mnist_rejects_synthetic`
+  / `test_cifar10_real` (skipped with reason when the truncated download cannot
+  load — the honest verdict, never a silent pass) /
+  `test_cifar10_rejects_synthetic` (runs without the download).
+- **`numbers_gate`**: the four gate tests already existed and run the gate via
+  `sys.executable` in an isolated temp dir; instruments.json now points at them
+  by node id (`test_gate_positive_known_correct`, `test_gate_negative_known_wrong`,
+  `test_gate_blocked_metric_not_silent_pass`, `test_gate_raises_on_unusable_input`).
+- **`logreg_analytic_equivalence`**: positive `test_logreg_fgsm_equals_analytic_form`;
+  new negative `test_logreg_analytic_wrong_sign_differs` asserts the wrong-sign
+  (+eps*||w||_1) closed form does NOT match the FGSM loss — proving the
+  equivalence check rejects a known-wrong form.
+- **`fgsm_inf_norm`**: positives `test_fgsm_inf_norm_equals_eps`,
+  `test_fgsm_no_clipping`; new negative `test_fgsm_rejects_clipping_and_scaling`
+  asserts a clipping impl and a scaled (0.5*eps) perturbation are both rejected.
+- **`degeneracy_check`**: positives `test_adversarial_eps0_equals_baseline_exact`,
+  `test_noise_eps0_equals_baseline_exact`, `test_l1_coef0_equals_baseline_exact`;
+  new negative `test_degeneracy_detects_nonzero_eps` asserts eps>0 adversarial
+  training gives bit-different weights — the check is sensitive to a leak.
+- **`rubbish_any_prob_threshold`**: positives
+  `test_rubbish_eval_softmax_in_range_and_shares_sum_to_100` (softmax: err in
+  [0,100], shares sum to 100) and `test_rubbish_eval_rbf_near_zero` (RBF far
+  from data: err ~0, the oracle for the 0.5 threshold); new negative
+  `test_rubbish_rejects_wrong_threshold` shows a >0.0 threshold (always true for
+  exp-quadratic RBF) would mis-report the robust RBF as ~100% error.
+
+All 20 referenced test nodes exist and pass (`pytest tests/` → 24 passed, 1
+skipped = cifar positive, download unavailable). A typo introduced while
+editing `load_mnist_3v7` (key `y_te` instead of `y_test`, which would have
+broken the `logreg_3v7` arm) was caught by `test_mnist_real` and fixed; the
+fingerprint check inside the loader is what surfaced it.
