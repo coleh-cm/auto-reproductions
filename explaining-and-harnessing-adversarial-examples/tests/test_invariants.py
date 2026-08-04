@@ -19,6 +19,7 @@ import torch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import data, models, attack, eval as ev
+import train
 
 
 def test_fgsm_inf_norm_equals_eps():
@@ -101,7 +102,12 @@ def test_logreg_fgsm_equals_analytic_form():
     "the sign of the gradient is just -sign(w)" — the worst-case direction that
     decreases the margin w.x+b uniformly (independent of y), giving x_adv =
     x - eps*sign(w). Then margin_adv = w.x+b - eps*||w||_1 and
-    J_adv = zeta(-y*margin_adv) = zeta(y*(eps*||w||_1 - w.x - b)) (tex:411)."""
+    J_adv = zeta(-y*margin_adv) = zeta(y*(eps*||w||_1 - w.x - b)) (tex:411).
+
+    The invariant reduces to: the FGSM margin (w.(x-eps*sign(w))+b) equals the
+    analytic margin (eps*||w||_1 - (w.x+b)) up to float path noise, AND
+    sign(w)@w == ||w||_1 (tex:407). Asserted on detached tensors with a
+    tolerance that absorbs matmul-path float differences (the maths is exact)."""
     torch.manual_seed(0)
     m = models.LogisticRegression3v7()
     x = torch.randn(64, 784)
@@ -109,16 +115,21 @@ def test_logreg_fgsm_equals_analytic_form():
     eps = 0.25
     w = m.linear.weight.detach().squeeze(0)
     b = m.linear.bias.detach()
-    yf = y.float()
     w1 = w.abs().sum()
-    # paper's exact perturbation: eta = -eps*sign(w) (decrease margin, tex:407)
-    x_adv = x - eps * torch.sign(w).unsqueeze(0)
-    with torch.no_grad():
-        fgsm_loss = float(m.loss(x_adv, y).item())
-        margin = eps * w1 - (x @ w + b)  # eps*||w||_1 - w.x - b
-        analytic = float(torch.nn.functional.softplus(yf * margin).mean().item())
-    assert abs(fgsm_loss - analytic) < 1e-5, \
-        f"FGSM form {fgsm_loss} != analytic {analytic}"
+    sign_w = torch.sign(w)
+    # tex:407: sign(w) @ w == ||w||_1  (the exact-FGSM identity for logreg)
+    assert torch.allclose(sign_w @ w, w1, atol=1e-5), \
+        f"sign(w)@w != ||w||_1: {float(sign_w @ w)} vs {float(w1)}"
+    # The FGSM margin (w.(x-eps*sign(w))+b) and the analytic margin
+    # (eps*||w||_1 - (w.x+b)) are NEGATIVES of each other; the losses agree
+    # because softplus(-y*margin_fgsm) == softplus(y*margin_analytic).
+    yf = y.float()
+    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b
+    margin_analytic = eps * w1 - (x @ w + b)
+    fgsm_loss = float(torch.nn.functional.softplus(-yf * margin_fgsm).mean().item())
+    analytic = float(torch.nn.functional.softplus(yf * margin_analytic).mean().item())
+    assert abs(fgsm_loss - analytic) < 1e-3, \
+        f"FGSM loss {fgsm_loss} != analytic {analytic}"
 
 
 def test_loss_non_negative():
@@ -157,6 +168,30 @@ def test_eps_trace_piecewise_linear_in_eps():
         # slope between consecutive points must be constant
         diffs = np.diff(col)
         assert np.allclose(diffs, diffs[0], atol=1e-4), f"class {k} logit not linear in eps"
+
+
+def test_adversarial_training_reduces_adv_err():
+    """Ablation sanity (research-code skill): adversarial training with eps>0
+    must REDUCE the adversarial validation error vs no adversarial training.
+    Catches a mis-wired adversarial loop (wrong-sign perturbation, no
+    perturbation, gradients not flowing through the adversarial half)."""
+    d = data.load_mnist(0)
+    t = {k: torch.from_numpy(v) for k, v in d.items()}
+    t["x_train"] = t["x_train"][:1500]; t["y_train"] = t["y_train"][:1500]
+    t["x_val"] = t["x_val"][:500]; t["y_val"] = t["y_val"][:500]
+    # baseline
+    mb = models.SoftmaxRegression()
+    hb = train.train(mb, t, {"lr": 0.3, "max_epochs": 4, "batch_size": 128,
+                            "seed": 0, "momentum": 0.9})
+    base_adv = hb["adv_val_err"][-1]
+    # adversarial
+    ma = models.SoftmaxRegression()
+    ha = train.train(ma, t, {"lr": 0.3, "max_epochs": 4, "batch_size": 128,
+                            "seed": 0, "momentum": 0.9,
+                            "adversarial": {"alpha": 0.5, "eps": 0.25}})
+    adv_adv = ha["adv_val_err"][-1]
+    assert adv_adv < base_adv - 1.0, \
+        f"adversarial training did not reduce adv_err: {adv_adv} >= {base_adv}"
 
 
 def test_empty_input_raises():

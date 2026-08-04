@@ -23,17 +23,34 @@ and checks them against the paper's reported numbers on MNIST and CIFAR-10.
 > the gradient of the cost w.r.t. the *input*; `torch.autograd.grad(loss, x)`
 > provides it. See `SPEC.md` §0 for why no upstream code is reused.
 
-## What's in here
+## What runs
 
-| Path | What |
-|---|---|
-| `paper/paper.md` | PDF-extracted text (prose reliable, maths **not**). |
-| `paper/source/iclr2015.tex` | arXiv LaTeX source — **authoritative** for every equation / number. |
-| `SPEC.md` | Method, symbols/shapes, equations with grep-verified `<file>:<line>` citations, the full arm list, and every gap the paper leaves open. |
-| `claims.json` | 70 claims (19 high-invariance gate claims) with tolerances and verbatim quotes. |
-| `figures/read-figure.jsonl` | Vision-read transcript for Figure 4. |
-| `data.py`, `models.py`, `attack.py`, `train.py`, `eval.py` | The implementation (interfaces fixed in `SPEC.md` §5). |
-| `tests/` | pytest suite. |
+| Arm | Dataset | What it does | Status |
+|---|---|---|---|
+| `softmax_reg` | MNIST | linear softmax, FGSM ε=.25, rubbish | runs (3 seeds) |
+| `logreg_3v7` | MNIST 3v7 | logistic regression, FGSM, analytic-equivalence (c07) | runs (3 seeds) |
+| `maxout_naive` / `maxout_adv` | MNIST | 240-unit maxout MLP, ±FGSM adversarial training | runs (3 seeds) |
+| `maxout_large_naive` / `maxout_large_adv` | MNIST | 1600-unit maxout, ±adv training (5 seeds for adv) | runs (sub-scale: 6 epochs, no 60k retrain) |
+| `maxout_sigmoid` | MNIST | maxout + independent sigmoid top, rubbish | runs (3 seeds) |
+| `noise_rademacher` / `noise_uniform` | MNIST | ±ε / U(−ε,ε) noise controls | runs (3 seeds) |
+| `l1_maxout` | MNIST | L¹ weight-decay control (coef .0025, first layer) | runs (3 seeds) |
+| `rbf_shallow` | MNIST | 10 RBF units, FGSM, rubbish | runs (3 seeds) |
+| `ensemble12` | MNIST | 12-member mean-prob ensemble | runs (3 seeds) |
+| `agreement_mnist` | MNIST | cross-model label agreement on FGSM | runs (3 seeds) |
+| `transfer_mnist` | MNIST | FGSM transfer between large naive ↔ large adv | runs (3 seeds) |
+| `eps_trace` | MNIST | Figure 4 ε-sweep logit curve | runs (3 seeds) |
+| `cifar_conv_maxout` | CIFAR-10 | conv maxout, FGSM ε=.1, rubbish, fooling | **BLOCKED** (CIFAR download stalled) |
+
+Not built (see SPEC §9): MP-DBM, GoogLeNet/ImageNet Fig. 1 demo.
+
+## Numbers gate
+
+`numbers_gate.py` evaluates `claims.json` (70 claims, 19 high-invariance) against
+`measured.json` and writes `claims_result.json` (with a `produced_by` stamp —
+never hand-authored). Result on this run: **18/19 HIGH pass, 0 fail, 1 blocked**
+(the CIFAR arm). The gate is FAIL only because of the CIFAR download blocker;
+the 19 `low`/`medium` value fails are the tight claims (clean 0.94%, 0.782%)
+that need the paper's full GPU budget and are rated low/medium for this reason.
 
 ## Quickstart
 
