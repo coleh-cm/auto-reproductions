@@ -38,15 +38,19 @@ EPS_MNIST = 0.25
 EPS_CIFAR = 0.10
 
 # Capped epoch budgets (CPU sub-scale; recorded in REPRODUCTION.md). Early
-# stopping with patience shortens most runs further.
-EPOCHS_SOFTMAX = 60
-EPOCHS_LOGREG = 60
-EPOCHS_MAXOUT240 = 40
-EPOCHS_MAXOUT1600 = 20
-EPOCHS_RBF = 40
-EPOCHS_CONV = 12
+# stopping with patience shortens most runs further. These caps are chosen so
+# the full 16-arm x 3-5-seed run finishes in ~1 hour on CPU; the high-invariance
+# claims (directions, orderings, the algebraic invariant, curve shapes) survive
+# at this scale, while tight value claims (clean_err 0.94%, 0.782%) are expected
+# to fail and are rated low/medium in claims.json for exactly this reason.
+EPOCHS_SOFTMAX = 30
+EPOCHS_LOGREG = 30
+EPOCHS_MAXOUT240 = 25
+EPOCHS_MAXOUT1600 = 10
+EPOCHS_RBF = 30
+EPOCHS_CONV = 8
 ENSEMBLE_MEMBERS = 12
-ENSEMBLE_EPOCHS = 18  # 12 members x 18 epochs x 3 seeds is heavy; capped
+ENSEMBLE_EPOCHS = 8  # 12 members x 8 epochs x 3 seeds; capped for CPU tractability
 
 
 def _t(d, key, dtype=None):

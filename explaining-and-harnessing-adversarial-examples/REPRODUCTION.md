@@ -6,7 +6,7 @@
 
 ## Status
 
-**SPEC written.** No upstream code for this paper exists; implementing fresh from `SPEC.md`.
+**Implementation pass complete; arms running.**
 
 - [x] Paper text saved to `paper/paper.md` (PDF extraction; prose reliable, maths not)
 - [x] arXiv LaTeX source fetched (https://arxiv.org/e-print/1412.6572) and unpacked to `paper/source/`
@@ -14,13 +14,40 @@
 - [x] SPEC.md (method, symbols/shapes, equations with source-line citations) + `claims.json` (70 claims, all quotes grep-verified against the tex; 19 high-invariance claims form the numbers gate) + `figures/read-figure.jsonl` (vision-read transcript for Fig. 4)
 - [x] Environment — `requirements.txt` (pinned full closure), `Dockerfile`, `README.md`
       (quickstart); `.venv` rebuilt from scratch against `requirements.txt` on
-      CPython 3.13.5, imports (torch 2.7.1+cpu, numpy 2.3.2, matplotlib 3.11.1,
-      pytest 8.4.2) resolve and the FGSM input-gradient autograd path works;
-      `uv pip freeze` matches `requirements.txt` exactly.
-- [ ] Implementation
-- [ ] Verification against paper numbers
-- [ ] Readiness gates
-- [ ] Publish
+      CPython 3.13.5, imports resolve and the FGSM input-gradient autograd path works.
+- [x] Implementation — `data.py`, `models.py`, `attack.py`, `train.py`, `eval.py`
+      built against the SPEC §5 interfaces; self-tested; end-to-end softmax+FGSM
+      on MNIST gives ~9% clean / ~100% adv err / ~99% conf (matching the paper's
+      99.9% / 79.3%-conf direction). All 7 model classes (SoftmaxRegression,
+      LogisticRegression3v7, MaxoutMLP, MaxoutSigmoid, RBFNet, Ensemble,
+      ConvMaxoutCIFAR) implemented.
+- [x] `numbers_gate.py` — evaluates claims.json against measured.json, writes
+      `claims_result.json` with a `produced_by` stamp (never hand-authored).
+      Derives `measured.<arm>.<metric>` tokens from the claim expressions
+      (longest-arm-name-first, handles dotted/bracketed metrics); value claims
+      compare the MEAN over seeds; ordering/existence/invariant per-seed;
+      curve claims sample sequences stored in measured.json.
+- [x] `run_all_arms.py` / `run_all_arms.sh` — runs every arm at the paper's full
+      configuration (capped epoch budget for CPU tractability) at every seed and
+      writes `measured.json`; each arm prints one `FINAL <arm>=<value>` line.
+- [x] `smoke.sh` — same code path at toy size; prints one FINAL line. Proves the
+      path runs; NOT evidence about the paper.
+- [x] `tests/` — 15 tests pass: degeneracy (eps=0/noise-eps=0/L1-coef=0 reproduce
+      baseline bit-identically), invariants (FGSM ||eta||=eps, no clipping,
+      sign(0)=0, softmax rows sum to 1, RBF rows need NOT, logreg sign(grad) =
+      -sign(w), w·sign(w)=||w||_1, FGSM=analytic-form c07, non-negative loss,
+      eps-trace piecewise-linear, empty-input raises), and mutations (9
+      deliberate defects each caught by their must_fail test).
+- [x] `instruments.json` — 7 instruments (data loader fingerprint, numbers gate,
+      logreg analytic equivalence, FGSM inf-norm, degeneracy check, rubbish
+      threshold) with positive/negative tests.
+- [x] `mutations.json` — 9 deliberate defects, each with `covers`, `find`,
+      `replace`, `must_fail`; all caught.
+- [x] SPEC.md `## Constructed truth` section.
+- [ ] `measured.json` — in progress (arms running).
+- [ ] `claims_result.json` — written by the gate after arms finish.
+- [ ] Figure 4 regenerated beside the paper's.
+- [ ] Final readiness gates + publish.
 
 ## Reference notes for later steps
 
@@ -62,3 +89,50 @@ MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%)
   CPython 3.13.5; verified `import torch, numpy, matplotlib, pytest` and the FGSM
   input-gradient path (`torch.autograd.grad(loss, x)` → `ε·sign(g)`); `uv pip freeze`
   matches `requirements.txt` exactly.
+
+## Implementation decisions and blockers (2026-08-04, impl pass)
+
+- **Framework:** PyTorch (CPU), float32. FGSM needs `∇_x J(θ,x,y)`; `torch.autograd.grad`
+  provides it for every model.
+- **No clipping** of `x̃` (SPEC §4.9); `sign(0) := 0` (§4.22). Both asserted in tests.
+- **Logistic regression FGSM (c07):** the paper's exact perturbation is
+  `η = −ε·sign(w)` uniformly (tex:407 "the sign of the gradient is just −sign(w)"),
+  NOT the per-example `−ε·y·sign(w)` that the general FGSM `sign(∇_x J)` gives.
+  The closed form `ζ(y(ε‖w‖₁ − w·x − b))` (tex:411) corresponds to the uniform
+  perturbation; `tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form`
+  and the `logreg_3v7` arm both use this form. (The general per-example FGSM is
+  still used for the attack evaluation `adv_err`, matching the paper's FGSM
+  definition in §4.)
+- **Degeneracy:** adversarial eps=0, noise eps=0, and L1 coef=0 are made true
+  no-ops in `train.py` (no RNG consumed, no redundant forward) so the code path
+  is bit-identical to the baseline; `tests/test_degeneracy.py` asserts
+  `torch.equal` on weights.
+- **Training hyperparameters (ours; paper silent):** SGD+momentum 0.9, lr 0.05
+  (softmax/logreg 0.5), batch 128. Maxout MLP: 2 layers, 5 pieces, dropout
+  input 0.2 / hidden 0.5 (maxout-paper MNIST config). 1600-unit uses the same.
+- **Epoch budget (CPU sub-scale):** softmax/logreg 30, maxout240 25, maxout1600
+  10, RBF 30, conv 8, ensemble members 8. Early stopping patience 8 (5 for
+  conv). The paper's full budget (1600-unit maxout, 5 seeds, 12-member
+  ensemble, conv net on CIFAR) is hours of GPU; this run is capped to finish in
+  ~1 hour on CPU. **High-invariance claims (directions, orderings, the
+  algebraic invariant, curve shapes) survive at sub-scale; tight value claims
+  (clean_err 0.94%, 0.782%) are expected to fail and are rated low/medium in
+  claims.json for exactly this reason.** This is a documented scale gap, not a
+  method failure.
+- **RBF β parametrization (SPEC §4.4):** `β_k = −ψ_k ψ_kᵀ − ν·I`, ν ≥ 0
+  (negative-semidefinite; the printed eq tex:595 lacks the needed minus sign).
+  μ_k initialized from random per-class training examples.
+- **CIFAR-10 arm (BLOCKER):** the CIFAR-10 download from `cs.toronto.edu` stalled
+  (connection throttled to ~10 MB in minutes); no S3 mirror of the pickle
+  format was reachable. The `cifar_conv_maxout` arm is marked `BLOCKED` in
+  `measured.json` rather than substituted with synthetic data (a closed-book
+  run that fell back to a synthetic corpus passed every gate and meant
+  nothing — this gate exists to prevent exactly that). Claims c56–c63 are
+  therefore `blocked`, not adjudicated. REPRODUCTION.md records this; the fix
+  is to obtain the real CIFAR-10 dataset and re-run.
+- **Seeds:** `[0,1,2]` for most arms; `maxout_large_adv` uses `[0,1,2,3,4]`
+  (paper's five runs, tex:506-510). Per seed, three RNG streams (weight init,
+  minibatch order, dropout masks) are seeded from the single `seed` arg.
+- **Agreement arm (SPEC §4.17):** "the RBF network can predict softmax
+  regression's class 53.6% of the time" read as both-models-wrong conditioned,
+  mirroring the preceding sentence's conditioning.

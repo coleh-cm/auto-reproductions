@@ -488,6 +488,55 @@ within `tolerance`. `claims.json` at the repo root is byte-identical to this blo
 }
 ```
 
+## 8.5. Constructed truth
+
+Which sources of ground truth this reproduction uses to check itself, and where
+one does not apply, why:
+
+- **Degeneracy (the no-op setting):** FGSM adversarial training at eps=0, the
+  Rademacher/uniform noise controls at eps=0, and L1 weight decay at coef=0 each
+  reduce to plain training. The implementation makes eps=0 / coef=0 a true
+  no-op (no RNG consumed, no redundant forward) so the code path is bit-identical
+  to the baseline; `tests/test_degeneracy.py` asserts `torch.equal` on weights.
+  This is the cheapest real correctness evidence and ships in the repo.
+- **The same quantity derived two ways (c07):** for logistic regression FGSM is
+  exact, so the closed form `E zeta(y(eps*||w||_1 - w.x - b))` (tex:411) equals
+  the actual adversarial loss under the paper's perturbation `eta = -eps*sign(w)`
+  (tex:407). `tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form`
+  asserts `|FGSM-form - analytic-form| < 1e-5` on a fixed batch. The paper hands
+  this to us for free.
+- **Invariants from the maths:** `||eta||_inf == eps` exactly (tex:309);
+  `sign(0) := 0`; no clipping of x_adv (SPEC §4.9); `w^T sign(w) = ||w||_1`
+  (tex:407); softmax prob rows sum to 1 while RBF rows need NOT (SPEC §4.4 —
+  the latter is what makes "confidence on mistakes 1.2%" possible); a
+  non-negative loss never goes negative; with the FGSM direction fixed at eps=0
+  the logits are exactly (piecewise) linear in eps for a linear model
+  (tex:762-770). All asserted in `tests/test_invariants.py`.
+- **Planting a known structure in synthetic input (eps trace, c65-c70):** the
+  Figure 4 curve claim plants a known example (first class-4 test example
+  correctly classified) and requires the pipeline to recover the thin-manifold
+  shape: correct-class logit above the max-wrong logit at eps=0, below at both
+  tails, crossing in between. The direction is fixed at eps=0 so the curve is
+  exactly piecewise linear — a structural assertion the gate checks point by
+  point.
+- **The paper's standard baseline as an oracle:** the FGSM error rates the paper
+  reports (softmax 99.9%, maxout 89.4%) are common knowledge and therefore an
+  oracle we already have; the high-invariance ordering claims (c03/c06/c13/c16/
+  c23/c28/c32/c33/c36/c43/c44/c53) check DIRECTIONS against these, which survive
+  this reproduction's CPU sub-scale where the tight value claims (0.94%, 0.782%)
+  do not.
+- **Brute force at toy scale against a closed form:** not used here — the paper
+  gives no worst-case bound to check against beyond the logistic closed form
+  (c07, above).
+- **Slow exact / convex reference solver:** not used; the paper's L-BFGS
+  adversarial-example finder (Szegedy et al. 2014b) is the slow reference, but
+  FGSM is the fast method this paper introduces and we test it directly.
+- **Naive implementation agreeing with the fast one:** not separately needed —
+  the FGSM implementation IS the naive implementation (a single sign step); the
+  c07 closed-form equivalence plays this role for logistic regression.
+- **Limiting cases:** eps=0 (degeneracy, above) is the limiting case; eps→large
+  moves into the rubbish regime (Fig. 4 right tail), covered by c66/c68.
+
 ## 9. Deliberately not tested (with reasons)
 
 - **MP-DBM generative-model claim** (clean 0.88 %, FGSM 97.5 %; `:794`, `:800`): requires
