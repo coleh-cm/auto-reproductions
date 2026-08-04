@@ -35,7 +35,7 @@
 
 ## Log
 
-- 2026-08-04 — Ingest: cloned repo (shallow `--depth 1 --filter=blob:none`,
+  - 2026-08-04 — Ingest: cloned repo (shallow `--depth 1 --filter=blob:none`,
   over HTTPS using existing credentials; clone completed without the HTTP/2
   stream failures seen in earlier runs), branch
   `repro/confidence-weighted-self-distillation-for-learning-under-label`
@@ -45,3 +45,27 @@
   to this run's objective text); this file started. No arXiv fetch
   (`arxiv_id: unknown`), so no eprint artifacts and nothing to gitignore
   beyond the folder's existing Python ignores.
+- 2026-08-04 — Implementation/verify pass: the prior run left a complete,
+  tested reproduction on the branch (`run_experiment.py`, 47 tests, SPEC,
+  claims, measured). Rather than rebuild a working implementation, this pass
+  re-ran it end to end and adversarially reviewed each independent component
+  against the paper via an orchestration of 5 review subagents (data pipeline,
+  method core Eqs 1-4, training loop, evaluation metric + FINAL contract,
+  baseline arm + degeneracy gate), each prompted to find failures and cite
+  `file:line`. All 5 components were approved with no blocker/major issues.
+  Three nit/minor findings were acted on: (a) SPEC §5 documented `train()`
+  returning a 3-tuple `(accuracy, params, metrics)` while the code returns a
+  4-tuple `(accuracy, params, Xtr, Ytr_onehot)` — SPEC corrected to match the
+  actual signature; (b) `tests/test_data.py` had a misleading comment
+  claiming the rate bound distinguishes uniform-all from uniform-other (it
+  does not reliably; the exclusion test does) — comment corrected; (c) no
+  test ran the full `train()` path and re-checked the test set stays clean
+  (structurally guaranteed since `corrupt_labels` is never passed `yte`, and
+  `test_instruments.py` fingerprints `yte` by SHA-256) — added
+  `test_train_leaves_test_set_clean` closing the gap. Re-verified:
+  `./run_all_arms.sh` reproduces the committed `measured.json` byte-for-byte
+  (baseline 0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 across seeds
+  0/1/2; gate `claims_result.json` 9/9 reproduced); `./smoke.sh` prints one
+  `FINAL smoke=` line in <1s; `python -m pytest -q tests` → 48 passed (was
+  47). No code-behavior change; this pass only corrects docs and adds one
+  regression test, so measured.json is unchanged.

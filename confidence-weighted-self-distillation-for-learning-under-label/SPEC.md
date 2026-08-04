@@ -213,7 +213,10 @@ make_target(z[B,10], Y[B,10], lam, tau, s, T) -> t[B,10]
 loss_and_grads(params, X, Y, lam, tau, s, T) -> (loss scalar, grads shaped like params)
 batches(n, B, rng, mode="epoch-permutation") -> iterator of index arrays (last may be short)
 evaluate(params, Xte, yte) -> float in [0,1]           # full test set, argmax over z
-train(config) -> (accuracy, params, metrics)           # exactly --steps SGD updates
+train(config) -> (accuracy, params, Xtr, Ytr_onehot)    # exactly --steps SGD updates; the
+                                                         # data arrays are returned so main()
+                                                         # can compute structural_metrics on
+                                                         # a fixed batch for measured.json
 ```
 
 RNG discipline: default `init-first` (one `default_rng(seed)`: init params → corrupt labels →
