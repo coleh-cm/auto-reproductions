@@ -168,8 +168,27 @@ paper never pins down.
 9. **Numeric details**: dtype (float32 vs float64), log-softmax vs softmax-then-log
    for Eq. (4), and framework are never stated. Immaterial at this scale but recorded
    for completeness.
-10. **Bias initialisation, hidden bias**: the architecture sentence (paper.md:339–343)
-    does not say whether biases exist at all; assumed present (standard MLP).
+ 10. **Bias initialisation, hidden bias**: the architecture sentence (paper.md:339–343)
+     does not say whether biases exist at all; assumed present (standard MLP).
+ 11. **`stopgrad_grad_err` tolerance**: the stop-gradient invariant (`dL/dz = (p−t)/B`
+     with `t` constant, Eq. 3) is verified by finite differences on `float32` arrays
+     with `eps = 1e-4`. Central-difference round-off on `float32` is ~`9e-4` (the
+     measured `stopgrad_grad_err` is `0.000893`, seed-independent because the check
+     runs on a fixed tiny network at seed 123). The paper states no tolerance. →
+     **Picked `5e-3`** for the claim predicate: safely above the `~9e-4` noise floor
+     and well below the `O(1)` error a wrong `dL/dz` produces. A tighter `1e-4`
+     would falsely fail on the noise floor; a looser `1e-2` would still catch a real
+     bug, but `5e-3` is the honest floor-plus-margin.
+ 12. **Numbers-gate schema**: the gate resolves `measured.<arm>.<metric>` tokens from
+     per-arm `metrics` blocks in `claims.json` and reads `measured[arm][seed][metric]`
+     from `measured.json` (a reserved `_meta` top-level key is ignored). The paper is
+     silent on reproduction infrastructure; this schema is the gate's contract, fixed
+     by mirroring the sibling EAE reproduction that passes it. → Per-arm `metrics`
+     blocks added (without them the canonical token set is empty and every claim
+     blocks); structural invariants emitted as measured metrics so the gate
+     adjudicates them as numbers (not only as pytest `check`s); `_meta` block
+     written by `run_all_arms.sh`. The arm names (`baseline`, `cwsd`) and the
+     headline metric name (`accuracy`) are unchanged from the paper's Table 1.
 
 ## 5. Component interfaces (frozen)
 
@@ -227,16 +246,36 @@ grep `run_experiment.py`), so the configurations differ in exactly one flag.
 
 | Arm | λ | Command | Config |
 |---|---|---|---|
-| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --seed {seed}` | Paper-stated: τ=0.9, T=2, lr 0.1, batch 64, 4000 steps, 20% symmetric noise. τ/s/T are **inert** at λ=0 (w ≡ 0, paper.md:253–280). Defaults per §4: s=0.15 (inert here), init=he, noise-mode=uniform-all, batch-mode=epoch-permutation, rng-layout=init-first. |
-| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --seed {seed}` | Paper-stated: λ=1, τ=0.9, T=2 (paper.md:361–377), same optimiser/steps/noise as baseline. s=0.15 (**unstated**, calibrated per §4 item 1), rest identical to `baseline`. |
+| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: τ=0.9, T=2, lr 0.1, batch 64, 4000 steps, 20% symmetric noise. τ/s/T are **inert** at λ=0 (w ≡ 0, paper.md:253–280). Defaults per §4: s=0.15 (inert here), init=he, noise-mode=uniform-all, batch-mode=epoch-permutation, rng-layout=init-first. |
+| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (paper.md:361–377), same optimiser/steps/noise as baseline. s=0.15 (**unstated**, calibrated per §4 item 1), rest identical to `baseline`. |
 
 Metric for both arms: held-out test accuracy parsed from the single stdout line
-`FINAL accuracy=<float>` (paper.md:466–470).
+`FINAL accuracy=<float>` (paper.md:466–470). In addition each run writes a JSON to
+`--metrics-out` carrying the accuracy **plus the structural-invariant metrics of
+Eqs. 1–4** (`param_count`, `gate_w_min/max`, `target_min`, `target_sum_err`,
+`stopgrad_grad_err` for the CWSD arm; `degeneracy_loss_err`, `degeneracy_grad_err`
+for the baseline arm), which `run_all_arms.sh` collects into `measured.json` so the
+numbers gate can adjudicate the structural claims as *measured* evidence (not only
+as pytest checks). The stdout contract is unchanged (exactly one `FINAL accuracy=`
+line); `tests/test_cli.py` pins that. The structural metrics are cheap (computed on
+one 128-example batch with the trained params; `stopgrad_grad_err` on a fixed tiny
+network, seed 123, so it is identical across seeds) and independent of the 4000-step
+budget.
 
 ## 7. `claims.json`
 
 Written to `claims.json` at the reproduction-folder root (also what the numbers gate
-settles). It carries: the two arms of §6; seeds `[0, 1, 2]` (the paper uses only seed 0
+settles). Schema (mirrors the gate's contract, verified against the sibling
+`explaining-and-harnessing-adversarial-examples` reproduction that passes it): top-level
+`paper_ref`/`project_id`/`title`/`authors`/`year`/`arxiv_id`/`paper_source`, `seeds`,
+an `evaluation` block (resolution / ordering / value / existence_or_invariant /
+compute_invariance), `arms`, `claims`, `not_tested`. **Per-arm `metrics`** blocks list
+every metric that arm emits (the gate builds its canonical `measured.<arm>.<metric>`
+tokens from these — without per-arm metrics the canonical set is empty and every claim
+blocks). `measured.json` carries a reserved `_meta` key (schema, `blocked_sentinel`,
+`seeds`, `headline_metric`) the gate ignores; the arm keys are exactly `claims.json['arms']`.
+
+It carries: the two arms of §6; seeds `[0, 1, 2]` (the paper uses only seed 0
 — paper.md:385 — so seeds 1/2 are our own budget-reduction check); and the claims below.
 Verbatim quotes use whitespace-normalised PDF text; every citation is a `paper/paper.md`
 line range plus a grep anchor. **High compute-invariance claims** (survive a smaller
@@ -244,10 +283,15 @@ budget; the gate settles on these): the ordering `cwsd-improves-over-baseline` (
 paper's central claim, Table 1 caption) and the five structural/existence claims
 (`lambda-zero-is-exact-cross-entropy`, `gate-weight-bounded-by-lambda`,
 `target-is-convex-combination`, `stop-gradient-holds-target-constant`,
-`single-network-no-extra-parameters`) — the last five need no more compute than the test
-suite. **Low**: the three magnitude claims (both Table-1 values and the exact 2.5-point
-gap) — exact magnitudes do not survive seed changes; tolerances were widened to cover
-the measured spread across seeds 0–2 rather than asserted as knife-edge matches.
+`single-network-no-extra-parameters`). The structural five are adjudicated TWO ways:
+(a) as **measured-expression `predicate`s** over the structural metrics in
+`measured.json` (e.g. `measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1`),
+so the gate resolves them from numbers; and (b) as pytest `check`s
+(`tests/test_degeneracy.py`, `tests/test_invariants.py`) a gate that runs `check`
+would invoke. Either path adjudicates them `pass`. **Low**: the three magnitude claims
+(both Table-1 values and the exact 2.5-point gap) — exact magnitudes do not survive seed
+changes; tolerances were widened to cover the measured spread across seeds 0–2 rather
+than asserted as knife-edge matches.
 
 The paper contains **no figures** — only Table 1 — and arxiv_id is unknown so no LaTeX
 source or figure assets exist (`paper/` holds only `paper.md`); there are therefore no
@@ -380,3 +424,31 @@ cases, naive-agrees-with-fast, baseline-as-oracle) and three DO NOT (closed-
 form extremum, planted structure, convex reference) — each "does not apply"
 because the paper makes no claim of that shape. The five that apply are all
 backed by tests a reader can run.
+
+### Structural invariants as *measured* evidence (this pass)
+
+The five structural/existence claims are not just pytest checks; each is ALSO
+emitted as a measured metric by `run_experiment.py --metrics-out` so the numbers
+gate adjudicates it from a number in `measured.json` (and would block, not
+fabricate, if the run failed). The mapping:
+
+| Claim | Measured predicate | Test (`check`) |
+|---|---|---|
+| `lambda-zero-is-exact-cross-entropy` | `measured.baseline.gate_w_max == 0 and measured.baseline.degeneracy_loss_err < 1e-12 and measured.baseline.degeneracy_grad_err < 1e-12` | `tests/test_degeneracy.py` |
+| `gate-weight-bounded-by-lambda` | `measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1` | `tests/test_invariants.py::test_weight_bounded_by_lambda` |
+| `target-is-convex-combination` | `measured.cwsd.target_min >= 0 and measured.cwsd.target_sum_err < 1e-6` | `tests/test_invariants.py::test_target_sums_to_one` |
+| `stop-gradient-holds-target-constant` | `measured.cwsd.stopgrad_grad_err < 5e-3` | `tests/test_invariants.py::test_gradient_matches_finite_differences` |
+| `single-network-no-extra-parameters` | `measured.cwsd.param_count == 4` | `tests/` |
+
+The `degeneracy_*_err` metrics are exactly `0.0` because the independent CE
+routine in `run_experiment.py` is bitwise identical to `loss_and_grads` at
+`λ = 0` (same float operations), so the predicate's `< 1e-12` holds with room
+to spare. The `stopgrad_grad_err` tolerance is `5e-3` (not a tighter `1e-4`):
+central finite differences on `float32` arrays with `eps = 1e-4` carry
+~`9e-4` round-off noise (the value is seed-independent, `0.000893`, because
+the check runs on a fixed tiny network at seed 123), and `5e-3` sits safely
+above that noise floor and below any real gradient bug (a wrong `dL/dz` gives
+`O(1)` error). The gate-bounds (`gate_w_min > 0`, `gate_w_max < 1`) hold with
+margin: `c = max_k p_k ≥ 1/K = 0.1` always, so the smallest possible gate
+weight is `λ·σ((0.1−0.9)/0.15) ≈ 0.0048 > 0`, and the largest is
+`λ·σ((1−0.9)/0.15) ≈ 0.66 < 1`.

@@ -40,6 +40,16 @@
       "replace": "    zc = z / 2.0 - (z / 2.0).max(axis=-1, keepdims=True)  # DEFECT",
       "must_fail": "tests/test_degeneracy.py::test_lambda_zero_loss_and_grads_equal_ce_bitwise",
       "invariant": "at lambda=0, the loss and gradients equal independent cross-entropy (which uses the T=1 softmax)"
+    },
+    {
+      "id": "M5-target-not-in-simplex",
+      "covers": ["core", "simplex"],
+      "description": "Double the p_tilde contribution to the target so t = (1-w)y + 2w p_tilde, which no longer sums to 1 (it sums to 1+w). This breaks the convex-combination invariant of Eq. (3) -- the target leaves the simplex -- and is caught by the simplex invariant test and by the target_sum_err structural metric in measured.json.",
+      "file": "run_experiment.py",
+      "find": "    t = (1.0 - wcol) * Y_onehot + wcol * p_tilde",
+      "replace": "    t = (1.0 - wcol) * Y_onehot + 2.0 * wcol * p_tilde  # DEFECT M5",
+      "must_fail": "tests/test_invariants.py::test_target_sums_to_one",
+      "invariant": "the training target t lies in the probability simplex (sum_k t_ik = 1 for every example i), because t is a convex combination of y and p_tilde (both distributions) with per-example weights"
     }
   ]
 }

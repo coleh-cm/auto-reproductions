@@ -41,6 +41,13 @@
       "positive_test": "tests/test_instruments.py::test_degeneracy_equivalence_positive",
       "negative_test": "tests/test_instruments.py::test_degeneracy_equivalence_negative",
       "requires_tools": []
+    },
+    {
+      "name": "structural-invariant-metrics",
+      "what_it_decides": "The structural-invariant metric values run_experiment.py emits via --metrics-out (gate_w_min/max, target_min, target_sum_err, stopgrad_grad_err, param_count, degeneracy_*_err), which are the measured evidence the numbers gate adjudicates the paper's equation-invariants (Eqs. 1-4) against. These decide whether the method's structural claims hold: 0<w<lambda (Eq. 2), t in the simplex (Eq. 3), dL/dz=(p-t)/B with t constant (Eq. 3 stop-grad), one parameter set (paper §1), and lambda=0 == independent CE (paper §2). Computed on one batch with the trained params; independent of the 4000-step budget.",
+      "positive_test": "tests/test_structural_metrics.py::test_structural_metrics_cwsd_in_bounds",
+      "negative_test": "tests/test_structural_metrics.py::test_structural_metrics_simplex_catches_broken_target",
+      "requires_tools": []
     }
   ]
 }

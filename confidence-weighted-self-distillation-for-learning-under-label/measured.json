@@ -1,24 +1,70 @@
 {
+  "_meta": {
+    "schema": "measured.<arm>.<seed>.<metric>; arm keys are exactly claims.json['arms']; this _meta key is reserved and ignored by the gate.",
+    "blocked_sentinel": "BLOCKED",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "headline_metric": {
+      "baseline": "accuracy",
+      "cwsd": "accuracy"
+    }
+  },
   "baseline": {
     "0": {
-      "accuracy": 0.937
+      "accuracy": 0.937,
+      "param_count": 4,
+      "gate_w_min": 0.0,
+      "gate_w_max": 0.0,
+      "degeneracy_loss_err": 0.0,
+      "degeneracy_grad_err": 0.0
     },
     "1": {
-      "accuracy": 0.9407
+      "accuracy": 0.9407,
+      "param_count": 4,
+      "gate_w_min": 0.0,
+      "gate_w_max": 0.0,
+      "degeneracy_loss_err": 0.0,
+      "degeneracy_grad_err": 0.0
     },
     "2": {
-      "accuracy": 0.9315
+      "accuracy": 0.9315,
+      "param_count": 4,
+      "gate_w_min": 0.0,
+      "gate_w_max": 0.0,
+      "degeneracy_loss_err": 0.0,
+      "degeneracy_grad_err": 0.0
     }
   },
   "cwsd": {
     "0": {
-      "accuracy": 0.9611
+      "accuracy": 0.9611,
+      "param_count": 4,
+      "gate_w_min": 0.012644888833165169,
+      "gate_w_max": 0.5378555655479431,
+      "target_min": 0.0004871104611083865,
+      "target_sum_err": 1.1920928955078125e-07,
+      "stopgrad_grad_err": 0.0008932575583457947
     },
     "1": {
-      "accuracy": 0.9481
+      "accuracy": 0.9481,
+      "param_count": 4,
+      "gate_w_min": 0.016735488548874855,
+      "gate_w_max": 0.5094069838523865,
+      "target_min": 0.0001675701205385849,
+      "target_sum_err": 1.1920928955078125e-07,
+      "stopgrad_grad_err": 0.0008932575583457947
     },
     "2": {
-      "accuracy": 0.9556
+      "accuracy": 0.9556,
+      "param_count": 4,
+      "gate_w_min": 0.020649416372179985,
+      "gate_w_max": 0.46549201011657715,
+      "target_min": 0.00045491091441363096,
+      "target_sum_err": 1.1920928955078125e-07,
+      "stopgrad_grad_err": 0.0008932575583457947
     }
   }
 }

@@ -1,38 +1,62 @@
 {
-  "paper": {
-    "title": "Confidence-Weighted Self-Distillation for Learning under Label Noise",
-    "authors": ["A. Bergstrom", "M. Oyelaran", "K. Vasquez"],
-    "year": "unknown",
-    "reference": "paper/paper.md",
-    "note": "Quotes below are verbatim sentence fragments with intra-sentence whitespace normalised (the on-disk text is PDF-extracted with line breaks inside sentences, e.g. the token stream '2', '.', '5'). Each citation gives a file:line range plus a grep anchor so a reader can check the quote rather than trust it."
-  },
+  "paper_ref": "ce7a63e8-2c90-4516-887d-14515c8f4516",
+  "project_id": "d7735ece-02c4-4228-985c-00834c92b8f3",
+  "title": "Confidence-Weighted Self-Distillation for Learning under Label Noise",
+  "authors": ["A. Bergstrom", "M. Oyelaran", "K. Vasquez"],
+  "year": "unknown",
+  "arxiv_id": "unknown",
+  "paper_source": "paper/paper.md",
   "seeds": [0, 1, 2],
+  "evaluation": {
+    "resolution": "measured.<arm>.<metric> resolves to measured[arm][str(seed)][metric] in measured.json, written by run_all_arms.sh from each run's --metrics-out JSON. The arm keys are exactly claims.json['arms']; a reserved _meta key at the top level of measured.json is ignored by the gate.",
+    "ordering": "the quantity must satisfy `direction` at EVERY seed.",
+    "value": "abs(quantity - claimed) <= tolerance at EVERY seed.",
+    "existence_or_invariant": "the boolean predicate (an expression over measured.<arm>.<metric> tokens, with min(), max(), mean(), abs(), arithmetic, comparisons, and/or) must evaluate true at EVERY seed. Structural invariants are emitted as measured metrics by run_experiment.py --metrics-out (Eqs. 1-4) AND independently checked by pytest (the claim's `check`); the predicate is the measured-expression form, the `check` is the test-suite form. A grader that cannot run raises; a missing/BLOCKED metric blocks the claim rather than fabricating a verdict.",
+    "compute_invariance": {
+      "policy": "high = the assertion is structural (independent of the 4000-step training budget: gate bounds, simplex membership, stop-grad, single-network, degeneracy) or a sign-only ordering that survives seed changes; low = an exact magnitude that the paper reports for a single seed-0 run and that the split/noise/init seed-dependence perturbs. The numbers gate checks the HIGH claims.",
+      "counts": {"high": 6, "low": 3}
+    }
+  },
   "arms": {
     "baseline": {
       "name": "Cross-entropy (baseline)",
-      "command": "python run_experiment.py --lambda 0.0 --seed {seed}",
+      "command": "python run_experiment.py --lambda 0.0 --seed {seed} --metrics-out <tmp>",
       "config": {
         "lambda": 0.0, "tau": 0.9, "s": 0.15, "temperature": 2.0,
         "steps": 4000, "lr": 0.1, "batch_size": 64, "noise_rate": 0.2,
         "noise_mode": "uniform-all", "batch_mode": "epoch-permutation",
         "init": "he", "rng_layout": "init-first"
       },
-      "notes": "Paper Table 1 first row (paper/paper.md:400-406). Same program as CWSD with --lambda 0.0; tau, s and temperature are inert at lambda=0 because w is identically 0 (paper/paper.md:253-280)."
+      "metrics": {
+        "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line (paper/paper.md:466-470). Headline metric.",
+        "param_count": "Number of parameter tensors {W1,b1,W2,b2}; ==4 (single network, no extra params; paper/paper.md:21-23).",
+        "gate_w_min": "Min over a batch of w=lam*sigmoid((c-tau)/s) (Eq. 2); ==0 at lambda=0 (degeneracy anchor).",
+        "gate_w_max": "Max over a batch of w; ==0 at lambda=0 (w identically zero, t==y).",
+        "degeneracy_loss_err": "|loss(lambda=0) - independent cross-entropy loss| on a batch; exactly 0.0 (paper/paper.md:253-280, 'recovers the cross-entropy baseline exactly').",
+        "degeneracy_grad_err": "max|grad(lambda=0) - independent CE grad| over all four params; exactly 0.0."
+      },
+      "notes": "Paper Table 1 first row (paper/paper.md:400-406). Same program as CWSD with --lambda 0.0; tau, s and temperature are inert at lambda=0 because w is identically 0 (paper/paper.md:253-280). The degeneracy_*_err metrics ARE the paper's own verification gate (lambda=0 reproduces the baseline exactly), measured as a bitwise comparison to an independently written cross-entropy routine."
     },
     "cwsd": {
       "name": "CWSD (ours)",
-      "command": "python run_experiment.py --lambda 1.0 --seed {seed}",
+      "command": "python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>",
       "config": {
         "lambda": 1.0, "tau": 0.9, "s": 0.15, "temperature": 2.0,
         "steps": 4000, "lr": 0.1, "batch_size": 64, "noise_rate": 0.2,
         "noise_mode": "uniform-all", "batch_mode": "epoch-permutation",
         "init": "he", "rng_layout": "init-first"
       },
-      "notes": "Paper Table 1 second row (paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-377); s=0.15 is calibrated because the paper never states the gate sharpness (SPEC.md section 4 item 1)."
+      "metrics": {
+        "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line. Headline metric.",
+        "param_count": "Number of parameter tensors {W1,b1,W2,b2}; ==4 (single network, no extra params; paper/paper.md:21-23).",
+        "gate_w_min": "Min over a batch of w=lam*sigmoid((c-tau)/s) (Eq. 2); >0 for lambda>0 (sigmoid is strictly positive).",
+        "gate_w_max": "Max over a batch of w; <lambda=1 (sigmoid<1), so w<1 (paper/paper.md:114-125 'maximum influence self-distillation may have').",
+        "target_min": "Min t_ik over a batch (Eq. 3); >=0 (t is a convex combination of two distributions, both >=0).",
+        "target_sum_err": "max|sum_k t_ik - 1| over a batch; ~1e-7 (t is a convex combination of two distributions, both summing to 1; paper/paper.md:172-176).",
+        "stopgrad_grad_err": "max|hand-derived grad - central finite-diff grad| on a tiny network; ~1e-3 (float32 finite-diff noise). Proves dL/dz=(p-t)/B with t constant (Eq. 3 stop-grad; paper/paper.md:213-214)."
+      },
+      "notes": "Paper Table 1 second row (paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-377); s=0.15 is calibrated because the paper never states the gate sharpness (SPEC.md section 4 item 1). The structural metrics (gate_w_*, target_*, stopgrad_grad_err, param_count) are the measured evidence for the paper's equation-invariants."
     }
-  },
-  "metrics": {
-    "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), parsed from the single stdout line 'FINAL accuracy=<float>' (paper/paper.md:466-470, grep 'FINAL accuracy=')."
   },
   "claims": [
     {
@@ -43,7 +67,7 @@
       "citation": "paper/paper.md:420-427 (grep 'improves over the cross-entropy' resolves to line 420)",
       "quantity": "measured.cwsd.accuracy - measured.baseline.accuracy",
       "direction": ">0",
-      "arithmetic": "(measured.cwsd.accuracy - measured.baseline.accuracy) > 0, evaluated at every seed in [0, 1, 2]. This is the paper's central claim and the one the reproduction gates on; it asks for a sign only, so it survives a smaller compute budget. Measured in this reproduction (2026-08-04, seeds 0/1/2): +0.0241, +0.0074, +0.0241."
+      "arithmetic": "(measured.cwsd.accuracy - measured.baseline.accuracy) > 0, evaluated at every seed in [0, 1, 2]. This is the paper's central claim and the one the reproduction gates on; it asks for a sign only, so it survives a smaller compute budget."
     },
     {
       "id": "baseline-accuracy-value",
@@ -54,7 +78,7 @@
       "quantity": "measured.baseline.accuracy",
       "claimed": 0.9370,
       "tolerance": 0.01,
-      "arithmetic": "abs(measured.baseline.accuracy - 0.9370) <= 0.01 at every seed. Exact magnitudes do not survive seed changes (the paper reports a single seed-0 run), hence low compute-invariance; the tolerance covers the paper's number plus five test examples on the 540-example test set. Measured at seeds 0/1/2: 0.9370, 0.9407, 0.9315 (max deviation 0.0055)."
+      "arithmetic": "abs(measured.baseline.accuracy - 0.9370) <= 0.01 at every seed. Exact magnitudes do not survive seed changes (the paper reports a single seed-0 run), hence low compute-invariance; the tolerance covers the paper's number plus five test examples on the 540-example test set."
     },
     {
       "id": "cwsd-accuracy-value",
@@ -65,7 +89,7 @@
       "quantity": "measured.cwsd.accuracy",
       "claimed": 0.9620,
       "tolerance": 0.015,
-      "arithmetic": "abs(measured.cwsd.accuracy - 0.9620) <= 0.015 at every seed. Low compute-invariance for the same reason as baseline-accuracy-value. Measured at seeds 0/1/2: 0.9611, 0.9481, 0.9556 (max deviation 0.0139)."
+      "arithmetic": "abs(measured.cwsd.accuracy - 0.9620) <= 0.015 at every seed. Low compute-invariance for the same reason as baseline-accuracy-value."
     },
     {
       "id": "improvement-magnitude-2p5-points",
@@ -76,7 +100,7 @@
       "quantity": "measured.cwsd.accuracy - measured.baseline.accuracy",
       "claimed": 0.025,
       "tolerance": 0.02,
-      "arithmetic": "abs((measured.cwsd.accuracy - measured.baseline.accuracy) - 0.025) <= 0.02 at every seed. The gap's magnitude is seed-sensitive in this reproduction (measured +0.0241, +0.0074, +0.0241 at seeds 0/1/2); the paper tested only seed 0, so the tolerance spans the observed seed spread. The robust claim is the ordering (cwsd-improves-over-baseline), not the exact 2.5 points."
+      "arithmetic": "abs((measured.cwsd.accuracy - measured.baseline.accuracy) - 0.025) <= 0.02 at every seed. The gap's magnitude is seed-sensitive; the paper tested only seed 0, so the tolerance spans the observed seed spread. The robust claim is the ordering (cwsd-improves-over-baseline), not the exact 2.5 points."
     },
     {
       "id": "lambda-zero-is-exact-cross-entropy",
@@ -84,7 +108,7 @@
       "compute_invariance": "high",
       "quote": "Setting the mixing coefficient to zero recovers the cross-entropy baseline exactly",
       "citation": "paper/paper.md:35-36 (grep 'recovers the cross-entropy baseline exactly' resolves to line 35; see also the method-section restatement at paper/paper.md:253-280, grep 'strict generalisation')",
-      "predicate": "tests/test_degeneracy.py passes: at lambda=0 the mixing weight w is identically 0, the training target equals the one-hot labels, and the loss and all four parameter gradients are bitwise identical to an independently implemented plain cross-entropy training loop, both per-step and after a 300-step SGD run (checked sweep over s in {0.01, 0.15, 1.0, 10.0}, so the gate cannot be fit through the one unstated hyperparameter). Structural: independent of compute budget.",
+      "predicate": "measured.baseline.gate_w_max == 0 and measured.baseline.degeneracy_loss_err < 1e-12 and measured.baseline.degeneracy_grad_err < 1e-12",
       "check": "pytest -q tests/test_degeneracy.py"
     },
     {
@@ -93,8 +117,8 @@
       "compute_invariance": "high",
       "quote": "scaled by a coefficient lambda in [0,1] that sets the maximum influence self-distillation may have",
       "citation": "paper/paper.md:114-125 (grep 'maximum influence' resolves to line 125; Eq. (2) at paper/paper.md:127-158)",
-      "predicate": "0 < w_i < lambda for every example i in every minibatch, since w = lambda*sigmoid((c-tau)/s) and sigmoid maps into the open interval (0,1); asserted by tests/test_invariants.py (gate-bound test). Structural: independent of compute budget.",
-      "check": "pytest -q tests/test_invariants.py"
+      "predicate": "measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1",
+      "check": "pytest -q tests/test_invariants.py::test_weight_bounded_by_lambda"
     },
     {
       "id": "target-is-convex-combination",
@@ -102,8 +126,8 @@
       "compute_invariance": "high",
       "quote": "The training target is the convex combination of the label and the model's own temperature-softened prediction",
       "citation": "paper/paper.md:172-176 (grep 'convex combination' resolves to line 172; Eq. (3) at paper/paper.md:178-212)",
-      "predicate": "For every minibatch the target t lies in the probability simplex (t_ik >= 0 and sum_k t_ik = 1 for every example i), because t = (1-w)y + w*p_tilde with 0<w<1 and both y and p_tilde on the simplex; asserted by tests/test_invariants.py (target-in-simplex test). Structural: independent of compute budget.",
-      "check": "pytest -q tests/test_invariants.py"
+      "predicate": "measured.cwsd.target_min >= 0 and measured.cwsd.target_sum_err < 1e-6",
+      "check": "pytest -q tests/test_invariants.py::test_target_sums_to_one"
     },
     {
       "id": "stop-gradient-holds-target-constant",
@@ -111,8 +135,8 @@
       "compute_invariance": "high",
       "quote": "The stop-gradient is essential: without it the target follows the prediction and the objective admits a trivial solution.",
       "citation": "paper/paper.md:213-214 (grep 'trivial solution' resolves to line 214; 'stopgrad' appears at line 198 in Eq. (3))",
-      "predicate": "No gradient flows through the target: make_target returns a plain numpy array used only as data in the loss, and the hand-derived gradient is exactly dL/dz = (p - t)/B with t constant; asserted by tests/test_invariants.py (stop-grad purity tests, including finite-difference gradient checks against the closed form for all four parameters). Structural: independent of compute budget.",
-      "check": "pytest -q tests/test_invariants.py"
+      "predicate": "measured.cwsd.stopgrad_grad_err < 5e-3",
+      "check": "pytest -q tests/test_invariants.py::test_gradient_matches_finite_differences"
     },
     {
       "id": "single-network-no-extra-parameters",
@@ -120,7 +144,7 @@
       "compute_invariance": "high",
       "quote": "CWSD adds one forward pass of bookkeeping, no second network, and no additional parameters.",
       "citation": "paper/paper.md:21-23 (grep 'no second network' resolves to line 23)",
-      "predicate": "The implementation holds exactly one parameter set {W1, b1, W2, b2}; p_tilde = softmax(z/T) reuses the same forward-pass logits z as p, so no second network and no additional parameters exist; verifiable by inspection of run_experiment.py (functions forward/make_target/loss_and_grads) and pinned by tests. Structural: independent of compute budget.",
+      "predicate": "measured.cwsd.param_count == 4",
       "check": "pytest -q tests/"
     }
   ],

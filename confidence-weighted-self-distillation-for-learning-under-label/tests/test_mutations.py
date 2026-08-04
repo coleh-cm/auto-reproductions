@@ -101,11 +101,21 @@ def _inv_loss_grads_equal_ce(mod):
     return True
 
 
+def _inv_target_in_simplex(mod):
+    """M5: make_target returns t in the probability simplex (sum_k t_ik = 1)."""
+    params, X, Y = _rand_case()
+    h = np.maximum(0.0, X @ params["W1"] + params["b1"])
+    z = h @ params["W2"] + params["b2"]
+    t = mod.make_target(z, Y, 1.0, 0.9, 0.15, 2.0)
+    return np.allclose(t.sum(axis=-1), 1.0)
+
+
 _CHECKERS = {
     "M1-gate-weight-nonzero-at-lambda-zero": _inv_target_equals_onehot,
     "M2-relu-mask-off-by-one": _inv_loss_grads_equal_ce,
     "M3-loss-reduction-mean-over-elements": _inv_loss_grads_equal_ce,
     "M4-temperature-leaks-into-loss-prediction": _inv_loss_grads_equal_ce,
+    "M5-target-not-in-simplex": _inv_target_in_simplex,
 }
 
 

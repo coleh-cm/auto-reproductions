@@ -2,16 +2,29 @@
 # Run every arm at the paper's full configuration at every seed, write
 # measured.json, and print one FINAL line per arm-seed.
 #
-# Arms and seeds are read from claims.json (the source of truth for what the
-# numbers gate evaluates). Each arm prints exactly one line
-#   FINAL <arm name>=<value>      (claims.json's arm names)
-# or   FINAL <arm name>=BLOCKED   (if the run failed or output did not parse)
+# Arms/seeds/metrics come from claims.json (the source of truth the numbers
+# gate evaluates). Each arm prints exactly one line
+#   FINAL <arm name>=<value>      (the arm's headline metric = accuracy)
+# or   FINAL <arm name>=BLOCKED   (run failed / output did not parse)
 # to stdout; that line is what a reader sees in the log. run_experiment.py
-# itself also prints its own 'FINAL accuracy=<float>' line, which is captured
-# and used as the source of the value.
+# itself prints its own 'FINAL accuracy=<float>' line; run_all_arms.sh
+# additionally reads the --metrics-out JSON to collect EVERY metric
+# (accuracy + the structural invariants of Eqs. 1-4) into measured.json, so
+# the gate can adjudicate the structural claims as well as the accuracy ones.
+#
+# measured.json shape (exactly as the numbers gate consumes it):
+#   {
+#     "_meta": { "schema": ..., "blocked_sentinel": "BLOCKED",
+#                "seeds": [...], "headline_metric": {<arm>: <metric>} },
+#     "<arm>": { "<seed>": { "<metric>": <value>, ... }, ... }, ...
+#   }
+# The top level is keyed by arm (the _meta key is reserved and ignored by the
+# gate). Any documentation of the shape belongs in REPRODUCTION.md, not in the
+# JSON. A run that fails, prints no FINAL accuracy= line, or writes no metrics
+# JSON is BLOCKED (every declared metric for that arm-seed set to "BLOCKED");
+# a number is never fabricated.
 #
 # Usage: ./run_all_arms.sh
-# Output: measured.json is (re)written at the repo root; FINAL lines on stdout.
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,65 +50,78 @@ lambda_for_arm() {
   $PY -c "import json,sys;print(json.load(open('claims.json'))['arms'][sys.argv[1]]['config']['lambda'])" "$1"
 }
 
-# Run one arm at one seed. Prints 'FINAL <arm>=<value>' (or =BLOCKED) on its
-# first stdout line and the bare value (or BLOCKED) on the second, so the
-# caller can collect both.
+# Run one arm at one seed. Prints two lines:
+#   line1: "FINAL <arm>=<accuracy>" (or "FINAL <arm>=BLOCKED")
+#   line2: the path to the --metrics-out JSON (or empty if BLOCKED)
 run_one() {
   local arm="$1" seed="$2" lam
   if ! lam="$(lambda_for_arm "$arm")"; then
-    echo "FINAL ${arm}=BLOCKED"; echo "BLOCKED"; return
+    echo "FINAL ${arm}=BLOCKED"; echo ""; return
   fi
-  local out rc val
-  out="$($PY run_experiment.py --lambda "$lam" --seed "$seed" 2>/dev/null)"
+  local tmpf rc headline out
+  tmpf="$(mktemp)"
+  out="$($PY run_experiment.py --lambda "$lam" --seed "$seed" --metrics-out "$tmpf" 2>/dev/null)"
   rc=$?
-  if [ $rc -ne 0 ]; then
-    echo "FINAL ${arm}=BLOCKED"; echo "BLOCKED"; return
+  headline="$(printf '%s\n' "$out" | grep -E '^FINAL accuracy=' | head -1 | sed 's/^FINAL accuracy=//')"
+  if [ $rc -ne 0 ] || [ -z "$headline" ] || [ ! -s "$tmpf" ]; then
+    rm -f "$tmpf"
+    echo "FINAL ${arm}=BLOCKED"; echo ""; return
   fi
-  val="$(printf '%s\n' "$out" | grep -E '^FINAL accuracy=' | head -1 | sed 's/^FINAL accuracy=//')"
-  if [ -z "$val" ]; then
-    echo "FINAL ${arm}=BLOCKED"; echo "BLOCKED"; return
-  fi
-  echo "FINAL ${arm}=${val}"; echo "$val"
+  echo "FINAL ${arm}=${headline}"; echo "$tmpf"
 }
 
-# Collect results, print FINAL lines.
-RESULTS=/tmp/cwsd_results.txt
+# Collect results, print FINAL lines, remember the per-run metrics JSON path.
+RESULTS=/tmp/cwsd_metrics_paths.txt
 : > "$RESULTS"
 for arm in "${ARMS[@]}"; do
   for seed in "${SEEDS[@]}"; do
-    { read -r line; read -r val; } < <(run_one "$arm" "$seed")
+    { read -r line; read -r tmpf; } < <(run_one "$arm" "$seed")
     echo "$line"
-    printf '%s\t%s\t%s\n' "$arm" "$seed" "$val" >> "$RESULTS"
+    printf '%s\t%s\t%s\n' "$arm" "$seed" "$tmpf" >> "$RESULTS"
   done
 done
 
-# Write measured.json from the collected results.
+# Assemble measured.json from the per-run metrics JSON files.
 $PY - "$RESULTS" <<'PY'
-import json, sys
-results = []
+import json, os, sys
+rows = []
 with open(sys.argv[1]) as f:
     for ln in f:
-        arm, seed, val = ln.rstrip("\n").split("\t")
-        results.append((arm, int(seed), val))
+        arm, seed, path = ln.rstrip("\n").split("\t")
+        rows.append((arm, int(seed), path))
 c = json.load(open("claims.json"))
 arms = list(c["arms"].keys())
 seeds = [int(s) for s in c["seeds"]]
-# measured.json shape, exactly as the numbers gate consumes it:
-#   {arm: {seed: {metric: value}}}
-# at the top level -- NO outer "arms" wrapper, NO "_comment" key. The gate
-# iterates the top-level dict treating each key as an arm and each value as
-# {seed: {metric: value}}; a top-level string such as "_comment" makes it raise
-# AttributeError: 'str' object has no attribute 'get'. Any documentation of the
-# shape belongs in REPRODUCTION.md, not in the JSON.
-out = {}
+out = {
+    "_meta": {
+        "schema": "measured.<arm>.<seed>.<metric>; arm keys are exactly "
+                  "claims.json['arms']; this _meta key is reserved and "
+                  "ignored by the gate.",
+        "blocked_sentinel": "BLOCKED",
+        "seeds": seeds,
+        "headline_metric": {
+            a: next(iter(spec.get("metrics", {})))
+            for a, spec in c["arms"].items()
+        },
+    }
+}
 for arm in arms:
     out[arm] = {}
+    declared = list(c["arms"][arm].get("metrics", {}))
     for seed in seeds:
-        v = [val for (a, s, val) in results if a == arm and s == seed][0]
-        if v == "BLOCKED":
-            out[arm][str(seed)] = {"accuracy": "BLOCKED"}
-        else:
-            out[arm][str(seed)] = {"accuracy": float(v)}
+        path = [p for (a, s, p) in rows if a == arm and s == seed]
+        if not path or not path[0] or not os.path.exists(path[0]):
+            # whole run blocked: mark every declared metric BLOCKED, never
+            # fabricate a number (a blocked run is indistinguishable from the
+            # method never having been applied).
+            out[arm][str(seed)] = {m: "BLOCKED" for m in declared}
+            continue
+        with open(path[0]) as f:
+            mj = json.load(f)
+        # only keep the metrics this arm declares; if a declared metric is
+        # missing from the run's JSON, mark it BLOCKED rather than omitting it.
+        out[arm][str(seed)] = {m: mj.get(m, "BLOCKED") for m in declared}
+        os.remove(path[0])
 json.dump(out, open("measured.json", "w"), indent=2)
-print("wrote measured.json", file=__import__("sys").stderr)
+print("wrote measured.json", file=sys.stderr)
 PY
