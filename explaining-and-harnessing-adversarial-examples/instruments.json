@@ -71,21 +71,21 @@
     },
     {
       "name": "numbers_gate_scalar_evaluator",
-      "what_it_decides": "Whether a scalar claim (ordering/value/existence/invariant) holds: resolves measured.<arm>.<metric> tokens from measured.json at every seed and evaluates the claim arithmetic; missing data BLOCKS, never fabricates.",
-      "positive_test": "tests/test_measured_resolver.py::test_single_element_list_pointer_collapses_to_scalar (plus the gate's own clean run over the 34 scalar claims: claims_result.json 31 pass / 3 annotated low fails)",
+      "what_it_decides": "Whether a scalar claim (ordering/value/existence/invariant) holds: resolves measured.<arm>.<metric> tokens from measured.json at every seed and evaluates the claim arithmetic; missing data BLOCKS, never fabricates. A one-element [*] pointer collapses to a scalar; a multi-element [*] is ambiguous and BLOCKS. The gate's own clean run over the 34 scalar claims is an additional positive signal (claims_result.json: 34 pass / 3 annotated low fails, 19/19 high).",
+      "positive_test": "tests/test_measured_resolver.py::test_single_element_list_pointer_collapses_to_scalar",
       "negative_test": "tests/test_measured_resolver.py::test_multi_element_list_pointer_is_blocked"
     },
     {
       "name": "numbers_gate_curve_evaluator",
-      "what_it_decides": "Whether a figure 'curve' claim holds (a curve rises, crosses, stays above/below, matches): resolves quantity/against/x SEQUENCES from the arm's per-seed result files (results/_per_seed/), restricts to the figure-read x_range, evaluates the comparison at every seed, and BLOCKS on missing/non-sequence data. Backs the Figure-4 claims fc1..fc3.",
-      "positive_test": "tests/test_curve_gate.py::{test_crosses_positive,test_crosses_with_against_field,test_below_curve_against_curve,test_below_positive_and_negative,test_increasing_positive_and_negative,test_matches_with_tolerance}",
-      "negative_test": "tests/test_curve_gate.py::{test_crosses_negative_no_crossing,test_below_positive_and_negative,test_increasing_positive_and_negative,test_every_seed_must_pass,test_missing_per_seed_file_blocks}"
+      "what_it_decides": "Whether a figure 'curve' claim holds (a curve rises, crosses, stays above/below, matches): resolves quantity/against/x SEQUENCES from the arm's per-seed result files (results/_per_seed/), restricts to the figure-read x_range, evaluates the comparison at every seed, and BLOCKS on missing/non-sequence data. Backs the Figure-4 claims fc1..fc3. The module tests/test_curve_gate.py exercises crosses/below/increasing/matches and every-seed-must-pass plus missing-file-blocks; the named positive/negative pair below is the canonical known-correct/known-wrong pair for the crosses comparison (fc1).",
+      "positive_test": "tests/test_curve_gate.py::test_crosses_positive",
+      "negative_test": "tests/test_curve_gate.py::test_crosses_negative_no_crossing"
     },
     {
       "name": "claims_quote_verifier",
-      "what_it_decides": "Whether every claim's quote is a VERBATIM substring of paper/source/iclr2015.tex starting at the line its citation names; whether claim kinds carry their required arithmetic fields; whether compute-invariance counts are truthful; whether every arm metric pointer resolves in the shipped results.",
-      "positive_test": "tests/test_claims_integrity.py::test_every_claim_quote_is_verbatim_at_cited_line (and the field/kind/pointer tests in the same module)",
-      "negative_test": "tests/test_claims_integrity.py (a non-verbatim quote, a stale count, a shifted citation line, or an unresolvable pointer each fail loudly)"
+      "what_it_decides": "Whether every claim's quote is a VERBATIM substring of paper/source/iclr2015.tex starting at the line its citation names; whether claim kinds carry their required arithmetic fields; whether compute-invariance counts are truthful; whether every arm metric pointer resolves in the shipped results. A non-verbatim quote, a stale count, a shifted citation line, or an unresolvable pointer each fail loudly (never a silent negative verdict).",
+      "positive_test": "tests/test_claims_integrity.py::test_every_claim_quote_is_verbatim_at_cited_line",
+      "negative_test": "tests/test_claims_integrity.py::test_claims_verifier_rejects_bad_quote_count_line_pointer"
     },
     {
       "name": "mp_dbm_generative_inference",

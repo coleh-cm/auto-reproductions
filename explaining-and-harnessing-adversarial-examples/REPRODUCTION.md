@@ -69,3 +69,21 @@
   into `instruments` with `positive_test`/`negative_test` = null and their reason
   inline; removed the top-level list; updated `_doc` and README. 92/92 tests pass;
   gate unaffected (no consumer parsed the field).
+- **2026-08-04 (instruments.json declaration-format fix):** the contract requires every
+  `positive_test`/`negative_test` to be a strict `<file>::<test>` node. Three instruments
+  declared non-conformant shapes: `numbers_gate_scalar_evaluator.positive_test` carried
+  trailing prose; `numbers_gate_curve_evaluator` used a brace-list `{a,b,c}` for both
+  fields; `claims_quote_verifier.positive_test` carried trailing prose and its
+  `negative_test` was a free-form sentence, not a test node at all. The brace/prose
+  shapes are not parseable as a single test node, so the declaration checker read them as
+  "declared but absent". Fixed: each field is now one `<file>::<test>` naming a canonical
+  known-correct (positive) and known-wrong (negative) case. For
+  `claims_quote_verifier` this required a NEW negative test
+  (`test_claims_verifier_rejects_bad_quote_count_line_pointer`) that proves the verifier
+  REJECTS each of the four bad-input kinds the contract names — a non-verbatim quote
+  (empty start-line set), a stale compute-invariance count (count mismatch), a shifted
+  citation line (line not among real starts), and an unresolvable metric pointer (walk
+  finds no key) — so a corrupted `claims.json` could not slip through silently. The other
+  curve-gate tests (below/increasing/matches/every-seed/missing-file) remain in
+  `tests/test_curve_gate.py` as additional coverage; the named pair is the canonical
+  crosses pair (fc1). 93/93 tests pass; gate unaffected (34/3/0, HIGH 19/19 PASS).

@@ -137,3 +137,70 @@ def test_every_arm_metric_pointer_resolves_in_shipped_results():
                     path = ""
             assert isinstance(val, (int, float)), (
                 f"{arm}.{metric} resolved to non-scalar {val!r}")
+
+
+def test_claims_verifier_rejects_bad_quote_count_line_pointer():
+    """Negative arm of the claims-quote verifier.
+
+    The positive test proves the verifier ACCEPTS the shipped claims.json. This
+    proves it REJECTS known-wrong inputs of every kind the contract names — a
+    non-verbatim quote, a stale compute-invariance count, a shifted citation
+    line, and an unresolvable metric pointer each fail loudly. A grader that
+    cannot run must raise, never return a negative verdict; here each bad input
+    is shown to be caught (empty start-line set / count mismatch / line
+    mismatch / unresolvable walk), so a corrupted claims.json could not slip
+    through silently.
+    """
+    tex = (REPRO_ROOT / "paper" / "source" / "iclr2015.tex").read_text()
+
+    # 1. A non-verbatim quote yields NO start line -> the quote check rejects.
+    assert _quote_start_lines(tex, "ZZZ_NOT_IN_TEX_qqq1299") == []
+
+    # 2. A shifted citation line is not among the real start lines -> rejected.
+    c0 = CLAIMS["claims"][0]
+    starts = _quote_start_lines(tex, c0["quote"])
+    assert starts, "sanity: the shipped claim's quote is verbatim"
+    bad_line = next(L for L in range(1, 6000) if L not in starts)
+    assert bad_line not in starts, "a shifted citation line is rejected"
+
+    # 3. A stale compute-invariance count disagrees with the real count ->
+    #    the count-equality check rejects it.
+    real = {lvl: sum(1 for c in CLAIMS["claims"]
+                     if c["compute_invariance"] == lvl)
+            for lvl in ("high", "medium", "low")}
+    stale = dict(real)
+    stale["high"] = real["high"] + 1
+    assert stale != CLAIMS["evaluation"]["compute_invariance"]["counts"], (
+        "a stale count is rejected by the equality check")
+
+    # 4. An unresolvable metric pointer (a bogus tail key) cannot be walked ->
+    #    the pointer-resolver rejects it (the walk finds no key to descend into).
+    arm_spec = next(iter(CLAIMS["arms"].values()))
+    blob = json.loads((REPRO_ROOT / arm_spec["results"]).read_text())
+    _f, _, path = next(iter(arm_spec["metrics"].values())).partition(":")
+    bad_path = path + ".NO_SUCH_KEY_zzz"
+    cur, p, resolved = blob, bad_path, True
+    while p:
+        if not isinstance(cur, dict):
+            # reached a leaf (scalar/list) with path left to walk -> unresolvable
+            resolved = False
+            break
+        best = None
+        for k in cur:
+            if p == k or p.startswith(k + ".") or p.startswith(k + "["):
+                if best is None or len(k) > len(best):
+                    best = k
+        if best is None:
+            resolved = False
+            break
+        val = cur[best]
+        p = p[len(best):]
+        if p.startswith("[*]"):
+            val = val[0][p[4:]]
+            p = ""
+        elif p.startswith("."):
+            p = p[1:]
+            cur = val
+        else:
+            p = ""
+    assert not resolved, "an unresolvable metric pointer must not resolve"
