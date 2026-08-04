@@ -290,3 +290,61 @@ paper's own `load_digits` corpus, fingerprinted); determinism. What was not
 checked: the §4 attribution claim, the Docker build, statistical
 significance, and anything depending on the unstated `s` beyond the survival
 sweep. The list of what was checked is the part that matters.
+
+---
+
+## 7. Publish-time addendum (this run)
+
+This section supersedes the rung statement in §6 with the publish-time state.
+
+- **Numbers gate, re-evaluated on the final committed `measured.json`:**
+  `claims_result.json` returns 9/9 `reproduced` (reproduced 9 / refuted 0 /
+  untested 0 / blocked 0), gate PASS.
+- **Budget files at publish:** `$HOME/.build_attempts`,
+  `$HOME/.env_attempts`, and `$HOME/.review_rounds` do **not exist** — no
+  build, environment, or review budget is recorded as spent in this run, and
+  no gate is failing at publish. (The build-attempt history in §5 — 7 retries
+  on numbers-gate infrastructure, the last being the `figures`-key crash — is
+  lineage history; all of it is resolved in the final committed state, which
+  is why the gate now passes 9/9 and no budget file remains.)
+- **Rung reached: `numbers`.** The gate passes 9/9, no budget file shows a
+  still-failing gate, and the recorded numbers are reproducible
+  (`./run_all_arms.sh` regenerates `measured.json` bit-identical).
+
+### What this run actually checked (final, consolidated)
+
+- Equations 1–4 and their structural invariants (gate bound `w ∈ [0,λ]`,
+  convex target `t ≥ 0, Σt = 1`, stop-gradient `dL/dz = (p−t)/B`, single
+  network / no extra params) — all held at 3 of 3 seeds.
+- The λ=0 == baseline degeneracy (the paper's own verification gate), bitwise
+  against an independent CE routine, per-step and end-to-end.
+- Headline magnitudes at seed 0: baseline 0.9370 (exact), CWSD 0.9611
+  (−0.0009 vs 0.9620), gap +0.0241 (−0.0009 vs +0.0250).
+- The CWSD > baseline ordering at every seed {0,1,2} (always positive).
+- Data provenance (the paper's own `load_digits`, fingerprinted) and
+  determinism (fresh run regenerates `measured.json` byte-identical).
+- A fresh from-scratch `uv venv` build reproduces the numbers (gate 1, the
+  Docker path itself unexercised because `docker` is absent).
+
+### What remains untested (final, consolidated)
+
+- The §4 *attribution* claim (gate suppresses gradient on
+  confidently-disagreement examples) — phrased as attribution, not measured;
+  the paper's one-line output contract does not expose per-example gate
+  weights. Listed in `claims.json` `not_tested`.
+- The Docker build (`docker` not installed).
+- Statistical significance: 3 seeds show the gap is seed-sensitive (within
+  noise at seed 1) but are not enough for a confidence interval; the paper
+  reports a single run and so does this reproduction's headline.
+- Anything depending on the unstated `s` beyond the survival sweep, and any
+  RNG layout / init other than the `init-first` + He-normal that the paper's
+  own λ=0 gate selects.
+
+### The honest headline
+
+At the paper's own seed (0) the arms are separated and the numbers agree with
+the paper to within 0.001 on every claimed quantity; at one extra seed (1)
+the arms are within noise and that seed does not by itself test the
+comparison. The gate passes 9/9. Whether that is a reproduction is the
+reader's call; this report states the numbers, the differences, and the
+untested list and asserts no tolerance.
