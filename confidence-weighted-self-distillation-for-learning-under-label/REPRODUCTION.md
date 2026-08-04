@@ -262,3 +262,30 @@ exercised here; the from-scratch environment was instead verified via a fresh
   reference — its maths must be treated as potentially lossy. Header (title,
   date, Status section) confirmed; this entry is this pass's setup record.
 
+- 2026-08-04: Setup step executed for a new reproduction pass (same paper_ref
+  `ce7a63e8-2c90-4516-887d-14515c8f4516`, same project_id
+  `d7735ece-02c4-4228-985c-00834c92b8f3`). Cloned the reproductions repository
+  into `$HOME` over HTTPS (token-credentialed): shallow + blobless
+  (`--depth 1 --filter=blob:none`) succeeded directly — the tarball fallback
+  was not needed this time. Found the slug folder already present from the
+  prior passes (kept, per the running-log convention). Created the required
+  branch `repro/confidence-weighted-self-distillation-for-learning-under-label`
+  from the `origin/main` tip (`4f8171c`); the push was rejected because the
+  same branch already existed upstream with one prior setup-pass commit
+  (`0d5ee78`, 2026-07-31) whose parent is exactly `4f8171c` — integrated by
+  fast-forwarding the local branch to `0d5ee78` (no re-creation, no force
+  push), so the prior pass's setup record is kept. Re-asserted
+  `/root/.repro_dir` (87 bytes, no trailing newline; verified `wc -c` + `od
+  -c`) and `/root/.repro_branch` (68 bytes, no trailing newline). Verified
+  `paper/paper.md` against this pass's provided paper text via an independent
+  fresh transcription: the whitespace-stripped content streams are
+  byte-identical (4020/4020 non-whitespace chars, `cmp` clean); only
+  whitespace/filler-line placement differs, the class adjudicated in prior
+  passes. The file was kept as previously adjudicated so the SPEC.md line
+  citations (Eq. (1) 96–108 … output contract 466–470) continue to resolve.
+  `arxiv_id` is `unknown` in this pass's objective, so the arXiv LaTeX source
+  (https://arxiv.org/e-print/<id>) cannot be fetched; per protocol this is
+  recorded here and the PDF-extracted text in `paper/paper.md` remains the
+  reference — its maths must be treated as potentially lossy. Header (title,
+  date, Status section) confirmed; this entry is this pass's setup record.
+
