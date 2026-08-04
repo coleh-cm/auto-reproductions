@@ -19,7 +19,7 @@ see SPEC §0). The self-check grader adjudicates all 70 claims.
 - [x] Core modules: `data.py`, `models.py`, `attack.py`, `train.py`, `eval.py`
 - [x] `run_all_arms.py` / `run_all_arms.sh` run every arm at every seed → `measured.json`
 - [x] `smoke.sh` runs the softmax path end-to-end (one FINAL line; not evidence)
-- [x] `tests/` — degeneracy, invariants, mutations, data-loader fingerprint, self-check grader (29 pass)
+- [x] `tests/` — degeneracy, invariants, mutations, data-loader fingerprint, self-check grader (32 pass)
 - [x] `instruments.json`, `mutations.json`, `## Constructed truth` in SPEC
 - [x] Self-check grader (`selfcheck_claims.py` → `selfcheck.json`): **HIGH 18 pass / 0 fail / 1 blocked**
 - [ ] CIFAR-10 arm — BLOCKED (download throttled in this env; see Blockers)
@@ -206,6 +206,23 @@ refuted; 2 surviving correctness findings fixed + guarded with tests:
   CIFAR is blocked here) and extended the negative test to reject a
   std-matched synthetic corpus. Also extended the std check to val/test.
 
+- **`run_all_arms.py` eps_trace FINAL line was unparseable** (gate feedback):
+  the curve arm printed `FINAL eps_trace=<mean> (seq mean)`, and the trailing
+  ` (seq mean)` annotation broke the gate's strict `FINAL <arm>=<value>` parser,
+  so `eps_trace` read as "printed no FINAL line". **Fixed:** the sequence-valued
+  primary metric now prints the mean with no suffix (`FINAL eps_trace=<mean>`);
+  the full per-ε sequence the curve claims (c65–c70) actually evaluate lives in
+  `measured.json` under the arm. All six eps_trace curve claims pass.
+
+- **Mutation-target files must be committed before `pytest`.** `tests/test_mutations.py`
+  `git checkout HEAD --`s each mutation target (`models.py`, `train.py`,
+  `tests/test_invariants.py`, `attack.py`) after probing it, so any *uncommitted*
+  edit on those files is silently reverted by a test run. The `float(nu)` and
+  retrain fixes above were caught by this once (documented as Fixed here while
+  the code sat uncommitted and got reverted); they are now committed and survive
+  a `pytest` run. `train.py`'s from-scratch retrain was already committed; its
+  guard test lives in `tests/test_degeneracy.py` (a non-target).
+
 Low/defensible items left as-is (documented): `Ensemble.loss` uses
 `cross_entropy(mean logits)` — a defensible perturb-the-whole-ensemble
 objective (the paper is silent, `tex:819-821`); both flows send gradients to
@@ -214,7 +231,7 @@ all members; low impact on the FGSM direction / c34-c35 (tolerances 8.0).
 ## How to run
 
 ```bash
-.venv/bin/pytest -q                       # tests (30 pass, 1 skip; cifar positive skips)
+.venv/bin/pytest -q                       # tests (32 pass, 1 skip; cifar positive skips)
 .venv/bin/python smoke.sh                 # smoke (one FINAL line; not evidence)
 .venv/bin/python -m run_all_arms          # every arm x seed -> measured.json
 .venv/bin/python selfcheck_claims.py      # claims.json vs measured.json -> selfcheck.json
