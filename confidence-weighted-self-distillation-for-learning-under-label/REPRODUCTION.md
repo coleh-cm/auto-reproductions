@@ -366,3 +366,16 @@ exercised here; the from-scratch environment was instead verified via a fresh
   `mutations` key). The four defects (M1–M4), their `must_fail` invariants,
   and the test that breaks the suite on purpose are unchanged; `pytest -q`
   still 41 passed.
+
+- 2026-08-04: Fixed `measured.json` shape. The numbers gate consumes
+  `measured.json` as a top-level `{arm: {seed: {metric: value}}}` dict: it
+  iterates the top-level keys treating each as an arm and calls `.get` on each
+  arm's per-seed value. The previous `run_all_arms.sh` wrapped the results under
+  an `"arms"` key and added a `"_comment"` string at the top level, so the gate
+  hit `"_comment"` first and raised `AttributeError: 'str' object has no
+  attribute 'get'`, marking all 9 claims `unevaluable`. The numbers themselves
+  were correct (baseline 0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556); only
+  the JSON container was wrong. Removed the `"arms"` wrapper and the
+  `"_comment"` key so the file is now exactly `{arm: {seed: {metric: value}}}`
+  (any shape documentation belongs here, not in the JSON). Re-ran
+  `run_all_arms.sh`: identical numbers, correct shape. `pytest -q` → 41 passed.
