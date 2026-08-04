@@ -32,17 +32,50 @@
       writes `measured.json`; each arm prints one `FINAL <arm>=<value>` line.
 - [x] `smoke.sh` — same code path at toy size; prints one FINAL line. Proves the
       path runs; NOT evidence about the paper.
-- [x] `tests/` — 15 tests pass: degeneracy (eps=0/noise-eps=0/L1-coef=0 reproduce
+- [x] `tests/` — 16 tests pass: degeneracy (eps=0/noise-eps=0/L1-coef=0 reproduce
       baseline bit-identically), invariants (FGSM ||eta||=eps, no clipping,
       sign(0)=0, softmax rows sum to 1, RBF rows need NOT, logreg sign(grad) =
       -sign(w), w·sign(w)=||w||_1, FGSM=analytic-form c07, non-negative loss,
-      eps-trace piecewise-linear, empty-input raises), and mutations (9
-      deliberate defects each caught by their must_fail test).
+      eps-trace piecewise-linear, empty-input raises, adversarial-training
+      reduces adv_err), and mutations (9 deliberate defects each caught by their
+      must_fail test).
 - [x] `instruments.json` — 7 instruments (data loader fingerprint, numbers gate,
       logreg analytic equivalence, FGSM inf-norm, degeneracy check, rubbish
       threshold) with positive/negative tests.
 - [x] `mutations.json` — 9 deliberate defects, each with `covers`, `find`,
       `replace`, `must_fail`; all caught.
+
+### Mutation-suite robustness (test_infra fix)
+
+The mutation test mutates real source files (`train.py`, `attack.py`, `models.py`,
+`tests/test_invariants.py`) and reverts them. Two failure modes bit us and are
+now closed:
+
+1. **Interrupted run ships the defect.** If the process is killed between
+   applying a mutation and its `finally` revert, the planted defect stays in the
+   working tree permanently. This actually happened: `train.py` was committed-run
+   with `eta = -eps*sign(g)` (the `mut_adv_leak_grad` defect, wrong-sign
+   perturbation that *helps* the model), so adversarial training never reduced
+   the adversarial error (`adv_val_err` stuck at 100% for both baseline and
+   adversarial arms). `tests/conftest.py` now restores every mutation-target
+   file from git at **conftest import time** — before pytest collects/imports
+   `train`/`models` — so an interrupted prior run can never reach the suite.
+   (Skipped under `EAE_SKIP_RESTORE=1`, which the mutation subprocess sets so the
+   deliberately-planted defect survives to be caught.)
+2. **Stale `.pyc` after a same-second revert.** The mutation subprocess compiled
+   a `.pyc` from the mutated source; the revert landed in the same wall-clock
+   second, and on this (second-granularity) filesystem Python's mtime-based
+   `.pyc` check treated the stale mutated bytecode as valid against the reverted
+   *clean* source. Symptom: `test_logreg_fgsm_equals_analytic_form` failed with
+   the `+eps*sign(w)` mutation's numbers (`fgsm=1.00688` vs `analytic=0.97394`)
+   while the traceback showed the clean `-eps*sign(w)` source text — clean text,
+   mutated bytecode. `tests/test_mutations.py` now runs the subprocess with
+   `python -B` / `PYTHONDONTWRITEBYTECODE=1` (no `.pyc` written) and purges the
+   mutated module's `.pyc` both before the subprocess and after the git revert.
+
+Net: the suite is now deterministic across consecutive runs without cache clearing
+(verified 10× consecutive `pytest tests/` → 16/16), and recovers automatically
+from a poisoned tree.
 - [x] SPEC.md `## Constructed truth` section.
 - [ ] `measured.json` — in progress (arms running).
 - [ ] `claims_result.json` — written by the gate after arms finish.
