@@ -308,3 +308,51 @@ exercised here; the from-scratch environment was instead verified via a fresh
   and Table-1 magnitudes at seeds ≠ 0). Measured this pass at seeds 0/1/2:
   baseline 0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — ordering holds
   at all three seeds; `pytest -q` → 24 passed.
+
+- 2026-08-04: Implementation/review/numbers pass. Ran the mandated adversarial
+  component review via orchestration (run `5bd3523c…`, 5 reviewers + 1
+  independent verify agent). Each of data-pipeline, method-core, training-loop,
+  evaluation-metric, baseline-arm was reviewed against `paper/paper.md` with
+  file:line evidence; all 5 approved, 0 issues. The verify agent ran the
+  actual program: `pytest -q` → 24 passed; `--lambda 0.0` → `FINAL
+  accuracy=0.9370` (exact); `--lambda 1.0` → `FINAL accuracy=0.9611` (within
+  ±0.004 of 0.9620); seed sensitivity confirmed (seed 1 CWSD 0.9481, seed 2
+  baseline 0.9315). No blocker/major. Built the remaining deliverables:
+  `measured.json` ({arm:{seed:{metric:value}}}, all arms × seeds [0,1,2], no
+  BLOCKED); `run_all_arms.sh` (reads arms/seeds from claims.json, runs every
+  arm at the paper's full config at every seed, writes measured.json, prints
+  one `FINAL <arm>=<value>` line per arm-seed); `smoke.sh` (same code path at
+  50 steps, one `FINAL smoke=` line, finishes <1s — not evidence about the
+  paper); `tests/test_instruments.py` + `instruments.json` (4 instruments:
+  data-loader fingerprinted by size/vocab/SHA-256, accuracy-scorer,
+  final-line-parser via `sys.executable`, degeneracy-equivalence — each with a
+  positive and negative test; the empty-evaluation case asserts the scorer
+  does not silently report 0.0); `tests/test_mutations.py` + `mutations.json`
+  (4 deliberate defects in the core, each caught by the degeneracy gate — M1
+  gate-weight non-zero at λ=0, M2 ReLU mask h>=0, M3 loss reduction /B·K, M4
+  temperature leaking into the loss prediction — each defect's find anchor is
+  verified unique and its must_fail invariant is verified to be violated by
+  the mutation while the original holds). Added §10 Constructed truth to
+  SPEC.md (5 of 8 strategies apply, each backed by a runnable test; 3 do not
+  apply because the paper makes no claim of that shape). `pytest -q` → 41
+  passed (24 prior + 9 instrument + 8 mutation). Both arms still reproduce:
+  baseline 0.9370 exact, CWSD 0.9611.
+
+- 2026-08-04: Sensitivity sweep over the one unstated hyperparameter `s`
+  (SPEC §4 item 1), recorded because the CWSD arm's verdict depends on a
+  value the paper never states. At seed 0, baseline 0.9370 (s-independent):
+  s=0.05→0.9519, 0.10→0.9574, 0.12→0.9593, 0.14→0.9593, 0.15→0.9611,
+  0.16→0.9611, 0.18→0.9648, 0.20→0.9630, 0.30→0.9630, 0.50→0.9648,
+  1.0→0.9667. Verdict survival across the sweep:
+  - `cwsd-improves-over-baseline` (ordering, the central claim): SURVIVES at
+    every s — CWSD > 0.9370 for all s tested (smallest gap +0.0149 at s=0.05).
+    Also survives at seeds 1 and 2 across s∈{0.05,0.15,1.0} (seed 1: 0.9481 >
+    0.9407; seed 2: 0.9444/0.9556/0.9630 > 0.9315).
+  - `cwsd-accuracy-value` (|measured − 0.9620| ≤ 0.015): SURVIVES at every s
+    (max deviation 0.0101 at s=0.05; all others ≤ 0.0047).
+  - `improvement-magnitude-2p5-points` (|gap − 0.025| ≤ 0.02): SURVIVES at
+    every s (gap ranges 0.0149–0.0297, |gap−0.025| ≤ 0.0101).
+  The reproduction is therefore not a knife-edge of `s`: the ordering
+  survives across two orders of magnitude of the unstated hyperparameter, and
+  the magnitude claims survive within their (seed-widened) tolerances. The
+  default `s=0.15` is retained as the calibrated, central value.

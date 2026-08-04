@@ -1,0 +1,46 @@
+{
+  "_comment": "Every thing that decides whether an output is correct, with a positive_test proving it accepts a known-correct input and a negative_test proving it rejects a known-wrong one. Run by `pytest -q tests/test_instruments.py`. Subprocess invocations inside the tests use sys.executable (not bare python) so they run on hosts with only python3. A grader that cannot run must raise, never return a negative verdict (see test_accuracy_scorer_must_raise_on_empty).",
+  "instruments": [
+    {
+      "name": "data-loader",
+      "what_it_decides": "Whether the training/evaluation data is the paper's own sklearn load_digits corpus (1797 8x8 digits, K=10 classes, pixels scaled to [0,1], class-stratified 70/30 split = 1257 train / 540 test at seed 0) rather than a synthetic or substitute corpus. A closed-book run that silently fell back to a synthetic corpus passed every gate and meant nothing; this instrument catches that by fingerprint (size, vocabulary, value range, dtype, and SHA-256 of the split arrays).",
+      "positive_test": "tests/test_instruments.py::test_data_loader_positive",
+      "negative_test": "tests/test_instruments.py::test_data_loader_negative",
+      "requires_tools": ["scikit-learn (load_digits, train_test_split)"],
+      "fingerprints": {
+        "n_total": 1797,
+        "n_features": 64,
+        "K": 10,
+        "Xtr_shape": [1257, 64],
+        "Xte_shape": [540, 64],
+        "ytr_shape": [1257],
+        "yte_shape": [540],
+        "Xtr_sha256": "4b186f7c4d31f28fdb60b595be73aa14fdc8e940987f3c6f8ba540bdf50b2cdb",
+        "Xte_sha256": "8a53b25f6dc18f3306918f5b81d1e4c24fa094c4a30baea173347fe0782eb070",
+        "yte_sha256": "12f9e0d92f950d5f4d65712f513ff9419f212566a442b8893c98af854b0d1e01"
+      }
+    },
+    {
+      "name": "accuracy-scorer",
+      "what_it_decides": "The test-set accuracy metric value (fraction of argmax(forward(Xte)) predictions matching the clean test labels), reported by run_experiment.evaluate and parsed from the 'FINAL accuracy=<float>' line into measured.json. This is the single number the claims' magnitudes are evaluated against.",
+      "positive_test": "tests/test_instruments.py::test_accuracy_scorer_positive",
+      "negative_test": "tests/test_instruments.py::test_accuracy_scorer_negative",
+      "requires_tools": []
+    },
+    {
+      "name": "final-line-parser",
+      "what_it_decides": "Whether a run produced exactly one parseable 'FINAL accuracy=<float>' stdout line (the value run_all_arms.sh extracts into measured.json). A run with no such line, multiple such lines, or a malformed value is rejected as BLOCKED rather than fabricated into a number.",
+      "positive_test": "tests/test_instruments.py::test_final_line_parser_positive",
+      "negative_test": "tests/test_instruments.py::test_final_line_parser_negative",
+      "requires_tools": [],
+      "invokes": "sys.executable (never bare python) to run run_experiment.py as a subprocess"
+    },
+    {
+      "name": "degeneracy-equivalence",
+      "what_it_decides": "Whether the lambda=0 path is bitwise identical (loss + all four parameter gradients) to an INDEPENDENTLY implemented plain cross-entropy routine, so the method at its no-op setting reproduces the baseline exactly (the paper's own verification gate). The check must REJECT a non-degenerate input (lambda=1, gate active), proving it is not a vacuous always-equal comparison.",
+      "positive_test": "tests/test_instruments.py::test_degeneracy_equivalence_positive",
+      "negative_test": "tests/test_instruments.py::test_degeneracy_equivalence_negative",
+      "requires_tools": []
+    }
+  ]
+}

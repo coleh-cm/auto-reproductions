@@ -303,3 +303,80 @@ REPRODUCTION.md since the paper cannot adjudicate them.
 |---|---|---|---|---|
 | Cross-entropy baseline | 0 | 0.9370 | 0.9370 | ✅ exact |
 | CWSD | 1 | 0.9620 | 0.9611 | ✅ (gap 0.0009) |
+
+## 10. Constructed truth
+
+Which of the standard constructed-truth strategies apply to this method, and
+where one does not, why. Each applies-or-not is justified; an "applies" line
+names the test that enforces it so a reader can verify without trusting us.
+
+- **Degeneracy (the method at its no-op setting reproduces the baseline
+  exactly).** APPLIES. This is the paper's own verification gate
+  (paper.md:253–280, "Setting the mixing coefficient to zero recovers the
+  cross-entropy baseline exactly"). At `λ = 0`, `w = λ·σ(·) = 0` exactly, so
+  `t = y` and Eq. (4) is plain cross-entropy. Enforced by
+  `tests/test_degeneracy.py` at three levels (structural `t == Y`, per-step
+  loss+grad bitwise equality to an independent CE routine, and an end-to-end
+  300-step SGD loop with bit-identical params + accuracy), swept over
+  `s ∈ {0.01,0.05,0.15,0.5,1.0,10.0}` so the gate cannot be fit through the one
+  unstated hyperparameter. This is the cheapest real correctness evidence
+  there is, and a reader can run it (`pytest -q tests/test_degeneracy.py`).
+
+- **Brute force at toy scale against any closed form claiming a maximum,
+  minimum or worst case.** DOES NOT APPLY. The paper makes no closed-form
+  extremum claim (no bound, no worst-case guarantee); its claim is an empirical
+  accuracy comparison (Table 1). There is nothing to brute-force a closed form
+  against.
+
+- **The same quantity derived two ways (papers often hand you this for free).**
+  APPLIES, threefold. (1) The loss of Eq. (4): `loss_and_grads` (log-softmax
+  path) vs a direct `-mean(sum t·log p)` computation —
+  `tests/test_invariants.py::test_loss_matches_direct_formula`. (2) The
+  gradient `dL/dz = (p−t)/B`: the closed form vs finite differences on ALL four
+  parameters (W1/b1/W2/b2, including the ReLU-backprop path) —
+  `tests/test_invariants.py::test_gradient_matches_finite_differences`. (3)
+  The CWSD loss at the fully-open gate (`t = p̃`) vs a direct `CE(p̃, p)` —
+  `tests/test_invariants.py::test_gate_open_target_equals_ptilde`.
+
+- **Planting a known structure in synthetic input and requiring the pipeline
+  to recover it.** DOES NOT APPLY. The method is a training-objective change,
+  not a structure-recovery algorithm; there is no planted structure to
+  recover. The data is the paper's own real `load_digits` corpus (fingerprinted
+  by `instruments.json`/`tests/test_instruments.py::test_data_loader_*`), and
+  substituting synthetic data is explicitly forbidden (a closed-book run that
+  fell back to a synthetic corpus produced seven chance-level arms and meant
+  nothing).
+
+- **A slow exact or convex reference solver.** DOES NOT APPLY. The model is a
+  non-convex 2-layer MLP trained by SGD; there is no exact/convex reference
+  solver for the trained weights. The reference we DO have is the paper's own
+  baseline (below).
+
+- **The method's limiting cases.** APPLIES. Two limits are tested:
+  (a) `λ → 0` ⇒ `w = 0` ⇒ `t = y` ⇒ standard CE (degeneracy, above);
+  (b) gate fully open (`λ = 1`, `τ = 0`, `s → 0` ⇒ `w → 1` for all `c > 0`)
+  ⇒ `t = p̃` ⇒ Eq. (4) reduces to `CE(p̃, p)` —
+  `tests/test_invariants.py::test_gate_open_target_equals_ptilde`.
+
+- **The naive implementation agreeing with the fast one.** APPLIES. The
+  independent cross-entropy routine in `tests/test_degeneracy.py`
+  (`ce_loss_and_grads`, a separate code path that does NOT call `make_target`
+  or `loss_and_grads`) agrees bitwise with `loss_and_grads` at `λ = 0` (loss +
+  all four grads, per-step and end-to-end). The data loader is likewise
+  cross-checked by fingerprint against a re-derivation
+  (`tests/test_instruments.py::test_data_loader_positive`).
+
+- **The paper's standard baseline, whose value is common knowledge and
+  therefore an oracle you already have.** APPLIES. The cross-entropy baseline
+  (0.9370, Table 1) is the paper's own stated number and is reproduced EXACTLY
+  at `λ = 0` under the `init-first` RNG layout (506/540). This is the oracle:
+  matching it exactly is stronger evidence than any tolerance band. The CWSD
+  arm's one unstated hyperparameter (`s`) is calibrated against this already-
+  matched layout, not against the CWSD number, so the baseline oracle is not
+  fit through the CWSD arm.
+
+Summary: of the eight strategies, five APPLY (degeneracy, two-ways, limiting
+cases, naive-agrees-with-fast, baseline-as-oracle) and three DO NOT (closed-
+form extremum, planted structure, convex reference) — each "does not apply"
+because the paper makes no claim of that shape. The five that apply are all
+backed by tests a reader can run.

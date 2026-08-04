@@ -1,0 +1,45 @@
+{
+  "_comment": "Deliberate defects injected into run_experiment.py, each paired with the test node that MUST fail when the defect is present. A suite nobody has broken on purpose is not evidence; these defects exercise the suite's ability to catch real bugs. Each defect covers `core` (it is in the method core, run_experiment.py) and `degeneracy` (it is caught by the paper's own lambda=0==baseline verification gate). tests/test_mutations.py applies each find->replace to a fresh exec'd copy of run_experiment.py and asserts the must_fail invariant is VIOLATED (the test catches it), while the original holds.",
+  "defects": [
+    {
+      "id": "M1-gate-weight-nonzero-at-lambda-zero",
+      "covers": ["core", "degeneracy", "gate"],
+      "description": "Add a tiny constant to the gate weight so it is no longer exactly zero at lambda=0, breaking the no-op=baseline guarantee (w != 0 => t != y).",
+      "file": "run_experiment.py",
+      "find": "    w = lam / (1.0 + np.exp(-(c - tau) / s))           # [B]",
+      "replace": "    w = lam / (1.0 + np.exp(-(c - tau) / s)) + 1e-6     # [B] DEFECT",
+      "must_fail": "tests/test_degeneracy.py::test_lambda_zero_target_equals_onehot",
+      "invariant": "at lambda=0, make_target returns t bitwise equal to the one-hot label Y"
+    },
+    {
+      "id": "M2-relu-mask-off-by-one",
+      "covers": ["core", "degeneracy", "gradient"],
+      "description": "Use h>=0 instead of h>0 for the ReLU gradient mask, so units with exactly-zero pre-activation propagate gradient (wrong ReLU derivative). At lambda=0 the grads then differ from the independent cross-entropy routine.",
+      "file": "run_experiment.py",
+      "find": "    dh = dh * (h > 0).astype(np.float32)",
+      "replace": "    dh = dh * (h >= 0).astype(np.float32)  # DEFECT",
+      "must_fail": "tests/test_degeneracy.py::test_lambda_zero_loss_and_grads_equal_ce_bitwise",
+      "invariant": "at lambda=0, all four parameter gradients are bitwise identical to an independent cross-entropy routine (which uses h>0)"
+    },
+    {
+      "id": "M3-loss-reduction-mean-over-elements",
+      "covers": ["core", "degeneracy", "loss"],
+      "description": "Divide the loss by B*K instead of B, i.e. mean over elements rather than mean over examples (sum over classes). Eq. (4) is -1/B sum_i sum_k; this defect scales the loss by 1/K.",
+      "file": "run_experiment.py",
+      "find": "    loss = float(-np.sum(t * log_p) / B)",
+      "replace": "    loss = float(-np.sum(t * log_p) / (B * 10))  # DEFECT",
+      "must_fail": "tests/test_degeneracy.py::test_lambda_zero_loss_and_grads_equal_ce_bitwise",
+      "invariant": "at lambda=0, the loss equals the independent cross-entropy loss (-sum(y log p)/B)"
+    },
+    {
+      "id": "M4-temperature-leaks-into-loss-prediction",
+      "covers": ["core", "degeneracy", "temperature"],
+      "description": "Apply temperature T=2 to the logits used for the loss prediction p, so p = softmax(z/2) instead of softmax(z). The paper's Eq. (4) uses the T=1 prediction; T appears only in the target p_tilde. At lambda=0 this makes the loss differ from plain cross-entropy.",
+      "file": "run_experiment.py",
+      "find": "    zc = z - z.max(axis=-1, keepdims=True)",
+      "replace": "    zc = z / 2.0 - (z / 2.0).max(axis=-1, keepdims=True)  # DEFECT",
+      "must_fail": "tests/test_degeneracy.py::test_lambda_zero_loss_and_grads_equal_ce_bitwise",
+      "invariant": "at lambda=0, the loss and gradients equal independent cross-entropy (which uses the T=1 softmax)"
+    }
+  ]
+}
