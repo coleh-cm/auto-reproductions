@@ -6,12 +6,12 @@
 
 ## Status
 
-**Ingest complete.** Workspace set up; no code yet.
+**SPEC written.** No upstream code for this paper exists; implementing fresh from `SPEC.md`.
 
 - [x] Paper text saved to `paper/paper.md` (PDF extraction; prose reliable, maths not)
 - [x] arXiv LaTeX source fetched (https://arxiv.org/e-print/1412.6572) and unpacked to `paper/source/`
 - [x] `paper/source/iclr2015.tex` and `paper/source/iclr2015.bbl` committed (no separate `.bib` in the e-print; the `.bbl` is the compiled bibliography). Figures, `.sty`/`.bst` files and the tarball are gitignored — see `.gitignore`.
-- [ ] SPEC.md (method, symbols/shapes, equations with source-line citations)
+- [x] SPEC.md (method, symbols/shapes, equations with source-line citations) + `claims.json` (70 claims, all quotes grep-verified against the tex; 19 high-invariance claims form the numbers gate) + `figures/read-figure.jsonl` (vision-read transcript for Fig. 4)
 - [ ] Environment
 - [ ] Implementation
 - [ ] Verification against paper numbers
@@ -44,3 +44,8 @@ MNIST rubbish-class: maxout softmax 98.35% (conf 92.8%), sigmoid top 68% (87.9%)
 - 2026-08-04 — Ingest: cloned repo (shallow, blobless), branch created, prior merged run's folder
   reset (its final state remains in history on `main`, merge commit 858edac), paper text + LaTeX
   source committed.
+- 2026-08-04 — SPEC pass: full method read from the LaTeX source; upstream-code check
+  (`goodfeli/adversarial` is the GAN paper's repo, not this one; paper's only code link is
+  pylearn2 CIFAR preprocessing; nothing runnable — implement fresh); SPEC.md + claims.json
+  written; Figure 4 read via `read-figure` (eps_curve.pdf rasterized first); all 70 claim
+  quotes audited as substrings of their cited tex lines (0 mismatches).
