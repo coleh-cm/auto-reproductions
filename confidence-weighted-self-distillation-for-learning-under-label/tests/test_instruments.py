@@ -157,16 +157,14 @@ def test_accuracy_scorer_negative():
 def test_accuracy_scorer_must_raise_on_empty():
     """A grader that cannot run must raise, never return a negative verdict.
     evaluate on an empty test set must not silently report 0.0 (which would
-    read as 'all wrong'); it raises (or returns nan, which is also not a
-    silent negative verdict) — assert it does not return a plain 0.0 on empty.
+    read as 'all wrong'); it raises ValueError (so a blocked evaluation cannot
+    be silently plotted). Assert the raise, not just a non-0.0 return.
     """
     P = _toy_params()
     Xte = np.zeros((0, 4), dtype=np.float32)
     yte = np.array([], dtype=np.int64)
-    with np.errstate(invalid="ignore"):
-        acc = r.evaluate(P, Xte, yte)
-    # empty evaluation must NOT be reportable as a clean 0.0 success
-    assert not (acc == 0.0 and np.isfinite(acc))
+    with pytest.raises(ValueError):
+        r.evaluate(P, Xte, yte)
 
 
 # --------------------------------------------------------------------------- #
@@ -180,7 +178,7 @@ def parse_final_line(stdout: str):
     final_lines = [ln for ln in lines if ln.startswith("FINAL accuracy=")]
     if len(final_lines) != 1:
         return (False, None)
-    m = re.match(r"^FINAL accuracy=(-?\d+\.?\d*)$", final_lines[0])
+    m = re.match(r"^FINAL accuracy=(\d+\.?\d*)$", final_lines[0])
     if not m:
         return (False, None)
     return (True, float(m.group(1)))
@@ -214,6 +212,9 @@ def test_final_line_parser_negative():
     # a malformed line is rejected
     ok3, val3 = parse_final_line("FINAL accuracy=NaN")
     assert ok3 is False and val3 is None
+    # a negative value is out of the [0,1] domain and rejected (not parsed)
+    ok4, val4 = parse_final_line("FINAL accuracy=-0.5")
+    assert ok4 is False and val4 is None
 
 
 # --------------------------------------------------------------------------- #

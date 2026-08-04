@@ -346,7 +346,16 @@ def batches(
 def evaluate(
     params: Dict[str, np.ndarray], Xte: np.ndarray, yte: np.ndarray,
 ) -> float:
-    """Test-set accuracy = fraction of correctly classified examples."""
+    """Test-set accuracy = fraction of correctly classified examples.
+
+    An empty test set cannot be evaluated: a "0.0" would read as "all wrong"
+    and a "nan" cannot be parsed into the FINAL line. The contract (SPEC §5;
+    instruments.json) is that a grader that cannot run must RAISE rather than
+    return a silent negative verdict, so an empty evaluation raises instead of
+    printing a fabricated number.
+    """
+    if Xte.shape[0] == 0:
+        raise ValueError("evaluate called on an empty test set")
     out = forward(params, Xte)
     pred = out["p"].argmax(axis=-1)
     return float(np.mean(pred == yte))
