@@ -681,7 +681,8 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
   `results/_per_seed/<arm>__seed<seed>.json` — `measured.json` stays scalar-only per
   `test_measured_resolver.py`); `x` is the sample grid; `x_range` restricts to the figure's axis
   region; `comparison` is one of `increasing`, `decreasing`, `above`, `below`, `crosses`,
-  `matches` (`above`/`below` against a second sequence in `reference`, or the scalar `claimed`;
+  `matches` (`crosses`, and two-curve `above`/`below`, name the OTHER curve in `against`;
+  scalar `above`/`below` compare against `claimed` instead;
   `crosses` = `(q−r)` changes strict sign between the first and last sampled x; `increasing` =
   ends higher with no drop beyond `tolerance` below the running max; `matches` = elementwise
   within `tolerance` of the `claimed` sequence). Shape comparisons need nothing from the authors
@@ -724,7 +725,7 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
         "low": 12
       }
     },
-    "curve": "a figure claim: `quantity` (and optional `reference`) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
+    "curve": "a figure claim: `quantity` (and `against` (the other curve, required by crosses and by two-curve above/below)) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
   },
   "arms": {
     "m1_softmax_regression": {
@@ -1244,7 +1245,7 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
       "quote": "By tracing out different values of $\\eps$, we can see that adversarial examples occur reliably\nfor almost any sufficiently large value of $\\eps$ provided that we move in\nthe correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
       "citation": "paper/source/iclr2015.tex:762",
       "quantity": "measured.f4_eps_curve.correct_logit",
-      "reference": "measured.f4_eps_curve.max_wrong_logit",
+      "against": "measured.f4_eps_curve.max_wrong_logit",
       "x": "measured.f4_eps_curve.eps_values",
       "x_range": [
         0.0,
@@ -1259,16 +1260,16 @@ at the repo root (byte-identical to the JSON embedded here). Semantics:
       "compute_invariance": "high",
       "quote": "the wrong classifications are stable across a wide region of $\\eps$ values.",
       "citation": "paper/source/iclr2015.tex:769",
-      "quantity": "measured.f4_eps_curve.predicted_is_correct",
+      "quantity": "measured.f4_eps_curve.correct_logit",
+      "against": "measured.f4_eps_curve.max_wrong_logit",
       "x": "measured.f4_eps_curve.eps_values",
       "x_range": [
         4.0,
         15.0
       ],
       "comparison": "below",
-      "claimed": 0.5,
       "tolerance": 0.0,
-      "note": "Every sample of the eps grid in [4,15] (23 points, step 0.5 -- a WIDE region, 11/30 of the figure's positive axis) is classified wrong; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seed 0: frac correct in [4,15] = 0.000. High: a stability/shape assertion that survives sub-scale budgets."
+      "note": "Wrong classification stable over a WIDE region, expressed curve-vs-curve: at every sample of the eps grid in [4,15] (23 points, step 0.5 -- 11/30 of the figure's positive axis) the correct-class logit sits strictly below the top wrong-class logit, i.e. the input is misclassified at all 23 points; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seeds 0-2: min margin correct_logit - max_wrong_logit in [4,15] = -1622.3 / -1094.6 / -954.3 (23/23 below at every seed; equivalently frac correct = 0.000). High: a stability/shape assertion that survives sub-scale budgets."
     },
     {
       "id": "fc3_fig4_predictions_become_extreme",
@@ -1449,11 +1450,13 @@ x-axis ε ∈ [−15, 15] (ticks −15,−10,−5,0,5,10,15); y-axis "argument t
 the correct class (4, thick solid) is on top at ε=0 and is overtaken almost immediately
 (crossing ≈ ε 0.5–1); a wrong class (cyan, ~class 5) tops at ≈ +400 at ε=10 and a wrong class
 tops at ≈ +800 at ε=−10; per-class curves are piecewise linear in ε; the wrong prediction is
-stable across the wide region |ε| ≳ 4. These become the three `curve` claims fc1 (crosses),
-fc2 (below: all-wrong over ε ∈ [4, 15]), fc3 (increasing: top wrong-class logit over
+stable across the wide region |ε| ≳ 4. These become the three `curve` claims fc1 (crosses:
+correct-class logit `against` the top wrong-class logit, ε ∈ [0, 15]), fc2 (below: correct-class
+logit strictly `against` the top wrong-class logit at all 23 grid samples over ε ∈ [4, 15] —
+the all-wrong region), fc3 (increasing: top wrong-class logit over
 ε ∈ [0, 15]) in `claims.json` — all rated high (shape comparisons needing no author numbers),
 all PASS at every seed. Our sub-scale curve reproduces the shape exactly: crossing at ε=0.5,
-0/23 correct samples in [4, 15], top-wrong logit 5.3–6.9 → 468–873 depending on seed, and the
+correct-below-wrong margin ≤ −954 logits at all 23 samples in [4, 15] every seed, top-wrong logit 5.3–6.9 → 468–873 depending on seed, and the
 top class at ε=+15 differs from ε=−15 (paper-consistent: direction matters, not the endpoint).
 
 **Other figures (read, recorded in the transcript; claims already in prose or qualitative):**

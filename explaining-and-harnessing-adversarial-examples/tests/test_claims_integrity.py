@@ -77,7 +77,8 @@ def test_claim_arithmetic_fields_match_kind():
             assert "quantity" in claim and "x" in claim
             assert claim["comparison"] in (
                 "increasing", "decreasing", "above", "below", "crosses", "matches")
-            for tok in (claim["quantity"], claim["x"], claim.get("reference")):
+            for tok in (claim["quantity"], claim["x"],
+                        claim.get("against", claim.get("reference"))):
                 if tok is None:
                     continue
                 m = re.match(r"^measured\.([A-Za-z0-9_]+)\.(.+)$", tok)

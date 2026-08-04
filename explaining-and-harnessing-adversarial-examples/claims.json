@@ -24,7 +24,7 @@
         "low": 12
       }
     },
-    "curve": "a figure claim: `quantity` (and optional `reference`) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
+    "curve": "a figure claim: `quantity` (and `against` (the other curve, required by crosses and by two-curve above/below)) resolve through the arm's `curve_metrics` to SEQUENCES read from the arm's per-seed result file (results/_per_seed/<stem>__seed<seed>.json); measured.json stays scalar-only. `x` is the sample grid; `x_range` [lo,hi] optionally restricts to the figure's axis region. `comparison` is one of: crosses ((q-r) changes strict sign between the first and last sampled x), above/below (every q_i relative to r_i elementwise, or to the scalar `claimed`, with `tolerance` as slack), increasing/decreasing (q_last vs q_first strictly in the named direction AND no sample drops more than `tolerance` beyond the running extremum), matches (every |q_i - claimed_i| <= tolerance). The comparison must hold at EVERY seed. Curve claims carry figure reads: the x_range comes from paper/figure_transcripts.md (read-figure over paper/source figures), not from the paper's text."
   },
   "arms": {
     "m1_softmax_regression": {
@@ -544,7 +544,7 @@
       "quote": "By tracing out different values of $\\eps$, we can see that adversarial examples occur reliably\nfor almost any sufficiently large value of $\\eps$ provided that we move in\nthe correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
       "citation": "paper/source/iclr2015.tex:762",
       "quantity": "measured.f4_eps_curve.correct_logit",
-      "reference": "measured.f4_eps_curve.max_wrong_logit",
+      "against": "measured.f4_eps_curve.max_wrong_logit",
       "x": "measured.f4_eps_curve.eps_values",
       "x_range": [
         0.0,
@@ -559,16 +559,16 @@
       "compute_invariance": "high",
       "quote": "the wrong classifications are stable across a wide region of $\\eps$ values.",
       "citation": "paper/source/iclr2015.tex:769",
-      "quantity": "measured.f4_eps_curve.predicted_is_correct",
+      "quantity": "measured.f4_eps_curve.correct_logit",
+      "against": "measured.f4_eps_curve.max_wrong_logit",
       "x": "measured.f4_eps_curve.eps_values",
       "x_range": [
         4.0,
         15.0
       ],
       "comparison": "below",
-      "claimed": 0.5,
       "tolerance": 0.0,
-      "note": "Every sample of the eps grid in [4,15] (23 points, step 0.5 -- a WIDE region, 11/30 of the figure's positive axis) is classified wrong; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seed 0: frac correct in [4,15] = 0.000. High: a stability/shape assertion that survives sub-scale budgets."
+      "note": "Wrong classification stable over a WIDE region, expressed curve-vs-curve: at every sample of the eps grid in [4,15] (23 points, step 0.5 -- 11/30 of the figure's positive axis) the correct-class logit sits strictly below the top wrong-class logit, i.e. the input is misclassified at all 23 points; the correct class survives only near eps=0 ('a thin manifold'). Sub-scale seeds 0-2: min margin correct_logit - max_wrong_logit in [4,15] = -1622.3 / -1094.6 / -954.3 (23/23 below at every seed; equivalently frac correct = 0.000). High: a stability/shape assertion that survives sub-scale budgets."
     },
     {
       "id": "fc3_fig4_predictions_become_extreme",

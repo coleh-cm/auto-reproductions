@@ -77,8 +77,8 @@
     },
     {
       "name": "numbers_gate_curve_evaluator",
-      "what_it_decides": "Whether a figure 'curve' claim holds (a curve rises, crosses, stays above/below, matches): resolves quantity/reference/x SEQUENCES from the arm's per-seed result files (results/_per_seed/), restricts to the figure-read x_range, evaluates the comparison at every seed, and BLOCKS on missing/non-sequence data. Backs the Figure-4 claims fc1..fc3.",
-      "positive_test": "tests/test_curve_gate.py::{test_crosses_positive,test_below_positive_and_negative,test_increasing_positive_and_negative,test_matches_with_tolerance}",
+      "what_it_decides": "Whether a figure 'curve' claim holds (a curve rises, crosses, stays above/below, matches): resolves quantity/against/x SEQUENCES from the arm's per-seed result files (results/_per_seed/), restricts to the figure-read x_range, evaluates the comparison at every seed, and BLOCKS on missing/non-sequence data. Backs the Figure-4 claims fc1..fc3.",
+      "positive_test": "tests/test_curve_gate.py::{test_crosses_positive,test_crosses_with_against_field,test_below_curve_against_curve,test_below_positive_and_negative,test_increasing_positive_and_negative,test_matches_with_tolerance}",
       "negative_test": "tests/test_curve_gate.py::{test_crosses_negative_no_crossing,test_below_positive_and_negative,test_increasing_positive_and_negative,test_every_seed_must_pass,test_missing_per_seed_file_blocks}"
     },
     {

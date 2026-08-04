@@ -1162,22 +1162,22 @@
             "seed": 0,
             "ok": true,
             "n_samples": 23,
-            "q_first": 0.0,
-            "q_last": 0.0
+            "q_first": -209.98573303222656,
+            "q_last": -749.56005859375
           },
           {
             "seed": 1,
             "ok": true,
             "n_samples": 23,
-            "q_first": 0.0,
-            "q_last": 0.0
+            "q_first": -170.7481231689453,
+            "q_last": -613.7621459960938
           },
           {
             "seed": 2,
             "ok": true,
             "n_samples": 23,
-            "q_first": 0.0,
-            "q_last": 0.0
+            "q_first": -135.1154022216797,
+            "q_last": -486.68316650390625
           }
         ]
       }

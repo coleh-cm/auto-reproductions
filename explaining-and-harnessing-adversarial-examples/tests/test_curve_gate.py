@@ -136,6 +136,36 @@ def test_missing_per_seed_file_blocks(tmp_path, monkeypatch):
     assert res["verdict"] == "blocked"
 
 
+def test_crosses_with_against_field(tmp_path, monkeypatch):
+    # `against` is the schema field naming the OTHER curve in a crosses claim;
+    # it must be honored exactly like the deprecated `reference` alias.
+    q = [10.0 - e for e in EPS]
+    r = [e * 1.0 for e in EPS]
+    cd, canonical = _write_seed_files(tmp_path, monkeypatch,
+                                      {"eps_values": EPS, "q": q, "r": r})
+    claim = _base_claim("crosses", against="measured.f4_eps_curve.r")
+    res = numbers_gate.evaluate_curve_claim(claim, cd, [0, 1, 2], canonical)
+    assert res["verdict"] == "pass" and res["seeds_evaluated"] == [0, 1, 2]
+
+
+def test_below_curve_against_curve(tmp_path, monkeypatch):
+    # below can compare two curves: every q_i < against_i over the x_range
+    # (the fc2 shape: correct-class logit below top wrong-class logit).
+    q = [-e * 1.0 for e in EPS]         # strictly below r everywhere on [4, 15]
+    r = [0.0] * len(EPS)
+    cd, canonical = _write_seed_files(tmp_path, monkeypatch,
+                                      {"eps_values": EPS, "q": q, "r": r})
+    claim = _base_claim("below", against="measured.f4_eps_curve.r",
+                        tolerance=0.0, x_range=[4.0, 15.0])
+    assert numbers_gate.evaluate_curve_claim(claim, cd, [0, 1, 2], canonical)["verdict"] == "pass"
+    # q pokes ABOVE r inside the range -> fail
+    q2 = [-e * 1.0 for e in EPS]
+    q2[8] = 1.0
+    cd, canonical = _write_seed_files(tmp_path, monkeypatch,
+                                      {"eps_values": EPS, "q": q2, "r": r})
+    assert numbers_gate.evaluate_curve_claim(claim, cd, [0, 1, 2], canonical)["verdict"] == "fail"
+
+
 def test_matches_with_tolerance(tmp_path, monkeypatch):
     q = [float(e) + 0.2 for e in EPS]
     cd, canonical = _write_seed_files(tmp_path, monkeypatch,

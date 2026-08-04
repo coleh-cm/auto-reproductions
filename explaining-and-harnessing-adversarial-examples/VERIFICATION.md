@@ -126,8 +126,8 @@ x₀ + ε·sign(∇ₓJ) for the first class-4 test example, ε ∈ [−15, 15] 
 
 | Claim | Comparison | x_range | Result (seeds 0/1/2) |
 |-------|-----------|---------|----------------------|
-| fc1 correct-class logit crossed by a wrong class | `crosses` (correct vs max-wrong logit) | [0, 15] | PASS — correct on top at ε=0 (12.3/13.8/14.6 vs 6.9/5.3/6.2), crossing at ε=0.5, deeply below at ε=15 |
-| fc2 wrong classification stable over a wide ε region | `below` (predicted_is_correct < 0.5 at all 23 samples) | [4, 15] | PASS — 0/23 correct at every seed |
+| fc1 correct-class logit crossed by a wrong class | `crosses` (correct vs max-wrong logit, `against`) | [0, 15] | PASS — correct on top at ε=0 (12.3/13.8/14.6 vs 6.9/5.3/6.2), crossing at ε=0.5, deeply below at ε=15 |
+| fc2 wrong classification stable over a wide ε region | `below` (correct-class logit strictly below max-wrong logit, `against`, at all 23 samples) | [4, 15] | PASS — 23/23 below at every seed; min margin −1622.3/−1094.6/−954.3 logits (equivalently 0/23 correct) |
 | fc3 predictions become very extreme with ε | `increasing` (max-wrong logit, tol 0.5) | [0, 15] | PASS — 6.9→872.7, 5.3→480.9, 6.2→467.6; max dip below running max = 0.0 |
 
 Gate evaluator: `numbers_gate.evaluate_curve_claim`, instrument-tested on

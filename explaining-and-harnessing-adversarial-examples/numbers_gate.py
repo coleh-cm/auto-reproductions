@@ -18,7 +18,9 @@ Semantics (mirrors claims.json['evaluation']):
   - ``value``          ``abs(quantity - claimed) <= tolerance`` at every seed.
   - ``existence`` /    the boolean ``predicate`` must hold at every seed.
     ``invariant``
-  - ``curve``          a figure claim. ``quantity`` (and optional ``reference``)
+  - ``curve``          a figure claim. ``quantity`` (and, for ``crosses`` /
+                       curve-vs-curve ``above`` / ``below``, ``against`` -- the
+                       OTHER curve; deprecated alias: ``reference``)
                        resolve through the arm's ``curve_metrics`` to SEQUENCES
                        read from that arm's per-seed result file
                        (``results/_per_seed/<stem>__seed<seed>.json``) --
@@ -213,7 +215,7 @@ def _curve_verdict(comparison: str, q: list, r: list | None,
     n = len(q)
     if comparison == "crosses":
         if r is None:
-            raise ValueError("crosses needs a reference sequence")
+            raise ValueError("crosses needs an `against` curve sequence")
         d0, dn = q[0] - r[0], q[-1] - r[-1]
         return d0 * dn < 0
     if comparison in ("above", "below"):
@@ -248,7 +250,9 @@ def evaluate_curve_claim(claim: dict, claims_doc: dict, top_seeds: list,
     seeds_requested = claim.get("seeds", top_seeds)
     comparison = claim["comparison"]
     q_tok, x_tok = claim["quantity"], claim["x"]
-    r_tok = claim.get("reference")
+    # ``against`` names the OTHER curve for crosses / curve-vs-curve above/below;
+    # ``reference`` is kept as a deprecated alias for older claims documents.
+    r_tok = claim.get("against", claim.get("reference"))
     if q_tok not in canonical or x_tok not in canonical:
         return {"verdict": "blocked", "reason": "quantity/x is not a measured token",
                 "seeds_evaluated": []}
@@ -257,12 +261,12 @@ def evaluate_curve_claim(claim: dict, claims_doc: dict, top_seeds: list,
     r_arm = r_metric = None
     if r_tok is not None:
         if r_tok not in canonical:
-            return {"verdict": "blocked", "reason": "reference is not a measured token",
+            return {"verdict": "blocked", "reason": "against is not a measured token",
                     "seeds_evaluated": []}
         r_arm, r_metric = canonical[r_tok]
     if not (q_arm == x_arm and (r_arm is None or r_arm == q_arm)):
         return {"verdict": "blocked",
-                "reason": "curve claims must draw quantity/x/reference from ONE arm",
+                "reason": "curve claims must draw quantity/x/against from ONE arm",
                 "seeds_evaluated": []}
     arm = q_arm
     if q_metric not in claims_doc["arms"][arm].get("curve_metrics", {}) or \
