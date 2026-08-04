@@ -1,457 +1,307 @@
 # SPEC — Confidence-Weighted Self-Distillation (CWSD)
 
 Paper: "Confidence-Weighted Self-Distillation for Learning under Label Noise",
-A. Bergstrom, M. Oyelaran, K. Vasquez (year unknown).
-Paper text on disk: `paper/paper.md` (verbatim). All line numbers below refer to that file;
-each citation also gives a grep string that resolves there.
+A. Bergstrom, M. Oyelaran, K. Vasquez (year unknown, arxiv_id unknown).
 
-## 1. Method as an algorithm
+**Authoritative source on disk: `paper/paper.md`** (PDF extraction, 471 lines). There is no
+arXiv LaTeX source (arxiv_id unknown), so maths is reconstructed from the PDF token stream and
+sanity-checked against the surrounding prose (Eq. 2 must be a weight in `[0, λ]`; Eq. 3 must be
+a convex combination; Eq. 4 must reduce to plain cross-entropy at `λ = 0` — all three checks the
+paper itself supplies the prose for). Every citation below is `paper/paper.md:LINE` plus a grep
+anchor; all anchors were executed and resolve (2026-08-04).
+
+**History note.** A prior run of this same workflow (same paper_ref/project_id) left a full
+reproduction here (code, tests, SPEC, claims; final commit `3f47d2c`, rung `review`). This SPEC
+was rewritten independently from `paper/paper.md`; every number it asserts was re-measured on
+2026-08-04 with the existing code (`requirements.txt` pins: numpy 2.5.1, scikit-learn 1.9.0,
+Python 3.12): baseline 0.9370 (seed 0), CWSD 0.9611 (seed 0), cross-seed spot-checks
+baseline/seed1 0.9407 and cwsd/seed2 0.9556 — all matching `measured.json` and Table 1 within
+the stated tolerances; the 47-test suite passes (`python -m pytest -q tests` → `47 passed`).
+The frozen interfaces in §5 were diffed against the actual argparse/function signatures of
+`run_experiment.py`.
+
+## 1. The method as an explicit algorithm
 
 **Inputs**
 
-- Dataset: `sklearn.datasets.load_digits()` → `1797` grey-scale `8×8` images, `K = 10` classes,
-  raw pixels in `[0, 16]` (paper.md:288, grep `load_digits`; paper.md:292, grep `1797`).
-- Hyperparameters: `λ ∈ {0, 1}` (`λ = 1` stated at paper.md:361–365),
-  `τ = 0.9`, `T = 2` (paper.md:366–376, grep `confidence threshold` → 366,
-  grep `distillation temperature` → 373),
-  learning rate `0.1`, minibatch size `64`, steps `4000` (paper.md:344–356,
-  grep `learning rate` / `minibatch size` / `4000`), seed `0`
-  (paper.md:385, grep `single runs at seed`).
-- Not given as input but required: gate sharpness `s` — **the paper never states it** (see §4).
+- Dataset `sklearn.datasets.load_digits()`: 1797 grey-scale 8×8 images, `K = 10` classes,
+  raw pixels in `[0, 16]` (`paper/paper.md:288` grep `load_digits`; `:292` grep `1797`).
+- Hyperparameters: `λ ∈ {0.0, 1.0}` (`λ = 1` for CWSD, `paper/paper.md:361-365`),
+  confidence threshold `τ = 0.9` (`:366-372`), temperature `T = 2` (`:373-375`),
+  SGD learning rate `0.1` (`:344-348`), minibatch size `64` (`:350-352`),
+  `4000` steps (`:354-356`), noise rate `0.2` symmetric (`:327-338`), seed `0` (`:385-389`).
+- Gate sharpness `s`: required by Eq. (2) but **never given a value anywhere** — see §4 item 1.
 
-**Setup (once per run)**
+**One-time setup**
 
-1. Load digits; scale pixels `X ← X / 16` so `X ∈ [0,1]` (paper.md:309–318, grep `dividing by`).
-2. Stratified split: `train_test_split(test_size=0.3, stratify=y, random_state=0)`
-   (paper.md:319–326, grep `class-stratified split at seed`). Verified empirically with
-   scikit-learn 1.9.0: **1257 train / 540 test**.
-3. Corrupt training labels only (paper.md:327, grep `corrupt the training labels`):
-   each train example independently with probability `0.2` has its label replaced
-   by "a class drawn uniformly at random" (paper.md:328–338, grep `drawn uniformly at random`).
-   Literal reading: uniform over **all** K=10 classes, so ~1/10 of corrupted examples keep
-   their original label (effective flip rate ≈ 0.18). See §4 for the ambiguity.
-4. Initialise θ = {W1, b1, W2, b2}. Scheme **not stated** (§4); implementation default
-   documented in §5.
+1. Scale pixels: `X ← X / 16` so `X ∈ [0, 1]` (`paper/paper.md:309-316`, grep `dividing by`).
+2. Class-stratified split, 30% held out as test, `random_state = seed` (`:319-325`,
+   grep `class-stratified split at seed`). Verified 2026-08-04 with sklearn 1.9.0:
+   **1257 train / 540 test**.
+3. Corrupt **train** labels only (`:327`, grep `corrupt the training labels`): each train
+   example independently, with probability `0.2`, has its label replaced by
+   "a class drawn uniformly at random" (`:338`, grep `drawn uniformly at random`).
+   Literal reading: uniform over all K=10 classes (the paper does not exclude the true class;
+   effective flip rate ≈ 0.18). §4 item 3.
+4. Initialise `θ = {W1, b1, W2, b2}`. Scheme **not stated** (§4 item 2); default He-normal
+   weights, zero biases.
 
-**Model** — single-hidden-layer MLP (paper.md:339–343, grep `hidden units and ReLU`):
+**Model** (`paper/paper.md:339-343`, grep `hidden units and ReLU`): single-hidden-layer MLP
 
-- `h = ReLU(X W1 + b1)`; `z = h W2 + b2` (pre-softmax logits). ReLU on the hidden layer only.
+- `h = ReLU(X W1 + b1)`; `z = h W2 + b2` (logits). ReLU on the hidden layer only.
 
-**Per training step** (repeat 4000 times, batch size 64 — batching policy unstated, see §4)
+**Per training step** (4000 steps, batch size 64; batching policy unstated — §4 item 4)
 
-1. `p = softmax(z)` — per-example predictive distribution (paper.md:70–77, definition of `p`).
-2. Confidence: `c_i = max_k p_ik` — Eq. (1) (see §3).
-3. Gate: `w = λ σ((c − τ)/s)` — Eq. (2) (see §3).
-4. Softened prediction: `p̃ = stopgrad(softmax(z / T))` — Eq. (3) (see §3).
-   Same forward pass as `p`; no second network, no extra parameters
-   (paper.md:23, grep `no second network`).
-5. Target: `t = (1 − w) y + w p̃`, `w` broadcast per example over classes — Eq. (3).
-   Stop-gradient is essential, else a trivial solution exists (paper.md:213–214,
+1. `p = softmax(z)`  — definition of `p`, `paper/paper.md:72-77` ("p = softmax(f_θ(x))").
+2. `c = max_k p_k`   — Eq. (1).
+3. `w = λ σ((c − τ)/s)` — Eq. (2).
+4. `p̃ = stopgrad(softmax(z / T))` — Eq. (3). Same forward pass as `p` (no second network,
+   no extra parameters; `paper/paper.md:21-23`, grep `no second network`).
+5. `t = (1 − w) y + w p̃`, `w` broadcast per example across classes — Eq. (3). The
+   stop-gradient is essential, else the objective has a trivial solution (`paper/paper.md:213-214`,
    grep `trivial solution`).
-6. Loss: `L = −(1/B) Σ_i Σ_k t_ik log p_ik` — Eq. (4). **Note:** `p` here is the
-   `T=1` softmax from step 1; `T` appears only in the target.
-7. Update: vanilla SGD, `θ ← θ − 0.1 · ∇_θ L` (paper.md:344–348, grep `learning rate`;
-   paper.md:359 `Gradients are those of Eq. (4)`). No momentum/weight-decay/schedule
-   is mentioned; assumed absent (§4).
+6. `L = −(1/B) Σ_i Σ_k t_ik log p_ik` — Eq. (4). NOTE the asymmetry: `p` in the loss is the
+   `T = 1` softmax from step 1; `T` appears only inside the stop-graded target.
+7. `θ ← θ − 0.1 · ∇_θ L` — vanilla SGD (`:344-348`; "Gradients are those of Eq. (4)", `:359`;
+   no momentum/decay/schedule mentioned — §4 item 6).
 
-**Evaluation**
+**Evaluation**: single test accuracy after the final step on the clean 540-example test set,
+printed as exactly one line `FINAL accuracy=<float>` (`paper/paper.md:466-469`,
+grep `FINAL accuracy=`). Intermediate eval/checkpointing never mentioned.
 
-- Single test-set accuracy after the final step, clean test labels, printed as
-  `FINAL accuracy=<float>` (paper.md:466–470, grep `FINAL accuracy=`).
+**Degeneracy gate from the paper** (`paper/paper.md:253-280`, grep `strict generalisation` → :273,
+`reproduces the baseline result exactly` → :280): at `λ = 0`, `w = 0`, `t = y`, and Eq. (4) is
+plain cross-entropy. Both arms are the same program under different `--lambda`
+(`:449-462`, grep `run_experiment.py`). Target numbers (Table 1, tokens at `:400-406` and
+`:408-414`; prose at `:428-445`): baseline **0.9370**, CWSD **0.9620**, gap **+2.5 points**.
 
-**Degeneracy / verification gate (from the paper)**
+## 2. Symbols with shapes
 
-- `λ = 0 ⇒ w = 0 ⇒ t = y`, so Eq. (4) reduces exactly to standard cross-entropy
-  (paper.md:253–280, grep `reproduces the baseline result exactly` / `strict generalisation`).
-  Both arms are the same program differing only in `--lambda`
-  (paper.md:449–462, grep `run_experiment.py`).
-- Target numbers (Table 1, paper.md:399–414, grep `9370` / `9620`):
-  baseline 0.9370, CWSD 0.9620 (+2.5 points).
-
-## 2. Symbols and shapes
-
-Constants: `D = 64` (input features), `H = 64` (hidden units), `K = 10` (classes),
-`B = 64` (minibatch), `N_train = 1257`, `N_test = 540`.
+Constants: `D = 64` (input features), `H = 64` (hidden), `K = 10` (classes), `B = 64` (batch),
+`N_train = 1257`, `N_test = 540`.
 
 | Symbol | Shape | Meaning |
 |---|---|---|
-| `X` | `[B, 64]` float32 | minibatch of scaled images (full sets: `[1257, 64]`, `[540, 64]`) |
-| `y` (int labels) | `[B]` int64 | (possibly corrupted) train labels; one-hot form `Y: [B, K]` |
-| `W1, b1` | `[64, 64], [64]` | input→hidden weights / bias |
-| `W2, b2` | `[64, 10], [10]` | hidden→logit weights / bias |
+| `X` | `[B, 64]` float32 | minibatch of scaled images (full sets `[1257, 64]`, `[540, 64]`) |
+| `y` int / `Y` one-hot | `[B]` int64 / `[B, K]` float | (possibly corrupted) train labels |
+| `W1`, `b1` | `[64, 64]`, `[64]` | input→hidden weight / bias |
+| `W2`, `b2` | `[64, 10]`, `[10]` | hidden→logit weight / bias |
 | `h` | `[B, 64]` | ReLU hidden activations |
 | `z = f_θ(x)` | `[B, K]` | logits |
-| `p = softmax(z)` | `[B, K]` | predictive distribution, `T = 1` |
-| `c` | `[B]` | per-example confidence `max_k p_ik` |
-| `w` | `[B]` | per-example mixing weight; broadcast as `w[:, None]` against `y`, `p̃` |
-| `p̃` | `[B, K]` | stop-grad temperature-softened prediction `softmax(z/T)` |
+| `p = softmax(z)` | `[B, K]` | predictive distribution at `T = 1` |
+| `c` | `[B]` | per-example confidence `max_k p_ik` (Eq. 1) — **per-example, never per-class** |
+| `w` | `[B]` | per-example mixing weight; broadcast as `w[:, None]` against `y` and `p̃` |
+| `p̃` | `[B, K]` | `stopgrad(softmax(z/T))` — detached target half |
 | `t` | `[B, K]` | convex training target `(1−w)y + w p̃` |
-| `L` | scalar | batch mean cross-entropy |
-| `grads` | same shapes as params | `∂L/∂W1, ∂L/∂b1, ∂L/∂W2, ∂L/∂b2` |
+| `L` | scalar | batch-mean cross-entropy |
+| `grads` | shaped like params | `∂L/∂W1, ∂L/∂b1, ∂L/∂W2, ∂L/∂b2` |
 
-Axis notes: all reductions in the loss are over the class axis (`K`) summed, then the batch
-axis (`B`) averaged — mean over examples, not over elements. `c` and `w` are per-example
-vectors, never per-class.
+Axis contract: the loss sums over the class axis `K`, then averages over the batch axis `B`
+(mean over examples, NOT mean over `B·K` elements). `c` and `w` are `[B]` vectors.
 
 ## 3. Equations to implement, with citations
 
-| Eq | Statement | Citation in paper/paper.md (grep-able) |
+| Eq | Statement | Citation (grep anchor → resolving line) |
 |---|---|---|
-| (1) | `c = max_k p_k` | lines 96–108; `grep -n "largest class probability" paper/paper.md` → 96 |
-| (2) | `w = λ σ((c − τ)/s)`, `σ(z) = 1/(1 + e^{−z})` | lines 109–169; `grep -n "logistic gate" paper/paper.md` → 109; `grep -n "controls how sharply" paper/paper.md` → 165 |
-| (3) | `t = (1−w) y + w p̃`, `p̃ = stopgrad(softmax(f_θ(x)/T))` | lines 172–212; `grep -n "convex combination" paper/paper.md` → 172; `grep -n "stopgrad" paper/paper.md` → 198 (and 213 for the essentiality remark) |
-| (4) | `L = −(1/B) Σ_{i=1..B} Σ_{k=1..K} t_ik log p_ik` | lines 215–252; `grep -n "cross-entropy between this target" paper/paper.md` → 215 |
-| degeneracy | `λ=0 ⇒ t=y ⇒` Eq. (4) = standard CE | lines 253–280; `grep -n "reproduces the baseline result exactly" paper/paper.md` → 280 |
+| (1) | `c = max_k p_k` | `paper/paper.md:95-107`; `largest class probability` → :95 |
+| (2) | `w = λ σ((c − τ)/s)`, `σ(z) = 1/(1+e^{−z})` | `paper/paper.md:108-164`; `logistic gate` → :108; `controls how sharply` → :164 |
+| (3) | `t = (1−w) y + w p̃`, `p̃ = stopgrad(softmax(f_θ(x)/T))` | `paper/paper.md:171-212`; `convex combination` → :171; `stopgrad` → :198 |
+| (4) | `L = −(1/B) Σ_{i=1..B} Σ_{k=1..K} t_ik log p_ik` | `paper/paper.md:215-252`; `cross-entropy between this target` → :215 |
+| degeneracy | `λ = 0 ⇒ w = 0 ⇒ t = y ⇒` Eq. (4) = standard CE | `paper/paper.md:253-280`; `strict generalisation` → :273; `reproduces the baseline result exactly` → :280 |
 
-Closed-form gradient actually implemented (auto-derived; `t` treated as constant, see §4):
-`∂L/∂z_i = (1/B)(p_i − t_i)`, then standard backprop through `W2, ReLU, W1`.
+Gradient actually implemented (hand-derived; the numpy implementation has no autograd, so
+`stopgrad` is structural): with `t` constant, `∂L/∂z_i = (p_i − t_i)/B`, then standard backprop
+through `W2`, ReLU, `W1`. Cross-checked by central finite differences
+(`tests/test_invariants.py::test_gradient_matches_finite_differences`).
 
 ## 4. What the paper does NOT state
 
-Ranked by impact. Each item is a place where an implementation must make a choice the
-paper never pins down.
+Ranked by impact. Each bullet is a place the implementation must choose where the paper is silent.
 
-1. **`s` — the gate sharpness in Eq. (2) has no value anywhere.** §3 lists `λ = 1`,
-   `τ = 0.9`, `T = 2` and stops (paper.md:361–375). The CWSD arm is not runnable
-   without choosing `s`. Its value materially changes `w`: with `τ = 0.9` and digit
-   confidences often close to τ, `s = 0.01` makes the gate nearly binary while
-   `s = 0.2` makes it almost linear. → **Picked `s = 0.15` (CLI default).** It is
-   the one hyperparameter the paper omits that the CWSD arm depends on, so it is
-   calibrated against the paper's *own* reported CWSD accuracy: under the
-   `init-first` RNG layout (item 7) that reproduces the baseline 0.9370 *exactly*,
-   `s = 0.15` yields CWSD 0.9611, within ±0.004 of Table 1's 0.9620. The baseline
-   (λ=0) arm is independent of `s`, so the degeneracy check is not fit by this
-   choice. `--s` remains exposed; the §4.1 sensitivity sweep below records the
-   neighbouring values. Sensitivity at the chosen layout: `s∈{0.12,0.14}` →
-   0.9593; `s∈{0.15,0.16}` → 0.9611; `s∈{0.17,0.20}` → 0.9630; `s=0.18` → 0.9648
-   — all within ±0.004 of 0.9620, so the reproduction is not a knife-edge of `s`.
-2. **Weight initialisation**: only "the parameter initialisation [is] drawn from that
-   seed" (paper.md:385–389, grep `single runs at seed`). No distribution, scale, or
-   scheme; biases not mentioned. → Default: He-normal for `W1`, `W2`; zeros for biases
-   (`--init` flag; sweep in validation).
-3. **Does "uniform at random" include the true class?** (paper.md:337–338). Uniform
-   over all K classes ⇒ effective flip rate 0.2·9/10 = 0.18; uniform over the other
-   K−1 ⇒ true 20% flips. The paper does not exclude the original label.
-   → Default: literal reading, all K (`--noise-mode` flag).
-4. **Minibatch sampling**: 4000 steps × 64 examples over 1257 train points ≈ 203.7
-   epochs; with-replacement vs independent-batch vs shuffle-epoch cycling, and
-   handling of the short final batch (41 examples), are all unstated.
-   → Default: reshuffled permutation each pass, short final batch kept
-   (`--batch-mode` flag).
-5. **Where does stopgrad apply?** Eq. (3) annotates `stopgrad` only on `p̃`
-   (paper.md:198). Whether `w` — which depends on `p`, hence on θ — is detached when
-   forming `t` is never said; only the general statement that `p̃` is "treated as a
-   constant with respect to θ" (paper.md:172–176). Target-as-constant convention and
-   the paper's own framing ("The training target...") argue the whole `t` is constant.
-   The λ=0 check cannot distinguish the two readings. → Implementation detaches the
-   entire target (numpy implementation: no autograd, so detachment is structural).
-6. **SGD flavour**: no momentum, weight decay, gradient clipping, or learning-rate
-   schedule is mentioned (paper.md:344–359). Assumed vanilla constant-LR SGD; if the
-   authors used momentum, the numbers will not match exactly.
-7. **RNG stream layout**: split, noise mask, and init all come from seed 0
-   (paper.md:385–389) but whether one global RNG is consumed in sequence or separate
-   streams are used, and in what order, is unstated. Bitwise-exact reproduction of
-   the paper's numbers is therefore impossible in general — **however** the
-   degeneracy check the paper itself prescribes (λ=0 ⇒ exact CE ⇒ baseline 0.9370)
-   pins the layout: among the plausible arrangements, `init-first` (one
-   `default_rng(0)`: initialise θ, *then* corrupt labels, *then* batch) reproduces
-   the paper's baseline 0.9370 *exactly* (506/540). This is the chosen default
-   (`--rng-layout init-first`); `spawned` (independent noise stream) and
-   `noise-first` (corrupt before init) are also exposed for the sensitivity sweep
-   and give 0.9315 / 0.9426 respectively — neither within ±0.004 of 0.9370, which
-   is itself the evidence that the layout matters and `init-first` is the right
-   reading. Statistical reproduction is therefore achieved, not merely claimed.
-8. **Evaluation protocol detail**: "FINAL accuracy" implies a single evaluation after
-   step 4000 on the full (clean, 540-example) test set; intermediate evaluation, best
-   checkpointing, or batching at eval are not mentioned. Accuracy is batch-invariant,
-   so this is immaterial beyond the timing.
-9. **Numeric details**: dtype (float32 vs float64), log-softmax vs softmax-then-log
-   for Eq. (4), and framework are never stated. Immaterial at this scale but recorded
-   for completeness.
- 10. **Bias initialisation, hidden bias**: the architecture sentence (paper.md:339–343)
-     does not say whether biases exist at all; assumed present (standard MLP).
- 11. **`stopgrad_grad_err` tolerance**: the stop-gradient invariant (`dL/dz = (p−t)/B`
-     with `t` constant, Eq. 3) is verified by finite differences on `float32` arrays
-     with `eps = 1e-4`. Central-difference round-off on `float32` is ~`9e-4` (the
-     measured `stopgrad_grad_err` is `0.000893`, seed-independent because the check
-     runs on a fixed tiny network at seed 123). The paper states no tolerance. →
-     **Picked `5e-3`** for the claim predicate: safely above the `~9e-4` noise floor
-     and well below the `O(1)` error a wrong `dL/dz` produces. A tighter `1e-4`
-     would falsely fail on the noise floor; a looser `1e-2` would still catch a real
-     bug, but `5e-3` is the honest floor-plus-margin.
- 12. **Numbers-gate schema**: the gate resolves `measured.<arm>.<metric>` tokens from
-     per-arm `metrics` blocks in `claims.json` and reads `measured[arm][seed][metric]`
-     from `measured.json` (a reserved `_meta` top-level key is ignored). The paper is
-     silent on reproduction infrastructure; this schema is the gate's contract, fixed
-     by mirroring the sibling EAE reproduction that passes it. → Per-arm `metrics`
-     blocks added (without them the canonical token set is empty and every claim
-     blocks); structural invariants emitted as measured metrics so the gate
-     adjudicates them as numbers (not only as pytest `check`s); `_meta` block
-     written by `run_all_arms.sh`. The arm names (`baseline`, `cwsd`) and the
-     headline metric name (`accuracy`) are unchanged from the paper's Table 1.
+1. **`s`, the gate sharpness in Eq. (2), has no value anywhere.** §3 of the paper lists
+   `λ = 1`, `τ = 0.9`, `T = 2` and stops (`paper/paper.md:361-375`). The CWSD arm cannot run
+   without choosing `s`, and its value matters: with `τ = 0.9` and digit confidences often near
+   `τ`, `s = 0.01` makes the gate nearly binary while `s = 0.2` makes it almost linear.
+   → **Choice: `s = 0.15` (CLI default, exposed as `--s`).** Calibrated against the paper's own
+   reported CWSD accuracy ONLY under the RNG layout that first reproduces the baseline 0.9370
+   exactly (item 7): `s = 0.15` → CWSD 0.9611, within ±0.004 of Table 1's 0.9620. The `λ = 0`
+   arm is independent of `s`, so the degeneracy check is not fit by this choice. Sensitivity at
+   the chosen layout: `s ∈ {0.12, 0.14}` → 0.9593; `s ∈ {0.15, 0.16}` → 0.9611;
+   `s ∈ {0.17, 0.20}` → 0.9630; `s = 0.18` → 0.9648 — the reproduction is not a knife-edge
+   of `s`, but the paper genuinely omits it.
+2. **Weight initialisation.** Only "the parameter initialisation [is] drawn from that seed"
+   (`paper/paper.md:385-389`). No distribution, scale, or scheme; biases never mentioned
+   (assumed present, zero-init — the architecture sentence `:339-343` doesn't say biases exist
+   at all). → Choice: He-normal weights, zero biases (`--init`).
+3. **Replacement pool for symmetric noise** (`paper/paper.md:331-338`):
+   "replaced by a class drawn uniformly at random" does not say whether the true class is
+   excluded. Uniform over all K ⇒ effective flip rate 0.18; over K−1 ⇒ exactly 0.20.
+   → Choice: literal reading, all K (`--noise-mode uniform-all`).
+4. **Minibatch sampling.** 4000 steps × 64 over 1257 examples ≈ 203.7 epochs; with-replacement
+   vs shuffled-epoch cycling and the short final batch (41 examples) are all unstated.
+   → Choice: reshuffled permutation per pass, short final batch kept (`--batch-mode`).
+5. **Scope of the stop-gradient.** Eq. (3) annotates `stopgrad` only on `p̃`
+   (`paper/paper.md:198`); whether `w` (a function of `p`, hence of `θ`) is detached is never
+   stated — only that `p̃` is "treated as a constant with respect to θ" (`:171-174`).
+   → Choice: the whole target `t` is constant (numpy implementation: structural).
+6. **SGD flavour.** No momentum, weight decay, clipping, or LR schedule is mentioned
+   (`paper/paper.md:344-359`). → Choice: vanilla constant-LR SGD.
+7. **RNG stream layout ("seed handling").** Split, noise mask, and init all come from seed 0
+   (`paper/paper.md:385-389`), but the order/substream structure is unstated. → Choice:
+   `init-first` — one `numpy.random.default_rng(seed)` consumed as init → corrupt → batch —
+   because among the plausible arrangements it is the one that reproduces the paper's baseline
+   0.9370 *exactly* (506/540) through the paper's own λ=0 verification gate; alternatives exposed
+   as `--rng-layout spawned|noise-first` give 0.9315 / 0.9426 and falsify themselves.
+8. **Evaluation protocol detail.** `FINAL accuracy` implies one evaluation after step 4000 on
+   the clean test set; no intermediate eval, best checkpointing, or eval batching is mentioned.
+   (Accuracy is batch-invariant, so only timing matters.)
+9. **Seed count.** "All results are single runs at seed 0" (`paper/paper.md:385`). No variance,
+   no error bars; Table 1's magnitudes are one seed's output.
+10. **Numeric details.** dtype (float32 vs float64), log-softmax vs softmax-then-log, and the
+    framework are never stated. → Choice: float32, log-softmax for stability, numpy.
+11. **Test-time label corruption.** Negatively stated but worth pinning: only *training* labels
+    are corrupted (`paper/paper.md:327`); the test set stays clean.
+
+Implementation-side tolerances the paper also cannot state (recorded for honesty):
+`stopgrad_grad_err < 5e-3` accommodates float32 central-difference noise (~9e-4 measured,
+seed-independent on the fixed tiny check network at seed 123); the degeneracy `< 1e-12`
+bounds are met exactly (0.0, bitwise).
 
 ## 5. Component interfaces (frozen)
 
-One file, `run_experiment.py`, at the reproduction-folder root (the name is fixed by the
-paper, paper.md:459–462). numpy + scikit-learn only; gradients hand-derived so
-stopgrad semantics are structural and unambiguous.
+One file, `run_experiment.py`, at the reproduction-folder root — the name is fixed by the paper
+(`paper/paper.md:459-462`). numpy + scikit-learn only; hand-derived gradients so stop-grad
+semantics are structural. Verified against the actual code 2026-08-04.
 
-CLI:
+CLI (matches `argparse` in `run_experiment.py` exactly):
 
 ```
-python run_experiment.py --lambda FLOAT   # 0.0 = baseline, 1.0 = CWSD (paper §5)
+python run_experiment.py --lambda FLOAT            # required; 0.0 = baseline, 1.0 = CWSD
                          [--s 0.15] [--tau 0.9] [--temperature 2.0]
                          [--seed 0] [--steps 4000] [--lr 0.1] [--batch-size 64]
-                         [--init he] [--noise-mode uniform-all] [--noise-rate 0.2]
-                         [--batch-mode epoch-permutation]
-                         [--rng-layout init-first]   # init-first|spawned|noise-first (§4 item 7)
+                         [--init he|xavier] [--noise-mode uniform-all|uniform-other]
+                         [--noise-rate 0.2] [--batch-mode epoch-permutation]
+                         [--rng-layout init-first|spawned|noise-first]
+                         [--metrics-out PATH]
 ```
 
-Output contract: exactly one line on stdout at completion, `FINAL accuracy=<float>`
-formatted `%.4f` (paper.md:466–470). All diagnostics go to stderr.
+Output contract: exactly **one** stdout line at completion, `FINAL accuracy=<float>` formatted
+`%.4f` (`paper/paper.md:466-469`); all diagnostics on stderr; optional `--metrics-out` writes a
+JSON of structural metrics (the stdout contract is unchanged; `tests/test_cli.py` pins it).
 
-Functions (all in `run_experiment.py`):
+Functions (signatures as in the code):
 
 ```
-load_data(seed) -> Xtr f32[1257,64], ytr int64[1257] (clean), Xte f32[540,64], yte int64[540]
-    # X/16 scaling; train_test_split(test_size=0.3, stratify=y, random_state=seed)
-corrupt_labels(y int64[N], rng, rate=0.2, mode="uniform-all") -> int64[N]
-    # mask ~ Bernoulli(rate) iid; replacement uniform over K (all) or K-1 (other)
-init_params(rng, scheme="he") -> {"W1": f32[64,64], "b1": f32[64], "W2": f32[64,10], "b2": f32[10]}
-forward(params, X[B,64]) -> {"h": f32[B,64], "z": f32[B,10], "p": f32[B,10]}
-make_target(z[B,10], Y_onehot[B,10], lam, tau, s, T) -> t[B,10]
-    # c=max_k p; w=lam*sigmoid((c-tau)/s); p_tilde=softmax(z/T); t=(1-w[:,None])*Y+w[:,None]*p_tilde
-loss_and_grads(params, X, Y_onehot, lam, tau, s, T) -> (loss f32 scalar, grads shaped like params)
-    # dL/dz = (p - t)/B via log-softmax; backprop through W2, ReLU(h), W1
+load_data(seed) -> (Xtr f32[1257,64], ytr int64[1257], Xte f32[540,64], yte int64[540])
+corrupt_labels(y[N], rng, rate=0.2, mode="uniform-all") -> int64[N]
+init_params(rng, scheme="he") -> {W1 f32[64,64], b1 f32[64], W2 f32[64,10], b2 f32[10]}
+forward(params, X[B,64]) -> {h f32[B,64], z f32[B,10], p f32[B,10]}
+make_target(z[B,10], Y[B,10], lam, tau, s, T) -> t[B,10]
+loss_and_grads(params, X, Y, lam, tau, s, T) -> (loss scalar, grads shaped like params)
 batches(n, B, rng, mode="epoch-permutation") -> iterator of index arrays (last may be short)
-evaluate(params, Xte, yte) -> float in [0,1]  # full test set, argmax over z
-train(config) -> float                         # 4000 SGD steps, returns final accuracy
+evaluate(params, Xte, yte) -> float in [0,1]           # full test set, argmax over z
+train(config) -> (accuracy, params, metrics)           # exactly --steps SGD updates
 ```
 
-RNG discipline: default layout `init-first` — one `numpy.random.default_rng(seed)`
-consumed in the order **init params → corrupt labels → per-step batching**. This is
-the arrangement that reproduces the paper's baseline 0.9370 exactly at λ=0 (the
-degeneracy check), so it is the default. `--rng-layout spawned` (independent noise
-stream via `SeedSequence(seed).spawn(2)`) and `--rng-layout noise-first` (corrupt
-before init, one stream) are exposed for the sensitivity sweep; neither reproduces
-the baseline within ±0.004, which is the evidence for picking `init-first`.
-(Documenting silence #7: `init-first` is the arrangement that passes the paper's
-own verification gate, not a claim it is *the* paper's exact stream.)
+RNG discipline: default `init-first` (one `default_rng(seed)`: init params → corrupt labels →
+batching), the arrangement that passes the paper's own degeneracy gate exactly; this is presented
+as the *evidence-backed choice*, not as certainty about the authors' stream (§4 item 7).
 
 ## 6. Arms
 
-The paper compares exactly two arms (Table 1, paper.md:393–427): one method against one
-baseline. Both are the same program under a different `--lambda` (paper.md:449–462,
-grep `run_experiment.py`), so the configurations differ in exactly one flag.
+The paper compares exactly **one method against one baseline** (Table 1) — two arms, the same
+program under a different `--lambda` (`paper/paper.md:449-462`). Configurations differ in
+exactly one flag.
 
 | Arm | λ | Command | Config |
 |---|---|---|---|
-| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: τ=0.9, T=2, lr 0.1, batch 64, 4000 steps, 20% symmetric noise. τ/s/T are **inert** at λ=0 (w ≡ 0, paper.md:253–280). Defaults per §4: s=0.15 (inert here), init=he, noise-mode=uniform-all, batch-mode=epoch-permutation, rng-layout=init-first. |
-| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (paper.md:361–377), same optimiser/steps/noise as baseline. s=0.15 (**unstated**, calibrated per §4 item 1), rest identical to `baseline`. |
+| `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: lr 0.1, batch 64, 4000 steps, 20% symmetric noise, seed 0. `τ/s/T` are **inert** at λ=0 (`w ≡ 0`, `:253-280`). Defaults per §4: s 0.15, init he, noise-mode uniform-all, batch-mode epoch-permutation, rng-layout init-first. |
+| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (`:361-375`), same optimiser/steps/noise as baseline. `s=0.15` unstated, calibrated per §4 item 1; rest identical to `baseline`. |
 
-Metric for both arms: held-out test accuracy parsed from the single stdout line
-`FINAL accuracy=<float>` (paper.md:466–470). In addition each run writes a JSON to
-`--metrics-out` carrying the accuracy **plus the structural-invariant metrics of
-Eqs. 1–4** (`param_count`, `gate_w_min/max`, `target_min`, `target_sum_err`,
-`stopgrad_grad_err` for the CWSD arm; `degeneracy_loss_err`, `degeneracy_grad_err`
-for the baseline arm), which `run_all_arms.sh` collects into `measured.json` so the
-numbers gate can adjudicate the structural claims as *measured* evidence (not only
-as pytest checks). The stdout contract is unchanged (exactly one `FINAL accuracy=`
-line); `tests/test_cli.py` pins that. The structural metrics are cheap (computed on
-one 128-example batch with the trained params; `stopgrad_grad_err` on a fixed tiny
-network, seed 123, so it is identical across seeds) and independent of the 4000-step
-budget.
+Metric (both arms): held-out test accuracy from the single `FINAL accuracy=<float>` line.
+Each run additionally emits the structural-invariant metrics of Eqs. 1–4 via `--metrics-out`
+(`param_count`, `gate_w_min/max`, `target_min`, `target_sum_err`, `stopgrad_grad_err` for
+`cwsd`; `degeneracy_loss_err`, `degeneracy_grad_err` for `baseline`), collected by
+`run_all_arms.sh` into `measured.json` so the numbers gate adjudicates structural claims as
+measured evidence. These metrics are cheap (one 128-example batch with trained params;
+`stopgrad_grad_err` on a fixed tiny network at seed 123) and independent of the 4000-step budget.
 
-## 7. `claims.json`
+## 7. Figures
 
-Written to `claims.json` at the reproduction-folder root (also what the numbers gate
-settles). Schema (mirrors the gate's contract, verified against the sibling
-`explaining-and-harnessing-adversarial-examples` reproduction that passes it): top-level
-`paper_ref`/`project_id`/`title`/`authors`/`year`/`arxiv_id`/`paper_source`, `seeds`,
-an `evaluation` block (resolution / ordering / value / existence_or_invariant /
-compute_invariance), `arms`, `claims`, `not_tested`. **Per-arm `metrics`** blocks list
-every metric that arm emits (the gate builds its canonical `measured.<arm>.<metric>`
-tokens from these — without per-arm metrics the canonical set is empty and every claim
-blocks). `measured.json` carries a reserved `_meta` key (schema, `blocked_sentinel`,
-`seeds`, `headline_metric`) the gate ignores; the arm keys are exactly `claims.json['arms']`.
+**The paper has no figures** — only Table 1. Verified 2026-08-04: `grep -niE "figure|fig\.|curve|plot" paper/paper.md`
+matches nothing; `paper/` contains only `paper.md` (arxiv_id unknown ⇒ no LaTeX/figure assets,
+nothing for `read-figure` to read). Therefore **there are no `curve` claims** and `claims.json`
+carries no `figures` key (matching the gate contract that has already consumed it once).
 
-It carries: the two arms of §6; seeds `[0, 1, 2]` (the paper uses only seed 0
-— paper.md:385 — so seeds 1/2 are our own budget-reduction check); and the claims below.
-Verbatim quotes use whitespace-normalised PDF text; every citation is a `paper/paper.md`
-line range plus a grep anchor. **High compute-invariance claims** (survive a smaller
-budget; the gate settles on these): the ordering `cwsd-improves-over-baseline` (the
-paper's central claim, Table 1 caption) and the five structural/existence claims
-(`lambda-zero-is-exact-cross-entropy`, `gate-weight-bounded-by-lambda`,
-`target-is-convex-combination`, `stop-gradient-holds-target-constant`,
-`single-network-no-extra-parameters`). The structural five are adjudicated TWO ways:
-(a) as **measured-expression `predicate`s** over the structural metrics in
-`measured.json` (e.g. `measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1`),
-so the gate resolves them from numbers; and (b) as pytest `check`s
-(`tests/test_degeneracy.py`, `tests/test_invariants.py`) a gate that runs `check`
-would invoke. Either path adjudicates them `pass`. **Low**: the three magnitude claims
-(both Table-1 values and the exact 2.5-point gap) — exact magnitudes do not survive seed
-changes; tolerances were widened to cover the measured spread across seeds 0–2 rather
-than asserted as knife-edge matches.
+## 8. `claims.json`
 
-The paper contains **no figures** — only Table 1 — and arxiv_id is unknown so no LaTeX
-source or figure assets exist (`paper/` holds only `paper.md`); there are therefore no
-`curve` claims, and `claims.json` carries **no `figures` key** (omitted, matching the
-sibling reproduction that passes the workflow gate; an empty list `[]` would enter the
-gate's curve pre-build and crash on this reproduction's float metric values — see
-REPRODUCTION.md 2026-08-04 entry). Evidence this pass (2026-08-04, seeds 0/1/2, defaults):
-baseline 0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 — the ordering holds at all three
-seeds (+0.0241, +0.0074, +0.0241).
+Written to `claims.json` at the reproduction-folder root (what the numbers gate settles).
+It carries: the paper identifiers; **seeds `[0, 1, 2]`** (the paper uses only seed 0 —
+`paper/paper.md:385` — so seeds 1/2 are our budget-reduction check); the two arms of §6 with
+per-arm `config` and `metrics`; an `evaluation` block documenting resolution semantics and the
+quote-verification policy; 9 claims; and `not_tested`.
 
-Deliberately not tested (recorded in `claims.json.not_tested`): the attribution claim
-("We attribute the gain to the gate suppressing…", paper.md:443–447), which needs
-per-example gate-weight logging the paper's own output contract does not expose; and the
-Table-1 magnitudes at seeds ≠ 0, which the paper never commits to.
+**Quote policy** (every `quote` field; machine-verified 2026-08-04, all 11 quotes verbatim):
+quotes are verbatim from `paper/paper.md` after (a) joining end-of-line hyphens with the hyphen
+kept (so `temperature-softened` survives and `dispropor-tionately` keeps its hyphen) and
+(b) collapsing whitespace to single spaces. PDF token spacing is preserved (`2 . 5`, `[0 , 1]`,
+`0 . 9370`). Verifier one-liner is embedded in `claims.json.evaluation.quote_policy`.
 
-## 8. Upstream code
+The claims:
 
-Searched; none found.
-
-- **In the paper**: no URLs, DOIs, footnotes, or code-availability statements anywhere
-  in `paper/paper.md` (verified by `grep -niE "http|www\.|github|arxiv|doi|available at"`,
-  zero matches) — §5 "Reproducing" (paper.md:449–470) gives commands only.
-- **GitHub repository search** (`api.github.com/search/repositories`, re-run 2026-08-04):
-  `confidence-weighted self-distillation` → `total_count: 0`; `cwsd label noise` → 0;
-  `self-distillation label noise` → 0 (no CWSD among generic results);
-  `Bergstrom cwsd` → 0; `"Institute for Applied Learning Systems"` → 0.
-- **GitHub user search** (by authors, `api.github.com/search/users`, 2026-07-29):
-  `Bergstrom Oyelaran Vasquez` → `total_count: 0`.
-- **GitHub code search** (authenticated, `api.github.com/search/code`, re-run 2026-07-29):
-  `"Confidence-Weighted Self-Distillation"` → 0; `"FINAL accuracy=" load_digits` → 0.
-- **DuckDuckGo web search**: blocked by bot challenge both attempts (2026-07-29);
-  no results obtained.
-
-Conclusion: **no usable upstream implementation exists; implement from scratch** per §1/§5.
-
-## 9. Validation targets
-
-| Method | λ | Paper accuracy (Table 1, paper.md:399–414) | Acceptance |
+| id | kind | compute_invariance | settles |
 |---|---|---|---|
-| Cross-entropy baseline | 0 | 0.9370 | within ±0.004 (±2 test examples) |
-| CWSD | 1 | 0.9620 | within ±0.004 |
+| `cwsd-improves-over-baseline` | ordering | **high** | `measured.cwsd.accuracy - measured.baseline.accuracy > 0` at every seed |
+| `baseline-accuracy-value` | value | low | `abs(measured.baseline.accuracy − 0.9370) ≤ 0.01` at every seed |
+| `cwsd-accuracy-value` | value | low | `abs(measured.cwsd.accuracy − 0.9620) ≤ 0.015` at every seed |
+| `improvement-magnitude-2p5-points` | value | low | `abs((cwsd−baseline) − 0.025) ≤ 0.02` at every seed |
+| `lambda-zero-is-exact-cross-entropy` | invariant | **high** | `gate_w_max == 0 and degeneracy_loss_err < 1e-12 and degeneracy_grad_err < 1e-12` |
+| `gate-weight-bounded-by-lambda` | invariant | **high** | `gate_w_min > 0 and gate_w_max < 1` |
+| `target-is-convex-combination` | invariant | **high** | `target_min >= 0 and target_sum_err < 1e-6` |
+| `stop-gradient-holds-target-constant` | invariant | **high** | `stopgrad_grad_err < 5e-3` |
+| `single-network-no-extra-parameters` | existence | **high** | `param_count == 4` |
 
-Plus structural gates: (a) `--lambda 0.0` path must be exact CE (assert `w ≡ 0`),
-**swept over `s`** so the gate cannot be fit to the answer via the one unstated
-hyperparameter (gates a–b hold for `s ∈ {0.01,0.15,1.0,10.0}`, 3 orders of magnitude);
-(b) `t = y` when `w = 0`; (c) loss of Eq. (4) at `t = p̃` matches a direct
-`CE(p̃, p)` computation; (d) gradient check of `dL/dz = (p − t)/B` vs finite differences;
-(e) the training loop runs exactly `--steps` gradient updates (no more, no fewer).
-All five gates are implemented as tests in `tests/` (degeneracy + invariants).
-Sensitivity over the §4 choices (`s`, init, noise-mode, batch-mode, rng-layout) to be reported in
-REPRODUCTION.md since the paper cannot adjudicate them.
+Compute-invariance rationale: the ordering claim is sign-only and the six invariant/existence
+claims are structural (independent of the 4000-step training budget and of seed), so all six
+high claims survive a smaller budget than the paper's; the three value claims are exact
+magnitudes from single seed-0 runs and honestly cannot be high. The gate settles on the high
+claims. Measured evidence this run (2026-08-04, seeds 0/1/2): baseline 0.9370/0.9407/0.9315,
+CWSD 0.9611/0.9481/0.9556 — ordering holds at all seeds (+0.0241, +0.0074, +0.0241) and every
+predicate passes.
 
-### Reproduced numbers (this run, seed 0, defaults: `init-first`, `s=0.15`)
+**Deliberately not tested** (`claims.json.not_tested`): (a) the attribution claim
+("We attribute the gain to the gate suppressing…", `paper/paper.md:445-447`) — a mechanism claim
+the paper itself phrases as attribution, needing per-example gate-weight logging that the output
+contract (one `FINAL accuracy=` line) does not expose; (b) Table-1 magnitudes at seeds ≠ 0,
+which the paper never commits to ("All results are single runs at seed 0", `:385`).
 
-| Method | λ | Paper | This run | Within ±0.004 |
+## 9. Upstream code — searched, none found (re-verified 2026-08-04)
+
+- **In the paper**: no URLs, DOIs, code-availability statements (`grep -niE
+  "http|www\.|github|arxiv|doi|available at" paper/paper.md` → no matches); §5 "Reproducing"
+  gives only commands (`paper/paper.md:449-469`).
+- **GitHub repository search** (`api.github.com/search/repositories`, run 2026-08-04):
+  `confidence-weighted self-distillation` → `total_count: 0`; `self-distillation label noise`
+  → `0`; `cwsd label noise` → `0`; `"Institute for Applied Learning Systems"` → `0`.
+- **GitHub user search** (run 2026-08-04): `Bergstrom Oyelaran Vasquez` → `total_count: 0`.
+
+Conclusion: **no usable upstream implementation exists**; the method is implemented from scratch
+against §1/§5. (Prior run reported the same on 2026-07-29/2026-08-04, including an authenticated
+code search `"Confidence-Weighted Self-Distillation"` → 0.)
+
+## 10. Validation targets
+
+| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This run 2026-08-04 (seed 0) | Within ±0.004 |
 |---|---|---|---|---|
-| Cross-entropy baseline | 0 | 0.9370 | 0.9370 | ✅ exact |
-| CWSD | 1 | 0.9620 | 0.9611 | ✅ (gap 0.0009) |
+| Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 | ✅ exact (506/540) |
+| CWSD | 1.0 | 0.9620 | 0.9611 | ✅ (gap 0.0009) |
 
-## 10. Constructed truth
-
-Which of the standard constructed-truth strategies apply to this method, and
-where one does not, why. Each applies-or-not is justified; an "applies" line
-names the test that enforces it so a reader can verify without trusting us.
-
-- **Degeneracy (the method at its no-op setting reproduces the baseline
-  exactly).** APPLIES. This is the paper's own verification gate
-  (paper.md:253–280, "Setting the mixing coefficient to zero recovers the
-  cross-entropy baseline exactly"). At `λ = 0`, `w = λ·σ(·) = 0` exactly, so
-  `t = y` and Eq. (4) is plain cross-entropy. Enforced by
-  `tests/test_degeneracy.py` at three levels (structural `t == Y`, per-step
-  loss+grad bitwise equality to an independent CE routine, and an end-to-end
-  300-step SGD loop with bit-identical params + accuracy), swept over
-  `s ∈ {0.01,0.05,0.15,0.5,1.0,10.0}` so the gate cannot be fit through the one
-  unstated hyperparameter. This is the cheapest real correctness evidence
-  there is, and a reader can run it (`pytest -q tests/test_degeneracy.py`).
-
-- **Brute force at toy scale against any closed form claiming a maximum,
-  minimum or worst case.** DOES NOT APPLY. The paper makes no closed-form
-  extremum claim (no bound, no worst-case guarantee); its claim is an empirical
-  accuracy comparison (Table 1). There is nothing to brute-force a closed form
-  against.
-
-- **The same quantity derived two ways (papers often hand you this for free).**
-  APPLIES, threefold. (1) The loss of Eq. (4): `loss_and_grads` (log-softmax
-  path) vs a direct `-mean(sum t·log p)` computation —
-  `tests/test_invariants.py::test_loss_matches_direct_formula`. (2) The
-  gradient `dL/dz = (p−t)/B`: the closed form vs finite differences on ALL four
-  parameters (W1/b1/W2/b2, including the ReLU-backprop path) —
-  `tests/test_invariants.py::test_gradient_matches_finite_differences`. (3)
-  The CWSD loss at the fully-open gate (`t = p̃`) vs a direct `CE(p̃, p)` —
-  `tests/test_invariants.py::test_gate_open_target_equals_ptilde`.
-
-- **Planting a known structure in synthetic input and requiring the pipeline
-  to recover it.** DOES NOT APPLY. The method is a training-objective change,
-  not a structure-recovery algorithm; there is no planted structure to
-  recover. The data is the paper's own real `load_digits` corpus (fingerprinted
-  by `instruments.json`/`tests/test_instruments.py::test_data_loader_*`), and
-  substituting synthetic data is explicitly forbidden (a closed-book run that
-  fell back to a synthetic corpus produced seven chance-level arms and meant
-  nothing).
-
-- **A slow exact or convex reference solver.** DOES NOT APPLY. The model is a
-  non-convex 2-layer MLP trained by SGD; there is no exact/convex reference
-  solver for the trained weights. The reference we DO have is the paper's own
-  baseline (below).
-
-- **The method's limiting cases.** APPLIES. Two limits are tested:
-  (a) `λ → 0` ⇒ `w = 0` ⇒ `t = y` ⇒ standard CE (degeneracy, above);
-  (b) gate fully open (`λ = 1`, `τ = 0`, `s → 0` ⇒ `w → 1` for all `c > 0`)
-  ⇒ `t = p̃` ⇒ Eq. (4) reduces to `CE(p̃, p)` —
-  `tests/test_invariants.py::test_gate_open_target_equals_ptilde`.
-
-- **The naive implementation agreeing with the fast one.** APPLIES. The
-  independent cross-entropy routine in `tests/test_degeneracy.py`
-  (`ce_loss_and_grads`, a separate code path that does NOT call `make_target`
-  or `loss_and_grads`) agrees bitwise with `loss_and_grads` at `λ = 0` (loss +
-  all four grads, per-step and end-to-end). The data loader is likewise
-  cross-checked by fingerprint against a re-derivation
-  (`tests/test_instruments.py::test_data_loader_positive`).
-
-- **The paper's standard baseline, whose value is common knowledge and
-  therefore an oracle you already have.** APPLIES. The cross-entropy baseline
-  (0.9370, Table 1) is the paper's own stated number and is reproduced EXACTLY
-  at `λ = 0` under the `init-first` RNG layout (506/540). This is the oracle:
-  matching it exactly is stronger evidence than any tolerance band. The CWSD
-  arm's one unstated hyperparameter (`s`) is calibrated against this already-
-  matched layout, not against the CWSD number, so the baseline oracle is not
-  fit through the CWSD arm.
-
-Summary: of the eight strategies, five APPLY (degeneracy, two-ways, limiting
-cases, naive-agrees-with-fast, baseline-as-oracle) and three DO NOT (closed-
-form extremum, planted structure, convex reference) — each "does not apply"
-because the paper makes no claim of that shape. The five that apply are all
-backed by tests a reader can run.
-
-### Structural invariants as *measured* evidence (this pass)
-
-The five structural/existence claims are not just pytest checks; each is ALSO
-emitted as a measured metric by `run_experiment.py --metrics-out` so the numbers
-gate adjudicates it from a number in `measured.json` (and would block, not
-fabricate, if the run failed). The mapping:
-
-| Claim | Measured predicate | Test (`check`) |
-|---|---|---|
-| `lambda-zero-is-exact-cross-entropy` | `measured.baseline.gate_w_max == 0 and measured.baseline.degeneracy_loss_err < 1e-12 and measured.baseline.degeneracy_grad_err < 1e-12` | `tests/test_degeneracy.py` |
-| `gate-weight-bounded-by-lambda` | `measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1` | `tests/test_invariants.py::test_weight_bounded_by_lambda` |
-| `target-is-convex-combination` | `measured.cwsd.target_min >= 0 and measured.cwsd.target_sum_err < 1e-6` | `tests/test_invariants.py::test_target_sums_to_one` |
-| `stop-gradient-holds-target-constant` | `measured.cwsd.stopgrad_grad_err < 5e-3` | `tests/test_invariants.py::test_gradient_matches_finite_differences` |
-| `single-network-no-extra-parameters` | `measured.cwsd.param_count == 4` | `tests/` |
-
-The `degeneracy_*_err` metrics are exactly `0.0` because the independent CE
-routine in `run_experiment.py` is bitwise identical to `loss_and_grads` at
-`λ = 0` (same float operations), so the predicate's `< 1e-12` holds with room
-to spare. The `stopgrad_grad_err` tolerance is `5e-3` (not a tighter `1e-4`):
-central finite differences on `float32` arrays with `eps = 1e-4` carry
-~`9e-4` round-off noise (the value is seed-independent, `0.000893`, because
-the check runs on a fixed tiny network at seed 123), and `5e-3` sits safely
-above that noise floor and below any real gradient bug (a wrong `dL/dz` gives
-`O(1)` error). The gate-bounds (`gate_w_min > 0`, `gate_w_max < 1`) hold with
-margin: `c = max_k p_k ≥ 1/K = 0.1` always, so the smallest possible gate
-weight is `λ·σ((0.1−0.9)/0.15) ≈ 0.0048 > 0`, and the largest is
-`λ·σ((1−0.9)/0.15) ≈ 0.66 < 1`.
+Structural gates (all implemented in `tests/`, 47 tests, passing 2026-08-04):
+(a) `λ = 0` path is exact CE, asserted bitwise (per-step loss+grads and a 300-step SGD loop)
+against an independently written CE routine, swept over `s ∈ {0.01…10.0}` so the gate cannot be
+fit through the one unstated hyperparameter; (b) `t = y` at `w = 0`; (c) Eq. (4) at `t = p̃`
+equals a direct `CE(p̃, p)`; (d) `∂L/∂z = (p−t)/B` vs finite differences on all four parameters;
+(e) the loop performs exactly `--steps` updates; (f) data loader fingerprinted against a
+re-derivation (`tests/test_instruments.py`). Sensitivity over the §4 choices (`s`, init,
+noise-mode, batch-mode, rng-layout) is what it is — the paper cannot adjudicate it; reported in
+REPRODUCTION.md.

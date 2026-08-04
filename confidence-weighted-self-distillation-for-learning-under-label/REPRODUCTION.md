@@ -33,3 +33,22 @@
 - 2026-08-04 — Ingest: cloned repo (shallow, blobless), branch
   `repro/confidence-weighted-self-distillation-for-learning-under-label`
   created and pushed; paper text saved; this file started.
+- 2026-08-04 — SPEC step (this run): rewrote `SPEC.md` and `claims.json` from
+  `paper/paper.md` alone, then verified them against the actual code and a fresh
+  environment (numpy 2.5.1, scikit-learn 1.9.0 installed for this workstation).
+  Verified, not trusted from the prior run: (1) every grep anchor cited in
+  SPEC §1/§3 and claims.json resolves to the cited line; (2) all 11 `quote`
+  fields are verbatim under the documented normalisation (hyphen-join +
+  whitespace collapse, PDF token spacing kept: `2 . 5`, `[0 , 1]`) — a checker
+  one-liner is embedded in `claims.json.evaluation.quote_policy`; (3) the
+  frozen CLI/function interfaces in SPEC §5 match `run_experiment.py`'s
+  argparse and signatures; (4) split is 1257/540 as stated; (5) fresh runs
+  reproduce the numbers SPEC asserts: baseline seed 0 = 0.9370 (exact match,
+  Table 1), CWSD seed 0 = 0.9611, baseline seed 1 = 0.9407, CWSD seed 2 =
+  0.9556 — identical to `measured.json`; `pytest -q tests` = 47 passed;
+  (6) upstream-code search re-run (GitHub repos for the title / topic /
+  institution, users for the authors): all `total_count: 0`; no links in the
+  paper. Paper has no figures (grep over `paper/paper.md`), so no curve
+  claims. Key unstated item confirmed: the gate sharpness `s` in Eq. (2) has
+  no value anywhere in the paper; `s = 0.15` stands as the calibrated default
+  with the sensitivity sweep recorded in SPEC §4 item 1.

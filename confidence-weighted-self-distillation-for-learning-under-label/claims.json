@@ -2,19 +2,31 @@
   "paper_ref": "ce7a63e8-2c90-4516-887d-14515c8f4516",
   "project_id": "d7735ece-02c4-4228-985c-00834c92b8f3",
   "title": "Confidence-Weighted Self-Distillation for Learning under Label Noise",
-  "authors": ["A. Bergstrom", "M. Oyelaran", "K. Vasquez"],
+  "authors": [
+    "A. Bergstrom",
+    "M. Oyelaran",
+    "K. Vasquez"
+  ],
   "year": "unknown",
   "arxiv_id": "unknown",
   "paper_source": "paper/paper.md",
-  "seeds": [0, 1, 2],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
   "evaluation": {
     "resolution": "measured.<arm>.<metric> resolves to measured[arm][str(seed)][metric] in measured.json, written by run_all_arms.sh from each run's --metrics-out JSON. The arm keys are exactly claims.json['arms']; a reserved _meta key at the top level of measured.json is ignored by the gate.",
     "ordering": "the quantity must satisfy `direction` at EVERY seed.",
     "value": "abs(quantity - claimed) <= tolerance at EVERY seed.",
     "existence_or_invariant": "the boolean predicate (an expression over measured.<arm>.<metric> tokens, with min(), max(), mean(), abs(), arithmetic, comparisons, and/or) must evaluate true at EVERY seed. Structural invariants are emitted as measured metrics by run_experiment.py --metrics-out (Eqs. 1-4) AND independently checked by pytest (the claim's `check`); the predicate is the measured-expression form, the `check` is the test-suite form. A grader that cannot run raises; a missing/BLOCKED metric blocks the claim rather than fabricating a verdict.",
+    "quote_policy": "every `quote` is verbatim from paper/paper.md after (a) joining end-of-line hyphens with the hyphen kept (so 'temperature-softened' survives and 'dispropor-tionately' keeps its break hyphen) and (b) collapsing all whitespace to single spaces. PDF token spacing is preserved, e.g. '2 . 5', '[0 , 1]', '0 . 9370'. Verifier: python3 -c \"import re;t=open('paper/paper.md').read();t=re.sub(r'(?<=\\w)-\\s*\\n\\s*(?=\\w)','-',t);t=re.sub(r'\\s+',' ',t);print(QUOTE in t)\"",
     "compute_invariance": {
       "policy": "high = the assertion is structural (independent of the 4000-step training budget: gate bounds, simplex membership, stop-grad, single-network, degeneracy) or a sign-only ordering that survives seed changes; low = an exact magnitude that the paper reports for a single seed-0 run and that the split/noise/init seed-dependence perturbs. The numbers gate checks the HIGH claims.",
-      "counts": {"high": 6, "low": 3}
+      "counts": {
+        "high": 6,
+        "low": 3
+      }
     }
   },
   "arms": {
@@ -22,40 +34,56 @@
       "name": "Cross-entropy (baseline)",
       "command": "python run_experiment.py --lambda 0.0 --seed {seed} --metrics-out <tmp>",
       "config": {
-        "lambda": 0.0, "tau": 0.9, "s": 0.15, "temperature": 2.0,
-        "steps": 4000, "lr": 0.1, "batch_size": 64, "noise_rate": 0.2,
-        "noise_mode": "uniform-all", "batch_mode": "epoch-permutation",
-        "init": "he", "rng_layout": "init-first"
+        "lambda": 0.0,
+        "tau": 0.9,
+        "s": 0.15,
+        "temperature": 2.0,
+        "steps": 4000,
+        "lr": 0.1,
+        "batch_size": 64,
+        "noise_rate": 0.2,
+        "noise_mode": "uniform-all",
+        "batch_mode": "epoch-permutation",
+        "init": "he",
+        "rng_layout": "init-first"
       },
       "metrics": {
-        "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line (paper/paper.md:466-470). Headline metric.",
+        "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line (paper/paper.md:466-469). Headline metric.",
         "param_count": "Number of parameter tensors {W1,b1,W2,b2}; ==4 (single network, no extra params; paper/paper.md:21-23).",
         "gate_w_min": "Min over a batch of w=lam*sigmoid((c-tau)/s) (Eq. 2); ==0 at lambda=0 (degeneracy anchor).",
         "gate_w_max": "Max over a batch of w; ==0 at lambda=0 (w identically zero, t==y).",
         "degeneracy_loss_err": "|loss(lambda=0) - independent cross-entropy loss| on a batch; exactly 0.0 (paper/paper.md:253-280, 'recovers the cross-entropy baseline exactly').",
         "degeneracy_grad_err": "max|grad(lambda=0) - independent CE grad| over all four params; exactly 0.0."
       },
-      "notes": "Paper Table 1 first row (paper/paper.md:400-406). Same program as CWSD with --lambda 0.0; tau, s and temperature are inert at lambda=0 because w is identically 0 (paper/paper.md:253-280). The degeneracy_*_err metrics ARE the paper's own verification gate (lambda=0 reproduces the baseline exactly), measured as a bitwise comparison to an independently written cross-entropy routine."
+      "notes": "Paper Table 1 first row (tokens at paper/paper.md:400-406). Same program as CWSD with --lambda 0.0; tau, s and temperature are inert at lambda=0 because w is identically 0 (paper/paper.md:253-280). The degeneracy_*_err metrics ARE the paper's own verification gate (lambda=0 reproduces the baseline exactly), measured as a bitwise comparison to an independently written cross-entropy routine."
     },
     "cwsd": {
       "name": "CWSD (ours)",
       "command": "python run_experiment.py --lambda 1.0 --seed {seed} --metrics-out <tmp>",
       "config": {
-        "lambda": 1.0, "tau": 0.9, "s": 0.15, "temperature": 2.0,
-        "steps": 4000, "lr": 0.1, "batch_size": 64, "noise_rate": 0.2,
-        "noise_mode": "uniform-all", "batch_mode": "epoch-permutation",
-        "init": "he", "rng_layout": "init-first"
+        "lambda": 1.0,
+        "tau": 0.9,
+        "s": 0.15,
+        "temperature": 2.0,
+        "steps": 4000,
+        "lr": 0.1,
+        "batch_size": 64,
+        "noise_rate": 0.2,
+        "noise_mode": "uniform-all",
+        "batch_mode": "epoch-permutation",
+        "init": "he",
+        "rng_layout": "init-first"
       },
       "metrics": {
         "accuracy": "Held-out test accuracy in [0,1] on the clean, class-stratified 30% split (540 examples), from the 'FINAL accuracy=<float>' line. Headline metric.",
         "param_count": "Number of parameter tensors {W1,b1,W2,b2}; ==4 (single network, no extra params; paper/paper.md:21-23).",
         "gate_w_min": "Min over a batch of w=lam*sigmoid((c-tau)/s) (Eq. 2); >0 for lambda>0 (sigmoid is strictly positive).",
-        "gate_w_max": "Max over a batch of w; <lambda=1 (sigmoid<1), so w<1 (paper/paper.md:114-125 'maximum influence self-distillation may have').",
+        "gate_w_max": "Max over a batch of w; <lambda=1 (sigmoid<1), so w<1 (paper/paper.md:113-124, 'maximum influence self-distillation may have').",
         "target_min": "Min t_ik over a batch (Eq. 3); >=0 (t is a convex combination of two distributions, both >=0).",
-        "target_sum_err": "max|sum_k t_ik - 1| over a batch; ~1e-7 (t is a convex combination of two distributions, both summing to 1; paper/paper.md:172-176).",
+        "target_sum_err": "max|sum_k t_ik - 1| over a batch; ~1e-7 (t is a convex combination of two distributions, both summing to 1; paper/paper.md:171-174).",
         "stopgrad_grad_err": "max|hand-derived grad - central finite-diff grad| on a tiny network; ~1e-3 (float32 finite-diff noise). Proves dL/dz=(p-t)/B with t constant (Eq. 3 stop-grad; paper/paper.md:213-214)."
       },
-      "notes": "Paper Table 1 second row (paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-377); s=0.15 is calibrated because the paper never states the gate sharpness (SPEC.md section 4 item 1). The structural metrics (gate_w_*, target_*, stopgrad_grad_err, param_count) are the measured evidence for the paper's equation-invariants."
+      "notes": "Paper Table 1 second row (tokens at paper/paper.md:408-414). lambda=1, tau=0.9, T=2 are stated (paper/paper.md:361-375); s=0.15 is calibrated because the paper never states the gate sharpness (SPEC.md section 4 item 1). The structural metrics (gate_w_*, target_*, stopgrad_grad_err, param_count) are the measured evidence for the paper's equation-invariants."
     }
   },
   "claims": [
@@ -63,20 +91,20 @@
       "id": "cwsd-improves-over-baseline",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quote": "CWSD improves over the cross-entropy baseline (Table 1 caption; on disk the sentence reads 'CWSD improves over the cross-entropy baseline by 2.5 accuracy points.' across lines 420-427 with the spaced token stream '2 . 5')",
-      "citation": "paper/paper.md:420-427 (grep 'improves over the cross-entropy' resolves to line 420)",
+      "quote": "CWSD improves over the cross-entropy baseline by 2 . 5 accuracy points.",
+      "citation": "paper/paper.md:416-427 (grep 'improves over the cross-entropy' resolves to line 420)",
       "quantity": "measured.cwsd.accuracy - measured.baseline.accuracy",
       "direction": ">0",
-      "arithmetic": "(measured.cwsd.accuracy - measured.baseline.accuracy) > 0, evaluated at every seed in [0, 1, 2]. This is the paper's central claim and the one the reproduction gates on; it asks for a sign only, so it survives a smaller compute budget."
+      "arithmetic": "(measured.cwsd.accuracy - measured.baseline.accuracy) > 0, evaluated at every seed in [0, 1, 2]. This is the paper's central claim (Table 1 caption) and the one the reproduction gates on; it asks for a sign only, so it survives a smaller compute budget and seed changes."
     },
     {
       "id": "baseline-accuracy-value",
       "kind": "value",
       "compute_invariance": "low",
-      "quote": "Cross-entropy (baseline) 0 0.9370 (Table 1, first row; tokens 'Cross-entropy (baseline)', '0', '0', '.', '9370' on lines 400-406)",
-      "citation": "paper/paper.md:400-406 (grep '9370' resolves to lines 406 and 438)",
+      "quote": "CWSD reaches 0 . 9620 against the baseline’s 0 . 9370 , an improvement of 2 . 5 points",
+      "citation": "paper/paper.md:428-445 (grep '9370' resolves to lines 406 and 438; Table 1 first-row tokens at paper/paper.md:400-406)",
       "quantity": "measured.baseline.accuracy",
-      "claimed": 0.9370,
+      "claimed": 0.937,
       "tolerance": 0.01,
       "arithmetic": "abs(measured.baseline.accuracy - 0.9370) <= 0.01 at every seed. Exact magnitudes do not survive seed changes (the paper reports a single seed-0 run), hence low compute-invariance; the tolerance covers the paper's number plus five test examples on the 540-example test set."
     },
@@ -84,10 +112,10 @@
       "id": "cwsd-accuracy-value",
       "kind": "value",
       "compute_invariance": "low",
-      "quote": "CWSD (ours) 1 0.9620 (Table 1, second row; tokens 'CWSD (ours)', '1', '0', '.', '9620' on lines 408-414)",
-      "citation": "paper/paper.md:408-414 (grep '9620' resolves to lines 414 and 432)",
+      "quote": "CWSD reaches 0 . 9620 against the baseline’s 0 . 9370 , an improvement of 2 . 5 points",
+      "citation": "paper/paper.md:428-445 (grep '9620' resolves to lines 414 and 432; Table 1 second-row tokens at paper/paper.md:408-414)",
       "quantity": "measured.cwsd.accuracy",
-      "claimed": 0.9620,
+      "claimed": 0.962,
       "tolerance": 0.015,
       "arithmetic": "abs(measured.cwsd.accuracy - 0.9620) <= 0.015 at every seed. Low compute-invariance for the same reason as baseline-accuracy-value."
     },
@@ -95,8 +123,8 @@
       "id": "improvement-magnitude-2p5-points",
       "kind": "value",
       "compute_invariance": "low",
-      "quote": "it improves test accuracy by 2.5 points over standard cross-entropy. (Abstract; on disk 'by', '2', '.', '5', 'points over standard', 'cross-entropy' span lines 28-36)",
-      "citation": "paper/paper.md:28-36 (grep 'points over standard' resolves to line 34)",
+      "quote": "it improves test accuracy by 2 . 5 points over standard cross-entropy.",
+      "citation": "paper/paper.md:24-36 (grep 'points over standard' resolves to line 34)",
       "quantity": "measured.cwsd.accuracy - measured.baseline.accuracy",
       "claimed": 0.025,
       "tolerance": 0.02,
@@ -107,7 +135,7 @@
       "kind": "invariant",
       "compute_invariance": "high",
       "quote": "Setting the mixing coefficient to zero recovers the cross-entropy baseline exactly",
-      "citation": "paper/paper.md:35-36 (grep 'recovers the cross-entropy baseline exactly' resolves to line 35; see also the method-section restatement at paper/paper.md:253-280, grep 'strict generalisation')",
+      "citation": "paper/paper.md:35-36 (grep 'recovers the cross-entropy baseline exactly' resolves to line 35; method-section restatement at paper/paper.md:253-280, grep 'strict generalisation' resolves to line 273)",
       "predicate": "measured.baseline.gate_w_max == 0 and measured.baseline.degeneracy_loss_err < 1e-12 and measured.baseline.degeneracy_grad_err < 1e-12",
       "check": "pytest -q tests/test_degeneracy.py"
     },
@@ -115,8 +143,8 @@
       "id": "gate-weight-bounded-by-lambda",
       "kind": "invariant",
       "compute_invariance": "high",
-      "quote": "scaled by a coefficient lambda in [0,1] that sets the maximum influence self-distillation may have",
-      "citation": "paper/paper.md:114-125 (grep 'maximum influence' resolves to line 125; Eq. (2) at paper/paper.md:127-158)",
+      "quote": "scaled by a coefficient λ ∈ [0 , 1] that sets the maximum influence self-distillation may have",
+      "citation": "paper/paper.md:113-124 (grep 'maximum influence' resolves to line 124; Eq. (2) tokens at paper/paper.md:126-158)",
       "predicate": "measured.cwsd.gate_w_min > 0 and measured.cwsd.gate_w_max < 1",
       "check": "pytest -q tests/test_invariants.py::test_weight_bounded_by_lambda"
     },
@@ -124,8 +152,8 @@
       "id": "target-is-convex-combination",
       "kind": "invariant",
       "compute_invariance": "high",
-      "quote": "The training target is the convex combination of the label and the model's own temperature-softened prediction",
-      "citation": "paper/paper.md:172-176 (grep 'convex combination' resolves to line 172; Eq. (3) at paper/paper.md:178-212)",
+      "quote": "The training target is the convex combination of the label and the model’s own temperature-softened prediction",
+      "citation": "paper/paper.md:171-174 (grep 'convex combination' resolves to line 171; Eq. (3) tokens at paper/paper.md:177-212)",
       "predicate": "measured.cwsd.target_min >= 0 and measured.cwsd.target_sum_err < 1e-6",
       "check": "pytest -q tests/test_invariants.py::test_target_sums_to_one"
     },
@@ -150,13 +178,13 @@
   ],
   "not_tested": [
     {
-      "quote": "We attribute the gain to the gate suppressing the gradient contribution of examples whose labels disagree with a confident prediction, which are disproportionately the corrupted ones.",
-      "citation": "paper/paper.md:443-447 (grep 'We attribute the gain' resolves to line 443)",
-      "reason": "Mechanism/attribution claim, phrased by the paper itself as an attribution ('We attribute'), not a measured result. Testing it requires per-example gate-weight logging that the paper's output contract (one 'FINAL accuracy=' line, paper/paper.md:466-470) does not expose; intentionally left out of the gate."
+      "quote": "We attribute the gain to the gate suppressing the gradient contribution of examples whose labels disagree with a confident prediction, which are dispropor-tionately the corrupted ones.",
+      "citation": "paper/paper.md:445-447 (grep 'We attribute the gain' resolves to line 445)",
+      "reason": "Mechanism/attribution claim, phrased by the paper itself as an attribution ('We attribute'), not a measured result. Testing it requires per-example gate-weight logging that the paper's output contract (one 'FINAL accuracy=' line, paper/paper.md:466-469) does not expose; intentionally left out of the gate."
     },
     {
       "quote": "All results are single runs at seed 0",
-      "citation": "paper/paper.md:385-389 (grep 'single runs at seed' resolves to line 385)",
+      "citation": "paper/paper.md:385 (grep 'single runs at seed' resolves to line 385)",
       "reason": "The paper's exact Table-1 magnitudes are seed-0 runs of a pipeline in which the split, noise mask, and init all depend on the seed. Value-type claims at seeds 1 and 2 are therefore out-of-distribution for the paper's numbers and are covered by widened tolerances rather than asserted as reproductions at those seeds."
     }
   ]
