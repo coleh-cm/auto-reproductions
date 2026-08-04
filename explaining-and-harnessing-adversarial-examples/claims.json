@@ -1,122 +1,1353 @@
 {
-  "paper": "Goodfellow, Shlens & Szegedy, Explaining and Harnessing Adversarial Examples, ICLR 2015 (arXiv:1412.6572v3)",
-  "source_of_truth": "paper/source/iclr2015.tex; every citation is grep-verified <file>:<line>",
-  "metric_convention": "all errors/confidences/agreements are percents in [0,100], matching the paper's printed numbers",
-  "seeds": [0, 1, 2],
-  "seed_protocol": {
-    "seeds_default": [0, 1, 2],
-    "maxout_large_adv": [0, 1, 2, 3, 4],
-    "rngs_per_seed": ["weight_init", "minibatch_order", "dropout_masks"],
-    "rngs_citation": "paper/source/iclr2015.tex:506-508"
-  },
-  "evaluation_rules": {
-    "value": "mean of measured.<arm>.<metric> over the claim's seeds must satisfy |mean - claimed| <= tolerance",
-    "ordering": "the quantity expression must satisfy direction at EVERY seed of the claim",
-    "invariant": "the boolean predicate must be true at every seed",
-    "existence": "the boolean predicate must be true (at every seed unless the predicate says otherwise)",
-    "curve": "quantity is a sequence stored by the arm; sample it at x; for above/below/crosses the field against names the other curve, sampled at the same x, and diffs = quantity - against: above = all sampled diffs >0; below = all sampled diffs <0; crosses = first sampled diff >0 and last sampled diff <0; increasing = last>first with >=80% of consecutive diffs >=0; matches = elementwise |sampled-claimed| <= tolerance",
-    "gate": "only claims with compute_invariance == \"high\" gate the reproduction; medium/low are reported"
-  },
-  "arms": {
-    "softmax_reg": {"dataset": "mnist [0,1]", "arch": "linear 784->10 softmax", "train": "NLL to convergence", "eval": "clean; FGSM eps=0.25; rubbish N(0,I784)"},
-    "logreg_3v7": {"dataset": "mnist 3-vs-7 subset, y in {-1,+1}, +1=digit 3", "arch": "linear sigmoid", "train": "mean softplus margin (tex:402)", "eval": "clean; FGSM eps=0.25; analytic-equivalence check"},
-    "maxout_naive": {"dataset": "mnist [0,1]", "arch": "maxout MLP 240 units/layer, dropout (pieces/rates: paper silent, see SPEC 4)", "train": "early stop on val_err, patience 100 (tex:501-503)", "eval": "clean; FGSM eps=0.25; rubbish"},
-    "maxout_adv": {"dataset": "mnist", "arch": "maxout_naive config", "train": "adversarial training alpha=0.5 eps=0.25 (tex:486-488)", "eval": "clean; FGSM eps=0.25"},
-    "maxout_large_naive": {"dataset": "mnist", "arch": "maxout MLP 1600 units/layer (tex:498)", "train": "early stop val_err", "eval": "clean (claimed 1.14, tex:500); FGSM"},
-    "maxout_large_adv": {"dataset": "mnist", "arch": "1600 units/layer + adversarial training", "train": "early stop on adversarial validation error (tex:504-505); retrain on all 60,000 (tex:505-506)", "eval": "clean 5 seeds; FGSM eps=0.25"},
-    "maxout_sigmoid": {"dataset": "mnist", "arch": "maxout_naive backbone + 10 independent sigmoid outputs, BCE top (tex:909)", "train": "as maxout_naive", "eval": "rubbish"},
-    "noise_rademacher": {"dataset": "mnist", "arch": "maxout_naive config", "train": "+ per-pixel eps*{-1,+1} noise, resampled per minibatch (tex:555-556)", "eval": "FGSM eps=0.25"},
-    "noise_uniform": {"dataset": "mnist", "arch": "maxout_naive config", "train": "+ per-pixel U(-0.25,0.25) noise (tex:556)", "eval": "FGSM eps=0.25"},
-    "l1_maxout": {"dataset": "mnist", "arch": "maxout_naive config", "train": "+ L1 coef 0.0025 on FIRST layer (tex:429-430)", "eval": "train_err"},
-    "rbf_shallow": {"dataset": "mnist [0,1]", "arch": "10 independent RBF units exp((x-mu)'beta(x-mu)), beta negative-semidefinite (SPEC 4.4; tex:595)", "train": "NLL", "eval": "clean conf; FGSM eps=0.25; rubbish"},
-    "ensemble12": {"dataset": "mnist", "arch": "12 x maxout_naive, distinct seeds (tex:819-821)", "combine": "mean probability", "eval": "FGSM eps=0.25 vs (a) full-ensemble gradient (b) member-0 gradient"},
-    "agreement_mnist": {"dataset": "mnist", "reuses": ["maxout_naive", "softmax_reg", "rbf_shallow"], "eval": "label agreement on FGSM (eps=0.25) examples misclassified by maxout_naive; *_cond conditioned on both models wrong"},
-    "transfer_mnist": {"dataset": "mnist", "pair": ["maxout_large_naive (orig)", "maxout_large_adv (new)"], "eval": "FGSM eps=0.25 generated on one model, error measured on the other (tex:518-520)"},
-    "eps_trace": {"dataset": "mnist test", "reuses": "maxout_naive of same seed", "example": "first class-4 test example correctly classified by that seed's model", "protocol": "FGSM direction computed once at eps=0; sweep eps=-10..10 step 1; record the [21,10] logits (tex:762-770)"},
-    "cifar_conv_maxout": {"dataset": "cifar-10, GCN preprocessed to std~0.5 (tex:343-345)", "arch": "conv maxout (arch ours, paper silent)", "train": "to convergence", "eval": "FGSM eps=0.1; rubbish N(0,I3072) 1000 samples; targeted fooling sign-step (tex:953-955)"},
-    "mp_dbm": {"status": "NOT BUILT - see not_tested"},
-    "googlenet_imagenet": {"status": "NOT BUILT - see not_tested"}
-  },
-  "claims": [
-    {"id": "c01", "kind": "value", "arm": "softmax_reg", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.softmax_reg.adv_err", "claimed": 99.9, "tolerance": 2.0, "quote": "a shallow softmax classifier to have an error rate of 99.9\\% with an average confidence of", "citation": "paper/source/iclr2015.tex:333"},
-    {"id": "c02", "kind": "value", "arm": "softmax_reg", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.softmax_reg.adv_conf_all", "claimed": 79.3, "tolerance": 8.0, "note": "denominator all vs mistakes unstated (SPEC 4.10); with 99.9% error the two nearly coincide", "quote": "79.3\\% on the MNIST", "citation": "paper/source/iclr2015.tex:334"},
-    {"id": "c03", "kind": "ordering", "arm": "softmax_reg", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.softmax_reg.adv_err - measured.softmax_reg.clean_err", "direction": ">0", "quote": "We find that this method reliably causes a wide variety of models to misclassify their input.", "citation": "paper/source/iclr2015.tex:331"},
-    {"id": "c04", "kind": "value", "arm": "logreg_3v7", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.logreg_3v7.clean_err", "claimed": 1.6, "tolerance": 0.8, "quote": "c) MNIST 3s and 7s. The logistic regression model has a 1.6\\% error rate on the 3 versus 7 discrimination task on these examples.", "citation": "paper/source/iclr2015.tex:454"},
-    {"id": "c05", "kind": "value", "arm": "logreg_3v7", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.logreg_3v7.adv_err", "claimed": 99.0, "tolerance": 2.0, "quote": "The logistic regression model has an error rate of 99\\% on these examples.", "citation": "paper/source/iclr2015.tex:456"},
-    {"id": "c06", "kind": "ordering", "arm": "logreg_3v7", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.logreg_3v7.adv_err - measured.logreg_3v7.clean_err", "direction": ">0", "quote": "The logistic regression model has an error rate of 99\\% on these examples.", "citation": "paper/source/iclr2015.tex:456"},
-    {"id": "c07", "kind": "invariant", "arm": "logreg_3v7", "seeds": [0,1,2], "compute_invariance": "high", "predicate": "measured.logreg_3v7.analytic_equiv_max_absdiff < 1e-5", "note": "| mean_i zeta(-y_i(w.(x_i - eps*y_i*sign(w)) + b)) - mean_i zeta(y_i*(eps*||w||_1 - w.x_i - b)) | on a fixed batch; FGSM is exact for logreg", "quote": "Note that the sign of the gradient is just $- \\sign(\\vw)$, and that $\\vw^\\top \\sign(\\vw) = ||\\vw||_1$.", "citation": "paper/source/iclr2015.tex:407"},
-    {"id": "c08", "kind": "value", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_naive.clean_err", "claimed": 0.94, "tolerance": 0.3, "quote": "able to reduce the error rate from 0.94\\% without adversarial training to 0.84\\% with adversarial", "citation": "paper/source/iclr2015.tex:493"},
-    {"id": "c09", "kind": "value", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.maxout_naive.adv_err", "claimed": 89.4, "tolerance": 8.0, "quote": "}. In the same setting, a maxout network misclassifies 89.4\\%", "citation": "paper/source/iclr2015.tex:338"},
-    {"id": "c10", "kind": "value", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_naive.adv_conf_all", "claimed": 97.6, "tolerance": 8.0, "quote": "of our adversarial examples with an average confidence of 97.6\\%.", "citation": "paper/source/iclr2015.tex:339"},
-    {"id": "c11", "kind": "value", "arm": "maxout_adv", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_adv.clean_err", "claimed": 0.84, "tolerance": 0.25, "quote": "able to reduce the error rate from 0.94\\% without adversarial training to 0.84\\% with adversarial", "citation": "paper/source/iclr2015.tex:493"},
-    {"id": "c12", "kind": "ordering", "arm": "maxout_adv", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.maxout_naive.clean_err - measured.maxout_adv.clean_err", "direction": ">0", "note": "margin in the paper is only 0.1pp, so rated medium not high", "quote": "able to reduce the error rate from 0.94\\% without adversarial training to 0.84\\% with adversarial", "citation": "paper/source/iclr2015.tex:493"},
-    {"id": "c13", "kind": "ordering", "arm": "maxout_adv", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.maxout_naive.adv_err - measured.maxout_adv.adv_err", "direction": ">0", "note": "same-architecture version of 89.4% -> 17.9%; the paper's own numbers cross architectures", "quote": "examples based on the fast gradient sign method. With adversarial training, the error rate", "citation": "paper/source/iclr2015.tex:516"},
-    {"id": "c14", "kind": "value", "arm": "maxout_large_adv", "seeds": [0,1,2,3,4], "compute_invariance": "low", "quantity": "measured.maxout_large_adv.adv_err", "claimed": 17.9, "tolerance": 8.0, "quote": "fell to 17.9\\%. Adversarial examples are transferable between the two models but with the", "citation": "paper/source/iclr2015.tex:517"},
-    {"id": "c15", "kind": "value", "arm": "maxout_large_naive", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.maxout_large_naive.adv_err", "claimed": 89.4, "tolerance": 10.0, "note": "paper recalls the 89.4% figure for 'this same kind of model' (the 1600-unit one)", "quote": "adversarial training, this same kind of model had an error rate of 89.4\\% on adversarial", "citation": "paper/source/iclr2015.tex:515"},
-    {"id": "c16", "kind": "ordering", "arm": "maxout_large_adv", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.maxout_large_naive.adv_err - measured.maxout_large_adv.adv_err", "direction": ">0", "quote": "fell to 17.9\\%. Adversarial examples are transferable between the two models but with the", "citation": "paper/source/iclr2015.tex:517"},
-    {"id": "c17", "kind": "value", "arm": "maxout_large_naive", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_large_naive.clean_err", "claimed": 1.14, "tolerance": 0.3, "quote": "and get an error rate of 1.14\\% on the test set. With adversarial training, we found that", "citation": "paper/source/iclr2015.tex:500"},
-    {"id": "c18", "kind": "existence", "arm": "maxout_large_adv", "seeds": [0,1,2,3,4], "compute_invariance": "low", "predicate": "count(measured.maxout_large_adv.clean_err <= 0.9) >= 4 and mean(measured.maxout_large_adv.clean_err) <= 0.98 and max(measured.maxout_large_adv.clean_err) <= 1.1", "quote": "four trials that each had an error rate of 0.77\\% on the test set and one trial that had", "citation": "paper/source/iclr2015.tex:509"},
-    {"id": "c19", "kind": "value", "arm": "maxout_large_adv", "seeds": [0,1,2,3,4], "compute_invariance": "low", "quantity": "measured.maxout_large_adv.clean_err", "claimed": 0.782, "tolerance": 0.15, "quote": "an error rate of 0.83\\%. The average of 0.782\\% is the best result reported on the permutation", "citation": "paper/source/iclr2015.tex:510"},
-    {"id": "c20", "kind": "value", "arm": "maxout_large_adv", "seeds": [0,1,2,3,4], "compute_invariance": "low", "quantity": "measured.maxout_large_adv.adv_conf_mistakes", "claimed": 81.4, "tolerance": 12.0, "quote": "example was 81.4\\%. We also found that the weights of the learned model changed significantly,", "citation": "paper/source/iclr2015.tex:523"},
-    {"id": "c21", "kind": "value", "arm": "transfer_mnist", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.transfer_mnist.err_orig_on_advfromnew", "claimed": 40.9, "tolerance": 10.0, "quote": "adversarial examples generated via the new model yield an error rate of 40.9\\% on the original", "citation": "paper/source/iclr2015.tex:520"},
-    {"id": "c22", "kind": "value", "arm": "transfer_mnist", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.transfer_mnist.err_new_on_advfromorig", "claimed": 19.6, "tolerance": 8.0, "quote": "the original model yield an error rate of 19.6\\% on the adversarially trained model, while", "citation": "paper/source/iclr2015.tex:519"},
-    {"id": "c23", "kind": "ordering", "arm": "transfer_mnist", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.transfer_mnist.err_orig_on_advfromnew - measured.transfer_mnist.err_new_on_advfromorig", "direction": ">0", "quote": "adversarially trained model showing greater robustness. Adversarial examples generated via", "citation": "paper/source/iclr2015.tex:518"},
-    {"id": "c24", "kind": "value", "arm": "noise_rademacher", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.noise_rademacher.adv_err", "claimed": 86.2, "tolerance": 8.0, "quote": "to each pixel, or adding noise in $U(-\\eps, \\eps)$ to each pixel. These obtained an error rate of 86.2\\% with confidence", "citation": "paper/source/iclr2015.tex:556"},
-    {"id": "c25", "kind": "value", "arm": "noise_rademacher", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.noise_rademacher.adv_conf_all", "claimed": 97.3, "tolerance": 8.0, "quote": "97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.", "citation": "paper/source/iclr2015.tex:557"},
-    {"id": "c26", "kind": "value", "arm": "noise_uniform", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.noise_uniform.adv_err", "claimed": 90.4, "tolerance": 8.0, "quote": "97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.", "citation": "paper/source/iclr2015.tex:557"},
-    {"id": "c27", "kind": "value", "arm": "noise_uniform", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.noise_uniform.adv_conf_all", "claimed": 97.8, "tolerance": 8.0, "quote": "97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.", "citation": "paper/source/iclr2015.tex:557"},
-    {"id": "c28", "kind": "ordering", "arm": "noise_uniform", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "min(measured.noise_rademacher.adv_err, measured.noise_uniform.adv_err) - measured.maxout_large_adv.adv_err", "direction": ">0", "quote": "zero mean and zero covariance is very inefficient at preventing adversarial examples. The expected dot product", "citation": "paper/source/iclr2015.tex:550"},
-    {"id": "c29", "kind": "value", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.rbf_shallow.adv_err", "claimed": 55.4, "tolerance": 15.0, "quote": "rate of 55.4\\% on MNIST using adversarial examples generated with the fast gradient sign", "citation": "paper/source/iclr2015.tex:602"},
-    {"id": "c30", "kind": "value", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.rbf_shallow.adv_conf_mistakes", "claimed": 1.2, "tolerance": 2.0, "quote": "method and $\\eps = .25$. However, its confidence on mistaken examples is only $1.2\\%$.", "citation": "paper/source/iclr2015.tex:603"},
-    {"id": "c31", "kind": "value", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.rbf_shallow.clean_conf_all", "claimed": 60.6, "tolerance": 15.0, "quote": "Its average confidence on clean test examples is $60.6$\\%.", "citation": "paper/source/iclr2015.tex:604"},
-    {"id": "c32", "kind": "ordering", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.maxout_naive.adv_conf_mistakes - measured.rbf_shallow.adv_conf_mistakes", "direction": ">0", "quote": "RBF networks are naturally immune to adversarial examples, in the sense that they have low", "citation": "paper/source/iclr2015.tex:600"},
-    {"id": "c33", "kind": "ordering", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.rbf_shallow.clean_conf_all - measured.rbf_shallow.adv_conf_mistakes", "direction": ">0", "quote": "method and $\\eps = .25$. However, its confidence on mistaken examples is only $1.2\\%$.", "citation": "paper/source/iclr2015.tex:603"},
-    {"id": "c34", "kind": "value", "arm": "ensemble12", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.ensemble12.adv_err_ensemble_crafted", "claimed": 91.1, "tolerance": 8.0, "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed", "citation": "paper/source/iclr2015.tex:822"},
-    {"id": "c35", "kind": "value", "arm": "ensemble12", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.ensemble12.adv_err_single_crafted", "claimed": 87.9, "tolerance": 8.0, "quote": "member of the ensemble, the error rate falls to 87.9\\%. Ensembling provides only", "citation": "paper/source/iclr2015.tex:824"},
-    {"id": "c36", "kind": "ordering", "arm": "ensemble12", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.ensemble12.adv_err_ensemble_crafted - measured.ensemble12.clean_err", "direction": ">0", "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed", "citation": "paper/source/iclr2015.tex:822"},
-    {"id": "c37", "kind": "ordering", "arm": "ensemble12", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.ensemble12.adv_err_ensemble_crafted - measured.ensemble12.adv_err_single_crafted", "direction": ">0", "note": "paper margin only 3.2pp, so medium", "quote": "member of the ensemble, the error rate falls to 87.9\\%. Ensembling provides only", "citation": "paper/source/iclr2015.tex:824"},
-    {"id": "c38", "kind": "value", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.agreement_mnist.agree_softmax_all", "claimed": 54.6, "tolerance": 10.0, "quote": "predict the maxout network's class correctly 54.6\\% of the time. These numbers are largely", "citation": "paper/source/iclr2015.tex:683"},
-    {"id": "c39", "kind": "value", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.agreement_mnist.agree_rbf_all", "claimed": 16.0, "tolerance": 8.0, "quote": "the maxout network's class assignment only 16.0\\% of the time, while the softmax classifier", "citation": "paper/source/iclr2015.tex:682"},
-    {"id": "c40", "kind": "value", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.agreement_mnist.agree_softmax_cond", "claimed": 84.6, "tolerance": 10.0, "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's", "citation": "paper/source/iclr2015.tex:686"},
-    {"id": "c41", "kind": "value", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.agreement_mnist.agree_rbf_cond", "claimed": 54.3, "tolerance": 12.0, "quote": "class only 54.3\\% of the time. For comparison, the RBF network can predict softmax regression's", "citation": "paper/source/iclr2015.tex:687"},
-    {"id": "c42", "kind": "value", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.agreement_mnist.agree_rbf_on_softmax", "claimed": 53.6, "tolerance": 12.0, "note": "conditioning ambiguous (SPEC 4.17); read as both-wrong conditioned", "quote": "class 53.6\\% of the time, so it does have a strong linear component to its own behavior.", "citation": "paper/source/iclr2015.tex:688"},
-    {"id": "c43", "kind": "ordering", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.agreement_mnist.agree_softmax_all - measured.agreement_mnist.agree_rbf_all", "direction": ">0", "quote": "predict the maxout network's class correctly 54.6\\% of the time. These numbers are largely", "citation": "paper/source/iclr2015.tex:683"},
-    {"id": "c44", "kind": "ordering", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.agreement_mnist.agree_softmax_cond - measured.agreement_mnist.agree_rbf_cond", "direction": ">0", "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's", "citation": "paper/source/iclr2015.tex:686"},
-    {"id": "c45", "kind": "existence", "arm": "agreement_mnist", "seeds": [0,1,2], "compute_invariance": "high", "predicate": "measured.agreement_mnist.agree_softmax_cond > 40", "note": "'a significant proportion ... consistent with linear behavior'; 40 is far above 10-class chance (~10) and far below the paper's 84.6", "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's", "citation": "paper/source/iclr2015.tex:686"},
-    {"id": "c46", "kind": "value", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.maxout_naive.rubbish_err", "claimed": 98.35, "tolerance": 5.0, "quote": "of 98.35\\% on Gaussian rubbish examples with an average confidence of 92.8\\% on mistakes.", "citation": "paper/source/iclr2015.tex:908"},
-    {"id": "c47", "kind": "value", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_naive.rubbish_conf_mistakes", "claimed": 92.8, "tolerance": 10.0, "quote": "of 98.35\\% on Gaussian rubbish examples with an average confidence of 92.8\\% on mistakes.", "citation": "paper/source/iclr2015.tex:908"},
-    {"id": "c48", "kind": "value", "arm": "maxout_sigmoid", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_sigmoid.rubbish_err", "claimed": 68.0, "tolerance": 15.0, "quote": "Changing the top layer to independent sigmoids dropped the error rate to 68\\% with an average", "citation": "paper/source/iclr2015.tex:909"},
-    {"id": "c49", "kind": "value", "arm": "maxout_sigmoid", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_sigmoid.rubbish_conf_mistakes", "claimed": 87.9, "tolerance": 10.0, "quote": "confidence on mistakes of 87.9\\%.", "citation": "paper/source/iclr2015.tex:910"},
-    {"id": "c50", "kind": "value", "arm": "softmax_reg", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.softmax_reg.rubbish_err", "claimed": 59.8, "tolerance": 15.0, "quote": "A softmax regression model has an error rate of 59.8\\%", "citation": "paper/source/iclr2015.tex:920"},
-    {"id": "c51", "kind": "value", "arm": "softmax_reg", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.softmax_reg.rubbish_conf_mistakes", "claimed": 70.8, "tolerance": 15.0, "quote": "on the rubbish examples, with an average confidence on mistakes of 70.8\\%.", "citation": "paper/source/iclr2015.tex:921"},
-    {"id": "c52", "kind": "value", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.rbf_shallow.rubbish_err", "claimed": 0.0, "tolerance": 1.0, "quote": "we find an error rate of 0\\%. Note that when the error rate is zero the average confidence on a mistake", "citation": "paper/source/iclr2015.tex:923"},
-    {"id": "c53", "kind": "ordering", "arm": "rbf_shallow", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.maxout_naive.rubbish_err - measured.rbf_shallow.rubbish_err", "direction": ">0", "quote": "far from the training data, are not fooled by this phenomenon.", "citation": "paper/source/iclr2015.tex:903"},
-    {"id": "c54", "kind": "existence", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "medium", "predicate": "measured.maxout_naive.rubbish_class_shares['8'] < 1.0", "note": "share of rubbish false positives predicted as 8; paper observed exactly none", "quote": "and none were classified as 8s. Likewise, on CIFAR-10, 49.7\\% of the convolutional network's", "citation": "paper/source/iclr2015.tex:931"},
-    {"id": "c55", "kind": "value", "arm": "maxout_naive", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.maxout_naive.rubbish_class_shares['5']", "claimed": 45.3, "tolerance": 25.0, "quote": "On MNIST, 45.3\\% of a naively trained maxout network's false positives were classified as 5s,", "citation": "paper/source/iclr2015.tex:930"},
-    {"id": "c56", "kind": "value", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.cifar_conv_maxout.adv_err", "claimed": 87.15, "tolerance": 10.0, "quote": "Similarly, using $\\eps=.1$, we obtain an error rate of 87.15\\% and an average probability of", "citation": "paper/source/iclr2015.tex:340"},
-    {"id": "c57", "kind": "value", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.cifar_conv_maxout.adv_conf_mistakes", "claimed": 96.6, "tolerance": 8.0, "quote": "96.6\\% assigned to the incorrect labels", "citation": "paper/source/iclr2015.tex:341"},
-    {"id": "c58", "kind": "value", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "medium", "quantity": "measured.cifar_conv_maxout.rubbish_err", "claimed": 93.4, "tolerance": 8.0, "quote": "obtains an error rate of 93.4\\%, with an average confidence of 84.4\\%.", "citation": "paper/source/iclr2015.tex:912"},
-    {"id": "c59", "kind": "value", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.cifar_conv_maxout.rubbish_conf_mistakes", "claimed": 84.4, "tolerance": 10.0, "quote": "obtains an error rate of 93.4\\%, with an average confidence of 84.4\\%.", "citation": "paper/source/iclr2015.tex:912"},
-    {"id": "c60", "kind": "value", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.cifar_conv_maxout.fool_success_avg", "claimed": 75.3, "tolerance": 20.0, "quote": "step. Averaged over all ten classes, the method has an average per-step success rate of 75.3\\%.", "citation": "paper/source/iclr2015.tex:941"},
-    {"id": "c61", "kind": "value", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.cifar_conv_maxout.fool_success['0']", "claimed": 24.7, "tolerance": 15.0, "note": "class 0 = airplane in CIFAR-10 label order", "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling", "citation": "paper/source/iclr2015.tex:940"},
-    {"id": "c62", "kind": "existence", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "medium", "predicate": "measured.cifar_conv_maxout.fool_success['6'] >= 99 and measured.cifar_conv_maxout.fool_success['9'] >= 99", "note": "class 6 = frog, 9 = truck; paper: 100% per-step success for both", "quote": "with variable runtime. On CIFAR-10, we found that one sampling step had a 100\\% success rate for", "citation": "paper/source/iclr2015.tex:939"},
-    {"id": "c63", "kind": "existence", "arm": "cifar_conv_maxout", "seeds": [0,1,2], "compute_invariance": "high", "predicate": "measured.cifar_conv_maxout.fool_success['0'] <= min(measured.cifar_conv_maxout.fool_success[c] for c in 0..9)", "note": "airplane is the hardest class: its success rate is the minimum over classes", "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling", "citation": "paper/source/iclr2015.tex:940"},
-    {"id": "c64", "kind": "existence", "arm": "l1_maxout", "seeds": [0,1,2], "compute_invariance": "medium", "predicate": "measured.l1_maxout.train_err > 5.0", "quote": ".0025 was too large, and caused the model to get stuck with over 5\\% error on", "citation": "paper/source/iclr2015.tex:430"},
-    {"id": "c65", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_correct_seq", "against": "measured.eps_trace.logit_maxwrong_seq", "x": [0], "comparison": "above", "note": "at eps=0 the example is unperturbed and correctly classified as 4, so the correct-class curve sits above the max wrong-class curve (equivalently margin_seq > 0)", "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.", "citation": "paper/source/iclr2015.tex:764"},
-    {"id": "c66", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_correct_seq", "against": "measured.eps_trace.logit_maxwrong_seq", "x": [-10, 10], "comparison": "below", "note": "at BOTH tails the correct-class curve sits under the max wrong-class curve - the thin-manifold claim; figure read: class-4 curve at ~+200 vs wrong classes up to ~+800 at eps=-10; ~-350 vs ~+420 at eps=+10 (figures/read-figure.jsonl)", "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.", "citation": "paper/source/iclr2015.tex:764"},
-    {"id": "c67", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_correct_seq", "against": "measured.eps_trace.logit_maxwrong_seq", "x": [0,1,2,3,4,5,6,7,8,9,10], "comparison": "crosses", "note": "correct-class curve starts above the max wrong-class curve at eps=0 and ends below it at eps=10, crossing near eps of order 1 (vision read: at eps=+5 correct class already below top wrong class)", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
-    {"id": "c68", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "high", "quantity": "measured.eps_trace.logit_maxwrong_seq", "x": [0,1,2,3,4,5,6,7,8,9,10], "comparison": "increasing", "note": "predictions become very extreme moving into the rubbish regime", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
-    {"id": "c69", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.eps_trace.logit_maxwrong_seq", "x": [10], "comparison": "matches", "claimed": [420], "tolerance": 400, "note": "value read off Figure 4 left by the vision model (top wrong-class logit ~ +400..430 at eps=+10); tolerance covers reading error and reproduction spread - anchor only", "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we", "citation": "paper/source/iclr2015.tex:769"},
-    {"id": "c70", "kind": "curve", "arm": "eps_trace", "seeds": [0,1,2], "compute_invariance": "low", "quantity": "measured.eps_trace.logit_correct_seq", "x": [10], "comparison": "matches", "claimed": [-350], "tolerance": 350, "note": "class-4 logit read as ~ -350 at eps=+10 (figures/read-figure.jsonl); anchor only", "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that", "citation": "paper/source/iclr2015.tex:768"}
+ "paper": "Goodfellow, Shlens & Szegedy, Explaining and Harnessing Adversarial Examples, ICLR 2015 (arXiv:1412.6572v3)",
+ "source_of_truth": "paper/source/iclr2015.tex; every citation is grep-verified <file>:<line>",
+ "metric_convention": "all errors/confidences/agreements are percents in [0,100], matching the paper's printed numbers",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "seed_protocol": {
+  "seeds_default": [
+   0,
+   1,
+   2
   ],
-  "not_tested": [
-    {"what": "MP-DBM is vulnerable to FGSM eps=0.25 (error 97.5%); its clean error is 0.88%", "citation": "paper/source/iclr2015.tex:794,800", "reason": "requires training a multi-prediction deep Boltzmann machine; outside compute scope"},
-    {"what": "Fig.1 ImageNet demo: panda 57.7% -> gibbon 99.3% at eps=.007 on GoogLeNet", "citation": "paper/source/iclr2015.tex:364-383", "reason": "illustrative; needs pretrained GoogLeNet + ImageNet pipeline; not load-bearing"},
-    {"what": "Fig.3 weight-localization claim (adversarially trained weights more localized/interpretable)", "citation": "paper/source/iclr2015.tex:523-525", "reason": "qualitative; paper defines no metric"},
-    {"what": "rotational / scaled-gradient perturbation training weaker than FGSM adversarial training", "citation": "paper/source/iclr2015.tex:559-565", "reason": "no numbers reported"},
-    {"what": "hidden-layer vs input perturbation comparison", "citation": "paper/source/iclr2015.tex:567-585", "reason": "qualitative only"},
-    {"what": "maxout trained to 0% error on Gaussian rubbish with no clean-error benefit", "citation": "paper/source/iclr2015.tex:963-968", "reason": "tangential; stretch goal"},
-    {"what": "46.2% error rate for direction transferred across clean examples", "citation": "paper/source/iclr2015.tex:776-779", "reason": "commented out (%) by the authors in v3 - not a claim of the published paper"},
-    {"what": "quadratic/V1 model numbers (0.84% clean, 30.7% adversarial)", "citation": "paper/source/iclr2015.tex:620-643", "reason": "commented out (%) by the authors in v3"}
-  ]
+  "maxout_large_adv": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "rngs_per_seed": [
+   "weight_init",
+   "minibatch_order",
+   "dropout_masks"
+  ],
+  "rngs_citation": "paper/source/iclr2015.tex:506-508"
+ },
+ "evaluation_rules": {
+  "value": "mean of measured.<arm>.<metric> over the claim's seeds must satisfy |mean - claimed| <= tolerance",
+  "ordering": "the quantity expression must satisfy direction at EVERY seed of the claim",
+  "invariant": "the boolean predicate must be true at every seed",
+  "existence": "the boolean predicate must be true (at every seed unless the predicate says otherwise)",
+  "curve": "quantity is a sequence stored by the arm; sample it at x; for above/below/crosses the field against names the other curve, sampled at the same x, and diffs = quantity - against: above = all sampled diffs >0; below = all sampled diffs <0; crosses = first sampled diff >0 and last sampled diff <0; increasing = last>first with >=80% of consecutive diffs >=0; matches = elementwise |sampled-claimed| <= tolerance",
+  "gate": "only claims with compute_invariance == \"high\" gate the reproduction; medium/low are reported"
+ },
+ "arms": {
+  "softmax_reg": {
+   "dataset": "mnist [0,1]",
+   "arch": "linear 784->10 softmax",
+   "train": "NLL to convergence",
+   "eval": "clean; FGSM eps=0.25; rubbish N(0,I784)"
+  },
+  "logreg_3v7": {
+   "dataset": "mnist 3-vs-7 subset, y in {-1,+1}, +1=digit 3",
+   "arch": "linear sigmoid",
+   "train": "mean softplus margin (tex:402)",
+   "eval": "clean; FGSM eps=0.25; analytic-equivalence check"
+  },
+  "maxout_naive": {
+   "dataset": "mnist [0,1]",
+   "arch": "maxout MLP 240 units/layer, dropout (pieces/rates: paper silent, see SPEC 4)",
+   "train": "early stop on val_err, patience 100 (tex:501-503)",
+   "eval": "clean; FGSM eps=0.25; rubbish"
+  },
+  "maxout_adv": {
+   "dataset": "mnist",
+   "arch": "maxout_naive config",
+   "train": "adversarial training alpha=0.5 eps=0.25 (tex:486-488)",
+   "eval": "clean; FGSM eps=0.25"
+  },
+  "maxout_large_naive": {
+   "dataset": "mnist",
+   "arch": "maxout MLP 1600 units/layer (tex:498)",
+   "train": "early stop val_err",
+   "eval": "clean (claimed 1.14, tex:500); FGSM"
+  },
+  "maxout_large_adv": {
+   "dataset": "mnist",
+   "arch": "1600 units/layer + adversarial training",
+   "train": "early stop on adversarial validation error (tex:504-505); retrain on all 60,000 (tex:505-506)",
+   "eval": "clean 5 seeds; FGSM eps=0.25"
+  },
+  "maxout_sigmoid": {
+   "dataset": "mnist",
+   "arch": "maxout_naive backbone + 10 independent sigmoid outputs, BCE top (tex:909)",
+   "train": "as maxout_naive",
+   "eval": "rubbish"
+  },
+  "noise_rademacher": {
+   "dataset": "mnist",
+   "arch": "maxout_naive config",
+   "train": "+ per-pixel eps*{-1,+1} noise, resampled per minibatch (tex:555-556)",
+   "eval": "FGSM eps=0.25"
+  },
+  "noise_uniform": {
+   "dataset": "mnist",
+   "arch": "maxout_naive config",
+   "train": "+ per-pixel U(-0.25,0.25) noise (tex:556)",
+   "eval": "FGSM eps=0.25"
+  },
+  "l1_maxout": {
+   "dataset": "mnist",
+   "arch": "maxout_naive config",
+   "train": "+ L1 coef 0.0025 on FIRST layer (tex:429-430)",
+   "eval": "train_err"
+  },
+  "rbf_shallow": {
+   "dataset": "mnist [0,1]",
+   "arch": "10 independent RBF units exp((x-mu)'beta(x-mu)), beta negative-semidefinite (SPEC 4.4; tex:595)",
+   "train": "NLL",
+   "eval": "clean conf; FGSM eps=0.25; rubbish"
+  },
+  "ensemble12": {
+   "dataset": "mnist",
+   "arch": "12 x maxout_naive, distinct seeds (tex:819-821)",
+   "combine": "mean probability",
+   "eval": "FGSM eps=0.25 vs (a) full-ensemble gradient (b) member-0 gradient"
+  },
+  "agreement_mnist": {
+   "dataset": "mnist",
+   "reuses": [
+    "maxout_naive",
+    "softmax_reg",
+    "rbf_shallow"
+   ],
+   "eval": "label agreement on FGSM (eps=0.25) examples misclassified by maxout_naive; *_cond conditioned on both models wrong"
+  },
+  "transfer_mnist": {
+   "dataset": "mnist",
+   "pair": [
+    "maxout_large_naive (orig)",
+    "maxout_large_adv (new)"
+   ],
+   "eval": "FGSM eps=0.25 generated on one model, error measured on the other (tex:518-520)"
+  },
+  "eps_trace": {
+   "dataset": "mnist test",
+   "reuses": "maxout_naive of same seed",
+   "example": "first class-4 test example correctly classified by that seed's model",
+   "protocol": "FGSM direction computed once at eps=0; sweep eps=-10..10 step 1; record the [21,10] logits (tex:762-770)"
+  },
+  "cifar_conv_maxout": {
+   "dataset": "cifar-10, GCN preprocessed to std~0.5 (tex:343-345)",
+   "arch": "conv maxout (arch ours, paper silent)",
+   "train": "to convergence",
+   "eval": "FGSM eps=0.1; rubbish N(0,I3072) 1000 samples; targeted fooling sign-step (tex:953-955)"
+  },
+  "mp_dbm": {
+   "status": "NOT BUILT - see not_tested"
+  },
+  "googlenet_imagenet": {
+   "status": "NOT BUILT - see not_tested"
+  }
+ },
+ "claims": [
+  {
+   "id": "c01",
+   "kind": "value",
+   "arm": "softmax_reg",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.softmax_reg.adv_err",
+   "claimed": 99.9,
+   "tolerance": 2.0,
+   "quote": "a shallow softmax classifier to have an error rate of 99.9\\% with an average confidence of",
+   "citation": "paper/source/iclr2015.tex:333"
+  },
+  {
+   "id": "c02",
+   "kind": "value",
+   "arm": "softmax_reg",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.softmax_reg.adv_conf_all",
+   "claimed": 79.3,
+   "tolerance": 8.0,
+   "note": "denominator all vs mistakes unstated (SPEC 4.10); with 99.9% error the two nearly coincide",
+   "quote": "79.3\\% on the MNIST",
+   "citation": "paper/source/iclr2015.tex:334"
+  },
+  {
+   "id": "c03",
+   "kind": "ordering",
+   "arm": "softmax_reg",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.softmax_reg.adv_err - measured.softmax_reg.clean_err",
+   "direction": ">0",
+   "quote": "We find that this method reliably causes a wide variety of models to misclassify their input.",
+   "citation": "paper/source/iclr2015.tex:331"
+  },
+  {
+   "id": "c04",
+   "kind": "value",
+   "arm": "logreg_3v7",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.logreg_3v7.clean_err",
+   "claimed": 1.6,
+   "tolerance": 0.8,
+   "quote": "c) MNIST 3s and 7s. The logistic regression model has a 1.6\\% error rate on the 3 versus 7 discrimination task on these examples.",
+   "citation": "paper/source/iclr2015.tex:454"
+  },
+  {
+   "id": "c05",
+   "kind": "value",
+   "arm": "logreg_3v7",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.logreg_3v7.adv_err",
+   "claimed": 99.0,
+   "tolerance": 2.0,
+   "quote": "The logistic regression model has an error rate of 99\\% on these examples.",
+   "citation": "paper/source/iclr2015.tex:456"
+  },
+  {
+   "id": "c06",
+   "kind": "ordering",
+   "arm": "logreg_3v7",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.logreg_3v7.adv_err - measured.logreg_3v7.clean_err",
+   "direction": ">0",
+   "quote": "The logistic regression model has an error rate of 99\\% on these examples.",
+   "citation": "paper/source/iclr2015.tex:456"
+  },
+  {
+   "id": "c07",
+   "kind": "invariant",
+   "arm": "logreg_3v7",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "predicate": "measured.logreg_3v7.analytic_equiv_max_absdiff < 1e-5",
+   "note": "| mean_i zeta(-y_i(w.(x_i - eps*y_i*sign(w)) + b)) - mean_i zeta(y_i*(eps*||w||_1 - w.x_i - b)) | on a fixed batch; FGSM is exact for logreg",
+   "quote": "Note that the sign of the gradient is just $- \\sign(\\vw)$, and that $\\vw^\\top \\sign(\\vw) = ||\\vw||_1$.",
+   "citation": "paper/source/iclr2015.tex:407"
+  },
+  {
+   "id": "c08",
+   "kind": "value",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_naive.clean_err",
+   "claimed": 0.94,
+   "tolerance": 0.3,
+   "quote": "able to reduce the error rate from 0.94\\% without adversarial training to 0.84\\% with adversarial",
+   "citation": "paper/source/iclr2015.tex:493"
+  },
+  {
+   "id": "c09",
+   "kind": "value",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.maxout_naive.adv_err",
+   "claimed": 89.4,
+   "tolerance": 8.0,
+   "quote": "}. In the same setting, a maxout network misclassifies 89.4\\%",
+   "citation": "paper/source/iclr2015.tex:338"
+  },
+  {
+   "id": "c10",
+   "kind": "value",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_naive.adv_conf_all",
+   "claimed": 97.6,
+   "tolerance": 8.0,
+   "quote": "of our adversarial examples with an average confidence of 97.6\\%.",
+   "citation": "paper/source/iclr2015.tex:339"
+  },
+  {
+   "id": "c11",
+   "kind": "value",
+   "arm": "maxout_adv",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_adv.clean_err",
+   "claimed": 0.84,
+   "tolerance": 0.25,
+   "quote": "able to reduce the error rate from 0.94\\% without adversarial training to 0.84\\% with adversarial",
+   "citation": "paper/source/iclr2015.tex:493"
+  },
+  {
+   "id": "c12",
+   "kind": "ordering",
+   "arm": "maxout_adv",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.maxout_naive.clean_err - measured.maxout_adv.clean_err",
+   "direction": ">0",
+   "note": "margin in the paper is only 0.1pp, so rated medium not high",
+   "quote": "able to reduce the error rate from 0.94\\% without adversarial training to 0.84\\% with adversarial",
+   "citation": "paper/source/iclr2015.tex:493"
+  },
+  {
+   "id": "c13",
+   "kind": "ordering",
+   "arm": "maxout_adv",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.maxout_naive.adv_err - measured.maxout_adv.adv_err",
+   "direction": ">0",
+   "note": "same-architecture version of 89.4% -> 17.9%; the paper's own numbers cross architectures",
+   "quote": "examples based on the fast gradient sign method. With adversarial training, the error rate",
+   "citation": "paper/source/iclr2015.tex:516"
+  },
+  {
+   "id": "c14",
+   "kind": "value",
+   "arm": "maxout_large_adv",
+   "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_large_adv.adv_err",
+   "claimed": 17.9,
+   "tolerance": 8.0,
+   "quote": "fell to 17.9\\%. Adversarial examples are transferable between the two models but with the",
+   "citation": "paper/source/iclr2015.tex:517"
+  },
+  {
+   "id": "c15",
+   "kind": "value",
+   "arm": "maxout_large_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.maxout_large_naive.adv_err",
+   "claimed": 89.4,
+   "tolerance": 10.0,
+   "note": "paper recalls the 89.4% figure for 'this same kind of model' (the 1600-unit one)",
+   "quote": "adversarial training, this same kind of model had an error rate of 89.4\\% on adversarial",
+   "citation": "paper/source/iclr2015.tex:515"
+  },
+  {
+   "id": "c16",
+   "kind": "ordering",
+   "arm": "maxout_large_adv",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.maxout_large_naive.adv_err - measured.maxout_large_adv.adv_err",
+   "direction": ">0",
+   "quote": "fell to 17.9\\%. Adversarial examples are transferable between the two models but with the",
+   "citation": "paper/source/iclr2015.tex:517"
+  },
+  {
+   "id": "c17",
+   "kind": "value",
+   "arm": "maxout_large_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_large_naive.clean_err",
+   "claimed": 1.14,
+   "tolerance": 0.3,
+   "quote": "and get an error rate of 1.14\\% on the test set. With adversarial training, we found that",
+   "citation": "paper/source/iclr2015.tex:500"
+  },
+  {
+   "id": "c18",
+   "kind": "existence",
+   "arm": "maxout_large_adv",
+   "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "compute_invariance": "low",
+   "predicate": "count(measured.maxout_large_adv.clean_err <= 0.9) >= 4 and mean(measured.maxout_large_adv.clean_err) <= 0.98 and max(measured.maxout_large_adv.clean_err) <= 1.1",
+   "quote": "four trials that each had an error rate of 0.77\\% on the test set and one trial that had",
+   "citation": "paper/source/iclr2015.tex:509"
+  },
+  {
+   "id": "c19",
+   "kind": "value",
+   "arm": "maxout_large_adv",
+   "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_large_adv.clean_err",
+   "claimed": 0.782,
+   "tolerance": 0.15,
+   "quote": "an error rate of 0.83\\%. The average of 0.782\\% is the best result reported on the permutation",
+   "citation": "paper/source/iclr2015.tex:510"
+  },
+  {
+   "id": "c20",
+   "kind": "value",
+   "arm": "maxout_large_adv",
+   "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_large_adv.adv_conf_mistakes",
+   "claimed": 81.4,
+   "tolerance": 12.0,
+   "quote": "example was 81.4\\%. We also found that the weights of the learned model changed significantly,",
+   "citation": "paper/source/iclr2015.tex:523"
+  },
+  {
+   "id": "c21",
+   "kind": "value",
+   "arm": "transfer_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.transfer_mnist.err_orig_on_advfromnew",
+   "claimed": 40.9,
+   "tolerance": 10.0,
+   "quote": "adversarial examples generated via the new model yield an error rate of 40.9\\% on the original",
+   "citation": "paper/source/iclr2015.tex:520"
+  },
+  {
+   "id": "c22",
+   "kind": "value",
+   "arm": "transfer_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.transfer_mnist.err_new_on_advfromorig",
+   "claimed": 19.6,
+   "tolerance": 8.0,
+   "quote": "the original model yield an error rate of 19.6\\% on the adversarially trained model, while",
+   "citation": "paper/source/iclr2015.tex:519"
+  },
+  {
+   "id": "c23",
+   "kind": "ordering",
+   "arm": "transfer_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.transfer_mnist.err_orig_on_advfromnew - measured.transfer_mnist.err_new_on_advfromorig",
+   "direction": ">0",
+   "quote": "adversarially trained model showing greater robustness. Adversarial examples generated via",
+   "citation": "paper/source/iclr2015.tex:518"
+  },
+  {
+   "id": "c24",
+   "kind": "value",
+   "arm": "noise_rademacher",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.noise_rademacher.adv_err",
+   "claimed": 86.2,
+   "tolerance": 8.0,
+   "quote": "to each pixel, or adding noise in $U(-\\eps, \\eps)$ to each pixel. These obtained an error rate of 86.2\\% with confidence",
+   "citation": "paper/source/iclr2015.tex:556"
+  },
+  {
+   "id": "c25",
+   "kind": "value",
+   "arm": "noise_rademacher",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.noise_rademacher.adv_conf_all",
+   "claimed": 97.3,
+   "tolerance": 8.0,
+   "quote": "97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.",
+   "citation": "paper/source/iclr2015.tex:557"
+  },
+  {
+   "id": "c26",
+   "kind": "value",
+   "arm": "noise_uniform",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.noise_uniform.adv_err",
+   "claimed": 90.4,
+   "tolerance": 8.0,
+   "quote": "97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.",
+   "citation": "paper/source/iclr2015.tex:557"
+  },
+  {
+   "id": "c27",
+   "kind": "value",
+   "arm": "noise_uniform",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.noise_uniform.adv_conf_all",
+   "claimed": 97.8,
+   "tolerance": 8.0,
+   "quote": "97.3\\% and an error rate of 90.4\\% with a confidence of 97.8\\% respectively on fast gradient sign adversarial examples.",
+   "citation": "paper/source/iclr2015.tex:557"
+  },
+  {
+   "id": "c28",
+   "kind": "ordering",
+   "arm": "noise_uniform",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "min(measured.noise_rademacher.adv_err, measured.noise_uniform.adv_err) - measured.maxout_large_adv.adv_err",
+   "direction": ">0",
+   "quote": "zero mean and zero covariance is very inefficient at preventing adversarial examples. The expected dot product",
+   "citation": "paper/source/iclr2015.tex:550"
+  },
+  {
+   "id": "c29",
+   "kind": "value",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.rbf_shallow.adv_err",
+   "claimed": 55.4,
+   "tolerance": 15.0,
+   "quote": "rate of 55.4\\% on MNIST using adversarial examples generated with the fast gradient sign",
+   "citation": "paper/source/iclr2015.tex:602"
+  },
+  {
+   "id": "c30",
+   "kind": "value",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.rbf_shallow.adv_conf_mistakes",
+   "claimed": 1.2,
+   "tolerance": 2.0,
+   "quote": "method and $\\eps = .25$. However, its confidence on mistaken examples is only $1.2\\%$.",
+   "citation": "paper/source/iclr2015.tex:603"
+  },
+  {
+   "id": "c31",
+   "kind": "value",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.rbf_shallow.clean_conf_all",
+   "claimed": 60.6,
+   "tolerance": 15.0,
+   "quote": "Its average confidence on clean test examples is $60.6$\\%.",
+   "citation": "paper/source/iclr2015.tex:604"
+  },
+  {
+   "id": "c32",
+   "kind": "ordering",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.maxout_naive.adv_conf_mistakes - measured.rbf_shallow.adv_conf_mistakes",
+   "direction": ">0",
+   "quote": "RBF networks are naturally immune to adversarial examples, in the sense that they have low",
+   "citation": "paper/source/iclr2015.tex:600"
+  },
+  {
+   "id": "c33",
+   "kind": "ordering",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.rbf_shallow.clean_conf_all - measured.rbf_shallow.adv_conf_mistakes",
+   "direction": ">0",
+   "quote": "method and $\\eps = .25$. However, its confidence on mistaken examples is only $1.2\\%$.",
+   "citation": "paper/source/iclr2015.tex:603"
+  },
+  {
+   "id": "c34",
+   "kind": "value",
+   "arm": "ensemble12",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.ensemble12.adv_err_ensemble_crafted",
+   "claimed": 91.1,
+   "tolerance": 8.0,
+   "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed",
+   "citation": "paper/source/iclr2015.tex:822"
+  },
+  {
+   "id": "c35",
+   "kind": "value",
+   "arm": "ensemble12",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.ensemble12.adv_err_single_crafted",
+   "claimed": 87.9,
+   "tolerance": 8.0,
+   "quote": "member of the ensemble, the error rate falls to 87.9\\%. Ensembling provides only",
+   "citation": "paper/source/iclr2015.tex:824"
+  },
+  {
+   "id": "c36",
+   "kind": "ordering",
+   "arm": "ensemble12",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.ensemble12.adv_err_ensemble_crafted - measured.ensemble12.clean_err",
+   "direction": ">0",
+   "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed",
+   "citation": "paper/source/iclr2015.tex:822"
+  },
+  {
+   "id": "c37",
+   "kind": "ordering",
+   "arm": "ensemble12",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.ensemble12.adv_err_ensemble_crafted - measured.ensemble12.adv_err_single_crafted",
+   "direction": ">0",
+   "note": "paper margin only 3.2pp, so medium",
+   "quote": "member of the ensemble, the error rate falls to 87.9\\%. Ensembling provides only",
+   "citation": "paper/source/iclr2015.tex:824"
+  },
+  {
+   "id": "c38",
+   "kind": "value",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.agreement_mnist.agree_softmax_all",
+   "claimed": 54.6,
+   "tolerance": 10.0,
+   "quote": "predict the maxout network's class correctly 54.6\\% of the time. These numbers are largely",
+   "citation": "paper/source/iclr2015.tex:683"
+  },
+  {
+   "id": "c39",
+   "kind": "value",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.agreement_mnist.agree_rbf_all",
+   "claimed": 16.0,
+   "tolerance": 8.0,
+   "quote": "the maxout network's class assignment only 16.0\\% of the time, while the softmax classifier",
+   "citation": "paper/source/iclr2015.tex:682"
+  },
+  {
+   "id": "c40",
+   "kind": "value",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.agreement_mnist.agree_softmax_cond",
+   "claimed": 84.6,
+   "tolerance": 10.0,
+   "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's",
+   "citation": "paper/source/iclr2015.tex:686"
+  },
+  {
+   "id": "c41",
+   "kind": "value",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.agreement_mnist.agree_rbf_cond",
+   "claimed": 54.3,
+   "tolerance": 12.0,
+   "quote": "class only 54.3\\% of the time. For comparison, the RBF network can predict softmax regression's",
+   "citation": "paper/source/iclr2015.tex:687"
+  },
+  {
+   "id": "c42",
+   "kind": "value",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.agreement_mnist.agree_rbf_on_softmax",
+   "claimed": 53.6,
+   "tolerance": 12.0,
+   "note": "conditioning ambiguous (SPEC 4.17); read as both-wrong conditioned",
+   "quote": "class 53.6\\% of the time, so it does have a strong linear component to its own behavior.",
+   "citation": "paper/source/iclr2015.tex:688"
+  },
+  {
+   "id": "c43",
+   "kind": "ordering",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.agreement_mnist.agree_softmax_all - measured.agreement_mnist.agree_rbf_all",
+   "direction": ">0",
+   "quote": "predict the maxout network's class correctly 54.6\\% of the time. These numbers are largely",
+   "citation": "paper/source/iclr2015.tex:683"
+  },
+  {
+   "id": "c44",
+   "kind": "ordering",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.agreement_mnist.agree_softmax_cond - measured.agreement_mnist.agree_rbf_cond",
+   "direction": ">0",
+   "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's",
+   "citation": "paper/source/iclr2015.tex:686"
+  },
+  {
+   "id": "c45",
+   "kind": "existence",
+   "arm": "agreement_mnist",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "predicate": "measured.agreement_mnist.agree_softmax_cond > 40",
+   "note": "'a significant proportion ... consistent with linear behavior'; 40 is far above 10-class chance (~10) and far below the paper's 84.6",
+   "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's",
+   "citation": "paper/source/iclr2015.tex:686"
+  },
+  {
+   "id": "c46",
+   "kind": "value",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.maxout_naive.rubbish_err",
+   "claimed": 98.35,
+   "tolerance": 5.0,
+   "quote": "of 98.35\\% on Gaussian rubbish examples with an average confidence of 92.8\\% on mistakes.",
+   "citation": "paper/source/iclr2015.tex:908"
+  },
+  {
+   "id": "c47",
+   "kind": "value",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_naive.rubbish_conf_mistakes",
+   "claimed": 92.8,
+   "tolerance": 10.0,
+   "quote": "of 98.35\\% on Gaussian rubbish examples with an average confidence of 92.8\\% on mistakes.",
+   "citation": "paper/source/iclr2015.tex:908"
+  },
+  {
+   "id": "c48",
+   "kind": "value",
+   "arm": "maxout_sigmoid",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_sigmoid.rubbish_err",
+   "claimed": 68.0,
+   "tolerance": 15.0,
+   "quote": "Changing the top layer to independent sigmoids dropped the error rate to 68\\% with an average",
+   "citation": "paper/source/iclr2015.tex:909"
+  },
+  {
+   "id": "c49",
+   "kind": "value",
+   "arm": "maxout_sigmoid",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_sigmoid.rubbish_conf_mistakes",
+   "claimed": 87.9,
+   "tolerance": 10.0,
+   "quote": "confidence on mistakes of 87.9\\%.",
+   "citation": "paper/source/iclr2015.tex:910"
+  },
+  {
+   "id": "c50",
+   "kind": "value",
+   "arm": "softmax_reg",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.softmax_reg.rubbish_err",
+   "claimed": 59.8,
+   "tolerance": 15.0,
+   "quote": "A softmax regression model has an error rate of 59.8\\%",
+   "citation": "paper/source/iclr2015.tex:920"
+  },
+  {
+   "id": "c51",
+   "kind": "value",
+   "arm": "softmax_reg",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.softmax_reg.rubbish_conf_mistakes",
+   "claimed": 70.8,
+   "tolerance": 15.0,
+   "quote": "on the rubbish examples, with an average confidence on mistakes of 70.8\\%.",
+   "citation": "paper/source/iclr2015.tex:921"
+  },
+  {
+   "id": "c52",
+   "kind": "value",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.rbf_shallow.rubbish_err",
+   "claimed": 0.0,
+   "tolerance": 1.0,
+   "quote": "we find an error rate of 0\\%. Note that when the error rate is zero the average confidence on a mistake",
+   "citation": "paper/source/iclr2015.tex:923"
+  },
+  {
+   "id": "c53",
+   "kind": "ordering",
+   "arm": "rbf_shallow",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.maxout_naive.rubbish_err - measured.rbf_shallow.rubbish_err",
+   "direction": ">0",
+   "quote": "far from the training data, are not fooled by this phenomenon.",
+   "citation": "paper/source/iclr2015.tex:903"
+  },
+  {
+   "id": "c54",
+   "kind": "existence",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "predicate": "measured.maxout_naive.rubbish_class_shares['8'] < 1.0",
+   "note": "share of rubbish false positives predicted as 8; paper observed exactly none",
+   "quote": "and none were classified as 8s. Likewise, on CIFAR-10, 49.7\\% of the convolutional network's",
+   "citation": "paper/source/iclr2015.tex:931"
+  },
+  {
+   "id": "c55",
+   "kind": "value",
+   "arm": "maxout_naive",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.maxout_naive.rubbish_class_shares['5']",
+   "claimed": 45.3,
+   "tolerance": 25.0,
+   "quote": "On MNIST, 45.3\\% of a naively trained maxout network's false positives were classified as 5s,",
+   "citation": "paper/source/iclr2015.tex:930"
+  },
+  {
+   "id": "c56",
+   "kind": "value",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.cifar_conv_maxout.adv_err",
+   "claimed": 87.15,
+   "tolerance": 10.0,
+   "quote": "Similarly, using $\\eps=.1$, we obtain an error rate of 87.15\\% and an average probability of",
+   "citation": "paper/source/iclr2015.tex:340"
+  },
+  {
+   "id": "c57",
+   "kind": "value",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.cifar_conv_maxout.adv_conf_mistakes",
+   "claimed": 96.6,
+   "tolerance": 8.0,
+   "quote": "96.6\\% assigned to the incorrect labels",
+   "citation": "paper/source/iclr2015.tex:341"
+  },
+  {
+   "id": "c58",
+   "kind": "value",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "quantity": "measured.cifar_conv_maxout.rubbish_err",
+   "claimed": 93.4,
+   "tolerance": 8.0,
+   "quote": "obtains an error rate of 93.4\\%, with an average confidence of 84.4\\%.",
+   "citation": "paper/source/iclr2015.tex:912"
+  },
+  {
+   "id": "c59",
+   "kind": "value",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.cifar_conv_maxout.rubbish_conf_mistakes",
+   "claimed": 84.4,
+   "tolerance": 10.0,
+   "quote": "obtains an error rate of 93.4\\%, with an average confidence of 84.4\\%.",
+   "citation": "paper/source/iclr2015.tex:912"
+  },
+  {
+   "id": "c60",
+   "kind": "value",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.cifar_conv_maxout.fool_success_avg",
+   "claimed": 75.3,
+   "tolerance": 20.0,
+   "quote": "step. Averaged over all ten classes, the method has an average per-step success rate of 75.3\\%.",
+   "citation": "paper/source/iclr2015.tex:941"
+  },
+  {
+   "id": "c61",
+   "kind": "value",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.cifar_conv_maxout.fool_success['0']",
+   "claimed": 24.7,
+   "tolerance": 15.0,
+   "note": "class 0 = airplane in CIFAR-10 label order",
+   "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling",
+   "citation": "paper/source/iclr2015.tex:940"
+  },
+  {
+   "id": "c62",
+   "kind": "existence",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "predicate": "measured.cifar_conv_maxout.fool_success['6'] >= 99 and measured.cifar_conv_maxout.fool_success['9'] >= 99",
+   "note": "class 6 = frog, 9 = truck; paper: 100% per-step success for both",
+   "quote": "with variable runtime. On CIFAR-10, we found that one sampling step had a 100\\% success rate for",
+   "citation": "paper/source/iclr2015.tex:939"
+  },
+  {
+   "id": "c63",
+   "kind": "existence",
+   "arm": "cifar_conv_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "predicate": "measured.cifar_conv_maxout.fool_success['0'] <= min(measured.cifar_conv_maxout.fool_success[c] for c in 0..9)",
+   "note": "airplane is the hardest class: its success rate is the minimum over classes",
+   "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling",
+   "citation": "paper/source/iclr2015.tex:940"
+  },
+  {
+   "id": "c64",
+   "kind": "existence",
+   "arm": "l1_maxout",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "medium",
+   "predicate": "measured.l1_maxout.train_err > 5.0",
+   "quote": ".0025 was too large, and caused the model to get stuck with over 5\\% error on",
+   "citation": "paper/source/iclr2015.tex:430"
+  },
+  {
+   "id": "c65",
+   "kind": "curve",
+   "arm": "eps_trace",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.eps_trace.logit_correct_seq",
+   "against": "measured.eps_trace.logit_maxwrong_seq",
+   "x": [
+    0
+   ],
+   "comparison": "above",
+   "note": "at eps=0 the example is unperturbed and correctly classified as 4, so the correct-class curve sits above the max wrong-class curve (equivalently margin_seq > 0)",
+   "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
+   "citation": "paper/source/iclr2015.tex:764"
+  },
+  {
+   "id": "c66",
+   "kind": "curve",
+   "arm": "eps_trace",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.eps_trace.logit_correct_seq",
+   "against": "measured.eps_trace.logit_maxwrong_seq",
+   "x": [
+    -10,
+    10
+   ],
+   "comparison": "below",
+   "note": "at BOTH tails the correct-class curve sits under the max wrong-class curve - the thin-manifold claim; figure reads (figures/read-figure.jsonl): at eps=-10 class-4 ~ +200 vs top wrong-class ~ +800; at eps=+10 class-4 ~ -400 vs top ~ +400",
+   "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
+   "citation": "paper/source/iclr2015.tex:764"
+  },
+  {
+   "id": "c67",
+   "kind": "curve",
+   "arm": "eps_trace",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.eps_trace.logit_correct_seq",
+   "against": "measured.eps_trace.logit_maxwrong_seq",
+   "x": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "comparison": "crosses",
+   "note": "correct-class curve starts above the max wrong-class curve at eps=0 and ends below it at eps=10, crossing near eps of order 1 (vision read: at eps=+5 correct class already below top wrong class)",
+   "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we",
+   "citation": "paper/source/iclr2015.tex:769"
+  },
+  {
+   "id": "c68",
+   "kind": "curve",
+   "arm": "eps_trace",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "high",
+   "quantity": "measured.eps_trace.logit_maxwrong_seq",
+   "x": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "comparison": "increasing",
+   "note": "predictions become very extreme moving into the rubbish regime",
+   "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we",
+   "citation": "paper/source/iclr2015.tex:769"
+  },
+  {
+   "id": "c69",
+   "kind": "curve",
+   "arm": "eps_trace",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.eps_trace.logit_maxwrong_seq",
+   "x": [
+    10
+   ],
+   "comparison": "matches",
+   "claimed": [
+    400
+   ],
+   "tolerance": 400,
+   "note": "value read off Figure 4 left by the vision model in this run (top curve ~ +400 at eps=+10, figures/read-figure.jsonl); tolerance covers reading error and reproduction spread - anchor only",
+   "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we",
+   "citation": "paper/source/iclr2015.tex:769"
+  },
+  {
+   "id": "c70",
+   "kind": "curve",
+   "arm": "eps_trace",
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "compute_invariance": "low",
+   "quantity": "measured.eps_trace.logit_correct_seq",
+   "x": [
+    10
+   ],
+   "comparison": "matches",
+   "claimed": [
+    -400
+   ],
+   "tolerance": 400,
+   "note": "class-4 logit read as ~ -400 at eps=+10 in this run (figures/read-figure.jsonl); anchor only",
+   "quote": "The correct class is 4. We see that the unnormalized log probabilities for each class are conspicuously piecewise linear with $\\eps$ and that",
+   "citation": "paper/source/iclr2015.tex:768"
+  }
+ ],
+ "not_tested": [
+  {
+   "what": "MP-DBM is vulnerable to FGSM eps=0.25 (error 97.5%); its clean error is 0.88%",
+   "citation": "paper/source/iclr2015.tex:794,800",
+   "reason": "requires training a multi-prediction deep Boltzmann machine; outside compute scope"
+  },
+  {
+   "what": "Fig.1 ImageNet demo: panda 57.7% -> gibbon 99.3% at eps=.007 on GoogLeNet",
+   "citation": "paper/source/iclr2015.tex:364-383",
+   "reason": "illustrative; needs pretrained GoogLeNet + ImageNet pipeline; not load-bearing"
+  },
+  {
+   "what": "Fig.3 weight-localization claim (adversarially trained weights more localized/interpretable)",
+   "citation": "paper/source/iclr2015.tex:523-525",
+   "reason": "qualitative; paper defines no metric"
+  },
+  {
+   "what": "rotational / scaled-gradient perturbation training weaker than FGSM adversarial training",
+   "citation": "paper/source/iclr2015.tex:559-565",
+   "reason": "no numbers reported"
+  },
+  {
+   "what": "hidden-layer vs input perturbation comparison",
+   "citation": "paper/source/iclr2015.tex:567-585",
+   "reason": "qualitative only"
+  },
+  {
+   "what": "maxout trained to 0% error on Gaussian rubbish with no clean-error benefit",
+   "citation": "paper/source/iclr2015.tex:963-968",
+   "reason": "tangential; stretch goal"
+  },
+  {
+   "what": "46.2% error rate for direction transferred across clean examples",
+   "citation": "paper/source/iclr2015.tex:776-779",
+   "reason": "commented out (%) by the authors in v3 - not a claim of the published paper"
+  },
+  {
+   "what": "quadratic/V1 model numbers (0.84% clean, 30.7% adversarial)",
+   "citation": "paper/source/iclr2015.tex:620-643",
+   "reason": "commented out (%) by the authors in v3"
+  }
+ ]
 }

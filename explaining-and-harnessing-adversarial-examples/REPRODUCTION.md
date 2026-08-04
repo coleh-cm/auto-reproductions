@@ -13,7 +13,7 @@
 - [x] Branch `repro/explaining-and-harnessing-adversarial-examples` checked out (from `main`, which contains a prior merged run of this paper; this run supersedes it)
 - [x] PDF-extracted paper text saved to `paper/paper.md`
 - [x] arXiv LaTeX source (e-print 1412.6572) unpacked to `paper/source/`; `.tex`/`.bbl` tracked, figures/styles/tarball gitignored
-- [ ] SPEC.md (method spec from the paper)
+- [x] SPEC.md (method spec from the paper) — authored 2026-08-04 from `paper/source/iclr2015.tex`; all 70 claim quotes grep-verified verbatim at their cited lines; 26 fresh `read-figure` exchanges committed at `figures/read-figure.jsonl`; upstream code re-checked (pylearn2 maxout dir belongs to the maxout paper and is Theano-dead; GitHub title search returns only attack-only third-party notebooks; cleverhans is a generic library primitive) → no usable upstream, implement from SPEC
 - [ ] Implementation runs end to end
 - [ ] Adversarial review rounds clean
 - [ ] Readiness gates
