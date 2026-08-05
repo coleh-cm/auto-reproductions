@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""numbers_gate.py — evaluate claims.json against measured.json, write claims_result.json.
+"""selfcheck_claims.py — evaluate claims.json against measured.json, write selfcheck.json.
 
 The numbers gate. For each claim in claims.json it resolves the
 ``measured.<arm>.<metric>`` tokens from measured.json (per seed) and renders a
@@ -37,15 +37,17 @@ claims.json['arms']. This avoids depending on a separate metric registry and
 handles metrics whose names contain dots (the known arm name is the split
 point, longest-first).
 
-Output: claims_result.json = {produced_by, summary, claims, not_tested,
+Output: selfcheck.json = {produced_by, summary, claims, not_tested,
 generated_from}. Prints one FINAL line per verdict category and one
 FINAL gate=PASS|FAIL line (gate passes iff every HIGH claim is adjudicated
 ``pass`` with none blocked). Exits non-zero on a blocked HIGH claim or a
 failed HIGH claim — the gate's load-bearing verdict is over
 compute_invariance == "high".
 
-produced_by stamps the file with the gate's identity: claims_result.json must
-be written BY this gate and never by hand.
+produced_by stamps the file with the gate's identity. This is the
+reproduction's OWN self-check grader and writes selfcheck.json -- never
+claims_result.json, which the workflow's numbers gate owns (a script here
+writing that filename would collide with the gate and be refused).
 """
 from __future__ import annotations
 
@@ -57,7 +59,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent
 CLAIMS_PATH = REPO / "claims.json"
 MEASURED_PATH = REPO / "measured.json"
-OUT_PATH = REPO / "claims_result.json"
+OUT_PATH = REPO / "selfcheck.json"
 
 BLOCKED = "BLOCKED"
 
@@ -177,6 +179,19 @@ def _measured_value(measured: dict, arm: str, metric: str, seed):
     seed_block = arm_block.get(str(seed))
     if not isinstance(seed_block, dict):
         return BLOCKED
+    # `metric` may carry a subscript the harvester folded into the token name,
+    # e.g. ``rubbish_class_shares['8']`` or ``fool_success['0']``. Resolve the
+    # base key, then apply the subscript to the dict/list value.
+    if "[" in metric:
+        base, _, rest = metric.partition("[")
+        subscript = "[" + rest
+        val = seed_block.get(base, BLOCKED)
+        if val is BLOCKED:
+            return BLOCKED
+        try:
+            return eval("_v" + subscript, {"__builtins__": {}}, {"_v": val})
+        except Exception:
+            return BLOCKED
     return seed_block.get(metric, BLOCKED)
 
 
@@ -202,7 +217,10 @@ def _sample_at_x(seq, x_full, x_want):
     return out
 
 
-def _curve_verdict(comparison, q, r, claimed, tolerance):
+def _curve_verdict_seed(comparison, q, r, claimed, tolerance):
+    """Per-seed curve verdict over the stored sequence (one value per x in the
+    claim's x-list, stored as-is in measured.json -- the gate evaluates a curve
+    over the stored sequence, not a subsample)."""
     n = len(q)
     if comparison == "crosses":
         if r is None:
@@ -237,7 +255,8 @@ def _curve_verdict(comparison, q, r, claimed, tolerance):
         return nonpos >= 0.8 * len(diffs)
     if comparison == "matches":
         if not isinstance(claimed, list) or len(claimed) != n:
-            raise ValueError("matches needs `claimed` as a list of the same length")
+            raise ValueError("matches needs `claimed` as a list of the same length "
+                             f"as the stored sequence (claimed={len(claimed) if isinstance(claimed,list) else 'NA'}, seq={n})")
         return all(abs(qi - ci) <= tolerance for qi, ci in zip(q, claimed))
     raise ValueError(f"unknown curve comparison {comparison!r}")
 
@@ -247,7 +266,6 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
     comparison = claim["comparison"]
     q_tok = claim["quantity"]
     r_tok = claim.get("against", claim.get("reference"))
-    x_list = claim["x"]
     if q_tok not in canonical:
         return {"verdict": "blocked", "reason": "quantity is not a measured token",
                 "seeds_evaluated": []}
@@ -267,15 +285,8 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
     if not seeds:
         return {"verdict": "blocked", "reason": f"no seed data for arm {arm}",
                 "seeds_evaluated": []}
-    # Resolve the x-axis index labels: a curve claim's `x` holds SAMPLE POINTS
-    # (e.g. eps values), but the sequences are stored positionally. The arm's
-    # `eps_grid` (or generic `x_axis`/`grid` metric) gives the index labels; if
-    # absent, fall back to 0..n-1 (positional).
-    x_axis = None
-    for axis_key in ("eps_grid", "x_axis", "grid"):
-        if isinstance(_measured_value(measured, arm, axis_key, seeds[0]), list):
-            x_axis = _measured_value(measured, arm, axis_key, seeds[0])
-            break
+    # The stored sequence IS the sampled curve (one value per x in the claim's
+    # x-list); the gate evaluates it as-is, point by point. No eps_grid resampling.
     per_seed = []
     for s in seeds:
         q_raw = _measured_value(measured, arm, q_metric, s)
@@ -291,19 +302,15 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
             return {"verdict": "blocked",
                     "reason": f"{arm}.{r_metric} at seed {s} is not a sequence",
                     "seeds_evaluated": []}
-        # x_full = the index labels (eps_grid if available, else 0..n-1)
-        x_full = x_axis if x_axis is not None else list(range(len(q_raw)))
-        # sample at the claim's x (sample points)
-        q = _sample_at_x(q_raw, x_full, x_list)
-        r = _sample_at_x(r_raw, x_full, x_list) if r_tok else None
         try:
-            ok = _curve_verdict(comparison, q, r, claim.get("claimed"),
-                                float(claim.get("tolerance", 0.0)))
-        except Exception as e:
-            return {"verdict": "blocked", "reason": f"seed {s}: {e}",
+            ok = _curve_verdict_seed(comparison, q_raw, r_raw,
+                                     claim.get("claimed"),
+                                     float(claim.get("tolerance", 0.0)))
+        except Exception as ex:
+            return {"verdict": "blocked", "reason": f"seed {s}: {ex}",
                     "seeds_evaluated": []}
-        per_seed.append({"seed": s, "ok": bool(ok), "n_samples": len(q),
-                         "q_first": q[0], "q_last": q[-1]})
+        per_seed.append({"seed": s, "ok": bool(ok), "n_samples": len(q_raw),
+                         "q_first": q_raw[0], "q_last": q_raw[-1]})
     verdict = "pass" if all(p["ok"] for p in per_seed) else "fail"
     return {"verdict": verdict, "seeds_evaluated": [p["seed"] for p in per_seed],
             "comparison": comparison, "per_seed": per_seed}
@@ -343,12 +350,30 @@ def evaluate_claim(claim, measured, top_seeds, canonical, claims_doc=None):
     try:
         if is_aggregate(expr, canonical):
             import numpy as _np
-            token_values = {}
-            for t in tokens:
+            # Substitute each measured token with a placeholder VARIABLE NAME
+            # (not repr(array) -- ``repr`` yields ``array([...])`` which is not
+            # valid Python and leaks the disallowed name 'array' into co_names).
+            # The placeholder maps to the per-seed numpy array in the eval namespace.
+            namespace = {
+                "min": lambda *a: _np.minimum.reduce(a[0]) if len(a) == 1 else _np.minimum(*a),
+                "max": lambda *a: _np.maximum.reduce(a[0]) if len(a) == 1 else _np.maximum(*a),
+                "mean": lambda x: float(_np.mean(x)),
+                "abs": _np.abs,
+                "count": lambda x: int(_np.sum(_np.asarray(x, dtype=bool))),
+                "True": True, "False": False,
+            }
+            sub = expr
+            for t in sorted(tokens, key=lambda tk: len(tk), reverse=True):
                 arm, metric = canonical[t]
-                token_values[t] = _np.array([_measured_value(measured, arm, metric, s) for s in seeds], dtype=float)
-            sub = _substitute(expr, token_values, canonical)
-            result = _safe_eval(sub, aggregate=True)
+                arr = _np.array([_measured_value(measured, arm, metric, s) for s in seeds], dtype=float)
+                ph = f"__v{len(namespace)}"
+                sub = sub.replace(t, ph)
+                namespace[ph] = arr
+            code = compile(sub, "<claim-expr>", "eval")
+            for name in code.co_names:
+                if name not in namespace:
+                    raise ValueError(f"disallowed name in expression: {name!r}")
+            result = eval(code, {"__builtins__": {}}, namespace)
             if is_bool:
                 return {"verdict": "pass" if bool(result) else "fail",
                         "seeds_evaluated": seeds, "aggregate_value": bool(result)}
@@ -434,7 +459,7 @@ def main() -> int:
     }
 
     out = {
-        "produced_by": "numbers_gate.py",
+        "produced_by": "selfcheck_claims.py",
         "summary": summary,
         "claims": results,
         "not_tested": claims_doc.get("not_tested", []),

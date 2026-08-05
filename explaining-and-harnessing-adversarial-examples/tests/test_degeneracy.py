@@ -103,3 +103,85 @@ def test_degeneracy_detects_nonzero_eps():
     differs = any(not torch.equal(v1, v2)
                   for (k1, v1), (k2, v2) in zip(m_base.state_dict().items(), m_adv.state_dict().items()))
     assert differs, "eps>0 adversarial training gave bit-identical weights -- degeneracy check cannot detect a leak"
+
+
+def test_retrain_full_60k_is_from_scratch():
+    """positive (retrain protocol invariant, paper tex:505-506): the Phase 2
+    retrain-on-full-60k must restart from the INITIAL weights with a FRESH
+    optimizer, NOT continue from the Phase-1 state. We assert the DIRECT
+    property: the Phase-2 starting state (the model state right after Phase 2
+    reloads the init weights, before any Phase-2 step) is BIT-IDENTICAL to the
+    captured init state. If Phase 2 continued from the Phase-1 best_state (the
+    old bug), phase2_start_state would be the Phase-1 weights, NOT init, and
+    this assertion would fail. We also assert the final weights DIFFER from a
+    Phase-1-only run (Phase 2 actually retrains — a no-op Phase 2 would leave
+    the init weights and trivially "differ" from Phase-1, but then phase2_start
+    == final == init, which the first assertion plus a non-trivial best_epoch
+    rules out: if Phase 2 ran >=1 step from init it cannot stay at init).
+
+    The earlier guard only asserted final != Phase-1-only, which is true under
+    ANY continuation too — a vacuous check that could not detect the defect it
+    named. This version directly compares the Phase-2 start to init."""
+    d = _tiny_data()
+    # give the retrain a full split to use
+    d_full = dict(d)
+    d_full["x_train_full"] = d_full["x_train"]  # same small set; exercises the path
+    d_full["y_train_full"] = d_full["y_train"]
+    cfg = {"lr": 0.1, "max_epochs": 4, "batch_size": 64, "seed": 3,
+           "momentum": 0.9, "retrain_full_60k": True}
+    m_full = _fresh(3)
+    h_full = train.train(m_full, d_full, dict(cfg))
+    # Phase 1 must select an epoch count
+    assert h_full["best_epoch"] >= 1, "Phase 1 must select an epoch count"
+    # DIRECT from-scratch check: Phase 2 starts from the init weights
+    assert "init_state" in h_full and "phase2_start_state" in h_full, \
+        "retrain run did not expose init_state/phase2_start_state for guarding"
+    init_state = h_full["init_state"]
+    p2_start = h_full["phase2_start_state"]
+    for k in init_state:
+        assert torch.equal(init_state[k], p2_start[k]), \
+            f"Phase 2 did NOT start from init weights at {k} (continuation bug)"
+    # Phase 1-only run (no retrain) for comparison
+    m_p1 = _fresh(3)
+    cfg_p1 = dict(cfg)
+    cfg_p1.pop("retrain_full_60k")
+    h_p1 = train.train(m_p1, d_full, cfg_p1)
+    # final weights must DIFFER from Phase-1-only (Phase 2 actually retrains;
+    # a from-scratch retrain for best_epoch>=1 epochs diverges from the
+    # Phase-1-continued trajectory, and also from the init it started from)
+    differs_from_p1 = any(not torch.equal(v1, v2)
+                          for (k1, v1), (k2, v2) in zip(m_full.state_dict().items(),
+                                                        m_p1.state_dict().items()))
+    assert differs_from_p1, "retrain_full_60k produced bit-identical weights to Phase-1-only"
+    # and Phase 2 must have moved OFF the init weights (>=1 step ran)
+    final_state = m_full.state_dict()
+    moved_off_init = any(not torch.equal(init_state[k], final_state[k]) for k in init_state)
+    assert moved_off_init, "Phase 2 never moved off the init weights (no-op retrain?)"
+
+
+def test_retrain_full_60k_detects_continuation_bug():
+    """negative (retrain protocol invariant): simulate the OLD continuation
+    bug — Phase 2 resumes from the Phase-1 best_state instead of the init
+    weights — and show the guard above rejects it. We do this by checking that
+    the Phase-1 best_state is NOT equal to the init state (so a Phase-2 start
+    from Phase-1 would fail the `phase2_start == init` assertion). This proves
+    the guard has discriminating power: a continuation Phase 2 (phase2_start =
+    Phase-1 best_state) cannot pass as from-scratch (phase2_start = init)."""
+    d = _tiny_data()
+    d_full = dict(d)
+    d_full["x_train_full"] = d_full["x_train"]
+    d_full["y_train_full"] = d_full["y_train"]
+    cfg = {"lr": 0.1, "max_epochs": 4, "batch_size": 64, "seed": 3, "momentum": 0.9}
+    m = _fresh(3)
+    h = train.train(m, d_full, dict(cfg))
+    # Phase-1 best_state (the weights the old continuation bug would resume from)
+    best_state = {k: v.detach().clone() for k, v in m.state_dict().items()}
+    # a fresh init for the same seed
+    m_init = _fresh(3)
+    init_state = {k: v.detach().clone() for k, v in m_init.state_dict().items()}
+    # After >=1 epoch of training the best_state differs from the init (otherwise
+    # training is a no-op). If they differ, a phase2_start == best_state would
+    # fail the guard's `phase2_start == init` check — i.e. the guard catches the
+    # continuation bug.
+    differs = any(not torch.equal(best_state[k], init_state[k]) for k in init_state)
+    assert differs, "Phase-1 best_state == init (training was a no-op); guard cannot be tested"

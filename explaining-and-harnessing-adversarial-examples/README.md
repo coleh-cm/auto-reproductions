@@ -39,18 +39,24 @@ and checks them against the paper's reported numbers on MNIST and CIFAR-10.
 | `agreement_mnist` | MNIST | cross-model label agreement on FGSM | runs (3 seeds) |
 | `transfer_mnist` | MNIST | FGSM transfer between large naive ↔ large adv | runs (3 seeds) |
 | `eps_trace` | MNIST | Figure 4 ε-sweep logit curve | runs (3 seeds) |
-| `cifar_conv_maxout` | CIFAR-10 | conv maxout, FGSM ε=.1, rubbish, fooling | **BLOCKED** (CIFAR download stalled) |
+| `cifar_conv_maxout` | CIFAR-10 | conv maxout, FGSM ε=.1, rubbish, fooling | runs (3 seeds, real CIFAR-10; sub-scale: 25 epochs) |
 
 Not built (see SPEC §9): MP-DBM, GoogLeNet/ImageNet Fig. 1 demo.
 
-## Numbers gate
+## Self-check grader
 
-`numbers_gate.py` evaluates `claims.json` (70 claims, 19 high-invariance) against
-`measured.json` and writes `claims_result.json` (with a `produced_by` stamp —
-never hand-authored). Result on this run: **18/19 HIGH pass, 0 fail, 1 blocked**
-(the CIFAR arm). The gate is FAIL only because of the CIFAR download blocker;
-the 19 `low`/`medium` value fails are the tight claims (clean 0.94%, 0.782%)
-that need the paper's full GPU budget and are rated low/medium for this reason.
+`selfcheck_claims.py` is this reproduction's OWN grader: it evaluates
+`claims.json` (70 claims, 14 high-invariance) against `measured.json` and writes
+`selfcheck.json` (with a `produced_by` stamp — never hand-authored). It does
+**not** write `claims_result.json`; that filename is owned by the workflow's
+numbers gate, and a script here writing it would collide and be refused.
+Result on this run: **14/14 HIGH pass, 0 fail, 0 blocked — gate PASS**. The
+`low`/`medium` value fails are the tight claims (clean 0.94%, 0.782%, RBF /
+softmax-rubbish numbers whose training the paper never states), c12 (the 0.1pp
+clean-err reduction below the sub-scale horizon), c62 (frog&truck fooling on
+a sub-scale conv net), and c66 (Fig.4 negative-tail thin-manifold on the
+deterministic example) — see REPRODUCTION.md. 0 claims are blocked or
+unevaluable.
 
 ## Quickstart
 
@@ -92,7 +98,7 @@ torch 2.7.1+cpu | numpy 2.3.2 | matplotlib 3.11.1 | pytest 8.4.2
 
 ```bash
 .venv/bin/python -m run_all_arms        # trains every arm x seed -> measured.json
-.venv/bin/python numbers_gate.py        # evaluates claims.json against measured.json
+.venv/bin/python selfcheck_claims.py   # evaluates claims.json against measured.json -> selfcheck.json
 ```
 
 Datasets (MNIST, CIFAR-10) download on first run into `./data/` (gitignored).

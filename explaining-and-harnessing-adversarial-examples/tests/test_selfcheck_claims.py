@@ -1,12 +1,12 @@
-"""tests/test_numbers_gate.py — exercise the numbers gate (the grader) on a
+"""tests/test_selfcheck_claims.py — exercise the numbers gate (the grader) on a
 known-correct and a known-wrong input.
 
 The task contract: anything that decides whether an output is correct — a
 grader, scorer, equivalence check — must be exercised on one known-correct and
 one known-wrong input, and must invoke ``sys.executable`` rather than bare
-``python``. ``numbers_gate.py`` is exactly such a grader: it adjudicates every
-claim in claims.json against measured.json and writes claims_result.json. This
-test runs it in an isolated temp directory (so the real claims_result.json is
+``python``. ``selfcheck_claims.py`` is exactly such a grader: it adjudicates every
+claim in claims.json against measured.json and writes selfcheck.json. This
+test runs it in an isolated temp directory (so the real selfcheck.json is
 never clobbered) via ``sys.executable`` and asserts:
 
   - positive: a measured.json where HIGH claim c03 holds  -> verdict "pass"
@@ -30,7 +30,7 @@ import sys
 import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GATE = os.path.join(REPO, "numbers_gate.py")
+GATE = os.path.join(REPO, "selfcheck_claims.py")
 CLAIMS = os.path.join(REPO, "claims.json")
 PY = sys.executable  # never bare `python`: a host with only python3 would mis-grade
 
@@ -48,11 +48,11 @@ def _seed_measured(adv_err, clean_err):
 
 def _run_gate(tmpdir):
     """Run the COPIED gate in tmpdir so REPO resolves there (isolating the real
-    claims_result.json). Returns (returncode, stdout, stderr)."""
-    shutil.copy(GATE, os.path.join(tmpdir, "numbers_gate.py"))
+    selfcheck.json). Returns (returncode, stdout, stderr)."""
+    shutil.copy(GATE, os.path.join(tmpdir, "selfcheck_claims.py"))
     shutil.copy(CLAIMS, os.path.join(tmpdir, "claims.json"))
     return subprocess.run(
-        [PY, "numbers_gate.py"], cwd=tmpdir,
+        [PY, "selfcheck_claims.py"], cwd=tmpdir,
         capture_output=True, text=True,
     )
 
@@ -63,11 +63,11 @@ def _verdict(result_path, claim_id):
     for c in doc["claims"]:
         if c["id"] == claim_id:
             return c["verdict"]
-    raise AssertionError(f"{claim_id} not in claims_result.json")
+    raise AssertionError(f"{claim_id} not in selfcheck.json")
 
 
 def test_gate_positive_known_correct(tmp_path):
-    """c03 (adv_err - clean_err > 0) holds -> verdict pass; claims_result.json is
+    """c03 (adv_err - clean_err > 0) holds -> verdict pass; selfcheck.json is
     stamped produced_by the gate (never hand-authored).
 
     The gate's overall exit code is non-zero here because the *other* 18 HIGH
@@ -77,10 +77,10 @@ def test_gate_positive_known_correct(tmp_path):
     (tmp_path / "measured.json").write_text(json.dumps(_seed_measured(99.0, 10.0)))
     r = _run_gate(str(tmp_path))
     assert "FINAL gate=FAIL" in r.stdout, r.stdout + r.stderr  # 18 HIGH blocked
-    res = tmp_path / "claims_result.json"
+    res = tmp_path / "selfcheck.json"
     assert res.exists()
     doc = json.loads(res.read_text())
-    assert doc["produced_by"] == "numbers_gate.py"
+    assert doc["produced_by"] == "selfcheck_claims.py"
     assert _verdict(res, "c03") == "pass"
 
 
@@ -91,7 +91,7 @@ def test_gate_negative_known_wrong(tmp_path):
     r = _run_gate(str(tmp_path))
     # gate exits 1 because HIGH claim c03 failed (gate_pass False)
     assert r.returncode != 0, "a failed HIGH claim must make the gate exit non-zero"
-    res = tmp_path / "claims_result.json"
+    res = tmp_path / "selfcheck.json"
     assert _verdict(res, "c03") == "fail"
 
 
@@ -101,7 +101,7 @@ def test_gate_blocked_metric_not_silent_pass(tmp_path):
     (tmp_path / "measured.json").write_text(json.dumps({}))  # no arms at all
     r = _run_gate(str(tmp_path))
     assert r.returncode != 0  # c03 is HIGH and blocked -> gate_pass False
-    res = tmp_path / "claims_result.json"
+    res = tmp_path / "selfcheck.json"
     assert _verdict(res, "c03") == "blocked"
 
 
@@ -116,5 +116,5 @@ def test_gate_raises_on_unusable_input(tmp_path):
     assert "Traceback" in r.stderr, "the gate must raise a traceback, not return quietly"
     assert "FINAL gate=" not in r.stdout, (
         "a crashed grader must not emit a clean verdict line")
-    assert not (tmp_path / "claims_result.json").exists(), (
-        "a crashed grader must not write a claims_result.json")
+    assert not (tmp_path / "selfcheck.json").exists(), (
+        "a crashed grader must not write a selfcheck.json")

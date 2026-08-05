@@ -98,46 +98,86 @@ def test_logreg_w_dot_sign_w_equals_l1():
 
 def test_logreg_fgsm_equals_analytic_form():
     """c07 invariant: for logistic regression FGSM is EXACT, so the analytic
-    closed form equals the loss under the paper's perturbation. tex:407 states
-    "the sign of the gradient is just -sign(w)" — the worst-case direction that
-    decreases the margin w.x+b uniformly (independent of y), giving x_adv =
-    x - eps*sign(w). Then margin_adv = w.x+b - eps*||w||_1 and
-    J_adv = zeta(-y*margin_adv) = zeta(y*(eps*||w||_1 - w.x - b)) (tex:411).
+    closed form equals the loss under the REAL gradient-based per-example FGSM.
 
-    The invariant reduces to: the FGSM margin (w.(x-eps*sign(w))+b) equals the
-    analytic margin (eps*||w||_1 - (w.x+b)) up to float path noise, AND
-    sign(w)@w == ||w||_1 (tex:407). Asserted on detached tensors with a
-    tolerance that absorbs matmul-path float differences (the maths is exact)."""
+    sign(grad_x J) = -y*sign(w) for logreg (tex:407 drops the y factor — a sign
+    slip; the true sign is -y*sign(w)), so attack.fgsm gives x_adv_i = x_i -
+    eps*y_i*sign(w) and the loss is zeta(eps*||w||_1 - y_i*(w.x_i+b)). The
+    CORRECT worst-case closed form is zeta(eps*||w||_1 - y*(w.x+b)). We check
+    the identity with MIXED labels (y in {-1,+1}) using the real attack.fgsm,
+    so a sign bug in attack.fgsm OR the closed form breaks the invariant.
+
+    The paper's tex:411 form zeta(y*(eps*||w||_1 - w.x - b)) equals this only
+    for y=+1; for y=-1 it gives zeta(m - eps*||w||_1) which DECREASES the loss
+    (not the worst case) — see test_logreg_paper_tex411_form_fails_for_yneg."""
     torch.manual_seed(0)
     m = models.LogisticRegression3v7()
+    # train a little so w is non-trivial (sign(w) meaningful, mixed margins)
+    x_tr = torch.randn(256, 784)
+    y_tr = torch.where(torch.rand(256) > 0.5, 1, -1).long()
+    train.train(m, {"x_train": x_tr, "y_train": y_tr, "x_val": x_tr[:64],
+                    "y_val": y_tr[:64]},
+                {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 0,
+                 "momentum": 0.0})
     x = torch.randn(64, 784)
-    y = torch.where(torch.rand(64) > 0.5, 1, -1).long()
+    y = torch.where(torch.rand(64) > 0.5, 1, -1).long()  # MIXED labels
     eps = 0.25
     w = m.linear.weight.detach().squeeze(0)
     b = m.linear.bias.detach()
     w1 = w.abs().sum()
-    sign_w = torch.sign(w)
-    # tex:407: sign(w) @ w == ||w||_1  (the exact-FGSM identity for logreg)
-    assert torch.allclose(sign_w @ w, w1, atol=1e-5), \
-        f"sign(w)@w != ||w||_1: {float(sign_w @ w)} vs {float(w1)}"
-    # The FGSM margin (w.(x-eps*sign(w))+b) and the analytic margin
-    # (eps*||w||_1 - (w.x+b)) are NEGATIVES of each other; the losses agree
-    # because softplus(-y*margin_fgsm) == softplus(y*margin_analytic).
     yf = y.float()
-    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b
-    margin_analytic = eps * w1 - (x @ w + b)
-    fgsm_loss = float(torch.nn.functional.softplus(-yf * margin_fgsm).mean().item())
-    analytic = float(torch.nn.functional.softplus(yf * margin_analytic).mean().item())
-    assert abs(fgsm_loss - analytic) < 1e-3, \
-        f"FGSM loss {fgsm_loss} != analytic {analytic}"
+    # tex:407: sign(w) @ w == ||w||_1
+    assert torch.allclose(torch.sign(w) @ w, w1, atol=1e-5)
+    # REAL gradient-based per-example FGSM
+    x_adv = attack.fgsm(m, x, y, eps)
+    fgsm_loss = float(m.loss(x_adv, y).item())
+    # CORRECT worst-case closed form
+    margin = eps * w1 - yf * (x @ w + b)
+    analytic = float(torch.nn.functional.softplus(margin).mean().item())
+    assert abs(fgsm_loss - analytic) < 1e-4, \
+        f"FGSM loss {fgsm_loss} != correct analytic {analytic} (diff {abs(fgsm_loss-analytic):.2e})"
+
+
+def test_logreg_paper_tex411_form_fails_for_yneg():
+    """negative / discriminating (c07): the paper's OWN tex:411 closed form
+    zeta(y*(eps*||w||_1 - w.x - b)) does NOT match the real per-example FGSM
+    loss for mixed labels — it has a sign slip for y=-1 (it decreases the loss
+    instead of maximizing it). Asserting the paper's form would fail, which is
+    WHY c07 checks the corrected form zeta(eps*||w||_1 - y*(w.x+b)). This proves
+    the invariant is not a rubber stamp: it would reject the paper's own
+    (slipped) closed form on mixed labels."""
+    torch.manual_seed(0)
+    m = models.LogisticRegression3v7()
+    x_tr = torch.randn(256, 784)
+    y_tr = torch.where(torch.rand(256) > 0.5, 1, -1).long()
+    train.train(m, {"x_train": x_tr, "y_train": y_tr, "x_val": x_tr[:64],
+                    "y_val": y_tr[:64]},
+                {"lr": 0.1, "max_epochs": 3, "batch_size": 64, "seed": 0,
+                 "momentum": 0.0})
+    x = torch.randn(64, 784)
+    y = torch.where(torch.rand(64) > 0.5, 1, -1).long()  # MIXED labels
+    eps = 0.25
+    w = m.linear.weight.detach().squeeze(0)
+    b = m.linear.bias.detach()
+    w1 = w.abs().sum()
+    yf = y.float()
+    x_adv = attack.fgsm(m, x, y, eps)
+    fgsm_loss = float(m.loss(x_adv, y).item())
+    # paper's tex:411 form (the slipped one)
+    paper_margin = yf * (eps * w1 - (x @ w + b))
+    paper_analytic = float(torch.nn.functional.softplus(paper_margin).mean().item())
+    assert abs(fgsm_loss - paper_analytic) > 1e-2, \
+        (f"paper tex:411 form matched the real FGSM loss on mixed labels "
+         f"({fgsm_loss} vs {paper_analytic}) — the sign slip did not bite; "
+         f"invariant lacks discriminating power")
 
 
 def test_logreg_analytic_wrong_sign_differs():
-    """negative (logreg_analytic_equivalence instrument): the WRONG-sign analytic
-    form -- using +eps*||w||_1 (i.e. perturbing x in the +sign(w) direction,
-    which INCREASES the margin instead of decreasing it) -- does NOT match the
-    FGSM loss. Proves the equivalence check rejects a known-wrong closed form
-    rather than rubber-stamping any sign."""
+    """negative (logreg_analytic_equivalence instrument): a WRONG-sign attack
+    (perturbing x in the +y*sign(w) direction, which INCREASES the margin
+    instead of decreasing it) does NOT match the correct closed form. Proves
+    the equivalence check rejects a sign-flipped attack rather than rubber-
+    stamping any sign."""
     torch.manual_seed(0)
     m = models.LogisticRegression3v7()
     x = torch.randn(64, 784)
@@ -146,16 +186,15 @@ def test_logreg_analytic_wrong_sign_differs():
     w = m.linear.weight.detach().squeeze(0)
     b = m.linear.bias.detach()
     w1 = w.abs().sum()
-    sign_w = torch.sign(w)
     yf = y.float()
-    # correct FGSM margin (paper's -sign(w) perturbation)
-    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b
-    fgsm_loss = float(torch.nn.functional.softplus(-yf * margin_fgsm).mean().item())
-    # WRONG-sign analytic form: -eps*||w||_1 - (w.x+b)  (the +sign(w) bug)
-    margin_wrong = -eps * w1 - (x @ w + b)
-    wrong_loss = float(torch.nn.functional.softplus(yf * margin_wrong).mean().item())
-    assert abs(fgsm_loss - wrong_loss) > 1e-3, \
-        f"wrong-sign analytic form matched FGSM loss ({fgsm_loss} vs {wrong_loss}) -- check is a rubber stamp"
+    # WRONG-sign attack: x + eps*y*sign(w) (increases margin for the true label)
+    x_adv_wrong = x + eps * (yf.unsqueeze(1) * torch.sign(w).unsqueeze(0))
+    wrong_loss = float(m.loss(x_adv_wrong, y).item())
+    # CORRECT closed form
+    correct = float(torch.nn.functional.softplus(
+        eps * w1 - yf * (x @ w + b)).mean().item())
+    assert abs(wrong_loss - correct) > 1e-2, \
+        f"wrong-sign attack matched the correct closed form ({wrong_loss} vs {correct}) — rubber stamp"
 
 
 def test_loss_non_negative():
@@ -322,3 +361,93 @@ def test_rubbish_rejects_wrong_threshold():
     buggy_err = float((conf > 0.0).float().mean().item()) * 100.0  # the bug
     assert correct_err <= 5.0, f"correct eval not ~0 on robust RBF: {correct_err}"
     assert buggy_err >= 95.0, f"buggy eval not ~100 on robust RBF: {buggy_err}"
+
+
+def test_rbf_nu_trainable_receives_gradient():
+    """positive (RBF autograd invariant): when nu_trainable=True the nu
+    Parameter MUST receive a gradient from loss.backward(). An earlier
+    implementation wrapped self.nu in float(...) inside _quad, which detached
+    it from the autograd graph and silently zeroed the nu gradient. The default
+    (nu_trainable=False, a buffer) is unaffected, but the trainable path must
+    not be silently broken."""
+    torch.manual_seed(0)
+    m = models.RBFNet(nu=0.01, nu_trainable=True)
+    assert m.nu.requires_grad, "nu_trainable=True must make nu a learnable Parameter"
+    x = torch.from_numpy(data.rubbish(784, 32, seed=0))
+    y = torch.zeros(32, dtype=torch.long)
+    loss = m.loss(x, y)
+    loss.backward()
+    assert m.nu.grad is not None, "nu received no gradient (float(nu) detach bug?)"
+    assert torch.isfinite(m.nu.grad), "nu gradient is not finite"
+
+
+def test_rbf_nu_buffer_default_is_not_learnable():
+    """negative: by default nu is a fixed buffer (not a Parameter), so it has
+    no .grad attribute and requires_grad=False. This is the paper-silent default
+    (SPEC 4.4); the trainable path above is opt-in."""
+    torch.manual_seed(0)
+    m = models.RBFNet(nu=0.01)  # nu_trainable defaults False
+    assert not isinstance(m.nu, torch.nn.Parameter), "default nu must be a buffer"
+    assert not m.nu.requires_grad, "default nu must not require grad"
+
+
+def test_build_x_adv_uses_eval_mode_no_dropout():
+    """positive (adversarial-training FGSM mode invariant): the in-training FGSM
+    perturbation is computed with the model in EVAL mode (dropout OFF), so the
+    perturbation is non-zero on essentially all pixels with a non-zero input
+    gradient. Under the old bug (train mode, active dropout mask) the input
+    gradient is exactly 0 on masked pixels. With input dropout p=0.99 the
+    train-mode gradient is ~0 on ~99% of pixels while the eval-mode perturbation
+    is non-zero on most — a >50pp gap. Guards the review finding that the
+    adversarial-training attack ran through an active dropout mask."""
+    torch.manual_seed(0)
+    m = models.MaxoutMLP(32, 2, 3, {"input": 0.99, "hidden": 0.0})
+    x = torch.rand(8, 784)
+    y = torch.randint(0, 10, (8,))
+    m.train()
+    x_adv = train._build_x_adv(m, x, y, 0.25)
+    assert m.training, "_build_x_adv did not restore the model's train mode"
+    frac_eval = ((x_adv - x).abs() > 0).float().mean().item()
+    # contrast: a TRAIN-mode FGSM (the bug) zeros the input gradient on masked pixels
+    m.train()
+    x_req = x.detach().clone().requires_grad_(True)
+    g_train = torch.autograd.grad(m.loss(x_req, y), x_req)[0]
+    frac_train = (g_train.abs() > 0).float().mean().item()
+    assert frac_eval > 0.5, f"eval-mode perturbation mostly zero ({frac_eval:.3f})"
+    assert frac_eval > frac_train + 0.5, \
+        f"eval-mode frac {frac_eval:.3f} not >> train-mode {frac_train:.3f}; dropout not off in _build_x_adv"
+
+
+def test_rbf_has_no_log_temp_and_no_loss_clamp():
+    """positive (RBF equation-faithfulness invariant, tex:595): the printed
+    RBF equation has NO per-class temperature and NO loss clamp. An earlier
+    version carried an inert `log_temp` Parameter and a `nll.clamp(min=-50)`
+    (dead, since RBF logits <= 0 => NLL >= 0). Both are removed; this test
+    guards against their reintroduction and asserts NLL is non-negative by
+    construction (so no clamp is needed)."""
+    m = models.RBFNet()
+    assert not hasattr(m, "log_temp"), "RBFNet should not carry a log_temp Parameter"
+    torch.manual_seed(0)
+    x = torch.randn(16, 784)
+    y = torch.randint(0, 10, (16,))
+    with torch.no_grad():
+        logits = m.logits(x)
+    assert (logits <= 1e-6).all(), f"RBF logits should be <= 0, got max {logits.max().item()}"
+    loss = m.loss(x, y).item()
+    assert loss >= -1e-6, f"RBF NLL negative ({loss}); clamp would be dead but NLL should be >= 0"
+
+
+def test_conv_maxout_has_no_post_relu():
+    """positive (CIFAR arch-faithfulness invariant): maxout is itself the
+    nonlinearity (Goodfellow et al. 2013c); NO ReLU CALL is applied after a
+    conv-maxout stage (an earlier version inserted F.relu, an extra nonlinearity
+    the paper never describes). Guards against reintroduction. (Checks for a
+    relu() call, not the word 'relu' in comments.)"""
+    import inspect
+    import re
+    src = inspect.getsource(models.ConvMaxoutCIFAR.forward_features)
+    # strip comments so a docstring/comment mentioning 'relu' does not trigger
+    code_lines = [ln.split("#")[0] for ln in src.splitlines()]
+    code = "\n".join(code_lines)
+    assert not re.search(r"\brelu\s*\(", code), \
+        "ConvMaxoutCIFAR.forward_features calls relu() (should be pure maxout)"

@@ -164,12 +164,17 @@ def load_mnist(seed=0):
 
 
 def load_mnist_full(seed=0):
-    """60k train / 10k val (last 10k of train) / 10k test."""
+    """50k train / 10k val / 10k test for Phase 1 early-stopping, PLUS the full
+    60k (x_train_full) for the Phase 2 from-scratch retrain (paper tex:505-506:
+    train on the train split to pick the epoch count, then RETRAIN on all 60k).
+    x_train is the first 50k (val held out); x_train_full is all 60k."""
     x_train, y_train, x_test, y_test = _load_mnist_raw()
     x_val = x_train[50000:]
     y_val = y_train[50000:]
+    x_tr = x_train[:50000]
+    y_tr = y_train[:50000]
     return {
-        "x_train": x_train, "y_train": y_train,
+        "x_train": x_tr, "y_train": y_tr,
         "x_train_full": x_train, "y_train_full": y_train,
         "x_val": x_val, "y_val": y_val,
         "x_test": x_test, "y_test": y_test,
@@ -256,8 +261,38 @@ def check_cifar10_fingerprint(d):
         assert d[k].dtype == np.int64, f"{k} dtype {d[k].dtype} != int64"
         labels = set(np.unique(d[k]).tolist())
         assert labels == set(range(10)), f"{k} labels {labels} != {{0..9}}"
-    gstd = float(d["x_train"].std())
-    assert abs(gstd - 0.5) < 0.04, f"x_train global std {gstd} not ~0.5 (GCN not applied?)"
+    for k in ("x_train", "x_val", "x_test"):
+        gstd_k = float(d[k].std())
+        assert abs(gstd_k - 0.5) < 0.04, f"{k} global std {gstd_k} not ~0.5 (GCN not applied?)"
+    # Structural check (not a rubber stamp): real CIFAR-10 images have highly
+    # NON-UNIFORM per-pixel variance (sky pixels ~constant, object pixels vary),
+    # while a std-matched SYNTHETIC iid corpus (e.g. N(0, 0.25*I_3072) GCN'd to
+    # global std 0.5) has ~uniform per-pixel variance (std of per-pixel stds ~0).
+    # This rejects the closed-book failure mode (a synthetic corpus that passes
+    # shape + global-std + label-set) WITHOUT a precomputed checksum, which we
+    # cannot populate here because the CIFAR download is blocked in this env.
+    per_pix_std = d["x_train"].std(axis=0)  # [3072] std of each pixel across images
+    pp_std_spread = float(per_pix_std.std())
+    assert pp_std_spread > 0.01, (
+        f"per-pixel-std spread {pp_std_spread} too uniform; real CIFAR-10 has "
+        f"structured (non-uniform) per-pixel variance, a std-matched iid "
+        f"synthetic corpus does not. (GCN pixel-sum is ~0 by construction for "
+        f"ANY centered corpus, so a sum checksum cannot distinguish them.)")
+
+
+def cifar10_available():
+    """True iff the real CIFAR-10 tar is present and loadable, WITHOUT triggering
+    a network download. A missing dataset is a blocked result (the contract);
+    callers must not hang on a download that this environment throttles/drops, so
+    this checks the local tar only and never reaches the network."""
+    dest = os.path.join(DATA_DIR, "cifar-10-python.tar.gz")
+    if not os.path.exists(dest) or os.path.getsize(dest) < 1000:
+        return False
+    try:
+        _load_cifar_raw()  # reads the local tar; no download (dest exists)
+        return True
+    except Exception:
+        return False
 
 
 def load_cifar10(seed=0):

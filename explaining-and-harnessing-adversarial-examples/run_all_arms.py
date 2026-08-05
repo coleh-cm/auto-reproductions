@@ -48,7 +48,7 @@ EPOCHS_LOGREG = 30
 EPOCHS_MAXOUT240 = 25
 EPOCHS_MAXOUT1600 = 6
 EPOCHS_RBF = 30
-EPOCHS_CONV = 8
+EPOCHS_CONV = 25
 ENSEMBLE_MEMBERS = 12
 ENSEMBLE_EPOCHS = 8  # 12 members x 8 epochs x 3 seeds; capped for CPU tractability
 
@@ -91,8 +91,23 @@ def _primary(arm, m):
         "transfer_mnist": "err_orig_on_advfromnew",
         "eps_trace": "margin_seq",  # sequence; prints mean
         "cifar_conv_maxout": "adv_err",
+        # deliberately-not-built arms (SPEC §9): no claims reference them, but
+        # measured.json must cover every arm in claims.json with BLOCKED.
+        "mp_dbm": "adv_err",
+        "googlenet_imagenet": "adv_err",
     }
     return table.get(arm)
+
+
+# Arms in claims.json['arms'] that this reproduction deliberately does NOT build
+# (SPEC §9: MP-DBM needs a multi-prediction deep Boltzmann machine; Fig.1 needs
+# pretrained GoogLeNet + ImageNet). They carry no claims; recorded as BLOCKED at
+# every seed so measured.json covers every arm in claims.json honestly (never a
+# silent synthetic substitute).
+NOT_BUILT = {
+    "mp_dbm": "MP-DBM (multi-prediction deep Boltzmann machine) outside compute scope (SPEC §9)",
+    "googlenet_imagenet": "Fig.1 ImageNet demo needs pretrained GoogLeNet + ImageNet (SPEC §9)",
+}
 
 
 def _seeded(seeds, fn):
@@ -127,22 +142,37 @@ def arm_softmax_reg(seed):
 
 
 def _logreg_analytic_equiv(m, d, eps=0.25, n=1024):
-    """c07: | mean zeta(-y(w.(x - eps*sign(w)) + b)) - mean zeta(y*(eps*||w||_1 - w.x - b)) |
-    should be ~0 on a fixed batch. The paper's exact FGSM for logreg uses the
-    uniform perturbation eta = -eps*sign(w) (tex:407 "sign of the gradient is
-    just -sign(w)"), giving x_adv = x - eps*sign(w) and the closed form
-    zeta(y*(eps*||w||_1 - w.x - b)) (tex:411)."""
+    """c07: | mean zeta(-y*(w.(x_adv) + b)) - mean zeta(eps*||w||_1 - y*(w.x + b)) |
+    should be ~0 on a fixed batch, where x_adv is the REAL gradient-based FGSM
+    `attack.fgsm(m, x, y, eps)` (per-example perturbation eta_i = -eps*y_i*sign(w),
+    since sign(grad_x J) = -y*sign(w) for logistic regression). The CORRECT
+    worst-case closed form for the per-example FGSM is
+    zeta(eps*||w||_1 - y*(w.x + b)).
+
+    NOTE on the paper's sign slip: tex:407 states "the sign of the gradient is
+    just -sign(w)" and tex:411 gives the closed form zeta(y*(eps*||w||_1 - w.x - b)).
+    That holds only for y=+1: the true per-example gradient sign is -y*sign(w)
+    (the y factor is dropped at tex:407), so the worst-case perturbation is
+    x_i - eps*y_i*sign(w), giving loss zeta(eps*||w||_1 - y_i*(w.x_i+b)). The
+    paper's tex:411 form equals this only for y=+1; for y=-1 it gives
+    zeta(m - eps*||w||_1), which DECREASES the loss (not the worst case). We
+    therefore check the identity against the CORRECT closed form
+    zeta(eps*||w||_1 - y*(w.x+b)), using the real attack.fgsm — so a sign bug in
+    either attack.fgsm or the closed form breaks the invariant (it has
+    discriminating power). Verified to ~1e-6 on a fixed batch with mixed labels.
+    """
     x = _t(d, "x_train")[:n]
     y = _t(d, "y_train", "long")[:n]
     w = m.linear.weight.detach().squeeze(0)
     b = m.linear.bias.detach()
-    # paper's exact perturbation (uniform -sign(w), tex:407)
-    x_adv = x - eps * torch.sign(w).unsqueeze(0)
+    # REAL gradient-based per-example FGSM (sign(grad_x J) = -y*sign(w))
+    x_adv = attack.fgsm(m, x, y, eps)
     fgsm_loss = m.loss(x_adv, y)
     w1 = w.abs().sum()
     yf = y.float()
-    margin = eps * w1 - (x @ w + b)  # eps*||w||_1 - w.x - b
-    analytic = torch.nn.functional.softplus(yf * margin).mean()
+    # CORRECT worst-case closed form (not the paper's tex:411 y-multiplied form)
+    margin = eps * w1 - yf * (x @ w + b)
+    analytic = torch.nn.functional.softplus(margin).mean()
     return float(abs(fgsm_loss.item() - analytic.item()))
 
 
@@ -188,9 +218,12 @@ def arm_maxout_naive(seed):
     train_err = h["train_err"][-1]
     adv = ev.adv_eval(m, x_test, y_test, EPS_MNIST)
     rub = ev.rubbish_eval(m, 784, 10000, seed)
-    return {"clean_err": clean, "train_err": train_err, **adv,
-            "rubbish_err": rub["rubbish_err"], "rubbish_conf_mistakes": rub["rubbish_conf_mistakes"],
-            "rubbish_class_shares": rub["rubbish_class_shares"]}
+    out = {"clean_err": clean, "train_err": train_err, **adv,
+           "rubbish_err": rub["rubbish_err"], "rubbish_conf_mistakes": rub["rubbish_conf_mistakes"],
+           "rubbish_class_shares": rub["rubbish_class_shares"]}
+    for k in range(10):  # flattened: gate cannot subscript dict values
+        out[f"rubbish_share_{k}"] = float(rub["rubbish_class_shares"].get(str(k), 0.0))
+    return out
 
 
 def arm_maxout_adv(seed):
@@ -352,57 +385,127 @@ def arm_transfer_mnist(seed, large_naive=None, large_adv=None):
             "err_new_on_advfromorig": err_new_on_orig}
 
 
-def arm_eps_trace(seed, maxout_naive_model=None):
-    d = _torch_data(data.load_mnist(seed))
-    if maxout_naive_model is None:
-        maxout_naive_model, _ = _train_maxout(240, seed, d, epochs=EPOCHS_MAXOUT240)
-    maxout_naive_model.eval()
-    x_test, y_test = d["x_test"], d["y_test"]
-    with torch.no_grad():
-        preds = maxout_naive_model.predict(x_test)
-    yv = y_test.view(-1)
-    correct = (preds == yv) & (yv == 4)
-    idx = torch.where(correct)[0]
-    if len(idx) == 0:
-        print(f"  eps_trace: no correctly-classified class-4 test example", flush=True)
-        return "BLOCKED"
-    eps_grid_t = torch.linspace(-10, 10, 21)
-    eps_grid = [float(v) for v in range(-10, 11)]
-    # The paper's Fig 4 illustrates the THIN-MANIFOLD property: the correct class
-    # wins only near eps=0 and loses at both tails. The paper does not state which
-    # class-4 example it used (tex:768 "The correct class is 4"); the "first
-    # correctly classified class-4" example need not exhibit the property. We
-    # therefore select the first class-4 example that DOES exhibit the thin
-    # manifold (margin>0 at eps=0, margin<0 at eps=+-10) -- this is the figure's
-    # stated claim, and ~5/30 class-4 examples show it (a real, non-universal
-    # property, matching the paper's "thin manifold" wording). Falls back to
-    # the first correct class-4 example if none exhibit it.
-    chosen = None
-    for i in idx[:60]:
-        ei = int(i)
-        tr0 = attack.fgsm_logits_trace(maxout_naive_model, x_test[ei], 4, eps_grid_t).detach().numpy()
-        lc = tr0[:, 4]; lw = np.delete(tr0, 4, axis=1).max(1)
-        m_neg, m_0, m_pos = lc[0] - lw[0], lc[10] - lw[10], lc[20] - lw[20]
-        if m_0 > 0 and m_neg < 0 and m_pos < 0:
-            chosen = ei
-            break
-    if chosen is None:
-        chosen = int(idx[0])
-        print(f"  eps_trace: no thin-manifold example in first 60; using first correct class-4 ({chosen})", flush=True)
-    ex_i = chosen
-    x0 = x_test[ex_i]
-    y0 = int(y_test[ex_i].item())
-    logits = attack.fgsm_logits_trace(maxout_naive_model, x0, y0, eps_grid_t).detach().cpu().numpy()
-    logit_correct = [float(logits[i, y0]) for i in range(21)]
-    wrong = np.delete(logits, y0, axis=1)
-    logit_maxwrong = [float(wrong[i].max()) for i in range(21)]
-    margin = [float(logit_correct[i] - logit_maxwrong[i]) for i in range(21)]
-    return {"eps_grid": eps_grid, "logit_correct_seq": logit_correct,
-            "logit_maxwrong_seq": logit_maxwrong, "margin_seq": margin,
-            "example_index": ex_i, "example_true_label": y0}
+EPS_TRACE_GRID = torch.linspace(-10, 10, 21)
+EPS_TRACE_X = [float(v) for v in range(-10, 11)]
+
+
+def _eps_trace_metrics(logits, y0):
+    """From a [21,K] logit trace (eps -10..10) build the full + sampled curve
+    metrics the eps_trace claims evaluate. The full 21-point sequence feeds the
+    `below at both tails` claim (c66); the per-claim sampled sequences (one value
+    per x in the claim's x-list) feed c65/c67/c68/c69/c70, because the numbers
+    gate evaluates a curve over the stored sequence point-by-point against a
+    per-point seed-spread noise floor (SPEC evaluation_rules.curve)."""
+    lc = logits[:, y0]
+    lw = np.delete(logits, y0, axis=1).max(1)
+    margin = lc - lw
+    out = {
+        "eps_grid": list(EPS_TRACE_X),
+        "logit_correct_seq": [float(v) for v in lc],          # 21pt (c66 tails)
+        "logit_maxwrong_seq": [float(v) for v in lw],         # 21pt (c66 tails)
+        "margin_seq": [float(v) for v in margin],             # 21pt (reference)
+        # c66: tails only (eps=-10, +10) -> below at both tails
+        "logit_correct_tails": [float(lc[0]), float(lc[20])],
+        "logit_maxwrong_tails": [float(lw[0]), float(lw[20])],
+        # c65: eps=0 only -> above
+        "logit_correct_e0": [float(lc[10])],
+        "logit_maxwrong_e0": [float(lw[10])],
+        # c67 / c68: eps=0..10 (11pt) -> crosses / increasing
+        "logit_correct_pos": [float(lc[10 + k]) for k in range(11)],
+        "logit_maxwrong_pos": [float(lw[10 + k]) for k in range(11)],
+        # c69 / c70: eps=+10 only -> matches the figure anchors (+400 / -400)
+        "logit_correct_e10": [float(lc[20])],
+        "logit_maxwrong_e10": [float(lw[20])],
+    }
+    return out
+
+
+def arm_eps_trace_all(seeds):
+    """Figure 4 eps-trace for ALL seeds at once.
+
+    The curve claims (c65-c70) assert the thin-manifold shape of the paper's
+    Figure 4 on a single illustrative class-4 example (the paper's caption:
+    "This plot was made from a naively trained maxout network ... The correct
+    class is 4", tex:768 — it reports ONE example, not a population claim). The
+    numbers gate evaluates each curve over its stored sequence against a
+    per-point seed-spread noise floor, so the example must be SHARED across
+    seeds (a different example per seed makes the eps=0 margin vary with the
+    example and fall within noise).
+
+    PROTOCOL (deterministic, NO selection on the claim predicates): train each
+    seed's 240-unit maxout network (single-thread for FP determinism), then
+    take the FIRST (lowest-index) class-4 test example that ALL seed models
+    classify correctly. The FGSM direction is computed once at eps=0 on that
+    fixed example and the logit trace is recorded over the eps grid. There is
+    NO selection on the thin-manifold predicates (margin>0 at eps=0, <0 at the
+    tails, monotone increase) — the example is chosen purely by index, so the
+    curve claims can genuinely FAIL if this particular deterministic example
+    does not reproduce the figure's shape. The claims are rated `low`
+    (single-example illustration, not a population invariant), so a fail is
+    informational, not a gate failure. Falls back to the first correct class-4
+    example of seed 0 if no class-4 example is correct for all seeds.
+    """
+    prev_threads = torch.get_num_threads()
+    torch.set_num_threads(1)              # FP-deterministic training + trace
+    try:
+        dts = [(_torch_data(data.load_mnist(s)), s) for s in seeds]
+        nets = []
+        for dt, s in dts:
+            m, _ = _train_maxout(240, s, dt, epochs=EPOCHS_MAXOUT240)
+            m.eval()
+            nets.append(m)
+            print(f"  eps_trace: trained seed {s}", flush=True)
+        x_test = dts[0][0]["x_test"]; y_test = dts[0][0]["y_test"]
+        # class-4 examples correctly classified by ALL seed models (no predicate
+        # selection — just correctness, which the paper's caption assumes).
+        correct_all = torch.ones(len(x_test), dtype=torch.bool)
+        for m in nets:
+            with torch.no_grad():
+                p = m.predict(x_test)
+            correct_all &= (p == y_test.view(-1)) & (y_test.view(-1) == 4)
+        cand = torch.where(correct_all)[0]
+        print(f"  eps_trace: {int(len(cand))} class-4 examples correct for all seeds", flush=True)
+
+        # FIRST (lowest-index) common-correct class-4 example — deterministic,
+        # no selection on the thin-manifold predicates the claims evaluate.
+        if len(cand) > 0:
+            fixed_ei = int(cand[0])
+        else:
+            # fallback: first correct class-4 example of seed 0
+            m0 = nets[0]
+            with torch.no_grad():
+                p0 = m0.predict(x_test)
+            cv = torch.where((p0 == y_test.view(-1)) & (y_test.view(-1) == 4))[0]
+            fixed_ei = int(cv[0]) if len(cv) > 0 else 0
+        print(f"  eps_trace: fixed example index {fixed_ei} (first common-correct "
+              f"class-4 example; NO predicate selection)", flush=True)
+
+        results = {}
+        for si, s in enumerate(seeds):
+            m = nets[si]
+            ei = fixed_ei
+            logits = attack.fgsm_logits_trace(m, x_test[ei], 4, EPS_TRACE_GRID).detach().cpu().numpy()
+            results[str(s)] = _eps_trace_metrics(logits, 4)
+            results[str(s)]["example_index"] = ei
+            results[str(s)]["example_true_label"] = 4
+        return results
+    finally:
+        torch.set_num_threads(prev_threads)
 
 
 def arm_cifar_conv_maxout(seed):
+    # CIFAR-10 is real data (paper's dataset). Download on first use (the
+    # tar is ~170MB; ~15 min on a throttled link). If the download truly cannot
+    # complete in this environment, BLOCK the arm honestly -- never substitute a
+    # synthetic corpus (the gate fingerprints the loader).
+    if not data.cifar10_available():
+        try:
+            print("  cifar: downloading CIFAR-10 (real data; first use)...", flush=True)
+            data.load_cifar10(seed)        # downloads into ./data/
+        except Exception as e:
+            raise RuntimeError(f"CIFAR-10 download failed: {repr(e)[:160]}")
+        if not data.cifar10_available():
+            raise RuntimeError("CIFAR-10 unavailable after download attempt")
     d = _torch_data(data.load_cifar10(seed))
     m = models.ConvMaxoutCIFAR()
     train.train(m, d, {"lr": 0.05, "max_epochs": EPOCHS_CONV, "batch_size": 256,
@@ -412,11 +515,17 @@ def arm_cifar_conv_maxout(seed):
     clean = ev.error(m, x_test, y_test)
     adv = ev.adv_eval(m, x_test, y_test, EPS_CIFAR)
     rub = ev.rubbish_eval(m, 3072, 1000, seed)
-    fool = ev.fooling_eval(m, 3072, 200, seed, EPS_CIFAR)
-    return {"clean_err": clean, **adv,
-            "rubbish_err": rub["rubbish_err"], "rubbish_conf_mistakes": rub["rubbish_conf_mistakes"],
-            "rubbish_class_shares": rub["rubbish_class_shares"],
-            "fool_success": fool["fool_success"], "fool_success_avg": fool["fool_success_avg"]}
+    fool = ev.fooling_eval(m, 3072, 1000, seed, EPS_CIFAR)
+    out = {"clean_err": clean, **adv,
+           "rubbish_err": rub["rubbish_err"], "rubbish_conf_mistakes": rub["rubbish_conf_mistakes"],
+           "rubbish_class_shares": rub["rubbish_class_shares"],
+           "fool_success": fool["fool_success"], "fool_success_avg": fool["fool_success_avg"]}
+    # flatten dict-valued metrics so the gate's path resolver can read each key
+    # as a scalar token (the gate cannot subscript dict values; SPEC notes this).
+    for k in range(10):
+        out[f"rubbish_share_{k}"] = float(rub["rubbish_class_shares"].get(str(k), 0.0))
+        out[f"fool_success_{k}"] = float(fool["fool_success"].get(str(k), 0.0))
+    return out
 
 
 ARMS = {
@@ -436,7 +545,10 @@ ARMS = {
     # composite arms reuse trained models of the same seed:
     "agreement_mnist": (SEEDS, arm_agreement_mnist),
     "transfer_mnist": (SEEDS, arm_transfer_mnist),
-    "eps_trace": (SEEDS, arm_eps_trace),
+    # eps_trace is handled cross-seed by arm_eps_trace_all (a FIXED example is
+    # shared across seeds so the thin-manifold curve claims resolve beyond the
+    # cross-seed noise floor); the per-seed loop special-cases it.
+    "eps_trace": (SEEDS, None),
 }
 
 
@@ -449,14 +561,21 @@ def _print_final(arm, res):
         print(f"FINAL {arm}=BLOCKED", flush=True)
         return
     val = res[key]
+    # The gate parses FINAL lines as exactly `FINAL <arm>=<value>` (or
+    # `=BLOCKED`); a trailing annotation like `(seq mean)` breaks that match
+    # and the arm reads as having printed no FINAL line. For a sequence-valued
+    # primary metric (e.g. eps_trace.margin_seq) we print the mean as the
+    # single headline number; the full per-eps sequence that the curve claims
+    # actually evaluate lives in measured.json under the arm.
     if isinstance(val, list):
-        print(f"FINAL {arm}={sum(val)/len(val):.4f} (seq mean)", flush=True)
+        print(f"FINAL {arm}={sum(val)/len(val):.4f}", flush=True)
     else:
         print(f"FINAL {arm}={val:.4f}", flush=True)
 
 
 def main():
-    torch.set_num_threads(max(1, os.cpu_count() // 2))
+    torch.set_num_threads(int(os.environ.get("EAE_NUM_THREADS",
+                                              max(1, os.cpu_count() // 2))))
     measured_path = os.path.join(REPO, "measured.json")
     measured = {}
     if os.path.exists(measured_path) and not os.environ.get("EAE_FRESH"):
@@ -465,12 +584,46 @@ def main():
         except Exception:
             measured = {}
     only = os.environ.get("EAE_ONLY")
+    # Register deliberately-not-built arms (SPEC §9) as BLOCKED at every seed so a
+    # fresh run still covers every arm in claims.json. They carry no claims; this
+    # only keeps measured.json complete and honest.
+    if not only:
+        for arm, why in NOT_BUILT.items():
+            print(f"\n=== arm {arm} (NOT BUILT: {why}) ===", flush=True)
+            measured.setdefault(arm, {})
+            for s in SEEDS:
+                measured[arm][str(s)] = "BLOCKED"
+            print(f"FINAL {arm}=BLOCKED", flush=True)
     for arm, (seeds, fn) in ARMS.items():
         if only and arm != only:
             continue
         print(f"\n=== arm {arm} (seeds {seeds}) ===", flush=True)
         t0 = time.time()
         measured.setdefault(arm, {})
+        # eps_trace trains all seed models together to pick ONE fixed class-4
+        # example (cross-seed-consistent thin-manifold curve); single-thread for
+        # FP determinism. Force re-run unless all seeds already dict-cached.
+        if arm == "eps_trace":
+            cached = all(isinstance(measured[arm].get(str(s)), dict)
+                         and not os.environ.get("EAE_FORCE")
+                         for s in seeds)
+            if cached:
+                print("  eps_trace: cached", flush=True)
+            else:
+                try:
+                    res_all = arm_eps_trace_all(list(seeds))
+                    for s in seeds:
+                        measured[arm][str(s)] = res_all[str(s)]
+                except Exception as e:
+                    print(f"  eps_trace FAILED: {repr(e)[:200]}", flush=True)
+                    traceback.print_exc()
+                    for s in seeds:
+                        measured[arm][str(s)] = "BLOCKED"
+            _print_final(arm, measured[arm][str(seeds[-1])])
+            print(f"  arm {arm} total {time.time()-t0:.0f}s", flush=True)
+            with open(os.path.join(REPO, "measured.json"), "w") as f:
+                json.dump(measured, f, indent=2)
+            continue
         for s in seeds:
             ts = time.time()
             # resume: skip seeds already completed with dict (non-BLOCKED) data
@@ -490,10 +643,6 @@ def main():
                     la, _ = _train_maxout(1600, s, d, adversarial=True,
                                           monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=False)
                     res = fn(s, large_naive=ln, large_adv=la)
-                elif arm == "eps_trace":
-                    d = _torch_data(data.load_mnist(s))
-                    mn, _ = _train_maxout(240, s, d, epochs=EPOCHS_MAXOUT240)
-                    res = fn(s, maxout_naive_model=mn)
                 else:
                     res = fn(s)
             except Exception as e:
@@ -501,7 +650,6 @@ def main():
                 traceback.print_exc()
                 res = "BLOCKED"
             measured[arm][str(s)] = res
-            _print_final(arm, res if str(s) == str(seeds[-1]) else None) if False else None
             # print per-seed headline
             key = _primary(arm, None)
             if isinstance(res, dict) and key and key in res:
