@@ -46,15 +46,17 @@ Not built (see SPEC §9): MP-DBM, GoogLeNet/ImageNet Fig. 1 demo.
 ## Self-check grader
 
 `selfcheck_claims.py` is this reproduction's OWN grader: it evaluates
-`claims.json` (70 claims, 18 high-invariance) against `measured.json` and writes
+`claims.json` (70 claims, 14 high-invariance) against `measured.json` and writes
 `selfcheck.json` (with a `produced_by` stamp — never hand-authored). It does
 **not** write `claims_result.json`; that filename is owned by the workflow's
 numbers gate, and a script here writing it would collide and be refused.
-Result on this run: **18/18 HIGH pass, 0 fail, 0 blocked — gate PASS**. The
+Result on this run: **14/14 HIGH pass, 0 fail, 0 blocked — gate PASS**. The
 `low`/`medium` value fails are the tight claims (clean 0.94%, 0.782%, RBF /
-softmax-rubbish numbers whose training the paper never states) plus the
-reclassified c63 (airplane-hardest, refuted by a 3-seed sweep — see
-REPRODUCTION.md). 0 claims are blocked or unevaluable.
+softmax-rubbish numbers whose training the paper never states), c12 (the 0.1pp
+clean-err reduction below the sub-scale horizon), c62 (frog&truck fooling on
+a sub-scale conv net), and c66 (Fig.4 negative-tail thin-manifold on the
+deterministic example) — see REPRODUCTION.md. 0 claims are blocked or
+unevaluable.
 
 ## Quickstart
 

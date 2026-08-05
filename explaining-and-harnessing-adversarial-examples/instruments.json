@@ -28,10 +28,13 @@
     },
     {
       "name": "logreg_analytic_equivalence",
-      "what_it_decides": "c07: that FGSM is exact for logistic regression -- the analytic closed form zeta(y*(eps*||w||_1 - w.x - b)) equals the actual adversarial loss under the paper's perturbation eta = -eps*sign(w) (tex:407-411). The positive test asserts |FGSM-form loss - analytic-form loss| < 1e-3 on a fixed batch; the negative test asserts the WRONG-sign analytic form (+eps*||w||_1, which increases the margin) does NOT match, proving the check rejects a known-wrong closed form.",
+      "what_it_decides": "c07: that FGSM is exact for logistic regression -- the CORRECT worst-case closed form zeta(eps*||w||_1 - y*(w.x+b)) equals the actual adversarial loss under the REAL gradient-based per-example FGSM attack.fgsm (sign(grad_x J) = -y*sign(w), so x_adv_i = x_i - eps*y_i*sign(w)). The paper's tex:411 form zeta(y*(eps*||w||_1 - w.x - b)) has a sign slip for y=-1 (it decreases the loss instead of maximizing it); c07 checks the CORRECTED form, not the paper's. The positive test asserts |real-FGSM loss - corrected analytic form| < 1e-4 on a fixed batch with MIXED labels; the negative tests assert (a) a wrong-sign (+y*sign(w)) attack does NOT match, and (b) the paper's OWN tex:411 form does NOT match on mixed labels -- proving the check is not a rubber stamp and would reject the paper's slipped closed form.",
       "positive_test": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form",
       "negative_test": "tests/test_invariants.py::test_logreg_analytic_wrong_sign_differs",
-      "requires_tools": "none"
+      "requires_tools": "none",
+      "additional_tests": [
+        "tests/test_invariants.py::test_logreg_paper_tex411_form_fails_for_yneg"
+      ]
     },
     {
       "name": "fgsm_inf_norm",
@@ -62,6 +65,27 @@
       "additional_tests": [
         "tests/test_invariants.py::test_rubbish_eval_softmax_in_range_and_shares_sum_to_100"
       ],
+      "requires_tools": "none"
+    },
+    {
+      "name": "retrain_from_scratch",
+      "what_it_decides": "Protocol invariant (paper tex:505-506): the Phase-2 retrain-on-full-60k must restart from the INITIAL weights with a FRESH optimizer (no carried momentum), not continue from the Phase-1 state. The positive test asserts the Phase-2 starting state is BIT-IDENTICAL to the captured init state (directly detects the old continuation bug where Phase 2 resumed from the Phase-1 best_state) AND that Phase 2 actually moves off the init weights and differs from a Phase-1-only run. The negative test shows the Phase-1 best_state differs from the init (so a continuation Phase 2 would fail the phase2_start==init check), proving the guard has discriminating power.",
+      "positive_test": "tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch",
+      "negative_test": "tests/test_degeneracy.py::test_retrain_full_60k_detects_continuation_bug",
+      "requires_tools": "none"
+    },
+    {
+      "name": "adv_train_fgsm_mode",
+      "what_it_decides": "That the in-training FGSM perturbation is computed with the model in EVAL mode (dropout OFF), per the paper's definition of FGSM on the deterministic network (tex:309, Fig.1). The positive test asserts the perturbation is non-zero on most pixels (eval mode) and that the eval-mode fraction is >50pp higher than a train-mode FGSM (which zeroes the input gradient on ~99% of pixels under p=0.99 dropout). Guards the review finding that the adversarial-training attack ran through an active dropout mask, weakening the perturbation. No separate negative_test: the contrast (eval >> train) IS the rejection of the train-mode bug.",
+      "positive_test": "tests/test_invariants.py::test_build_x_adv_uses_eval_mode_no_dropout",
+      "negative_test": "tests/test_invariants.py::test_build_x_adv_uses_eval_mode_no_dropout",
+      "requires_tools": "none"
+    },
+    {
+      "name": "model_arch_faithfulness",
+      "what_it_decides": "That the model classes match the paper's equations (not an output grader, but a construction invariant that decides whether the implemented model IS the one the paper describes). RBF (tex:595): no per-class temperature and no loss clamp -- logits <= 0 => NLL >= 0 by construction, so a clamp is dead; an earlier inert log_temp slot is removed (test_rbf_has_no_log_temp_and_no_loss_clamp). Conv maxout: maxout is itself the nonlinearity, so NO ReLU is applied after a conv-maxout stage (an earlier F.relu was an extra nonlinearity the paper never describes; test_conv_maxout_has_no_post_relu).",
+      "positive_test": "tests/test_invariants.py::test_rbf_has_no_log_temp_and_no_loss_clamp",
+      "negative_test": "tests/test_invariants.py::test_conv_maxout_has_no_post_relu",
       "requires_tools": "none"
     }
   ]

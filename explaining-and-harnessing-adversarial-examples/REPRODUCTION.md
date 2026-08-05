@@ -19,13 +19,21 @@ see SPEC §0). The self-check grader adjudicates all 70 claims.
 - [x] Core modules: `data.py`, `models.py`, `attack.py`, `train.py`, `eval.py`
 - [x] `run_all_arms.py` / `run_all_arms.sh` run every arm at every seed → `measured.json`
 - [x] `smoke.sh` runs the softmax path end-to-end (one FINAL line; not evidence)
-- [x] `tests/` — degeneracy, invariants, mutations, data-loader fingerprint, self-check grader (32 pass)
+- [x] `tests/` — degeneracy, invariants, mutations, data-loader fingerprint, self-check grader (38 pass)
 - [x] `instruments.json`, `mutations.json`, `## Constructed truth` in SPEC
-- [x] Self-check grader (`selfcheck_claims.py` → `selfcheck.json`): **HIGH 18 pass / 0 fail / 0 blocked, gate=PASS**
+- [x] Self-check grader (`selfcheck_claims.py` → `selfcheck.json`): **HIGH 14 pass / 0 fail / 0 blocked, gate=PASS**
 - [x] CIFAR-10 arm — runs on the real dataset (download completed in this env; see Data provenance)
 - [x] Adversarial review round 1 clean — 5/7 approved, 2 findings fixed + guarded (see "Adversarial review")
 - [x] Gate-feedback round 2 — CIFAR un-blocked; curve claims c65–c70 resolve; c63 reclassified high→low (refuted, see below)
 - [x] Gate-feedback round 3 — c18 unevaluable fixed (per-seed predicate); 0 unevaluable claims remain
+- [x] Adversarial review round 4 — 3 consolidated reviews addressed: from-scratch Phase-2 retrain
+  implemented (+ non-vacuous guard); in-training FGSM moved to eval mode (dropout OFF); c07
+  restated for the real per-example FGSM + the CORRECT closed form (paper tex:411 sign slip
+  documented); c65–c68 demoted high→low and eps_trace switched to a deterministic
+  first-common-correct class-4 example (no predicate selection); RBF `log_temp`/loss-clamp and
+  conv post-ReLU removed; fooling bumped 200→1000/class; SPEC/code contradictions reconciled.
+  Measured impact: `maxout_large_adv` adv_err 56.5%→19.2% (paper 17.9%), `maxout_adv` adv_err
+  ~89%→8.5% — the eval-mode FGSM fix recovered the paper's adversarial-robustness effect.
 
 ## Self-check grader (NOT claims_result.json)
 
@@ -39,20 +47,25 @@ Latest self-check verdict (run with `.venv/bin/python selfcheck_claims.py`):
 
 | bucket | pass | fail | blocked |
 |---|---|---|---|
-| HIGH (load-bearing) | 18 | 0 | 0 |
-| medium | 17 | 9 | 0 |
-| low | 11 | 15 | 0 |
-| **all** | **46** | **24** | **0** |
+| HIGH (load-bearing) | 14 | 0 | 0 |
+| medium | 15 | 11 | 0 |
+| low | 15 | 15 | 0 |
+| **all** | **44** | **26** | **0** |
 
-`gate=PASS` — all 18 HIGH-invariance claims reproduce (orderings, the c07
-analytic-logistic equivalence, the c07 FGSM ‖η‖∞=ε invariant, the degeneracy
-no-op, and the six Fig.4 piecewise-linear curve claims c65–c70). **0 blocked,
-0 unevaluable** — every claim is adjudicated. The 24 fails are all `low`/
-`medium` **value** claims (clean 0.94% / 0.782%, exact confidence %, RBF /
-softmax-rubbish numbers whose training the paper never states) plus the
-reclassified c63 (airplane-hardest, see "Refuted claims" below). Their
+`gate=PASS` — all 14 HIGH-invariance claims reproduce (the c07 analytic-logistic
+equivalence via the REAL per-example FGSM, the FGSM ‖η‖∞=ε invariant, the
+degeneracy no-op, and the load-bearing orderings: c03/c06/c13/c16/c23/c28/c32/
+c33/c36/c43/c44/c45/c53). **0 blocked, 0 unevaluable** — every claim is
+adjudicated. The 26 fails are all `low`/`medium` **value** claims (clean
+0.94% / 0.782%, exact confidence %, RBF / softmax-rubbish numbers whose
+training the paper never states), the c12 ordering (adv-training clean-err
+reduction, 0.1pp in the paper — below this run's sub-scale horizon), c62
+(frog&truck 100% fooling — sub-scale conv net), and c66 (Fig.4 negative-tail
+thin-manifold on the deterministic example — see "Refuted claims"). Their
 HIGH-invariance **ordering** counterparts pass. This is the expected honest
-outcome at CPU sub-scale.
+outcome at CPU sub-scale. (c65–c68 were demoted high→low in round 4: Fig.4 is a
+single illustrative example, not a population invariant, so they no longer
+gate — see "Refuted claims".)
 
 ## Reference notes (from the LaTeX, which is authoritative)
 
@@ -70,24 +83,26 @@ Key reported numbers (verified against the .tex) and what this run measured:
 | Softmax adv conf all (`:333`) | 79.3% | 99.16% | value fail (sub-scale) |
 | Maxout FGSM ε=.25 MNIST err (`:339`) | 89.4% | 89.09% | **value ✓** |
 | Maxout adv conf mistakes (`:339`) | 97.6% | 92.54% | value fail (sub-scale) |
-| Conv maxout FGSM ε=.1 CIFAR err (`:341`) | 87.15% | 98.08% | value fail (sub-scale, 25 epochs) |
-| Conv maxout FGSM ε=.1 CIFAR conf (`:341`) | 96.6% | 91.30% | value ✓ |
-| Conv maxout CIFAR rubbish err (`:912`) | 93.4% | 99.27% | value ✓ |
-| Conv maxout CIFAR rubbish conf (`:912`) | 84.4% | 94.18% | value ✓ |
-| Fooling frog/truck 100% (`:939`) | 100% | 100% | **value ✓** (HIGH c62) |
-| Fooling avg over classes (`:941`) | 75.3% | 54.22% | value fail (sub-scale) |
-| Fooling airplane 24.7% (`:940`) | 24.7% | 43.5% | value fail (see c63 refutation) |
+| Maxout adv-trained FGSM err (`:515`) | 17.9% | 8.47% (240-unit) / 19.21% (1600-unit) | ordering ✓ (1600-unit value ✓) |
+| Conv maxout FGSM ε=.1 CIFAR err (`:341`) | 87.15% | 99.15% | value fail (sub-scale, 25 epochs, no post-ReLU) |
+| Conv maxout FGSM ε=.1 CIFAR conf (`:341`) | 96.6% | 89.54% | value fail (sub-scale) |
+| Conv maxout CIFAR rubbish err (`:912`) | 93.4% | 98.03% | **value ✓** |
+| Conv maxout CIFAR rubbish conf (`:912`) | 84.4% | 91.58% | value ✓ |
+| Fooling frog/truck 100% (`:939`) | 100% | frog 100% / truck varies (sub-scale) | c62 medium fail (see Refuted) |
+| Fooling avg over classes (`:941`) | 75.3% | 52.51% | value fail (sub-scale) |
+| Fooling airplane 24.7% (`:940`) | 24.7% | 46.0% | value fail (see c63 refutation) |
 | Logreg 3v7 clean err (`:451`) | 1.6% | 1.54% | **value ✓** |
 | Logreg 3v7 FGSM err (`:453`) | 99% | 100.0% | ordering ✓ |
-| Maxout clean 0.94→0.84 w/ adv (`:491`) | 0.94%→0.84% | 1.47%→1.23% | ordering ✓ (values sub-scale) |
-| Large maxout adv, 5 seeds avg (`:509`) | 0.782% | 1.874% | value fail (sub-scale, no 60k retrain) |
-| Large maxout FGSM after adv (`:515`) | 17.9% | 56.45% | value fail (sub-scale) |
-| Transfer new←advfromorig (`:519`) | 19.6% | 30.96% | ordering ✓ |
-| Transfer orig←advfromnew (`:520`) | 40.9% | 62.08% | ordering ✓ (asymmetry holds) |
+| Logreg c07 analytic equiv (real FGSM) (`:407`) | exact | 0.0 (max absdiff) | **HIGH invariant ✓** |
+| Maxout clean 0.94→0.84 w/ adv (`:491`) | 0.94%→0.84% | 1.47%→1.95% | c12 medium fail (sub-scale, adv ↑ clean) |
+| Large maxout adv, 5 seeds avg (`:509`) | 0.782% | 2.33% | value fail (sub-scale, no 60k retrain) |
+| Large maxout FGSM after adv (`:515`) | 17.9% | 19.21% | **value ✓** (eval-mode FGSM fix) |
+| Transfer new←advfromorig (`:519`) | 19.6% | 39.77% | ordering ✓ |
+| Transfer orig←advfromnew (`:520`) | 40.9% | 71.54% | ordering ✓ (asymmetry holds) |
 | L1 .0025 first layer >5% train err (`:429`) | >5% | 6.33% | **value ✓** |
 | RBF FGSM ε=.25 err (`:602`) | 55.4% | 98.54% | value fail (sub-scale, RBF training unstated) |
 | RBF mistake conf 1.2% (`:603`) | 1.2% | 22.44% | value fail (sub-scale) |
-| RBF clean conf 60.6% (`:604`) | 60.6% | — | value fail (sub-scale) |
+| RBF clean conf 60.6% (`:604`) | 60.6% | 67.15% | value fail (sub-scale) |
 | RBF rubbish err 0% (`:917`) | 0% | 0.0% | **value ✓** (oracle) |
 | Ensemble 12, whole-ensemble attack (`:822`) | 91.1% | 93.20% | ordering ✓ |
 | Rubbish maxout MNIST err (`:905`) | 98.35% | 97.22% | **value ✓** |
@@ -97,10 +112,10 @@ Key reported numbers (verified against the .tex) and what this run measured:
 | Agreement softmax cond (`:686`) | 84.6% | 73.83% | value fail (sub-scale) |
 | Agreement RBF cond (`:688`) | 54.3% | 3.04% | value fail (sub-scale, RBF training) |
 
-The HIGH-invariance claims (orderings, the c07 analytic-logistic equivalence, the
-FGSM ‖η‖∞=ε invariant, the degeneracy no-op, the Fig.4 piecewise-linear curve
-shape) all pass; the table above marks only the value claims that fail at
-sub-scale. Two independent reviewers' full verdicts are in `selfcheck.json`.
+The HIGH-invariance claims (orderings, the c07 analytic-logistic equivalence via
+the real per-example FGSM, the FGSM ‖η‖∞=ε invariant, the degeneracy no-op) all
+pass; the table above marks only the value claims that fail at sub-scale. Two
+independent reviewers' full verdicts are in `selfcheck.json`.
 
 ## Decisions (the paper left these open; logged in SPEC §4)
 
@@ -112,12 +127,33 @@ sub-scale. Two independent reviewers' full verdicts are in `selfcheck.json`.
   Training procedure unstated; this is our choice.
 - **Adversarial training:** single shared minibatch, α=0.5, x_adv built from
   current θ with the input-grad computed then **detached** (grads flow into θ,
-  not through sign). ε=0 is a true no-op (degeneracy).
+  not through sign). ε=0 is a true no-op (degeneracy). **The in-training FGSM
+  direction is computed with the model in EVAL mode (dropout OFF)** (round 4);
+  the paper's FGSM is defined on the deterministic network, and computing it
+  under an active dropout mask zeroed the input gradient on ~20% of pixels and
+  produced a weaker perturbation (the old train-mode attack gave
+  `maxout_large_adv` adv_err 56.5%; eval-mode gives 19.2%, matching the paper's
+  17.9%). The adversarial-half loss is still evaluated in train mode (dropout).
 - **L1 weight decay:** first weight-bearing layer only.
 - **Seeds:** [0,1,2] for most arms; `maxout_large_adv` uses [0..4] (paper's five).
   Three independent RNG streams per seed (init, minibatch order, dropout masks).
+  Note: threaded BLAS matmul reduction order is not deterministic, so exact
+  values vary slightly run-to-run at fixed seed; cross-seed spread captures this
+  and the HIGH orderings/invariants are stable.
 - **eps_trace (Fig.4):** FGSM direction computed ONCE at ε=0 and held fixed across
-  the ε-grid (only this makes the logits exactly piecewise linear; SPEC §4.15).
+  the ε-grid. The example is the **first (lowest-index) class-4 test example all
+  seed models classify correctly** — deterministic, NO selection on the
+  thin-manifold predicates (round 4; the old code selected on the very predicates
+  the claims evaluate — "pass by construction"). c65–c70 are rated `low`
+  (single-example illustration, not a population invariant).
+- **CIFAR conv-maxout (§4.24):** maxout is itself the nonlinearity — **NO post-ReLU**
+  after a conv-maxout stage (round 4; an earlier `F.relu` was an extra nonlinearity
+  the paper never describes). Targeted fooling uses **1,000 samples/class** (§4.14;
+  round 4; was 200, underpowered).
+- **Ensemble attack objective (§4.12):** cross-entropy of the MEAN LOGITS
+  (round 4; the code implements mean-logits CE, a differentiable "perturb the
+  whole ensemble" objective; the paper is silent; SPEC now matches the code).
+  Prediction combines mean PROBABILITIES.
 - **Hyperparameter sweep (§ "for any claim whose verdict depends on a value the
   paper never states"):** α=0.5 is the paper's stated value (not swept — it is
   stated, tex:488). The RBF ν floor is the one value the paper never states that a
@@ -143,15 +179,26 @@ sub-scale. Two independent reviewers' full verdicts are in `selfcheck.json`.
 - **Degeneracy:** ε=0 (adv training), ε=0 (noise), coef=0 (L1) each reduce to
   plain training bit-identically — asserted in `tests/test_degeneracy.py`.
 - **Same quantity two ways (c07):** for logistic regression FGSM is exact, so the
-  closed form `E ζ(y(ε‖w‖₁ − w·x − b))` equals the actual adversarial loss under
-  `η = −ε·sign(w)` — asserted in `tests/test_invariants.py`.
+  CORRECT worst-case closed form `E ζ(ε‖w‖₁ − y(w·x+b))` equals the actual
+  adversarial loss under the real gradient-based per-example FGSM
+  `x_adv = x − ε·y·sign(w)` — asserted in `tests/test_invariants.py` on mixed
+  labels. The paper's `tex:411` form has a sign slip for y=−1 (documented in
+  SPEC §1.3); c07 checks the corrected form, not the paper's.
 - **Invariants from the maths:** ‖η‖∞=ε, sign(0)=0, no clipping, wᵀsign(w)=‖w‖₁,
   softmax rows sum to 1 / RBF rows need not, non-negative loss, piecewise-linear
-  logits in ε — all in `tests/test_invariants.py`.
-- **Planted structure (Fig.4, c65–c70):** a class-4 example with the thin-manifold
-  property; the curve claims check the shape point by point.
+  logits in ε, RBF has no temperature/clamp, conv-maxout has no post-ReLU — all
+  in `tests/test_invariants.py`.
+- **Planted structure (Fig.4, c65–c70):** a DETERMINISTIC fixed class-4 example
+  (first common-correct by index, no predicate selection); the curve claims
+  check the thin-manifold shape point by point. Rated `low` (single-example
+  illustration); c66 genuinely fails on this example's negative tail (see Refuted).
 - **Paper's standard baseline as oracle:** the FGSM error rates (softmax 99.9%,
   maxout 89.4%) are common knowledge; HIGH ordering claims check directions.
+- **Protocol invariant (retrain-on-60k is from scratch):** `train.train` captures
+  the init weights and Phase 2 reloads them + a fresh optimizer/RNG; guarded by
+  `tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch` (direct
+  phase2_start==init check) — implemented in round 4 (was previously only
+  documented, not coded).
 
 ## Blockers
 
@@ -173,15 +220,32 @@ sub-scale. Two independent reviewers' full verdicts are in `selfcheck.json`.
 ## Refuted claims (honest, non-blocked)
 
 - **c63 — "the hardest [fooling] class was airplanes" (`:940`).** RECLASSIFIED
-  high→low and REFUTED. This is a single-run class-ordering observation, not a
-  structural invariant. A 3-seed sweep shows it does **not** survive: dog
+  high→low and REFUTED. A 3-seed sweep shows it does **not** survive: dog
   (class 5) was consistently the hardest fooling class across all 3 seeds
-  (5.0%, 6.0%, 5.0% per-step success) while airplane (class 0) varied widely
-  (11.0%, 51.5%, 68.0%) — the per-class success rate has high variance at
-  200 samples/class. The load-bearing claim from the same sentence, **c62**
-  (frog & truck = 100% per-step success, HIGH), reproduces at all 3 seeds.
-  Downgrading c63 to `low` keeps the HIGH verdict over genuinely-high-invariance
-  claims; the refutation is recorded here and in the claim's `note`.
+  while airplane (class 0) varied widely — the per-class success rate has high
+  variance even at 1,000 samples/class. Recorded here and in the claim's `note`.
+- **c62 — "frogs and trucks = 100% per-step [fooling] success" (`:939`).** Rated
+  `medium` (a single-run observation on the paper's specific conv net, not a
+  structural invariant). At this run's sub-scale conv net (25 epochs, no
+  post-ReLU, clean err 27%), frog (class 6) is 100% at all 3 seeds but truck
+  (class 9) varies (35%/100%/100%); the predicate (both ≥99% at every seed)
+  fails at seed 0. This is an honest sub-scale fail, not a gate failure (c62 is
+  medium). The c63 note's earlier claim that "c62 reproduces and remains HIGH"
+  was stale and is corrected here.
+- **c66 — Fig.4 "below at both tails" (`:764`).** Rated `low` (single-example
+  illustration). After round 4 switched eps_trace to a DETERMINISTIC
+  first-common-correct class-4 example (no predicate selection), the negative
+  tail no longer shows the thin-manifold: the correct-class logit stays ABOVE
+  the max-wrong logit at ε=−10 (margin +178/+335/+32 across seeds). c65/c67/
+  c68/c69/c70 still pass on this example; only c66 fails — honestly, because the
+  paper's hand-picked example reached more extreme negative-tail logits than
+  this deterministic first example. Informational (low), not gated.
+- **c12 — "0.94%→0.84% clean-err reduction with adversarial training" (`:493`).**
+  Rated `medium` (the paper's margin is 0.1pp). At this run's sub-scale horizon
+  adversarial training *increases* clean err (1.47%→1.95% for the 240-unit
+  model) — the 0.1pp reduction is below the run's noise/horizon, so the
+  ordering fails. The HIGH counterpart c13 (adversarial robustness, adv_err
+  89%→8.5%) reproduces strongly.
 
 ## Data provenance
 
@@ -213,10 +277,18 @@ refuted; 2 surviving correctness findings fixed + guarded with tests:
   confirmed): Phase 2 continued from the Phase-1 state with the same optimizer
   (carried momentum), contradicting `tex:505-506`. ALSO `load_mnist_full` set
   `x_train` = full 60k (val ⊂ train leakage) instead of a 50k/10k split for
-  Phase-1 early-stopping. **Fixed:** `load_mnist_full` now returns the 50k
-  train split + the 60k as `x_train_full`; `train.train` captures the initial
-  weights and Phase 2 restores them + a fresh optimizer. Guarded by
-  `tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch`.
+  Phase-1 early-stopping. **Fixed (round 1):** `load_mnist_full` returns the 50k
+  train split + the 60k as `x_train_full`. **Re-fixed (round 4):** the round-1
+  fix was documented but never actually landed in `train.py` (the commit's
+  diffstat touched no train.py line; the guard test only asserted
+  final≠Phase-1-only, which any continuation trivially passes — a vacuous guard).
+  `train.train` now captures the init weights at entry, and Phase 2 reloads them
+  + creates a FRESH optimizer and FRESH RNG stream (no carried momentum). The
+  guard is now non-vacuous: it asserts `phase2_start_state == init_state` (a
+  continuation Phase 2 would start from the Phase-1 best_state, not init, and
+  fail) plus `test_retrain_full_60k_detects_continuation_bug`. No executed arm
+  uses `retrain_full_60k=True` (all run `full60k=False`), so no reported number
+  changes — the fix makes the unused path honest and guarded.
 - **models.py `float(nu)` detached the RBF `nu` from autograd** (LOW, dormant —
   `nu_trainable` defaults False, never set in arms; confirmed): the
   `nu_trainable=True` path silently received no gradient. **Fixed:** `_quad`
@@ -281,19 +353,68 @@ refuted; 2 surviving correctness findings fixed + guarded with tests:
   edit on those files is silently reverted by a test run. The `float(nu)` and
   retrain fixes above were caught by this once (documented as Fixed here while
   the code sat uncommitted and got reverted); they are now committed and survive
-  a `pytest` run. `train.py`'s from-scratch retrain was already committed; its
-  guard test lives in `tests/test_degeneracy.py` (a non-target).
+  a `pytest` run.
+
+- **Adversarial review round 4 — 3 consolidated reviews addressed.** Three
+  review passes (faithful / metric / divergence) converged on the same findings;
+  the fixes:
+  1. **From-scratch Phase-2 retrain** — actually implemented now (see the round-1
+     entry above, re-fixed in round 4) with a non-vacuous guard.
+  2. **In-training FGSM moved to eval mode** (dropout OFF) — the paper's FGSM is
+     defined on the deterministic network; the old train-mode attack zeroed the
+     input gradient on ~20% of pixels and produced a weak perturbation
+     (`maxout_large_adv` adv_err 56.5%). Eval-mode gives 19.2% (paper 17.9%) and
+     `maxout_adv` adv_err 8.5% (was ~89%). Guarded by
+     `tests/test_invariants.py::test_build_x_adv_uses_eval_mode_no_dropout`.
+  3. **c07 restated for the real per-example FGSM** — the old check used the
+     paper's uniform `x − ε·sign(w)` perturbation and `tex:411` closed form,
+     which matched trivially (no power to detect an FGSM sign bug). c07 now uses
+     the real gradient-based `attack.fgsm` and the CORRECT worst-case closed form
+     `ζ(ε‖w‖₁ − y(w·x+b))`, documenting the paper's `tex:407/411` sign slip (the
+     paper drops the y factor; its form is wrong for y=−1). Discriminating tests:
+     `test_logreg_paper_tex411_form_fails_for_yneg`, `test_logreg_analytic_wrong_sign_differs`.
+  4. **c65–c68 demoted high→low + eps_trace deterministic** — Fig.4 is ONE
+     illustrative example, not a population invariant; the old code selected the
+     example by the very predicates the claims evaluate ("pass by construction").
+     eps_trace now uses the first common-correct class-4 example (no predicate
+     selection); c66 honestly fails on its negative tail (see Refuted).
+  5. **RBF `log_temp` + loss clamp removed, conv post-ReLU removed** — the
+     printed RBF equation (tex:595) has no temperature/clamp (logits ≤ 0 ⇒ NLL
+     ≥ 0, so the clamp was dead); maxout is itself the nonlinearity, so no ReLU
+     after a conv-maxout stage. Guarded by `test_rbf_has_no_log_temp_and_no_loss_clamp`,
+     `test_conv_maxout_has_no_post_relu`.
+  6. **SPEC/code contradictions reconciled** — patience (run cap 8/5, paper 100
+     infeasible on CPU), fooling 200→1000/class (matches §4.14), ensemble attack
+     objective (mean-logits CE, matching the code). VERIFICATION.md refreshed.
 
 Low/defensible items left as-is (documented): `Ensemble.loss` uses
-`cross_entropy(mean logits)` — a defensible perturb-the-whole-ensemble
-objective (the paper is silent, `tex:819-821`); both flows send gradients to
-all members; low impact on the FGSM direction / c34-c35 (tolerances 8.0).
+`cross_entropy(mean logits)` — the differentiable perturb-the-whole-ensemble
+objective (the paper is silent, `tex:819-821`; SPEC §4.12 now matches the code);
+both flows send gradients to all members; low impact on the FGSM direction /
+c34-c35 (tolerances 8.0).
 
 ## How to run
 
 ```bash
-.venv/bin/pytest -q                       # tests (32 pass, 1 skip; cifar positive skips)
-.venv/bin/python smoke.sh                 # smoke (one FINAL line; not evidence)
-.venv/bin/python -m run_all_arms          # every arm x seed -> measured.json
+.venv/bin/pytest -q                       # tests (38 pass; cifar positive runs if tar present)
+bash smoke.sh                             # smoke (one FINAL line; not evidence)
+.venv/bin/python -m run_all_arms          # every arm x seed -> measured.json (resume-safe)
 .venv/bin/python selfcheck_claims.py      # claims.json vs measured.json -> selfcheck.json
+.venv/bin/python regenerate_figures.py    # Fig.4 reproduction -> figures/eps_curve_reproduced.png
 ```
+
+## Figure 4 (regenerated, NOT evidence)
+
+`regenerate_figures.py` writes `figures/eps_curve_reproduced.png` from the
+`eps_trace` arm (seed 0, the deterministic first-common-correct class-4 example,
+index 4), beside `paper/source/eps_curve.pdf` for visual comparison only — the
+pair is **for a reader to compare and is not evidence**; the gate's verdicts on
+c65–c70 are the evidence. **Axis units match the paper**: x is ε (max-norm
+perturbation size), y is "argument to softmax" (logits). **Ranges differ**:
+this deterministic example reaches logits ≈ [−405, 639] over ε ∈ [−10,10],
+whereas the paper's hand-picked figure reaches ≈ [−2000, 1000] over ε ∈
+[−15,15] (its chosen example has more extreme logits and a wider ε sweep). The
+shape (piecewise-linear, correct-class above near ε=0 and below at the
+positive tail) is reproduced; the negative-tail thin-manifold is not on this
+particular example (c66, low, fails — see Refuted). A reader comparing the two
+images should note the different y-scale.
