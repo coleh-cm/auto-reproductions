@@ -70,8 +70,8 @@ Key reported numbers (verified against the .tex) and what this run measured:
 | Maxout clean 0.94→0.84 w/ adv (`:491`) | 0.94%→0.84% | 1.47%→1.23% | ordering ✓ (values sub-scale) |
 | Large maxout adv, 5 seeds avg (`:509`) | 0.782% | 1.874% | value fail (sub-scale, no 60k retrain) |
 | Large maxout FGSM after adv (`:515`) | 17.9% | 56.45% | value fail (sub-scale) |
-| Transfer new←advfromorig (`:519`) | 19.6% | 30.83% | ordering ✓ |
-| Transfer orig←advfromnew (`:520`) | 40.9% | 61.12% | ordering ✓ (asymmetry holds) |
+| Transfer new←advfromorig (`:519`) | 19.6% | 30.96% | ordering ✓ |
+| Transfer orig←advfromnew (`:520`) | 40.9% | 62.08% | ordering ✓ (asymmetry holds) |
 | L1 .0025 first layer >5% train err (`:429`) | >5% | 6.33% | **value ✓** |
 | RBF FGSM ε=.25 err (`:602`) | 55.4% | 98.54% | value fail (sub-scale, RBF training unstated) |
 | RBF mistake conf 1.2% (`:603`) | 1.2% | 22.44% | value fail (sub-scale) |

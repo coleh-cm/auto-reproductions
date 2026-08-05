@@ -361,8 +361,8 @@
   },
   "transfer_mnist": {
     "0": {
-      "err_orig_on_advfromnew": 59.039998054504395,
-      "err_new_on_advfromorig": 31.069999933242798
+      "err_orig_on_advfromnew": 61.91999912261963,
+      "err_new_on_advfromorig": 31.459999084472656
     },
     "1": {
       "err_orig_on_advfromnew": 62.87999749183655,
