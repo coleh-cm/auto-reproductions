@@ -3,20 +3,60 @@
 - **Paper:** Ian J. Goodfellow, Jonathon Shlens, Christian Szegedy, *Explaining and Harnessing
   Adversarial Examples*, ICLR 2015 (arXiv:1412.6572v3, 20 Mar 2015).
 - **Authoritative source on disk:** `paper/source/iclr2015.tex` (arXiv LaTeX, 975 lines). Every
-  citation in this SPEC is `<file>:<line>` into that file and was grep-verified by script in this
-  run (all 70 claim quotes resolve verbatim at their cited lines). Math macros in the preamble
-  resolve as `\eps`→ε, `\sign`→sign, `\veta`→**η**, `\vtheta`→**θ**, `\vx`→**x**, `\vw`→**w**
-  (`iclr2015.tex:14-55`).
+  citation in this SPEC is `<file>:<line>` into that file and was grep-verified by script
+  (all 70 claim quotes resolve verbatim at their cited lines; re-verified 2026-08-05 in the
+  fresh run: 0 failures). Math macros in the preamble resolve as `\eps`→ε, `\sign`→sign,
+  `\veta`→**η**, `\vtheta`→**θ**, `\vx`→**x**, `\vw`→**w** (`iclr2015.tex:14-55`).
+- **Paper figures:** the arXiv e-print ships the figure files (`panda_577.png`,
+  `nematode_082.png`, `gibbon_993.png`, `logreg_*.png`, `naive_weights.png`, `adv_weights.png`,
+  `eps_curve.pdf` + `eps_curve_raster.png` (4× pymupdf render), `eps_curve_inputs.png`, `airplane.png`).
+  They sit unpacked under `paper/source/` (gitignored by design — `.gitignore` tracks only
+  `.tex`/`.bbl` from the e-print; the committed read-figure transcript is the auditable record).
 - **Convenience copy:** `paper/paper.md` (PDF extraction; prose reliable, maths not — never cited).
 - **Percent convention:** every error / confidence / agreement metric is a **percent** in
   [0, 100] so `measured` values compare directly against the paper's printed numbers.
-- **This SPEC is authored from the LaTeX source in this run**; where a numeric value could only
+- **This SPEC is authored from the LaTeX source**; where a numeric value could only
   come from a figure, it was read with `read-figure` and the exchange is committed at
-  `figures/read-figure.jsonl` (see §7).
+  `figures/read-figure.jsonl` (see §7). The figures were re-read in the 2026-08-05 run
+  (13 new transcript exchanges, including re-reads of every quantitative read); the reads
+  agree with the 2026-08-04 run's and the claims c65–c70 stand unchanged (§7).
 
 ## 0. Upstream code status
 
-Checked in this run (2026-08-04):
+Checked first 2026-08-04; **re-checked live in the fresh run 2026-08-05 with the same findings**
+(GitHub search API on the exact title: 13 repos, all attack-only third-party reimplementations;
+`goodfeli/adversarial` = the GAN paper's code, pushed 2020, description "Code and hyperparameters
+for the paper Generative Adversarial Networks"; the pylearn2 maxout-scripts directory exists and
+contains the maxout paper's YAML configs — `mnist_pi.yaml` is the 240-unit permutation-invariant
+config this paper's `:498` defers to). Detail:
+
+- **The paper's only code link** is the CIFAR-10 preprocessing footnote:
+  `https://github.com/lisa-lab/pylearn2/tree/master/pylearn2/scripts/papers/maxout`
+  (`iclr2015.tex:343-345`). Fetched: the repo exists but that directory's README recreates the
+  **maxout paper** (Goodfellow et al. 2013c) experiments ("The files in this directory recreate
+  some of the experiments reported in the paper Maxout Networks"), not this paper's. The stack is
+  Theano/Pylearn2 (Python 2, archived; Theano unmaintained) and cannot execute today. No FGSM or
+  adversarial-training code from this paper ships anywhere in it.
+- **`github.com/goodfeli/adversarial`** (lead author's account) is the GAN paper's code
+  ("Generative Adversarial Nets"), not this paper's. Not usable here.
+- **GitHub search on the exact title** (`"explaining and harnessing adversarial examples"`,
+  repositories): 13 hits, all third-party partial reimplementations of the *attack only*
+  (e.g. Harry24k/FGSM-pytorch, 70 stars, Jupyter notebook; rodgzilla/
+  machine_learning_adversarial_examples, 55 stars). None implements FGSM adversarial training,
+  none of the paper's arms (maxout adversarial training, agreement/transfer/rubbish/ensemble
+  experiments), and none carries the paper's configs.
+- **`github.com/cleverhans-lab/cleverhans`** (later library co-authored by the lead author)
+  contains `cleverhans/torch/attacks/fast_gradient_method.py` — verified by fetch: its docstring
+  cites `https://arxiv.org/abs/1412.6572` and it implements the single-step sign attack with
+  optional clipping. It is a generic library primitive; it contains none of this paper's models,
+  training procedures, or numbers. Not upstream code for the experiments.
+- **Decision:** no usable upstream code exists for this paper's experiments. We implement from
+  this SPEC.
+- **Reference-only material:** the maxout MLP training details this paper defers to ("the 240
+  used by the original maxout network", `iclr2015.tex:498`) live in the maxout paper's pylearn2
+  YAML configs (`mnist_pi.yaml` et al.). Where this paper is silent (§4), those configs may be
+  consulted as *reference defaults*; every such fill-in is logged as **our choice, not the
+  paper's**.
 
 - **The paper's only code link** is the CIFAR-10 preprocessing footnote:
   `https://github.com/lisa-lab/pylearn2/tree/master/pylearn2/scripts/papers/maxout`
@@ -405,15 +445,45 @@ MP-DBM (§9, not built) and the GoogLeNet/ImageNet Fig. 1 demo (§9, not built).
 ## 7. Figure readings
 
 Tool: `read-figure <png> "<question>"`, transcript appended to `figures/read-figure.jsonl`
-(committed). `eps_curve.pdf` was rasterized at 4× with pymupdf before reading (the reader takes
-PNGs). Questions were phrased for terse answers ("answer with only the number", "exactly one
-word"); **none of this run's 26 exchanges is flagged as deliberation**. Empty answers
-(the model declines some counting questions) are recorded as-is. The 11 earlier entries in the
-same transcript — from the prior run, several flagged `looks_like_reasoning` by inspection —
-are retained for history but are not used as evidence below.
+(committed). `eps_curve.pdf` was rasterized at 4× with pymupdf (`paper/source/eps_curve_raster.png`)
+before reading (the reader takes PNGs). Questions were phrased for terse answers ("answer with
+only the number", "exactly one word"). The transcript now holds three batches: 11 early entries
+(2026-08-04, several flagged `looks_like_reasoning`, kept for history, not used as evidence),
+26 clean entries (2026-08-04 late batch), and 23 entries from the 2026-08-05 fresh-run re-read
+(7 flagged as deliberation — each such read is treated as weak evidence and is either backed by
+a clean re-ask or by a programmatic check, and every claim resting on a figure value is rated
+`low` compute-invariance with tolerance covering the reading error).
 
-**Figure 4 left (`eps_curve.pdf`)** — the one figure carrying quantities the prose does not.
-Reads this run:
+**2026-08-05 re-read results (this run):**
+
+- **Figure 4 left, clean reads:** x ticks **−15, 15**; y ticks **−2000, 1000**; line shape
+  **"piecewise-linear"** (one word); "between x=0 and x=15, does any other curve end up above
+  the curve labeled 4?" → **yes**; curve labeled 4 at x=+10 → **−400** (clean integer read).
+- **Figure 4 left, flagged reads (weak):** highest curve at x=+10 deliberated (analysis in the
+  transcript converges on ~+400–440); the x=−10 pair deliberated twice (~+800 highest /
+  ~+170–200 for label 4). These match the 2026-08-04 clean reads (+400 at x=+10; +800 and +200
+  at x=−10), so the flagged reads change nothing.
+- **Figure 4 right:** "yellow-boxed thumbnails clustered near the middle?" → **yes** (clean).
+  Grid count deliberated both times (no clean token) — resolved **programmatically**: the
+  335×335 montage has a dominant autocorrelation period of 33 px → **10×10**.
+- **Figure 5:** grid **10×10** (clean, and confirmed programmatically: 375 px / 37 px period);
+  "recognizable photographs of airplanes?" → **no**; "some thumbnails yellow-bordered, others
+  not?" → **yes**.
+- **Figure 2:** `logreg_adv.png` "readable handwritten digits?" → **yes** (clean).
+  `logreg_weights_sign.png` "clearly recognizable handwritten digit shape?" → **yes** in one
+  clean read, then a re-ask ("resemble a handwritten digit?") deliberated and leaned **no**
+  (pattern looks like a Z-ish sign pattern). Unstable on a 431-byte thumbnail → not used.
+- **Figure 3:** adversarially-trained filters "localized pen-stroke fragments?" → **yes**
+  (clean, both runs). For the naive filters this run's three phrasings are mutually inconsistent
+  ("pen-stroke fragments?" **yes**; "unstructured salt-and-pepper noise?" **no**; "smooth,
+  spatially localized strokes?" **no**) → this read is **unstable across phrasings**; the
+  2026-08-04 read (naive → **no** on pen-stroke fragments) is the one consistent with the
+  paper's text. No claim depends on it (§9).
+
+**The reads that carry claims (both runs agree):**
+
+**Figure 4 left (`eps_curve.pdf`/`eps_curve_raster.png`)** — the one figure carrying quantities
+the prose does not:
 
 - x-axis tick range: **−15 to 15**; y-axis ticks top→bottom: **1000, 500, 0, −500, −1000,
   −1500, −2000** ("argument to softmax").
@@ -421,46 +491,49 @@ Reads this run:
   linear with ε" (`iclr2015.tex:768`).
 - "Between x=0 and x=15, does any other curve end up above the curve labeled 4?" → **yes** —
   matches "wrong classifications are stable across a wide region of ε values" (`:769`).
-- At ε = +10: highest curve ≈ **+400**; curve labeled 4 ≈ **−400**.
+- At ε = +10: highest curve ≈ **+400**; curve labeled 4 ≈ **−400** (both runs).
 - At ε = −10: highest curve ≈ **+800**; curve labeled 4 ≈ **+200** — i.e. the correct-class
   curve is below the top wrong-class curve at **both** tails: the thin-manifold claim
   ("Correct classifications occur only on a thin manifold where x occurs in the data", `:764`).
 - At x=0 the curves are bunched and the color→legend mapping could not be read reliably
   (one read answered "no" to "is the curve labeled 4 topmost", follow-ups returned empty) —
-  weak evidence, not used: the corresponding claim (c65) is now rated `low` and evaluated on a
+  weak evidence, not used: the corresponding claim (c65) is rated `low` and evaluated on a
   **deterministic** first-common-correct class-4 example (no predicate selection), so it can
   genuinely fail and does not depend on reading the paper's exact example.
 
 These enter curve claims c65–c70; the `matches` anchors c69 (+400 at ε=+10) and c70 (−400 at
-ε=+10) are this run's own reads, rated low compute-invariance with tolerances covering reading
-error and reproduction spread.
+ε=+10) are rated low compute-invariance with tolerances (±400) covering reading error and
+reproduction spread.
 
 **Figure 4 right (`eps_curve_inputs.png`)** — thumbnail montage of x + ε·sign(∇J) (yellow box
-= still correctly classified, `:771-772`). Reads: grid **10×10**; "are the yellow-boxed
-thumbnails clustered near the middle of the grid rather than at the top or bottom edges?" →
-**yes** (row-major ε from most negative top-left to most positive bottom-right, so correct
-classification survives only near ε ≈ 0 — the thin-manifold claim again). Count of yellow boxes
-itself: the reader returned empty twice; not used. This claim is subsumed by the (now `low`)
-curve claims c65–c67 and is not separately gated.
+= still correctly classified, `:771-772`). Grid **10×10** (programmatically confirmed);
+"are the yellow-boxed thumbnails clustered near the middle of the grid rather than at the top or
+bottom edges?" → **yes** (row-major ε from most negative top-left to most positive bottom-right,
+so correct classification survives only near ε ≈ 0 — the thin-manifold claim again). Count of
+yellow boxes itself: the reader returned empty twice; not used. This claim is subsumed by the
+(`low`) curve claims c65–c67 and is not separately gated.
 
-**Figure 5 (`airplane.png`)** — targeted "airplane" fooling montage. Reads: grid **10×10**
-(100 samples); "do some thumbnails have a yellow border and others not?" → **yes**, consistent
-with a per-step success rate below 100% for the hardest class (24.7%, `:940`); "do the
-thumbnails look like clearly recognizable photographs of airplanes?" → **no** — consistent with
-the caption's claim that these are fooling images, not rendered real airplanes (`:943-945,
-956-958`). The gated content is c61–c63 on the CIFAR arm; the montage itself adds no number.
+**Figure 5 (`airplane.png`)** — targeted "airplane" fooling montage. Grid **10×10** (100
+samples, programmatically confirmed); "do some thumbnails have a yellow border and others
+not?" → **yes**, consistent with a per-step success rate below 100% for the hardest class
+(24.7%, `:940`); "do the thumbnails look like clearly recognizable photographs of airplanes?" →
+**no** — consistent with the caption's claim that these are fooling images, not rendered real
+airplanes (`:943-945, 956-958`). The gated content is c61–c63 on the CIFAR arm; the montage
+itself adds no number.
 
 **Figure 2 (`logreg_clean.png`, `logreg_adv.png`, `logreg_weights_sign.png`)** — "do these
 images look like readable handwritten digits?" on panel (d) (FGSM ε=.25 adversarial examples) →
-**yes** — the caption's claim that humans read such images without difficulty (`:336-337`,
-panel c/d). "Does `sign(w)` show a clearly recognizable handwritten digit shape?" → **no** —
-the caption's "not readily recognizable as having anything to do with the relationship between
-3s and 7s" (`:450-453`). Qualitative; not gated (§9), recorded as evidence.
+**yes** (both runs) — the caption's claim that humans read such images without difficulty
+(`:336-337`, panel c/d). "Does `sign(w)` show a clearly recognizable handwritten digit
+shape?" → **no** (2026-08-04 clean; 2026-08-05 unstable: one clean **yes**, one deliberated
+lean-**no**) — the caption's "not readily recognizable as having anything to do with the
+relationship between 3s and 7s" (`:450-453`). Qualitative; not gated (§9), recorded as evidence.
 
 **Figure 3 (`naive_weights.png`, `adv_weights.png`)** — "do the filter rows look mostly like
-localized pen-stroke fragments of handwritten digits?": naive → **no**, adversarially trained →
-**yes** — the paper's "significantly more localized and interpretable" (`:523-524`).
-Qualitative; not gated (§9), recorded as evidence.
+localized pen-stroke fragments of handwritten digits?": adversarially trained → **yes** (both
+runs, clean); naive → **no** (2026-08-04 clean; 2026-08-05 phrasing-unstable, see above) — the
+paper's "significantly more localized and interpretable" (`:523-524`). Qualitative; not gated
+(§9), recorded as evidence.
 
 ## 8. claims.json
 
