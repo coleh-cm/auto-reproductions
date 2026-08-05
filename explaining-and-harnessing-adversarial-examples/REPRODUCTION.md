@@ -35,6 +35,60 @@ see SPEC §0). The self-check grader adjudicates all 70 claims.
   Measured impact: `maxout_large_adv` adv_err 56.5%→19.2% (paper 17.9%), `maxout_adv` adv_err
   ~89%→8.5% — the eval-mode FGSM fix recovered the paper's adversarial-robustness effect.
 
+## What this run can and cannot test — read this first
+
+Tolerance is not this run's to decide; the job is to state the numbers and the
+differences and let the reader judge. Two of the paper's comparisons **were not
+tested** by this run, and a third **reproduced**, and that distinction is the
+most important thing here:
+
+- **Within noise — the ensemble-resistance comparison (c37, medium).** The
+  paper reports a 12-member maxout ensemble at 91.1% error under a
+  whole-ensemble attack vs 87.9% under a single-member attack (a 3.2pp gap,
+  "Ensembling provides only limited resistance", `tex:822-824`). This run
+  measured whole-attack 93.20% vs single-member 91.26% — a 1.94pp gap that is
+  *smaller than the cross-seed spread on the single-member metric* (2.68pp),
+  so the gate returned `untested` ("the arms are not separated"). A measurement
+  that cannot tell the two attack modes apart has not tested the paper's
+  comparison, whatever else it shows, and this one cannot.
+- **Wrong direction at a shortened horizon — the clean-error regularization
+  claim (c12, medium; the paper's headline harnessing benefit).** The paper
+  reports maxout test error falling 0.94%→0.84% with adversarial training (a
+  0.1pp reduction, `tex:491-493`) and 1.14%→0.782% for the larger model
+  (`tex:499-510`). This run trained the 1600-unit model for **6 epochs on CPU
+  with no 60k retrain** (the paper's full GPU budget + early-stop + 60k retrain
+  is infeasible here). At that horizon adversarial training *increased* clean
+  error: 240-unit 1.47%→1.95% (c12 = −0.48pp, refuted), 1600-unit 1.80%→2.33%.
+  The paper's claimed 0.1pp effect is below this run's cross-seed noise, and a
+  number produced at a horizon too short to separate the clean-err arms is not
+  evidence about the paper's regularization claim. It is **not** presented as
+  one.
+- **Did separate, and reproduced — the adversarial-robustness effect (c13,
+  HIGH; the paper's central claim).** Naive maxout FGSM ε=.25 error 89.09% vs
+  adversarially-trained 8.47% (240-unit) / 19.21% (1600-unit, 5 seeds) — gaps
+  of 80/75pp, far larger than the per-arm spreads (4.72 / 1.44 / 9.87pp). The
+  paper reports 89.4%→17.9% (`tex:515-516`). This comparison **is** tested and
+  reproduces in direction and (for the 1600-unit model) in value (19.21% vs
+  17.9%). The noise-control arms (Rademacher 88.70%, uniform 88.10% vs
+  adv-trained 8.47%) and the transfer asymmetry (71.54% vs 39.77%, 32pp gap)
+  also separate clearly and reproduce the paper's orderings.
+
+All measured numbers below come from **the same command**, run resume-safe
+this run (arms were cached; re-running is bit-stable at fixed seed up to
+threaded-BLAS reduction order):
+
+```
+.venv/bin/python -m run_all_arms      # trains every arm × seed -> measured.json
+.venv/bin/python selfcheck_claims.py # claims.json vs measured.json -> selfcheck.json
+```
+
+Each arm prints one `FINAL <arm>=<value>` line (the last seed's value of the
+arm's primary metric, per `run_all_arms._primary`); the gate and the table
+below use the **per-seed values in `measured.json`** (means and spreads), not
+the single FINAL line. The per-arm spreads in the table are max−min across
+seeds. Data provenance: real MNIST IDX files and the real CIFAR-10 tar (see
+"Data provenance"); no synthetic corpus is substituted anywhere.
+
 ## Self-check grader (NOT claims_result.json)
 
 `selfcheck_claims.py` is this reproduction's OWN grader. It evaluates `claims.json`
@@ -75,42 +129,48 @@ gate — see "Refuted claims".)
 - Adversarial logistic regression: minimize **E ζ(y(ε‖w‖₁ − wᵀx − b))**, ζ softplus
 - RBF (`:595`): **p(y=1|x) = exp((x−μ)ᵀ β (x−μ))**, β negative-semidefinite (printed eq lacks the minus sign; SPEC §4.4)
 
-Key reported numbers (verified against the .tex) and what this run measured:
+Key reported numbers (verified against the .tex) and what this run measured
+(command: `.venv/bin/python -m run_all_arms` → `measured.json`; spread =
+max−min across seeds; the workflow's numbers gate wrote the same verdicts to
+`claims_result.json`):
 
-| Claim (tex) | Paper | Measured (mean over seeds) | Verdict |
-|---|---|---|---|
-| Softmax FGSM ε=.25 MNIST err (`:334`) | 99.9% | 100.0% | ordering ✓ (value low) |
-| Softmax adv conf all (`:333`) | 79.3% | 99.16% | value fail (sub-scale) |
-| Maxout FGSM ε=.25 MNIST err (`:339`) | 89.4% | 89.09% | **value ✓** |
-| Maxout adv conf mistakes (`:339`) | 97.6% | 92.54% | value fail (sub-scale) |
-| Maxout adv-trained FGSM err (`:515`) | 17.9% | 8.47% (240-unit) / 19.21% (1600-unit) | ordering ✓ (1600-unit value ✓) |
-| Conv maxout FGSM ε=.1 CIFAR err (`:341`) | 87.15% | 99.15% | value fail (sub-scale, 25 epochs, no post-ReLU) |
-| Conv maxout FGSM ε=.1 CIFAR conf (`:341`) | 96.6% | 89.54% | value fail (sub-scale) |
-| Conv maxout CIFAR rubbish err (`:912`) | 93.4% | 98.03% | **value ✓** |
-| Conv maxout CIFAR rubbish conf (`:912`) | 84.4% | 91.58% | value ✓ |
-| Fooling frog/truck 100% (`:939`) | 100% | frog 100% / truck varies (sub-scale) | c62 medium fail (see Refuted) |
-| Fooling avg over classes (`:941`) | 75.3% | 52.51% | value fail (sub-scale) |
-| Fooling airplane 24.7% (`:940`) | 24.7% | 46.0% | value fail (see c63 refutation) |
-| Logreg 3v7 clean err (`:451`) | 1.6% | 1.54% | **value ✓** |
-| Logreg 3v7 FGSM err (`:453`) | 99% | 100.0% | ordering ✓ |
-| Logreg c07 analytic equiv (real FGSM) (`:407`) | exact | 0.0 (max absdiff) | **HIGH invariant ✓** |
-| Maxout clean 0.94→0.84 w/ adv (`:491`) | 0.94%→0.84% | 1.47%→1.95% | c12 medium fail (sub-scale, adv ↑ clean) |
-| Large maxout adv, 5 seeds avg (`:509`) | 0.782% | 2.33% | value fail (sub-scale, no 60k retrain) |
-| Large maxout FGSM after adv (`:515`) | 17.9% | 19.21% | **value ✓** (eval-mode FGSM fix) |
-| Transfer new←advfromorig (`:519`) | 19.6% | 39.77% | ordering ✓ |
-| Transfer orig←advfromnew (`:520`) | 40.9% | 71.54% | ordering ✓ (asymmetry holds) |
-| L1 .0025 first layer >5% train err (`:429`) | >5% | 6.33% | **value ✓** |
-| RBF FGSM ε=.25 err (`:602`) | 55.4% | 98.54% | value fail (sub-scale, RBF training unstated) |
-| RBF mistake conf 1.2% (`:603`) | 1.2% | 22.44% | value fail (sub-scale) |
-| RBF clean conf 60.6% (`:604`) | 60.6% | 67.15% | value fail (sub-scale) |
-| RBF rubbish err 0% (`:917`) | 0% | 0.0% | **value ✓** (oracle) |
-| Ensemble 12, whole-ensemble attack (`:822`) | 91.1% | 93.20% | ordering ✓ |
-| Rubbish maxout MNIST err (`:905`) | 98.35% | 97.22% | **value ✓** |
-| Rubbish maxout conf (`:906`) | 92.8% | 90.20% | value fail (sub-scale) |
-| Rubbish softmax err (`:913`) | 59.8% | 98.31% | value fail (sub-scale) |
-| Rubbish sigmoid-top err (`:908`) | 68% | 11.22% | value fail (sub-scale) |
-| Agreement softmax cond (`:686`) | 84.6% | 73.83% | value fail (sub-scale) |
-| Agreement RBF cond (`:688`) | 54.3% | 3.04% | value fail (sub-scale, RBF training) |
+| Claim (tex) | Paper | Measured (mean over seeds) | Spread | Verdict |
+|---|---|---|---|---|
+| Softmax FGSM ε=.25 MNIST err (`:334`) | 99.9% | 100.0% | 0.00 | ordering ✓ (value low) |
+| Softmax adv conf all (`:333`) | 79.3% | 99.16% | 0.33 | value fail (sub-scale) |
+| Maxout FGSM ε=.25 MNIST err (`:339`) | 89.4% | 89.09% | 4.72 | **value ✓** |
+| Maxout adv conf mistakes (`:339`) | 97.6% | 92.54% | 2.19 | value fail (sub-scale) |
+| Maxout adv-trained FGSM err (`:515`) | 17.9% | 8.47% (240-unit) / 19.21% (1600-unit) | 1.44 / 9.87 | ordering ✓ (1600-unit value ✓) |
+| Conv maxout FGSM ε=.1 CIFAR err (`:341`) | 87.15% | 99.15% | 0.92 | value fail (sub-scale, 25 epochs, no post-ReLU) |
+| Conv maxout FGSM ε=.1 CIFAR conf (`:341`) | 96.6% | 89.54% | 3.32 | value fail (sub-scale) |
+| Conv maxout CIFAR rubbish err (`:912`) | 93.4% | 98.03% | 3.80 | **value ✓** |
+| Conv maxout CIFAR rubbish conf (`:912`) | 84.4% | 91.58% | 15.65 | value ✓ |
+| Fooling frog/truck 100% (`:939`) | 100% | frog 100% / truck 78.2% (35–100%) | 0 / 65.4 | c62 medium fail (see Refuted) |
+| Fooling avg over classes (`:941`) | 75.3% | 52.51% | 46.43 | value fail (sub-scale) |
+| Fooling airplane 24.7% (`:940`) | 24.7% | 46.0% | 94.50 | value fail (see c63 refutation) |
+| Logreg 3v7 clean err (`:451`) | 1.6% | 1.54% | 0.15 | **value ✓** |
+| Logreg 3v7 FGSM err (`:453`) | 99% | 100.0% | 0.00 | ordering ✓ |
+| Logreg c07 analytic equiv (real FGSM) (`:407`) | exact | 0.0 (max absdiff) | — | **HIGH invariant ✓** |
+| Maxout clean 0.94→0.84 w/ adv (`:491`) | 0.94%→0.84% | 1.47%→1.95% | 0.06 / 0.24 | c12 medium **refuted** (sub-scale; ↑ not ↓) |
+| Large maxout adv, 5 seeds avg (`:509`) | 0.782% | 2.33% | 0.71 | value fail (sub-scale, no 60k retrain) |
+| Large maxout FGSM after adv (`:515`) | 17.9% | 19.21% | 9.87 | **value ✓** (eval-mode FGSM fix) |
+| Ensemble whole-attack err (`:822`) | 91.1% | 93.20% | 0.71 | value ✓ (ordering c37 **untested** — within noise) |
+| Ensemble single-member-attack err (`:824`) | 87.9% | 91.26% | 2.68 | value fail (sub-scale) |
+| Transfer new←advfromorig (`:519`) | 19.6% | 39.77% | 4.61 | ordering ✓ |
+| Transfer orig←advfromnew (`:520`) | 40.9% | 71.54% | 0.74 | ordering ✓ (asymmetry holds) |
+| L1 .0025 first layer >5% train err (`:429`) | >5% | 6.33% | 1.60 | **value ✓** |
+| Rademacher-noise control FGSM err (`:791`) | 86.2% | 88.70% | 3.87 | **value ✓** |
+| Uniform-noise control FGSM err (`:791`) | 90.4% | 88.10% | 1.98 | **value ✓** |
+| RBF FGSM ε=.25 err (`:602`) | 55.4% | 98.54% | 0.46 | value fail (sub-scale, RBF training unstated) |
+| RBF mistake conf 1.2% (`:603`) | 1.2% | 22.44% | 0.10 | value fail (sub-scale) |
+| RBF clean conf 60.6% (`:604`) | 60.6% | 67.15% | 0.08 | value fail (sub-scale) |
+| RBF rubbish err 0% (`:917`) | 0% | 0.0% | — | **value ✓** (oracle) |
+| Rubbish maxout MNIST err (`:905`) | 98.35% | 97.22% | 2.43 | **value ✓** |
+| Rubbish maxout conf (`:906`) | 92.8% | 90.20% | 3.84 | value fail (sub-scale) |
+| Rubbish softmax err (`:913`) | 59.8% | 98.31% | 0.70 | value fail (sub-scale) |
+| Rubbish sigmoid-top err (`:908`) | 68% | 11.22% | 7.17 | value fail (sub-scale) |
+| Agreement softmax cond (`:686`) | 84.6% | 73.83% | 7.34 | value fail (sub-scale) |
+| Agreement RBF cond (`:688`) | 54.3% | 3.04% | 4.30 | value fail (sub-scale, RBF training) |
 
 The HIGH-invariance claims (orderings, the c07 analytic-logistic equivalence via
 the real per-example FGSM, the FGSM ‖η‖∞=ε invariant, the degeneracy no-op) all
@@ -392,6 +452,29 @@ Low/defensible items left as-is (documented): `Ensemble.loss` uses
 objective (the paper is silent, `tex:819-821`; SPEC §4.12 now matches the code);
 both flows send gradients to all members; low impact on the FGSM direction /
 c34-c35 (tolerances 8.0).
+
+## Research-readiness gates
+
+Walked per the `research-readiness` skill. `partial` is honest where a gate was
+only partly met. Every verdict is backed by a command run this session unless
+noted.
+
+| # | Gate | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Builds from scratch | **partial** | `Dockerfile` is well-formed (python:3.13-slim + uv + pinned `requirements.txt`); `docker build` was **not run** here (docker unavailable in the sandbox). The venv build itself succeeds: `uv venv --python 3.13 .venv && uv pip install --python .venv -r requirements.txt` (already built; `uv pip freeze` matches `requirements.txt`). |
+| 2 | README accurate | **pass** | README quickstart run verbatim this session: import check prints `torch 2.7.1+cpu \| numpy 2.3.2 \| matplotlib 3.11.1 \| pytest 8.4.2` (matches the README's expected line); `.venv/bin/pytest -q` → 38 passed; `.venv/bin/python -m run_all_arms` and `selfcheck_claims.py` run. |
+| 3 | Packages clear | **pass** | `requirements.txt` pins the full transitive closure (torch/numpy/pytest/matplotlib + 19 transitives); system requirement (Python 3.13, uv) stated; install command stated and succeeds. |
+| 4 | Entrypoint obvious | **pass** | One command `.venv/bin/python -m run_all_arms` runs every arm × seed → `measured.json`; `selfcheck_claims.py` grades. No source edits needed; `run_all_arms.sh` and `smoke.sh` wrap them. |
+| 5 | Fast path | **pass** | `bash smoke.sh` runs the whole softmax path (train + FGSM + FINAL line) in ~1.5 s — under the couple-minute budget. Marked "not evidence" in docs. |
+| 6 | Deterministic / noise quantified | **partial** | Fixed seeds (3 RNG streams/seed) make runs bit-stable modulo threaded-BLAS reduction order; the **cross-seed spread is measured and recorded** for every arm (Spread column above). Exact bit-reproducibility is not claimed (BLAS), but the spread bounds the noise. |
+| 7 | Degeneracy test in repo | **pass** | `tests/test_degeneracy.py`: adv eps=0 / noise eps=0 / L1 coef=0 are bit-identical (`torch.equal`) to baseline; eps>0 bit-different; from-scratch Phase-2 retrain guard. 38 tests pass. |
+| 8 | Data provenance stated | **pass** | MNIST from the ossci-datasets S3 IDX mirror, CIFAR-10 from cs.toronto.edu tar; `data.load_mnist`/`load_cifar10` download on first run; fingerprints asserted in `tests/test_data_loader.py` (positive + std-matched-synthetic negative). No synthetic substitution anywhere. |
+| 9 | Recorded number reproducible | **partial** | The command beside each number (`.venv/bin/python -m run_all_arms`) is resume-safe and re-running at fixed seed reproduces values within the recorded spread. **Caveat:** the headline clean-err values (0.94/0.782) are NOT reproduced at the 6-epoch sub-scale horizon (see "What this run can and cannot test"); the numbers that reproduce within noise are the invariants/orderings/robustness effect, not the tight clean-err values. |
+| 10 | Nothing depends on hidden local state | **pass** | Fresh clone + `uv venv` + `run_all_arms` works (datasets auto-download to gitignored `./data/`); `.venv`, `__pycache__`, `data/`, `selfcheck.json`, `claims_result.json` all gitignored. `git ls-files` shows no scratch dumps. |
+
+**Net:** 7 pass, 3 partial (Docker not built; exact bit-reproducibility; tight
+value-claim reproducibility). No fail. The partials are the honest sub-scale /
+sandbox limits, not gaps papered over.
 
 ## How to run
 
