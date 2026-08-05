@@ -217,7 +217,10 @@ def _sample_at_x(seq, x_full, x_want):
     return out
 
 
-def _curve_verdict(comparison, q, r, claimed, tolerance):
+def _curve_verdict_seed(comparison, q, r, claimed, tolerance):
+    """Per-seed curve verdict over the stored sequence (one value per x in the
+    claim's x-list, stored as-is in measured.json -- the gate evaluates a curve
+    over the stored sequence, not a subsample)."""
     n = len(q)
     if comparison == "crosses":
         if r is None:
@@ -252,7 +255,8 @@ def _curve_verdict(comparison, q, r, claimed, tolerance):
         return nonpos >= 0.8 * len(diffs)
     if comparison == "matches":
         if not isinstance(claimed, list) or len(claimed) != n:
-            raise ValueError("matches needs `claimed` as a list of the same length")
+            raise ValueError("matches needs `claimed` as a list of the same length "
+                             f"as the stored sequence (claimed={len(claimed) if isinstance(claimed,list) else 'NA'}, seq={n})")
         return all(abs(qi - ci) <= tolerance for qi, ci in zip(q, claimed))
     raise ValueError(f"unknown curve comparison {comparison!r}")
 
@@ -262,7 +266,6 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
     comparison = claim["comparison"]
     q_tok = claim["quantity"]
     r_tok = claim.get("against", claim.get("reference"))
-    x_list = claim["x"]
     if q_tok not in canonical:
         return {"verdict": "blocked", "reason": "quantity is not a measured token",
                 "seeds_evaluated": []}
@@ -282,15 +285,8 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
     if not seeds:
         return {"verdict": "blocked", "reason": f"no seed data for arm {arm}",
                 "seeds_evaluated": []}
-    # Resolve the x-axis index labels: a curve claim's `x` holds SAMPLE POINTS
-    # (e.g. eps values), but the sequences are stored positionally. The arm's
-    # `eps_grid` (or generic `x_axis`/`grid` metric) gives the index labels; if
-    # absent, fall back to 0..n-1 (positional).
-    x_axis = None
-    for axis_key in ("eps_grid", "x_axis", "grid"):
-        if isinstance(_measured_value(measured, arm, axis_key, seeds[0]), list):
-            x_axis = _measured_value(measured, arm, axis_key, seeds[0])
-            break
+    # The stored sequence IS the sampled curve (one value per x in the claim's
+    # x-list); the gate evaluates it as-is, point by point. No eps_grid resampling.
     per_seed = []
     for s in seeds:
         q_raw = _measured_value(measured, arm, q_metric, s)
@@ -306,19 +302,15 @@ def evaluate_curve_claim(claim, measured, top_seeds, canonical):
             return {"verdict": "blocked",
                     "reason": f"{arm}.{r_metric} at seed {s} is not a sequence",
                     "seeds_evaluated": []}
-        # x_full = the index labels (eps_grid if available, else 0..n-1)
-        x_full = x_axis if x_axis is not None else list(range(len(q_raw)))
-        # sample at the claim's x (sample points)
-        q = _sample_at_x(q_raw, x_full, x_list)
-        r = _sample_at_x(r_raw, x_full, x_list) if r_tok else None
         try:
-            ok = _curve_verdict(comparison, q, r, claim.get("claimed"),
-                                float(claim.get("tolerance", 0.0)))
-        except Exception as e:
-            return {"verdict": "blocked", "reason": f"seed {s}: {e}",
+            ok = _curve_verdict_seed(comparison, q_raw, r_raw,
+                                     claim.get("claimed"),
+                                     float(claim.get("tolerance", 0.0)))
+        except Exception as ex:
+            return {"verdict": "blocked", "reason": f"seed {s}: {ex}",
                     "seeds_evaluated": []}
-        per_seed.append({"seed": s, "ok": bool(ok), "n_samples": len(q),
-                         "q_first": q[0], "q_last": q[-1]})
+        per_seed.append({"seed": s, "ok": bool(ok), "n_samples": len(q_raw),
+                         "q_first": q_raw[0], "q_last": q_raw[-1]})
     verdict = "pass" if all(p["ok"] for p in per_seed) else "fail"
     return {"verdict": verdict, "seeds_evaluated": [p["seed"] for p in per_seed],
             "comparison": comparison, "per_seed": per_seed}

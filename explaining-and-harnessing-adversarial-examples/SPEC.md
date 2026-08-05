@@ -1836,16 +1836,6 @@ apply, why:
   (the active, non-clamped loss region) — guarding the `float(nu)` detach regression that silently
   zeroed the nu gradient. The default `nu_trainable=False` buffer is the paper-silent choice
   (`tests/test_invariants.py::test_rbf_nu_buffer_default_is_not_learnable`).
-- **Protocol invariant (retrain-on-60k is from scratch):** the paper picks an epoch count on
-  the val split then RETRAINS from scratch on all 60k (`tex:505-506`). `tests/test_degeneracy.py::
-  test_retrain_full_60k_is_from_scratch` asserts Phase 2 restores the initial weights + a fresh
-  optimizer (no carried momentum) and actually retrains — guarding the regression where Phase 2
-  continued from the Phase-1 state.
-- **RBF autograd invariant (nu_trainable):** `tests/test_invariants.py::test_rbf_nu_trainable_
-  receives_gradient` asserts a learnable `nu` receives a non-zero gradient on data near the means
-  (the active, non-clamped loss region) — guarding the `float(nu)` detach regression that silently
-  zeroed the nu gradient. The default `nu_trainable=False` buffer is the paper-silent choice
-  (`tests/test_invariants.py::test_rbf_nu_buffer_default_is_not_learnable`).
 
 ## 9. Deliberately not tested (with reasons)
 

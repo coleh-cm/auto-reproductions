@@ -13,7 +13,7 @@
       "positive_test": "tests/test_data_loader.py::test_cifar10_real",
       "negative_test": "tests/test_data_loader.py::test_cifar10_rejects_synthetic",
       "requires_tools": "network (CIFAR-10 download from cs.toronto.edu)",
-      "status_note": "In this run the CIFAR download is truncated (cs.toronto.edu stalled; data/cifar-10-python.tar.gz is partial and load_cifar10 raises EOFError). The positive test skips with that reason and the cifar_conv_maxout arm is marked BLOCKED in measured.json rather than substituted with synthetic data. The negative test (fingerprint rejects synthetic) runs without the download."
+      "status_note": "In this run the 170 MB CIFAR-10 tar downloaded successfully; load_cifar10 unpacks it, GCN-preprocesses to global std ~0.5, and check_cifar10_fingerprint (size, labels, dtype, global std, AND a per-pixel-variance structural check that rejects a std-matched iid synthetic corpus) passes. The positive test test_cifar10_real runs (not skipped) and the cifar_conv_maxout arm runs on the real data -- no synthetic substitution. The negative test (fingerprint rejects synthetic / non-GCN / wrong-dim) runs without the download."
     },
     {
       "name": "selfcheck_claims",

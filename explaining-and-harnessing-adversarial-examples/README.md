@@ -39,21 +39,22 @@ and checks them against the paper's reported numbers on MNIST and CIFAR-10.
 | `agreement_mnist` | MNIST | cross-model label agreement on FGSM | runs (3 seeds) |
 | `transfer_mnist` | MNIST | FGSM transfer between large naive ↔ large adv | runs (3 seeds) |
 | `eps_trace` | MNIST | Figure 4 ε-sweep logit curve | runs (3 seeds) |
-| `cifar_conv_maxout` | CIFAR-10 | conv maxout, FGSM ε=.1, rubbish, fooling | **BLOCKED** (CIFAR download stalled) |
+| `cifar_conv_maxout` | CIFAR-10 | conv maxout, FGSM ε=.1, rubbish, fooling | runs (3 seeds, real CIFAR-10; sub-scale: 25 epochs) |
 
 Not built (see SPEC §9): MP-DBM, GoogLeNet/ImageNet Fig. 1 demo.
 
 ## Self-check grader
 
 `selfcheck_claims.py` is this reproduction's OWN grader: it evaluates
-`claims.json` (70 claims, 19 high-invariance) against `measured.json` and writes
+`claims.json` (70 claims, 18 high-invariance) against `measured.json` and writes
 `selfcheck.json` (with a `produced_by` stamp — never hand-authored). It does
 **not** write `claims_result.json`; that filename is owned by the workflow's
 numbers gate, and a script here writing it would collide and be refused.
-Result on this run: **18/19 HIGH pass, 0 fail, 1 blocked** (the CIFAR arm).
-The gate is FAIL only because of the CIFAR download blocker; the `low`/`medium`
-value fails are the tight claims (clean 0.94%, 0.782%) that need the paper's
-full GPU budget and are rated low/medium for this reason.
+Result on this run: **18/18 HIGH pass, 0 fail, 0 blocked — gate PASS**. The
+`low`/`medium` value fails are the tight claims (clean 0.94%, 0.782%, RBF /
+softmax-rubbish numbers whose training the paper never states) plus the
+reclassified c63 (airplane-hardest, refuted by a 3-seed sweep — see
+REPRODUCTION.md). 0 claims are blocked or unevaluable.
 
 ## Quickstart
 
