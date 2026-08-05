@@ -75,13 +75,27 @@ def _build_x_adv(model, x, y, eps):
     run with grad ENABLED (torch.autograd.grad needs a graph), then the result
     is detached. (tex:486-488; sign is non-differentiable, so grads flow
     through x_adv as a constant w.r.t. theta.)
+
+    The FGSM direction is computed with the model in EVAL mode (deterministic
+    network, dropout OFF). The paper's FGSM (tex:309, Fig.1) is defined on the
+    cost of the deterministic network; computing it under an active dropout
+    mask zeroes the input gradient on masked pixels and yields a materially
+    different/weaker perturbation (review finding: the train-mode FGSM sign is
+    exactly 0 on ~20% of pixels). The adversarial-half LOSS is then evaluated
+    in the caller's (train) mode, with dropout, as part of training — only the
+    perturbation direction is made deterministic.
     """
-    x_req = x.detach().requires_grad_(True)
-    loss0 = model.loss(x_req, y)
-    g = torch.autograd.grad(loss0, x_req, create_graph=False)[0]
-    x_req.requires_grad_(False)
-    eta = eps * torch.sign(g)
-    return (x + eta).detach()
+    was_training = model.training
+    model.eval()
+    try:
+        x_req = x.detach().requires_grad_(True)
+        loss0 = model.loss(x_req, y)
+        g = torch.autograd.grad(loss0, x_req, create_graph=False)[0]
+        x_req.requires_grad_(False)
+        eta = eps * torch.sign(g)
+        return (x + eta).detach()
+    finally:
+        model.train(was_training)
 
 
 def _eval_train_err(model, x, y, batch=2000):
@@ -125,6 +139,12 @@ def train(model, data, cfg):
 
     opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
 
+    # Capture the INITIAL weights (tex:505-506: the retrain-on-60k is FROM
+    # SCRATCH — it must restart from the init weights with a FRESH optimizer,
+    # not continue from the Phase-1 state with carried momentum). Stored so
+    # Phase 2 can reload them; also exposed in history for the guard test.
+    init_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+
     history = {"epochs": [], "train_err": [], "val_err": [], "adv_val_err": []}
     best_metric = float("inf")
     best_state = None
@@ -134,52 +154,6 @@ def train(model, data, cfg):
     since_best = 0
 
     gen = torch.Generator().manual_seed(int(cfg.get("seed", 0)) + 1)
-
-    def run_epochs(model_local, x_tr, y_tr, n_epochs, return_best_by_monitor=False):
-        nonlocal best_metric, best_state, best_epoch, since_best
-        local_best_metric = float("inf")
-        local_best_state = None
-        local_best_epoch = 0
-        for ep in range(1, n_epochs + 1):
-            model_local.train()
-            perm = torch.randperm(x_tr.shape[0], generator=gen)
-            for i in range(0, x_tr.shape[0], batch_size):
-                batch_idx = perm[i:i + batch_size]
-                xb = x_tr[batch_idx]
-                yb = y_tr[batch_idx]
-                xb = _add_noise(xb, cfg, gen)
-                loss = model_local.loss(xb, yb)
-                if adv_active:
-                    x_adv = _build_x_adv(model_local, xb, yb, adv_eps)
-                    loss_adv = model_local.loss(x_adv, yb)
-                    loss = adv_alpha * loss + (1 - adv_alpha) * loss_adv
-                l1 = _l1_first_layer_penalty(model_local, l1_coef)
-                if not torch.is_tensor(l1):
-                    l1 = torch.tensor(0.0)
-                total = loss + l1
-                opt.zero_grad()
-                total.backward()
-                opt.step()
-            # epoch metrics
-            tr_err = _eval_train_err(model_local, x_tr, y_tr)
-            with torch.no_grad():
-                val_pred = model_local.predict(x_val)
-            val_err = float((val_pred != y_val.view(-1)).float().mean().item()) * 100.0
-            adv_val = ev.adv_eval(model_local, x_val, y_val, eps=adv_eps)["adv_err"]
-            history["epochs"].append(len(history["epochs"]) + 1)
-            history["train_err"].append(tr_err)
-            history["val_err"].append(val_err)
-            history["adv_val_err"].append(adv_val)
-            metric = val_err if monitor == "val_err" else adv_val
-            if metric < local_best_metric - 1e-6:
-                local_best_metric = metric
-                local_best_state = {k: v.detach().clone() for k, v in model_local.state_dict().items()}
-                local_best_epoch = ep
-                local_since = 0
-            else:
-                local_since = getattr(local, "since", 0) + 1 if metric >= local_best_metric else 0
-            print(f"  epoch {ep} train_err={tr_err:.3f} val_err={val_err:.3f} adv_val_err={adv_val:.3f}", flush=True)
-        return local_best_state, local_best_metric, local_best_epoch
 
     # Phase 1: train up to max_epochs with optional early stopping
     best_state, best_metric, best_epoch = None, float("inf"), 0
@@ -230,24 +204,31 @@ def train(model, data, cfg):
     if best_state is None:
         raise ValueError("train: no epoch improved the monitor metric (degenerate run)")
 
-    # Phase 2: optional retrain on full 60k for best_epoch epochs
+    # Phase 2: optional retrain on full 60k for best_epoch epochs (tex:505-506).
+    # This is a FROM-SCRATCH retrain: reload the INITIAL weights and use a FRESH
+    # optimizer (no carried momentum) + a FRESH RNG stream, then train for the
+    # early-stopped epoch count on the full 60k. The earlier implementation
+    # continued Phase 2 from the Phase-1 state with the same optimizer, which
+    # contradicts the paper's from-scratch protocol; guarded by
+    # tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch.
     if retrain_full and "x_train_full" in data:
         x_full = _data_tensor(data, "x_train_full")
         y_full = _data_tensor(data, "y_train_full")
-        print(f"  retraining on full 60k for {best_epoch} epochs", flush=True)
-        # fresh model: re-init by reloading a copy is the caller's job; here we
-        # continue training from current state on the full set for best_epoch
-        # epochs (the paper retrained from scratch with the chosen epoch count;
-        # callers pass a freshly-initialized model and call train once with
-        # retrain_full_60k=True so this loop IS the from-scratch run).
+        print(f"  retraining on full 60k for {best_epoch} epochs (from scratch)", flush=True)
+        model.load_state_dict(init_state)
+        # expose the Phase-2 starting point for the guard test (== init_state)
+        history["phase2_start_state"] = {k: v.detach().clone() for k, v in model.state_dict().items()}
+        history["init_state"] = init_state
+        opt2 = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+        gen2 = torch.Generator().manual_seed(int(cfg.get("seed", 0)) + 7)
+        model.train()
         for ep in range(1, best_epoch + 1):
-            model.train()
-            perm = torch.randperm(x_full.shape[0], generator=gen)
+            perm = torch.randperm(x_full.shape[0], generator=gen2)
             for i in range(0, x_full.shape[0], batch_size):
                 batch_idx = perm[i:i + batch_size]
                 xb = x_full[batch_idx]
                 yb = y_full[batch_idx]
-                xb = _add_noise(xb, cfg, gen)
+                xb = _add_noise(xb, cfg, gen2)
                 loss = model.loss(xb, yb)
                 if adv_active:
                     x_adv = _build_x_adv(model, xb, yb, adv_eps)
@@ -257,9 +238,9 @@ def train(model, data, cfg):
                 if not torch.is_tensor(l1):
                     l1 = torch.tensor(0.0)
                 total = loss + l1
-                opt.zero_grad()
+                opt2.zero_grad()
                 total.backward()
-                opt.step()
+                opt2.step()
             # record retrain epoch metrics (overwrite history tail to reflect final model)
             tr_err = _eval_train_err(model, x_full, y_full)
             with torch.no_grad():

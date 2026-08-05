@@ -142,22 +142,37 @@ def arm_softmax_reg(seed):
 
 
 def _logreg_analytic_equiv(m, d, eps=0.25, n=1024):
-    """c07: | mean zeta(-y(w.(x - eps*sign(w)) + b)) - mean zeta(y*(eps*||w||_1 - w.x - b)) |
-    should be ~0 on a fixed batch. The paper's exact FGSM for logreg uses the
-    uniform perturbation eta = -eps*sign(w) (tex:407 "sign of the gradient is
-    just -sign(w)"), giving x_adv = x - eps*sign(w) and the closed form
-    zeta(y*(eps*||w||_1 - w.x - b)) (tex:411)."""
+    """c07: | mean zeta(-y*(w.(x_adv) + b)) - mean zeta(eps*||w||_1 - y*(w.x + b)) |
+    should be ~0 on a fixed batch, where x_adv is the REAL gradient-based FGSM
+    `attack.fgsm(m, x, y, eps)` (per-example perturbation eta_i = -eps*y_i*sign(w),
+    since sign(grad_x J) = -y*sign(w) for logistic regression). The CORRECT
+    worst-case closed form for the per-example FGSM is
+    zeta(eps*||w||_1 - y*(w.x + b)).
+
+    NOTE on the paper's sign slip: tex:407 states "the sign of the gradient is
+    just -sign(w)" and tex:411 gives the closed form zeta(y*(eps*||w||_1 - w.x - b)).
+    That holds only for y=+1: the true per-example gradient sign is -y*sign(w)
+    (the y factor is dropped at tex:407), so the worst-case perturbation is
+    x_i - eps*y_i*sign(w), giving loss zeta(eps*||w||_1 - y_i*(w.x_i+b)). The
+    paper's tex:411 form equals this only for y=+1; for y=-1 it gives
+    zeta(m - eps*||w||_1), which DECREASES the loss (not the worst case). We
+    therefore check the identity against the CORRECT closed form
+    zeta(eps*||w||_1 - y*(w.x+b)), using the real attack.fgsm — so a sign bug in
+    either attack.fgsm or the closed form breaks the invariant (it has
+    discriminating power). Verified to ~1e-6 on a fixed batch with mixed labels.
+    """
     x = _t(d, "x_train")[:n]
     y = _t(d, "y_train", "long")[:n]
     w = m.linear.weight.detach().squeeze(0)
     b = m.linear.bias.detach()
-    # paper's exact perturbation (uniform -sign(w), tex:407)
-    x_adv = x - eps * torch.sign(w).unsqueeze(0)
+    # REAL gradient-based per-example FGSM (sign(grad_x J) = -y*sign(w))
+    x_adv = attack.fgsm(m, x, y, eps)
     fgsm_loss = m.loss(x_adv, y)
     w1 = w.abs().sum()
     yf = y.float()
-    margin = eps * w1 - (x @ w + b)  # eps*||w||_1 - w.x - b
-    analytic = torch.nn.functional.softplus(yf * margin).mean()
+    # CORRECT worst-case closed form (not the paper's tex:411 y-multiplied form)
+    margin = eps * w1 - yf * (x @ w + b)
+    analytic = torch.nn.functional.softplus(margin).mean()
     return float(abs(fgsm_loss.item() - analytic.item()))
 
 
@@ -409,22 +424,26 @@ def arm_eps_trace_all(seeds):
     """Figure 4 eps-trace for ALL seeds at once.
 
     The curve claims (c65-c70) assert the thin-manifold shape of the paper's
-    Figure 4: the correct-class logit sits above the max wrong-class logit only
-    in a thin band near eps=0 and falls below it at both tails, crashing toward
-    the figure's ~-400 (correct) / ~+400 (top wrong) anchors at eps=+10. The
+    Figure 4 on a single illustrative class-4 example (the paper's caption:
+    "This plot was made from a naively trained maxout network ... The correct
+    class is 4", tex:768 — it reports ONE example, not a population claim). The
     numbers gate evaluates each curve over its stored sequence against a
-    per-point seed-spread noise floor, so the eps=0 "above" point must be
-    resolved ACROSS seeds (|mean margin| > cross-seed range). Picking a different
-    example per seed makes the eps=0 margin vary with the example and fall
-    within noise. We therefore train every seed's maxout network (single-thread
-    for FP determinism) and pick ONE class-4 test example that all seeds
-    classify correctly AND that exhibits the thin-manifold for all of them,
-    searching for the example whose eps=0 margin is resolved across seeds and
-    whose eps=+10 logits land near the figure's +-400 anchors. The paper does
-    not state which class-4 example it used (tex:768 "The correct class is 4"),
-    so choosing one fixed example that reproduces the figure's stated shape is
-    faithful, not a substitute. Falls back to per-seed first-thin-manifold
-    selection if no common example is found (and prints a warning).
+    per-point seed-spread noise floor, so the example must be SHARED across
+    seeds (a different example per seed makes the eps=0 margin vary with the
+    example and fall within noise).
+
+    PROTOCOL (deterministic, NO selection on the claim predicates): train each
+    seed's 240-unit maxout network (single-thread for FP determinism), then
+    take the FIRST (lowest-index) class-4 test example that ALL seed models
+    classify correctly. The FGSM direction is computed once at eps=0 on that
+    fixed example and the logit trace is recorded over the eps grid. There is
+    NO selection on the thin-manifold predicates (margin>0 at eps=0, <0 at the
+    tails, monotone increase) — the example is chosen purely by index, so the
+    curve claims can genuinely FAIL if this particular deterministic example
+    does not reproduce the figure's shape. The claims are rated `low`
+    (single-example illustration, not a population invariant), so a fail is
+    informational, not a gate failure. Falls back to the first correct class-4
+    example of seed 0 if no class-4 example is correct for all seeds.
     """
     prev_threads = torch.get_num_threads()
     torch.set_num_threads(1)              # FP-deterministic training + trace
@@ -437,7 +456,8 @@ def arm_eps_trace_all(seeds):
             nets.append(m)
             print(f"  eps_trace: trained seed {s}", flush=True)
         x_test = dts[0][0]["x_test"]; y_test = dts[0][0]["y_test"]
-        # class-4 examples correctly classified by ALL seed models
+        # class-4 examples correctly classified by ALL seed models (no predicate
+        # selection — just correctness, which the paper's caption assumes).
         correct_all = torch.ones(len(x_test), dtype=torch.bool)
         for m in nets:
             with torch.no_grad():
@@ -446,57 +466,24 @@ def arm_eps_trace_all(seeds):
         cand = torch.where(correct_all)[0]
         print(f"  eps_trace: {int(len(cand))} class-4 examples correct for all seeds", flush=True)
 
-        def trace(m, ei):
-            lg = attack.fgsm_logits_trace(m, x_test[ei], 4, EPS_TRACE_GRID).detach().cpu().numpy()
-            return lg[:, 4], np.delete(lg, 4, axis=1).max(1)
-
-        best = None  # (score, ei)
-        for i in cand[:400]:
-            ei = int(i)
-            lcs, lws = [], []
-            for m in nets:
-                lc, lw = trace(m, ei); lcs.append(lc); lws.append(lw)
-            m0 = [lcs[s][10] - lws[s][10] for s in range(len(seeds))]
-            mneg = [lcs[s][0] - lws[s][0] for s in range(len(seeds))]
-            mpos = [lcs[s][20] - lws[s][20] for s in range(len(seeds))]
-            c10 = [lcs[s][20] for s in range(len(seeds))]
-            w10 = [lws[s][20] for s in range(len(seeds))]
-            incr = all(all(lws[s][10 + k + 1] > lws[s][10 + k] for k in range(10))
-                       for s in range(len(seeds)))
-            if not (all(m0[s] > 0 for s in range(len(seeds)))
-                    and all(mneg[s] < 0 for s in range(len(seeds)))
-                    and all(mpos[s] < 0 for s in range(len(seeds))) and incr
-                    and all(abs(w10[s] - 400) <= 400 for s in range(len(seeds)))
-                    and all(abs(c10[s] + 400) <= 400 for s in range(len(seeds)))):
-                continue
-            mean0 = float(np.mean(m0)); range0 = float(np.max(m0) - np.min(m0))
-            if not (mean0 > range0 and mean0 > 0):      # eps=0 resolved across seeds
-                continue
-            score = -abs(float(np.mean(c10)) + 400) - abs(float(np.mean(w10)) - 400) - range0
-            if best is None or score > best[0]:
-                best = (score, ei)
-
-        fixed_ei = best[1] if best is not None else None
-        if fixed_ei is None:
-            print("  eps_trace: WARN no common fixed example; per-seed fallback", flush=True)
+        # FIRST (lowest-index) common-correct class-4 example — deterministic,
+        # no selection on the thin-manifold predicates the claims evaluate.
+        if len(cand) > 0:
+            fixed_ei = int(cand[0])
         else:
-            print(f"  eps_trace: fixed example index {fixed_ei} (resolved eps=0, "
-                  f"thin-manifold, eps=+10 near figure anchors)", flush=True)
+            # fallback: first correct class-4 example of seed 0
+            m0 = nets[0]
+            with torch.no_grad():
+                p0 = m0.predict(x_test)
+            cv = torch.where((p0 == y_test.view(-1)) & (y_test.view(-1) == 4))[0]
+            fixed_ei = int(cv[0]) if len(cv) > 0 else 0
+        print(f"  eps_trace: fixed example index {fixed_ei} (first common-correct "
+              f"class-4 example; NO predicate selection)", flush=True)
 
         results = {}
         for si, s in enumerate(seeds):
             m = nets[si]
-            if fixed_ei is not None:
-                ei = fixed_ei
-            else:  # per-seed fallback: first thin-manifold class-4 example
-                with torch.no_grad():
-                    preds = m.predict(x_test)
-                cv = torch.where((preds == y_test.view(-1)) & (y_test.view(-1) == 4))[0]
-                ei = int(cv[0])
-                for j in cv[:60]:
-                    lc, lw = trace(m, int(j))
-                    if lc[10] - lw[10] > 0 and lc[0] - lw[0] < 0 and lc[20] - lw[20] < 0:
-                        ei = int(j); break
+            ei = fixed_ei
             logits = attack.fgsm_logits_trace(m, x_test[ei], 4, EPS_TRACE_GRID).detach().cpu().numpy()
             results[str(s)] = _eps_trace_metrics(logits, 4)
             results[str(s)]["example_index"] = ei
@@ -528,7 +515,7 @@ def arm_cifar_conv_maxout(seed):
     clean = ev.error(m, x_test, y_test)
     adv = ev.adv_eval(m, x_test, y_test, EPS_CIFAR)
     rub = ev.rubbish_eval(m, 3072, 1000, seed)
-    fool = ev.fooling_eval(m, 3072, 200, seed, EPS_CIFAR)
+    fool = ev.fooling_eval(m, 3072, 1000, seed, EPS_CIFAR)
     out = {"clean_err": clean, **adv,
            "rubbish_err": rub["rubbish_err"], "rubbish_conf_mistakes": rub["rubbish_conf_mistakes"],
            "rubbish_class_shares": rub["rubbish_class_shares"],

@@ -238,7 +238,6 @@ class RBFNet(nn.Module):
             self.nu = nn.Parameter(torch.tensor(float(nu)))
         else:
             self.register_buffer("nu", torch.tensor(float(nu)))
-        self.log_temp = nn.Parameter(torch.zeros(K))
 
     def _quad(self, x):
         x = _check(x)
@@ -254,18 +253,19 @@ class RBFNet(nn.Module):
         return quad
 
     def logits(self, x):
-        quad = self._quad(x)  # [B, K] <= 0
-        return quad - torch.relu(self.log_temp).unsqueeze(0)  # <= 0
+        # log-probabilities (tex:595): log p_k = (x-mu_k)^T beta_k (x-mu_k),
+        # beta NSD => logits <= 0. No per-class temperature (the printed eq
+        # has none; an earlier log_temp slot was inert and is removed).
+        return self._quad(x)  # [B, K] <= 0
 
     def prob(self, x):
         return torch.exp(self.logits(x))  # [B, K] in (0, 1], rows need NOT sum to 1
 
     def loss(self, x, y):
-        logp = self.logits(x)  # log of prob
+        logp = self.logits(x)  # log of prob, <= 0
         y = y.to(torch.long).view(-1)
-        nll = -logp.gather(1, y.unsqueeze(1)).squeeze(1)
-        # clamp to avoid -inf -> nan; this is a non-negative loss region
-        return nll.clamp(min=-50).mean()
+        nll = -logp.gather(1, y.unsqueeze(1)).squeeze(1)  # >= 0 by construction
+        return nll.mean()
 
     def predict(self, x):
         return self.prob(x).argmax(dim=-1).to(torch.long)
@@ -285,7 +285,11 @@ class RBFNet(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Ensemble of models, mean-probability combine (tex:819-821)
+# Ensemble of models, mean-probability combine for PREDICTION (tex:819-821).
+# The ensemble-attack objective (what FGSM differentiates to perturb the whole
+# ensemble, tex:822-823) is the cross-entropy of the MEAN LOGITS — a
+# differentiable "perturb the entire ensemble" NLL (the paper is silent on the
+# objective; SPEC §4.12 logs this choice). Prediction combines mean PROBABILITIES.
 # ---------------------------------------------------------------------------
 class Ensemble(nn.Module):
     def __init__(self, members):
@@ -300,7 +304,9 @@ class Ensemble(nn.Module):
         return torch.stack([m.prob(x) for m in self.members], dim=0).mean(0)
 
     def loss(self, x, y):
-        # NLL of mean prob via logsumexp on mean logits
+        # Ensemble-attack objective (SPEC §4.12): cross-entropy of the MEAN
+        # LOGITS — the differentiable NLL whose input gradient perturbs the
+        # whole ensemble (tex:822-823; paper silent on the objective form).
         logits = self.logits(x)
         return F.cross_entropy(logits, y.to(torch.long).view(-1))
 
@@ -333,6 +339,10 @@ class ConvMaxoutStage(nn.Module):
 class ConvMaxoutCIFAR(nn.Module):
     # arch (ours, paper silent): 3 conv-maxout stages (32,64,128 ch) + 2x maxpool
     # + maxout MLP head (256,2 pieces) + softmax top. Modest for CPU training.
+    # Maxout is itself the nonlinearity (Goodfellow et al. 2013c); NO ReLU is
+    # applied after a maxout stage (an earlier version inserted F.relu after
+    # each stage, an extra nonlinearity the paper never describes and which
+    # changes the model class — removed).
     def __init__(self, D=3072, K=10):
         super().__init__()
         self.D, self.K = D, K
@@ -351,11 +361,11 @@ class ConvMaxoutCIFAR(nn.Module):
         x = _check(x)
         B = x.shape[0]
         h = x.view(B, 3, 32, 32)
-        h = self.c1(h); h = F.relu(h)  # maxout already nonlinearity, relu keeps positivity
+        h = self.c1(h)         # maxout is the nonlinearity; no post-ReLU
         h = self.pool(h)
-        h = self.c2(h); h = F.relu(h)
+        h = self.c2(h)
         h = self.pool(h)
-        h = self.c3(h); h = F.relu(h)
+        h = self.c3(h)
         h = h.flatten(1)
         h = self.fc_max(h)
         return h

@@ -20,8 +20,8 @@
       "id": "mut_adv_leak_grad",
       "covers": ["core", "degeneracy"],
       "file": "train.py",
-      "find": "    eta = eps * torch.sign(g)\n    return (x + eta).detach()",
-      "replace": "    eta = -eps * torch.sign(g)  # BUG: wrong-sign perturbation helps the model\n    return (x + eta).detach()",
+      "find": "        eta = eps * torch.sign(g)\n        return (x + eta).detach()",
+      "replace": "        eta = -eps * torch.sign(g)  # BUG: wrong-sign perturbation helps the model\n        return (x + eta).detach()",
       "must_fail": "tests/test_invariants.py::test_adversarial_training_reduces_adv_err"
     },
     {
@@ -36,9 +36,17 @@
       "id": "mut_logreg_analytic_sign",
       "covers": ["core"],
       "file": "tests/test_invariants.py",
-      "find": "    margin_fgsm = (x - eps * sign_w.unsqueeze(0)) @ w + b\n    margin_analytic = eps * w1 - (x @ w + b)",
-      "replace": "    margin_fgsm = (x + eps * sign_w.unsqueeze(0)) @ w + b\n    margin_analytic = eps * w1 - (x @ w + b)",
+      "find": "    margin = eps * w1 - yf * (x @ w + b)\n    analytic = float(torch.nn.functional.softplus(margin).mean().item())",
+      "replace": "    margin = yf * (eps * w1 - (x @ w + b))  # BUG: paper tex:411 slipped form (fails for y=-1)\n    analytic = float(torch.nn.functional.softplus(margin).mean().item())",
       "must_fail": "tests/test_invariants.py::test_logreg_fgsm_equals_analytic_form"
+    },
+    {
+      "id": "mut_adv_train_dropout_mode",
+      "covers": ["core"],
+      "file": "train.py",
+      "find": "    was_training = model.training\n    model.eval()\n    try:",
+      "replace": "    was_training = model.training\n    # BUG: keep dropout ON for the in-training attack (zeroes grad on masked pixels)\n    try:",
+      "must_fail": "tests/test_invariants.py::test_build_x_adv_uses_eval_mode_no_dropout"
     },
     {
       "id": "mut_rbf_softmax_norm",

@@ -128,8 +128,8 @@
     "eps_trace": {
       "dataset": "mnist test",
       "reuses": "maxout_naive of same seed",
-      "example": "first class-4 test example correctly classified by that seed's model",
-      "protocol": "FGSM direction computed once at eps=0; sweep eps=-10..10 step 1; record the [21,10] logits (tex:762-770)"
+      "example": "first class-4 test example correctly classified by ALL seed models (deterministic; no selection on the thin-manifold predicates)",
+      "protocol": "train each seed's maxout network; take the lowest-index class-4 test example all seeds classify correctly; FGSM direction computed once at eps=0; sweep eps=-10..10 step 1; record the [21,10] logits (tex:762-770)"
     },
     "cifar_conv_maxout": {
       "dataset": "cifar-10, GCN preprocessed to std~0.5 (tex:343-345)",
@@ -251,7 +251,7 @@
       ],
       "compute_invariance": "high",
       "predicate": "measured.logreg_3v7.analytic_equiv_max_absdiff < 1e-5",
-      "note": "| mean_i zeta(-y_i(w.(x_i - eps*y_i*sign(w)) + b)) - mean_i zeta(y_i*(eps*||w||_1 - w.x_i - b)) | on a fixed batch; FGSM is exact for logreg",
+      "note": "| mean_i zeta(-y_i*(w.(x_adv_i) + b)) - mean_i zeta(eps*||w||_1 - y_i*(w.x_i + b)) | on a fixed batch, where x_adv = attack.fgsm(m,x,y,eps) is the REAL gradient-based per-example FGSM (sign(grad_x J) = -y*sign(w) for logreg, so x_adv_i = x_i - eps*y_i*sign(w)). FGSM is exact for logreg. NOTE on the paper sign slip: tex:407 states the gradient sign is -sign(w) (dropping the y factor) and tex:411 gives the closed form zeta(y*(eps*||w||_1 - w.x - b)); that holds only for y=+1. The true worst-case closed form is zeta(eps*||w||_1 - y*(w.x+b)), which the per-example FGSM realizes exactly; we check against THIS form (not the paper tex:411 form, which would fail for y=-1). The invariant exercises the real attack.fgsm, so a sign bug in either the attack or the closed form breaks it (discriminating).",
       "quote": "Note that the sign of the gradient is just $- \\sign(\\vw)$, and that $\\vw^\\top \\sign(\\vw) = ||\\vw||_1$.",
       "citation": "paper/source/iclr2015.tex:407"
     },
@@ -1134,19 +1134,19 @@
       "citation": "paper/source/iclr2015.tex:939"
     },
     {
- "id": "c63",
- "kind": "existence",
- "arm": "cifar_conv_maxout",
- "seeds": [
-  0,
-  1,
-  2
- ],
- "compute_invariance": "low",
- "predicate": "measured.cifar_conv_maxout.fool_success_0 <= min(measured.cifar_conv_maxout.fool_success_0, measured.cifar_conv_maxout.fool_success_1, measured.cifar_conv_maxout.fool_success_2, measured.cifar_conv_maxout.fool_success_3, measured.cifar_conv_maxout.fool_success_4, measured.cifar_conv_maxout.fool_success_5, measured.cifar_conv_maxout.fool_success_6, measured.cifar_conv_maxout.fool_success_7, measured.cifar_conv_maxout.fool_success_8, measured.cifar_conv_maxout.fool_success_9)",
- "note": "airplane is the hardest class: its success rate is the minimum over classes. RECLASSIFIED high->low after a 3-seed sweep: this is a single-run class-ordering observation, not a structural invariant. REFUTED -- dog (class 5) was consistently the hardest fooling class across all 3 seeds (5.0%, 6.0%, 5.0% success) while airplane varied widely (11.0%, 51.5%, 68.0%); the verdict did not survive the sweep. The load-bearing claim from the same sentence (c62, frog & truck = 100% per-step success) does reproduce and remains HIGH. See REPRODUCTION.md.",
- "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling",
- "citation": "paper/source/iclr2015.tex:940"
+      "id": "c63",
+      "kind": "existence",
+      "arm": "cifar_conv_maxout",
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "compute_invariance": "low",
+      "predicate": "measured.cifar_conv_maxout.fool_success_0 <= min(measured.cifar_conv_maxout.fool_success_0, measured.cifar_conv_maxout.fool_success_1, measured.cifar_conv_maxout.fool_success_2, measured.cifar_conv_maxout.fool_success_3, measured.cifar_conv_maxout.fool_success_4, measured.cifar_conv_maxout.fool_success_5, measured.cifar_conv_maxout.fool_success_6, measured.cifar_conv_maxout.fool_success_7, measured.cifar_conv_maxout.fool_success_8, measured.cifar_conv_maxout.fool_success_9)",
+      "note": "airplane is the hardest class: its success rate is the minimum over classes. RECLASSIFIED high->low after a 3-seed sweep: this is a single-run class-ordering observation, not a structural invariant. REFUTED -- dog (class 5) was consistently the hardest fooling class across all 3 seeds (5.0%, 6.0%, 5.0% success) while airplane varied widely (11.0%, 51.5%, 68.0%); the verdict did not survive the sweep. The load-bearing claim from the same sentence (c62, frog & truck = 100% per-step success) does reproduce and remains HIGH. See REPRODUCTION.md.",
+      "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling",
+      "citation": "paper/source/iclr2015.tex:940"
     },
     {
       "id": "c64",
@@ -1171,14 +1171,14 @@
         1,
         2
       ],
-      "compute_invariance": "high",
+      "compute_invariance": "low",
       "quantity": "measured.eps_trace.logit_correct_e0",
       "against": "measured.eps_trace.logit_maxwrong_e0",
       "x": [
         0
       ],
       "comparison": "above",
-      "note": "at eps=0 the example is unperturbed and correctly classified as 4, so the correct-class curve sits above the max wrong-class curve (equivalently margin_seq > 0)",
+      "note": "DEMOTE high->low: Figure 4 reports ONE illustrative class-4 example (tex:768 'The correct class is 4'), not a population claim that every class-4 example has this shape. The eps_trace arm now uses a DETERMINISTIC fixed example (first class-4 test example correctly classified by all seeds) with NO selection on the claim predicates, so this claim can genuinely fail if that example does not reproduce the figure shape; it is informational (low), not gating. at eps=0 the example is unperturbed and correctly classified as 4, so the correct-class curve sits above the max wrong-class curve (equivalently margin_seq > 0)",
       "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
       "citation": "paper/source/iclr2015.tex:764"
     },
@@ -1191,7 +1191,7 @@
         1,
         2
       ],
-      "compute_invariance": "high",
+      "compute_invariance": "low",
       "quantity": "measured.eps_trace.logit_correct_tails",
       "against": "measured.eps_trace.logit_maxwrong_tails",
       "x": [
@@ -1199,7 +1199,7 @@
         10
       ],
       "comparison": "below",
-      "note": "at BOTH tails the correct-class curve sits under the max wrong-class curve - the thin-manifold claim; figure reads (figures/read-figure.jsonl): at eps=-10 class-4 ~ +200 vs top wrong-class ~ +800; at eps=+10 class-4 ~ -400 vs top ~ +400",
+      "note": "DEMOTE high->low: Figure 4 reports ONE illustrative class-4 example (tex:768 'The correct class is 4'), not a population claim that every class-4 example has this shape. The eps_trace arm now uses a DETERMINISTIC fixed example (first class-4 test example correctly classified by all seeds) with NO selection on the claim predicates, so this claim can genuinely fail if that example does not reproduce the figure shape; it is informational (low), not gating. at BOTH tails the correct-class curve sits under the max wrong-class curve - the thin-manifold claim; figure reads (figures/read-figure.jsonl): at eps=-10 class-4 ~ +200 vs top wrong-class ~ +800; at eps=+10 class-4 ~ -400 vs top ~ +400",
       "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
       "citation": "paper/source/iclr2015.tex:764"
     },
@@ -1212,7 +1212,7 @@
         1,
         2
       ],
-      "compute_invariance": "high",
+      "compute_invariance": "low",
       "quantity": "measured.eps_trace.logit_correct_pos",
       "against": "measured.eps_trace.logit_maxwrong_pos",
       "x": [
@@ -1229,7 +1229,7 @@
         10
       ],
       "comparison": "crosses",
-      "note": "correct-class curve starts above the max wrong-class curve at eps=0 and ends below it at eps=10, crossing near eps of order 1 (vision read: at eps=+5 correct class already below top wrong class)",
+      "note": "DEMOTE high->low: Figure 4 reports ONE illustrative class-4 example (tex:768 'The correct class is 4'), not a population claim that every class-4 example has this shape. The eps_trace arm now uses a DETERMINISTIC fixed example (first class-4 test example correctly classified by all seeds) with NO selection on the claim predicates, so this claim can genuinely fail if that example does not reproduce the figure shape; it is informational (low), not gating. correct-class curve starts above the max wrong-class curve at eps=0 and ends below it at eps=10, crossing near eps of order 1 (vision read: at eps=+5 correct class already below top wrong class)",
       "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we",
       "citation": "paper/source/iclr2015.tex:769"
     },
@@ -1242,7 +1242,7 @@
         1,
         2
       ],
-      "compute_invariance": "high",
+      "compute_invariance": "low",
       "quantity": "measured.eps_trace.logit_maxwrong_pos",
       "x": [
         0,
@@ -1258,7 +1258,7 @@
         10
       ],
       "comparison": "increasing",
-      "note": "predictions become very extreme moving into the rubbish regime",
+      "note": "DEMOTE high->low: Figure 4 reports ONE illustrative class-4 example (tex:768 'The correct class is 4'), not a population claim that every class-4 example has this shape. The eps_trace arm now uses a DETERMINISTIC fixed example (first class-4 test example correctly classified by all seeds) with NO selection on the claim predicates, so this claim can genuinely fail if that example does not reproduce the figure shape; it is informational (low), not gating. predictions become very extreme moving into the rubbish regime",
       "quote": "the wrong classifications are stable across a wide region of $\\eps$ values. Moreover, the predictions become very extreme as we",
       "citation": "paper/source/iclr2015.tex:769"
     },
