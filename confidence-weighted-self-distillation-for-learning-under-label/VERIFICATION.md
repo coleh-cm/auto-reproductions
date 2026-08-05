@@ -12,9 +12,13 @@ the headline number.
   `unknown` so no arXiv LaTeX source could be fetched — the maths is treated
   as potentially lossy and re-derived by hand against the prose, then pinned
   by the equation-invariant tests below).
-- **Rung reached:** `correctness` — the implementation is faithful to the
-  paper's equations (Eqs. 1–4); the on-disk numbers gate adjudicates the
-  paper's claims against the paper-LITERAL arm at the gated sharp-gate `s=0.15`.
+- **Rung reached:** `numbers` — the on-disk numbers gate ran on this run's
+  `measured.json` and adjudicated the paper's 9 claims (its output is
+  `claims_result.json`: 6 reproduced / 2 refuted / 1 untested / 0 blocked; the
+  AUTHORITATIVE COUNTS line is the gate's, read off this run's journal). The
+  implementation is faithful to the paper's equations (Eqs. 1–4); the gate
+  adjudicates the paper's claims against the paper-LITERAL arm at the gated
+  sharp-gate `s=0.15`.
   At the gated `s=0.15` the 5 high structural invariants + the baseline value
   reproduce; the two CWSD value/magnitude claims honestly FAIL (refuted at the
   gated `s`); the central `cwsd > baseline` ordering is within noise (UNTESTED,
@@ -54,13 +58,14 @@ Compute is CPU-only (numpy + scikit-learn); no GPU was used or needed.
 
 ### 2.1 The numbers gate (`claims_result.json`)
 
-> **Note (implementation pass, 2026-08-04):** `claims_result.json` is owned by
-> the workflow's numbers gate, which refuses any copy it did not produce. The
-> stale committed copy from a prior run has been removed; the local
+> **Note (finalization pass, 2026-08-05):** the numbers gate RAN on this run's
+> `measured.json` and produced `claims_result.json` (timestamp-matched to
+> this run's `arms.log`/`measured.json`); its verdicts are 6 reproduced /
+> 2 refuted / 1 untested / 0 blocked (the AUTHORITATIVE COUNTS line is the
+> gate's, read off this run's journal — not tallied here). The local
 > re-implementation `selfcheck_claims.py` → `selfcheck.json` re-runs the same
-> 9 claims against `measured.json` and reports 9/9 pass at all 3 seeds. The
-> `claims_result.json` referenced below is the gate's own output, produced
-> when it runs.
+> 9 claims against `measured.json` and agrees (6 pass / 2 fail / 1 untested /
+> 0 blocked at all 3 seeds).
 
 The gate adjudicates 9 claims declared in `claims.json` against
 `measured.json` (`{arm: {seed: {metric: value}}}`, written by
@@ -227,10 +232,13 @@ known-correct input) and a negative test (rejects a known-wrong one):
 
 ### 2.6 Determinism / re-run check
 
-`./run_all_arms.sh` was run twice this pass; both invocations produced the
-identical six `FINAL` lines (baseline 0.9370/0.9407/0.9315, cwsd
-0.9611/0.9481/0.9556) and the identical `measured.json`. Same seed → same
-number; the run is seed-pinned and reproducible.
+`./run_all_arms.sh` was re-run this finalization pass; both invocations
+produced the identical six `FINAL` lines (baseline 0.9370/0.9407/0.9315,
+cwsd-literal 0.9407/0.9296/0.9333 — the gated arm, matching `/tmp/arms.log`
+and `measured.json` byte-for-byte) and the identical `measured.json`. Same
+seed → same number; the run is seed-pinned and reproducible. (The
+0.9611/0.9481/0.9556 figures quoted in earlier passes are the DETACHED
+counterfactual arm, not the gated literal arm — corrected here.)
 
 ### 2.7 Fresh from-scratch build (research-readiness gate 1)
 
@@ -253,7 +261,8 @@ baseline-arm against `paper/paper.md` with `file:line` evidence; all 5
 approved, 0 blocker/major. The verify agent ran the actual program:
 `pytest -q` → passed; `--lambda 0.0` → 0.9370 (exact); `--lambda 1.0` →
 0.9611. **No `$HOME/.review_rounds` file exists** — the reviewers went quiet;
-no review budget was spent without resolution.
+no review budget was spent without resolution. (Corrected below in §5: a
+`$HOME/.review_rounds` file now exists on this run with value 2 — see §5.)
 
 ---
 
@@ -367,15 +376,31 @@ and reports the honest verdicts.
 - **Environment attempts:** `$HOME/.env_attempts` **does not exist** — the
   environment is reproducible from the pinned `requirements.txt` (fresh venv
   verified, gate 1).
-- **Review rounds:** `$HOME/.review_rounds` **does not exist** — the
-  adversarial review approved all components and went quiet.
+- **Review rounds:** `$HOME/.review_rounds` **exists with value 2** on this
+  run. (The prior pass's docs — §2.8 above and the original of this section —
+  stated the file did not exist; that is now stale and corrected here.) Two
+  review rounds are recorded as spent. The committed review→fix log shows each
+  round's findings were resolved with a committed fix (impl pass: frozen-target
+  FD check; impl pass 2: paper-LITERAL gradient as default, fixing the blocking
+  whole-target stop-grad finding; claims-adjudication pass: extended s-sweep,
+  corrected false universal; final commit `f8a7d47`: a reviewer "minor" on the
+  cwsd-accuracy-value claim). No outstanding unresolved objection is found in
+  the committed record, and the numbers gate adjudicated with 0 blocked.
+  Whether the review budget was fully exhausted is not determinable from the
+  file alone; this reproduction does not claim an unqualified clean review pass
+  on that account. A reader should weigh the committed review→fix log rather
+  than the round count.
 
 ---
 
 ## 6. Bottom line
 
-**Rung reached: `correctness`.** The implementation faithfully implements the
-paper's Eqs. (1)–(4) under the paper-LITERAL gradient (stopgrad only on
+**Rung reached: `numbers`.** The on-disk numbers gate ran on this run's
+`measured.json` and adjudicated the paper's 9 claims (`claims_result.json`:
+6 reproduced / 2 refuted / 1 untested / 0 blocked; the AUTHORITATIVE COUNTS
+line is the gate's, off this run's journal). The implementation faithfully
+implements the paper's Eqs. (1)–(4) under the paper-LITERAL gradient (stopgrad
+only on
 `p_tilde`, the default `--grad-mode literal`); the 5 high structural
 invariants (degeneracy, gate bound, target simplex, stop-grad on `p_tilde`,
 single-network) and the baseline value reproduce. The paper's headline

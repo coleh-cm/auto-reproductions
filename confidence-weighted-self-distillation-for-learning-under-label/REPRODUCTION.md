@@ -11,8 +11,10 @@
 
 ## Status
 
-Current rung: **correctness** (implementation faithful to the paper's equations;
-adversarial review's blocking finding fixed). The paper's Table-1 headline
+Current rung: **numbers** — the on-disk numbers gate ran on this run's
+`measured.json` and adjudicated all 9 claims (its output is `claims_result.json`,
+verdicts 6 reproduced / 2 refuted / 1 untested / 0 blocked; the AUTHORITATIVE
+COUNTS line is the gate's, read off this run's journal). The paper's Table-1 headline
 (+2.5 points, 0.9620) and the central `cwsd > baseline` ordering are
 **`s`-DEPENDENT under the paper's LITERAL gradient** (stopgrad only on `p_tilde`,
 as Eq. 3 marks it) — NOT a universal. The paper never states the gate sharpness
@@ -54,8 +56,108 @@ heuristic. `selfcheck_claims.py` → `selfcheck.json` reports 6 pass / 2 fail /
 - [x] Adversarial review rounds: the prior pass was REJECTED on one blocking,
       outcome-determinative finding (whole-target stop-grad contradicts Eq. 3);
       this pass fixes it
-- [ ] Readiness gates
-- [ ] Publish
+- [x] Readiness gates (see `## Research-readiness gates` below)
+- [ ] Publish (this finalization pass: numbers recorded, gates walked,
+      VERIFICATION.md updated, branch pushed and default branch brought up;
+      `publish_reproduction` called)
+
+## Measured vs paper-claimed (this run's arms)
+
+**The two arms came out within noise of each other.** At the gated arm
+(paper-LITERAL gradient, `--grad-mode literal`, sharp-gate default `s=0.15`)
+the baseline and CWSD accuracy ranges overlap completely across seeds 0/1/2
+(baseline 0.9315–0.9407, CWSD 0.9296–0.9407); the per-seed CWSD−baseline gap is
++0.0037 / −0.0111 / +0.0019 (mean −0.0019), whose spread across seeds (0.0148)
+is ~8× the magnitude of the mean gap and straddles zero (the ordering flips at
+seed 1). A measurement that cannot tell the arms apart has not tested the
+paper's comparison, whatever else it shows, and the gated-arm numbers below are
+reported on that basis. (The headline IS reachable under the paper's equations
+for other `(s, grad-mode)` — see `## Literal vs detached, and the unstated s`
+— but not by this gated arm.)
+
+**Where the data came from.** scikit-learn `load_digits` — the paper's own
+stated benchmark (1797 8×8 digits, K=10, §3), fingerprinted by the
+`data-loader` instrument in `instruments.json` (n_total=1797, 64 features,
+Xtr 1257×64, Xte 540×64, plus a SHA-256 of the split arrays). This is the
+paper's dataset, not a synthetic stand-in; a number measured on a synthetic
+substitute would say nothing about the paper and is not used here.
+
+**Horizon.** Every arm ran the paper's full stated 4000-step SGD budget (§3);
+no horizon was shortened to fit the machine. (A number produced at a horizon
+too short to separate the arms would not be evidence about the paper's claim;
+this run did not do that.)
+
+**Exact commands.** The paper's own two commands (§5), run with all defaults
+(`--seed 0`, `--grad-mode literal`, `s=0.15`, `τ=0.9`, `T=2`, 4000 steps,
+lr 0.1, batch 64, 20% symmetric noise):
+
+```
+python run_experiment.py --lambda 0.0    # baseline  -> FINAL accuracy=0.9370
+python run_experiment.py --lambda 1.0    # CWSD       -> FINAL accuracy=0.9407
+```
+
+The full grid (both arms × seeds {0,1,2}) used by the gate is produced by
+`./run_all_arms.sh`, which invokes, per arm-seed:
+
+```
+.venv/bin/python run_experiment.py --lambda <0.0|1.0> --grad-mode literal --seed <0|1|2> --metrics-out <tmp>
+```
+
+and writes `measured.json` plus one `FINAL <arm>=<value>` line per arm-seed to
+`/tmp/arms.log`.
+
+| Arm | λ | Paper claim (Table 1) | Measured (seed 0 / 1 / 2) | Measured mean | Diff vs claim (seed 0) | Exact command (seed 0) |
+|---|---|---|---|---|---|---|
+| Cross-entropy (baseline) | 0 | 0.9370 | 0.9370 / 0.9407 / 0.9315 | 0.9364 | 0.0000 | `python run_experiment.py --lambda 0.0` |
+| CWSD (gated, literal, `s=0.15`) | 1 | 0.9620 | 0.9407 / 0.9296 / 0.9333 | 0.9345 | −0.0213 | `python run_experiment.py --lambda 1.0` |
+
+The paper's headline improvement is **+0.025** (0.9620 − 0.9370). This run's
+gated arm measures **−0.0019** on average (CWSD *below* baseline), with the
+per-seed gap +0.0037 / −0.0111 / +0.0019 — i.e. the gated-arm measurement does
+not reproduce the +2.5-point claim and, within its own seed spread, cannot
+distinguish the two arms. Tolerance is not this reproduction's to decide; the
+numbers and the difference are stated and the reader is left to judge. The
+numbers gate's own verdicts on these claims (read off this run's journal, not
+tallied here) are reported in `claims_result.json` and summarised in
+`VERIFICATION.md`.
+
+**Counterfactual arms (NOT the gated arm — reported for completeness, since
+the headline is reachable under them).** Under `--grad-mode detached` (whole
+target constant, the standard self-distillation convention the paper does not
+mark on `w`) at the same `s=0.15`: CWSD 0.9611 / 0.9481 / 0.9556 (gap
++0.0241 / +0.0074 / +0.0241 vs baseline) — Table 1 reachable. Under the literal
+gradient at `s=2.0`: CWSD 0.9648 / 0.9481 / 0.9611 (gap +0.0278 / +0.0074 /
++0.0296) — Table 1 also reachable. These are recorded in `selfcheck.json`
+(`counterfactual_detached`) and `s_sweep.json` (`sweep_s.py`).
+
+## Research-readiness gates
+
+| # | Gate | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Builds from scratch | **partial** | Fresh `uv venv --python 3.13` + `uv pip install -r requirements.txt` reproduces the numbers (`pytest -q` → 53 passed; `--lambda 0.0` → 0.9370; `--lambda 1.0` → 0.9407). The `Dockerfile` path was NOT exercised — `docker` is not installed in this environment. The Dockerfile is present and self-contained but unexercised here. |
+| 2 | Accurate README | **pass** | `README.md` describes the method, both grad modes, the unstated-`s` finding, the exact commands, and the measured-vs-claimed table; quickstart (uv / pip / Docker) reproduces. |
+| 3 | Clear packages / deps | **pass** | `requirements.txt` pins numpy/scikit-learn/pytest; `.venv` excluded by `.gitignore`; no stray unpinned imports (`run_experiment.py` is numpy + sklearn only). |
+| 4 | Obvious entrypoint | **pass** | `run_experiment.py` (single arm, `--lambda` required) and `run_all_arms.sh` (full grid → `measured.json`) are the documented entrypoints; each prints exactly one `FINAL accuracy=<float>` line as the paper's §5 contract specifies. |
+| 5 | Reproducible number | **partial** | Seed-pinned: `./run_all_arms.sh` re-run produces byte-identical `measured.json` and the same six `FINAL` lines (determinism check, VERIFICATION.md §2.6). The baseline reproduces the paper's 0.9370 exactly at seed 0. The CWSD headline (0.9620) is NOT reproduced by the gated arm at `s=0.15` (it is `s`-dependent and reachable only under other `(s, grad-mode)`); the central ordering is within noise. The number is reproducible; whether it reproduces the paper is the open question the table above states. |
+| 6 | Data provenance | **pass** | `load_digits` (the paper's own dataset) fingerprinted by the `data-loader` instrument; no synthetic stand-in. |
+| 7 | Tests exist & pass | **pass** | `pytest -q tests` → 53 passed; 7 deliberate mutations each caught by a `must_fail` test (suite broken on purpose to prove the checks bite). |
+| 8 | Adversarial review | **partial** | Review rounds ran (see `## Review-rounds note`); each surfaced finding was resolved with a committed fix (the blocking whole-target stop-grad finding → `--grad-mode literal` default; the false "never reproduces at any `s`" universal → extended s-sweep). No standing unresolved objection is recorded in the committed log; the numbers gate returned 0 blocked. The review-rounds file exists (`$HOME/.review_rounds` = 2), so this pass is recorded as `partial` rather than a clean pass — see the note. |
+
+## Review-rounds note
+
+`$HOME/.review_rounds` exists with value **2** on this run (the prior pass's
+docs, written before this finalization, state the file did not exist — that
+claim is now stale and corrected here). Two review rounds are recorded as
+spent. The committed log shows each review round's findings were resolved
+with a fix (impl pass: frozen-target FD check; impl pass 2: paper-LITERAL
+gradient as default, fixing the blocking whole-target stop-grad finding;
+claims-adjudication pass: extended s-sweep, corrected false universal; final
+commit `f8a7d47`: a reviewer "minor" on the cwsd-accuracy-value claim noted).
+No outstanding unresolved objection is found in the committed record, and the
+numbers gate adjudicated with 0 blocked. Whether the review budget was fully
+exhausted is not determinable from the file alone; this reproduction does not
+claim an unqualified clean review pass on that account, and a reader should
+weigh the committed review→fix log rather than the round count.
 
 ## Source notes
 
@@ -227,9 +329,29 @@ heuristic. `selfcheck_claims.py` → `selfcheck.json` reports 6 pass / 2 fail /
   within-noise → `untested`, not `refuted`), now consistent between
   `claims.json`, the numbers gate, and `selfcheck_claims.py`.
   (5) Removed the stale committed `claims_result.json` (the gate owns it).
-  `measured.json` regenerated (byte-identical: the gated `s=0.15` is
-  unchanged); `pytest -q tests` → 53 passed; `selfcheck.json` → 6 pass / 2 fail
-  / 1 untested / 0 blocked.
+   `measured.json` regenerated (byte-identical: the gated `s=0.15` is
+   unchanged); `pytest -q tests` → 53 passed; `selfcheck.json` → 6 pass / 2 fail
+   / 1 untested / 0 blocked.
+
+- 2026-08-05 — Finalization / publish. Arms re-run by `./run_all_arms.sh`
+  (`/tmp/arms.log`): baseline 0.9370/0.9407/0.9315, cwsd-literal 0.9407/0.9296/
+  0.9333 (seeds 0/1/2) — byte-identical to `measured.json`; baseline seed 0 =
+  Table 1 exactly. The numbers gate ran on this run's `measured.json` and
+  produced `claims_result.json` (6 reproduced / 2 refuted / 1 untested / 0
+  blocked — the AUTHORITATIVE COUNTS line is the gate's, off this run's
+  journal). Rung set to **numbers** (the gate ran and adjudicated). Added the
+  `## Measured vs paper-claimed (this run's arms)` section leading with the
+  within-noise finding (the gated arms' ranges overlap fully; the gap spread
+  0.0148 ≫ |mean gap| 0.0019 and straddles zero), the exact commands, the data
+  provenance (`load_digits`, the paper's own dataset, fingerprinted — not a
+  synthetic stand-in), and the full-horizon note (4000 steps, not shortened).
+  Added the `## Research-readiness gates` table (5 pass / 3 partial: build
+  without Docker, reproducible number that does not reproduce the headline at
+  the gated `s`, adversarial review with `$HOME/.review_rounds` = 2). Added the
+  `## Review-rounds note` correcting the prior docs' stale "no review_rounds
+  file" claim. Updated `VERIFICATION.md` rung → `numbers` and the same
+  review-rounds correction. `pytest -q tests` → 53 passed. Branch pushed and
+  the default branch brought up to it (merge, not force).
 
 ## Literal vs detached, and the unstated `s` — the central finding
 
