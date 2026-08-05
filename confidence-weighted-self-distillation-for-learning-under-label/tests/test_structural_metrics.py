@@ -77,3 +77,89 @@ def test_structural_metrics_degeneracy_catches_active_gate():
     assert abs(loss_cw - loss_ce) > 0.0
     assert any(not np.array_equal(grads_cw[k], grads_ce[k])
                for k in ("W1", "b1", "W2", "b2"))
+
+
+def test_stopgrad_grad_err_is_nonvacuous():
+    """The stopgrad_grad_err check must DISTINGUISH the paper-literal gradient
+    (stopgrad ONLY on p_tilde; gate weight w differentiable) from BOTH failure
+    modes a literal reading can get wrong:
+
+      (1) NO stop-grad on p_tilde (gradient also flows through p_tilde toward
+          matching it -- the trivial-solution hazard the paper warns about,
+          paper/paper.md:213-214). Its analytic grad = the full no-stopgrad
+          gradient; it matches a no-stopgrad FD (everything recomputed) but NOT
+          the frozen-p_tilde FD the check uses.
+      (2) DETACHED / no gate path (the WHOLE target constant, dL/dz=(p-t)/B
+          only -- the standard self-distillation convention, NOT what Eq. (3)
+          marks). Its analytic grad omits the L->t->w->c->z term; it does NOT
+          match the frozen-p_tilde FD (which includes the gate path).
+
+    The fixed check (``_stopgrad_grad_err``) finite-differences the loss with
+    p_tilde FROZEN at the unperturbed params (and w recomputed), which is the
+    literal gradient. We re-derive that FD here independently and assert:
+      - the LITERAL analytic (``grad_mode="literal"``) MATCHES the frozen-p_tilde
+        FD (correct stop-grad on p_tilde AND gate path included);
+      - a NO-stopgrad FD (everything recomputed) DIVERGES from the literal
+        analytic (proving p_tilde is actually stopped, not coincidentally
+        matching);
+      - a DETACHED analytic (``grad_mode="detached"``) DIVERGES from the
+        frozen-p_tilde FD (proving the gate path is actually included).
+
+    On the peaked net (W2 scaled 8x) the literal analytic matches at ~1e-3
+    while both failure modes diverge by O(1), so the check is not vacuous.
+    """
+    rng = np.random.default_rng(123)
+    P = {
+        "W1": (rng.standard_normal((4, 5)) * 0.1).astype(np.float32),
+        "b1": np.zeros(5, np.float32),
+        "W2": (rng.standard_normal((5, 3)) * 8.0).astype(np.float32),
+        "b2": np.zeros(3, np.float32),
+    }
+    X = rng.standard_normal((3, 4)).astype(np.float32)
+    Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
+    _, grads_lit = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0, grad_mode="literal")
+    _, grads_det = r.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0, grad_mode="detached")
+    h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
+    z0 = h0 @ P["W2"] + P["b2"]
+    eps = 1e-4
+
+    def _fd(loss_fn):
+        out = {}
+        for name in ("W1", "b1", "W2", "b2"):
+            num = np.zeros_like(P[name])
+            for idx in np.ndindex(P[name].shape):
+                orig = P[name][idx]
+                P[name][idx] = orig + eps
+                lp = loss_fn(P)
+                P[name][idx] = orig - eps
+                lm = loss_fn(P)
+                P[name][idx] = orig
+                num[idx] = (lp - lm) / (2 * eps)
+            out[name] = num
+        return out
+
+    # frozen-p_tilde FD (p_tilde from z0, w recomputed) = the literal gradient.
+    frozen_pt = _fd(lambda Pp: r._loss_with_frozen_ptilde(Pp, X, Y, z0, 1.0, 0.9, 0.15, 2.0))
+    frozen_err = max(float(np.max(np.abs(frozen_pt[k] - grads_lit[k])))
+                     for k in ("W1", "b1", "W2", "b2"))
+    assert frozen_err < 5e-3, frozen_err   # literal analytic matches frozen-p_tilde FD
+
+    # no-stopgrad FD (p_tilde recomputed from perturbed z) -- must DIVERGE from
+    # the literal analytic, proving p_tilde is actually stopped.
+    def _loss_nostop(Pp):
+        h = np.maximum(0.0, X @ Pp["W1"] + Pp["b1"])
+        z = h @ Pp["W2"] + Pp["b2"]
+        t = r.make_target(z, Y, 1.0, 0.9, 0.15, 2.0)   # p_tilde recomputed (NOT frozen)
+        zc = z - z.max(axis=-1, keepdims=True)
+        log_p = zc - np.log(np.exp(zc).sum(axis=-1, keepdims=True))
+        return float(-np.sum(t * log_p) / X.shape[0])
+    nostop = _fd(_loss_nostop)
+    nostop_err = max(float(np.max(np.abs(nostop[k] - grads_lit[k])))
+                     for k in ("W1", "b1", "W2", "b2"))
+    assert nostop_err > 1.0, nostop_err   # no-stopgrad diverges (p_tilde is stopped)
+
+    # detached analytic (no gate path) -- must DIVERGE from the frozen-p_tilde
+    # FD (which includes the gate path), proving the gate path is included.
+    detached_err = max(float(np.max(np.abs(frozen_pt[k] - grads_det[k])))
+                       for k in ("W1", "b1", "W2", "b2"))
+    assert detached_err > 1.0, detached_err   # detached diverges (gate path included)

@@ -110,12 +110,75 @@ def _inv_target_in_simplex(mod):
     return np.allclose(t.sum(axis=-1), 1.0)
 
 
+def _inv_stopgrad_gradient(mod):
+    """M6/M7: the paper-LITERAL analytic dL/dz (stopgrad ONLY on p_tilde; the
+    gate weight w differentiable in z, so the L->t->w->c->z gate path is
+    included) equals the finite-difference of the loss with p_tilde FROZEN at
+    the unperturbed params (and w recomputed from the perturbed logits) on a
+    peaked net (W2 scaled 8x, so p is non-uniform and BOTH the gate-path term
+    and the d p_tilde/dz chain term are non-negligible). Uses the same peaked-net
+    setup as test_gradient_matches_finite_differences / _stopgrad_grad_err.
+
+    This checker DISTINGUISHES the literal gradient from both failure modes:
+      - M6 (detached / drop the gate-path term): the analytic omits the gate
+        path; the frozen-p_tilde FD includes it -> mismatch -> caught.
+      - M7 (no stop-grad on p_tilde): the analytic adds the d p_tilde/dz chain;
+        the frozen-p_tilde FD omits it -> mismatch -> caught.
+    The original literal analytic matches the frozen-p_tilde FD (~1e-3)."""
+    rng = np.random.default_rng(123)
+    P = {
+        "W1": (rng.standard_normal((4, 5)) * 0.1).astype(np.float32),
+        "b1": np.zeros(5, np.float32),
+        "W2": (rng.standard_normal((5, 3)) * 8.0).astype(np.float32),
+        "b2": np.zeros(3, np.float32),
+    }
+    X = rng.standard_normal((3, 4)).astype(np.float32)
+    Y = np.eye(3, dtype=np.float32)[rng.integers(0, 3, size=3)]
+    h0 = np.maximum(0.0, X @ P["W1"] + P["b1"])
+    z0 = h0 @ P["W2"] + P["b2"]
+    _, grads = mod.loss_and_grads(P, X, Y, 1.0, 0.9, 0.15, 2.0, grad_mode="literal")
+    eps = 1e-4
+    for name in ("W1", "b1", "W2", "b2"):
+        num = np.zeros_like(P[name])
+        for idx in np.ndindex(P[name].shape):
+            orig = P[name][idx]
+            P[name][idx] = orig + eps
+            # loss with p_tilde frozen (the Eq. 3 stop-grad on p_tilde): recompute
+            # w from the perturbed z but p_tilde from the unperturbed z0.
+            h = np.maximum(0.0, X @ P["W1"] + P["b1"])
+            z = h @ P["W2"] + P["b2"]
+            zc = z - z.max(axis=-1, keepdims=True)
+            log_p = zc - np.log(np.exp(zc).sum(axis=-1, keepdims=True))
+            p = np.exp(log_p)
+            w = 1.0 / (1.0 + np.exp(-(p.max(axis=-1) - 0.9) / 0.15))
+            pt = mod.softmax(z0 / 2.0)            # FROZEN p_tilde
+            t = (1 - w[:, None]) * Y + w[:, None] * pt
+            lp = float(-np.sum(t * log_p) / X.shape[0])
+            P[name][idx] = orig - eps
+            h = np.maximum(0.0, X @ P["W1"] + P["b1"])
+            z = h @ P["W2"] + P["b2"]
+            zc = z - z.max(axis=-1, keepdims=True)
+            log_p = zc - np.log(np.exp(zc).sum(axis=-1, keepdims=True))
+            p = np.exp(log_p)
+            w = 1.0 / (1.0 + np.exp(-(p.max(axis=-1) - 0.9) / 0.15))
+            pt = mod.softmax(z0 / 2.0)
+            t = (1 - w[:, None]) * Y + w[:, None] * pt
+            lm = float(-np.sum(t * log_p) / X.shape[0])
+            P[name][idx] = orig
+            num[idx] = (lp - lm) / (2 * eps)
+        if not np.allclose(num, grads[name], atol=2e-3):
+            return False
+    return True
+
+
 _CHECKERS = {
     "M1-gate-weight-nonzero-at-lambda-zero": _inv_target_equals_onehot,
     "M2-relu-mask-off-by-one": _inv_loss_grads_equal_ce,
     "M3-loss-reduction-mean-over-elements": _inv_loss_grads_equal_ce,
     "M4-temperature-leaks-into-loss-prediction": _inv_loss_grads_equal_ce,
     "M5-target-not-in-simplex": _inv_target_in_simplex,
+    "M6-detached-gradient-drops-gate-path": _inv_stopgrad_gradient,
+    "M7-no-stop-grad-on-ptilde": _inv_stopgrad_gradient,
 }
 
 

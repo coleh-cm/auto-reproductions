@@ -4,223 +4,386 @@
 - **Authors:** A. Bergstrom, M. Oyelaran, K. Vasquez (Institute for Applied Learning Systems)
 - **Year:** unknown
 - **arxiv_id:** unknown
-- **Date started:** 2026-08-04
+- **Date:** 2026-08-04
 - **paper_ref:** ce7a63e8-2c90-4516-887d-14515c8f4516
 - **project_id:** d7735ece-02c4-4228-985c-00834c92b8f3
 - **Branch:** `repro/confidence-weighted-self-distillation-for-learning-under-label`
 
 ## Status
 
-**Rung reached: `numbers`.** The on-disk numbers gate passes 9/9
-(`claims_result.json`: reproduced 9 / refuted 0 / untested 0 / blocked 0,
-`gate_pass=true`). No `$HOME/.build_attempts`, `$HOME/.env_attempts`, or
-`$HOME/.review_rounds` file exists — no build, environment, or review budget
-is recorded as spent on a still-failing gate, and the adversarial reviewers
-went quiet (approved, not run out of rounds).
+Current rung: **numbers** — the on-disk numbers gate ran on this run's
+`measured.json` and adjudicated all 9 claims (its output is `claims_result.json`,
+verdicts 6 reproduced / 2 refuted / 1 untested / 0 blocked; the AUTHORITATIVE
+COUNTS line is the gate's, read off this run's journal). The paper's Table-1 headline
+(+2.5 points, 0.9620) and the central `cwsd > baseline` ordering are
+**`s`-DEPENDENT under the paper's LITERAL gradient** (stopgrad only on `p_tilde`,
+as Eq. 3 marks it) — NOT a universal. The paper never states the gate sharpness
+`s` (Eq. 2 defines it; §3 lists only `lambda=1, tau=0.9, T=2`). At the gated
+sharp-gate default `s=0.15` (prose-aligned — "s controls how sharply the gate
+opens", paper/paper.md:164 — and provably non-tuning, since the headline FAILS
+there under literal) the headline does NOT reproduce (CWSD ≈ baseline, ordering
+within noise / flips at seed 1). But the gate-path gradient term is `∝ 1/s`, so
+the literal gradient CONVERGES to the DETACHED one as `s` grows: the full s-sweep
+(`sweep_s.py` -> `s_sweep.json`) across seeds 0/1/2 shows the headline
+REPRODUCES under the literal gradient for shallow gates — ordering holds at
+every seed for `s >= ~0.7`, value and magnitude for `s >= ~2.0` (e.g. `s=2.0`:
+0.9648/0.9481/0.9611) — and under the DETACHED variant (whole target constant,
+which the paper does not state on `w`) already at `s=0.15` (0.9611/0.9481/0.9556).
+Because the paper states neither `s` nor the stop-grad scope on `w`, the
+headline is **under-specified**: reachable under the paper's equations for a
+range of `(s, grad-mode)`, but not at the prose-aligned sharp-gate default under
+the literal gradient. The reproduction implements the literal gradient as the
+default (faithful) and pins `s=0.15` for the gated arm with a disclosed
+non-headline rationale; the detached variant is reported as a counterfactual.
+The 5 high structural invariants + the baseline value reproduce; the two CWSD
+value/magnitude claims are REFUTED at the gated `s=0.15`; the central ordering
+is UNTESTED (within noise, flips at seed 1) under the declared spread
+heuristic. `selfcheck_claims.py` → `selfcheck.json` reports 6 pass / 2 fail /
+1 untested / 0 blocked at all 3 seeds; `measured.json` regenerated.
 
-- [x] Reproduction workspace set up from `main`, branch
-      `repro/confidence-weighted-self-distillation-for-learning-under-label` pushed
+- [x] Reproductions repo cloned (shallow, blobless) into `$HOME`; workspace folder
+      present at the slug name
+- [x] `$HOME/.repro_dir` and `$HOME/.repro_branch` written (no trailing newlines)
+- [x] Branch `repro/confidence-weighted-self-distillation-for-learning-under-label`
+      created from `origin/main` and pushed
 - [x] Paper text saved to `paper/paper.md`
-- [x] Comprehension (SPEC) — 2026-08-04: SPEC.md and claims.json re-verified
-      independently against `paper/paper.md` (all citations re-grepped, all 11
-      quotes verbatim-checked, `s`-has-no-value re-confirmed, both arms and all
-      three seeds re-executed: seed 0 baseline 0.9370 exactly / CWSD 0.9611;
-      `48 passed`; no upstream code found on GitHub). See SPEC.md's second
-      re-verification note for the command-level evidence.
-- [x] Implementation / verification of existing code against the paper
-- [x] Adversarial review rounds clean (0 blockers; reviewers went quiet)
-- [x] Readiness gates (see table below; gates 1 & 10 `partial`: Docker not
-      installed, fresh `uv venv` build used in its place)
-- [x] Publish
+- [x] Comprehension (SPEC)
+- [x] Implementation / verification (this pass: paper-LITERAL gradient made the
+      default; DETACHED kept as counterfactual; `param_count` computed;
+      stop-grad FD check rewritten to freeze `p_tilde` (w recomputed) and
+      discriminate both no-stopgrad and detached; M6 detached + M7 no-stopgrad
+      mutations added; 53 tests pass; arms re-run; measured.json regenerated)
+- [x] Adversarial review rounds: the prior pass was REJECTED on one blocking,
+      outcome-determinative finding (whole-target stop-grad contradicts Eq. 3);
+      this pass fixes it
+- [x] Readiness gates (see `## Research-readiness gates` below)
+- [ ] Publish (this finalization pass: numbers recorded, gates walked,
+      VERIFICATION.md updated, branch pushed and default branch brought up;
+      `publish_reproduction` called)
+
+## Measured vs paper-claimed (this run's arms)
+
+**The two arms came out within noise of each other.** At the gated arm
+(paper-LITERAL gradient, `--grad-mode literal`, sharp-gate default `s=0.15`)
+the baseline and CWSD accuracy ranges overlap completely across seeds 0/1/2
+(baseline 0.9315–0.9407, CWSD 0.9296–0.9407); the per-seed CWSD−baseline gap is
++0.0037 / −0.0111 / +0.0019 (mean −0.0019), whose spread across seeds (0.0148)
+is ~8× the magnitude of the mean gap and straddles zero (the ordering flips at
+seed 1). A measurement that cannot tell the arms apart has not tested the
+paper's comparison, whatever else it shows, and the gated-arm numbers below are
+reported on that basis. (The headline IS reachable under the paper's equations
+for other `(s, grad-mode)` — see `## Literal vs detached, and the unstated s`
+— but not by this gated arm.)
+
+**Where the data came from.** scikit-learn `load_digits` — the paper's own
+stated benchmark (1797 8×8 digits, K=10, §3), fingerprinted by the
+`data-loader` instrument in `instruments.json` (n_total=1797, 64 features,
+Xtr 1257×64, Xte 540×64, plus a SHA-256 of the split arrays). This is the
+paper's dataset, not a synthetic stand-in; a number measured on a synthetic
+substitute would say nothing about the paper and is not used here.
+
+**Horizon.** Every arm ran the paper's full stated 4000-step SGD budget (§3);
+no horizon was shortened to fit the machine. (A number produced at a horizon
+too short to separate the arms would not be evidence about the paper's claim;
+this run did not do that.)
+
+**Exact commands.** The paper's own two commands (§5), run with all defaults
+(`--seed 0`, `--grad-mode literal`, `s=0.15`, `τ=0.9`, `T=2`, 4000 steps,
+lr 0.1, batch 64, 20% symmetric noise):
+
+```
+python run_experiment.py --lambda 0.0    # baseline  -> FINAL accuracy=0.9370
+python run_experiment.py --lambda 1.0    # CWSD       -> FINAL accuracy=0.9407
+```
+
+The full grid (both arms × seeds {0,1,2}) used by the gate is produced by
+`./run_all_arms.sh`, which invokes, per arm-seed:
+
+```
+.venv/bin/python run_experiment.py --lambda <0.0|1.0> --grad-mode literal --seed <0|1|2> --metrics-out <tmp>
+```
+
+and writes `measured.json` plus one `FINAL <arm>=<value>` line per arm-seed to
+`/tmp/arms.log`.
+
+| Arm | λ | Paper claim (Table 1) | Measured (seed 0 / 1 / 2) | Measured mean | Diff vs claim (seed 0) | Exact command (seed 0) |
+|---|---|---|---|---|---|---|
+| Cross-entropy (baseline) | 0 | 0.9370 | 0.9370 / 0.9407 / 0.9315 | 0.9364 | 0.0000 | `python run_experiment.py --lambda 0.0` |
+| CWSD (gated, literal, `s=0.15`) | 1 | 0.9620 | 0.9407 / 0.9296 / 0.9333 | 0.9345 | −0.0213 | `python run_experiment.py --lambda 1.0` |
+
+The paper's headline improvement is **+0.025** (0.9620 − 0.9370). This run's
+gated arm measures **−0.0019** on average (CWSD *below* baseline), with the
+per-seed gap +0.0037 / −0.0111 / +0.0019 — i.e. the gated-arm measurement does
+not reproduce the +2.5-point claim and, within its own seed spread, cannot
+distinguish the two arms. Tolerance is not this reproduction's to decide; the
+numbers and the difference are stated and the reader is left to judge. The
+numbers gate's own verdicts on these claims (read off this run's journal, not
+tallied here) are reported in `claims_result.json` and summarised in
+`VERIFICATION.md`.
+
+**Counterfactual arms (NOT the gated arm — reported for completeness, since
+the headline is reachable under them).** Under `--grad-mode detached` (whole
+target constant, the standard self-distillation convention the paper does not
+mark on `w`) at the same `s=0.15`: CWSD 0.9611 / 0.9481 / 0.9556 (gap
++0.0241 / +0.0074 / +0.0241 vs baseline) — Table 1 reachable. Under the literal
+gradient at `s=2.0`: CWSD 0.9648 / 0.9481 / 0.9611 (gap +0.0278 / +0.0074 /
++0.0296) — Table 1 also reachable. These are recorded in `selfcheck.json`
+(`counterfactual_detached`) and `s_sweep.json` (`sweep_s.py`).
+
+## Research-readiness gates
+
+| # | Gate | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Builds from scratch | **partial** | Fresh `uv venv --python 3.13` + `uv pip install -r requirements.txt` reproduces the numbers (`pytest -q` → 53 passed; `--lambda 0.0` → 0.9370; `--lambda 1.0` → 0.9407). The `Dockerfile` path was NOT exercised — `docker` is not installed in this environment. The Dockerfile is present and self-contained but unexercised here. |
+| 2 | Accurate README | **pass** | `README.md` describes the method, both grad modes, the unstated-`s` finding, the exact commands, and the measured-vs-claimed table; quickstart (uv / pip / Docker) reproduces. |
+| 3 | Clear packages / deps | **pass** | `requirements.txt` pins numpy/scikit-learn/pytest; `.venv` excluded by `.gitignore`; no stray unpinned imports (`run_experiment.py` is numpy + sklearn only). |
+| 4 | Obvious entrypoint | **pass** | `run_experiment.py` (single arm, `--lambda` required) and `run_all_arms.sh` (full grid → `measured.json`) are the documented entrypoints; each prints exactly one `FINAL accuracy=<float>` line as the paper's §5 contract specifies. |
+| 5 | Reproducible number | **partial** | Seed-pinned: `./run_all_arms.sh` re-run produces byte-identical `measured.json` and the same six `FINAL` lines (determinism check, VERIFICATION.md §2.6). The baseline reproduces the paper's 0.9370 exactly at seed 0. The CWSD headline (0.9620) is NOT reproduced by the gated arm at `s=0.15` (it is `s`-dependent and reachable only under other `(s, grad-mode)`); the central ordering is within noise. The number is reproducible; whether it reproduces the paper is the open question the table above states. |
+| 6 | Data provenance | **pass** | `load_digits` (the paper's own dataset) fingerprinted by the `data-loader` instrument; no synthetic stand-in. |
+| 7 | Tests exist & pass | **pass** | `pytest -q tests` → 53 passed; 7 deliberate mutations each caught by a `must_fail` test (suite broken on purpose to prove the checks bite). |
+| 8 | Adversarial review | **partial** | Review rounds ran (see `## Review-rounds note`); each surfaced finding was resolved with a committed fix (the blocking whole-target stop-grad finding → `--grad-mode literal` default; the false "never reproduces at any `s`" universal → extended s-sweep). No standing unresolved objection is recorded in the committed log; the numbers gate returned 0 blocked. The review-rounds file exists (`$HOME/.review_rounds` = 2), so this pass is recorded as `partial` rather than a clean pass — see the note. |
+
+## Review-rounds note
+
+`$HOME/.review_rounds` exists with value **2** on this run (the prior pass's
+docs, written before this finalization, state the file did not exist — that
+claim is now stale and corrected here). Two review rounds are recorded as
+spent. The committed log shows each review round's findings were resolved
+with a fix (impl pass: frozen-target FD check; impl pass 2: paper-LITERAL
+gradient as default, fixing the blocking whole-target stop-grad finding;
+claims-adjudication pass: extended s-sweep, corrected false universal; final
+commit `f8a7d47`: a reviewer "minor" on the cwsd-accuracy-value claim noted).
+No outstanding unresolved objection is found in the committed record, and the
+numbers gate adjudicated with 0 blocked. Whether the review budget was fully
+exhausted is not determinable from the file alone; this reproduction does not
+claim an unqualified clean review pass on that account, and a reader should
+weigh the committed review→fix log rather than the round count.
 
 ## Source notes
 
 - The objective's `arxiv_id` is `unknown`, so **no arXiv LaTeX source could be
-  fetched** (`https://arxiv.org/e-print/<id>` is not applicable). Per the
-  ingest instructions, this is recorded here and work proceeds with the
-  PDF-extracted text at `paper/paper.md`, which is reliable for prose but
-  **not** for maths — some symbols may be silently missing (e.g. the gate
-  sharpness `s` in Eq. (2) has no stated value in the extracted text).
-- This slug's folder already exists on `main`: it holds the complete output of
-  a prior reproduction run of the same paper (its `REPRODUCTION.md` reported
-  rung `numbers`). Those artifacts (`run_experiment.py`, tests, `SPEC.md`,
-  `VERIFICATION.md`, `measured.json`, etc.) are left in place as starting
-  material; this run re-verifies them against the paper rather than trusting
-  them. The prior run's stale remote branch tip (`9a07636`) was fast-forwarded
-  to current `main` — the slug folder content was identical (`git diff` empty).
+  fetched** (`https://arxiv.org/e-print/<id>` is not applicable). Per the ingest
+  instructions this is recorded here and work proceeds with the PDF-extracted
+  text in `paper/paper.md`.
+- Consequence: **maths in the extracted text is not authoritative** — extraction
+  drops some glyphs (e.g. in Eq. (2) as extracted, the gate sharpness `s` appears
+  only as the prose symbol with no numeric value). Every equation must be
+  treated as provisional and cross-checked against the prose before use; the
+  SPEC step must re-derive any symbol it cannot confirm.
 
-## Claimed results (paper Table 1, §4)
+## Provenance
 
-| Method | λ | Test accuracy |
-|---|---|---|
-| Cross-entropy (baseline) | 0 | 0.9370 |
-| CWSD (ours) | 1 | 0.9620 |
+- This repository's default branch already contains a **complete earlier
+  reproduction of this exact paper** (same paper_ref/project_id), merged via
+  commit `53d7bb1` ("Merge repro/explaining-and-harnessing-adversarial-examples
+  ... CWSD and other papers preserved from origin/main"). Its branch, now fully
+  merged and redundant, still existed on the remote.
+- This run branches from current `origin/main`, so that prior reproduction's
+  artifacts (code, tests, SPEC, measured results) remain in this folder as the
+  **starting state**. Nothing from the prior run is trusted without
+  re-verification: later steps re-derive the SPEC from `paper/paper.md`, re-run
+  the experiments, and adversarially re-review the code against the paper
+  before any publish call. The prior run's claims are treated as unverified
+  prior work product, not ground truth.
+- Setup is committed on this run's branch, not on `main`; only the publish step
+  touches the default branch.
 
-Setup (§3): scikit-learn `load_digits` (1797 8×8 digits, K=10, pixels ÷16),
-30% stratified test split at seed 0, 20% symmetric label noise, 64-hidden-unit
-ReLU MLP, SGD lr 0.1, batch 64, 4000 steps; λ=1, τ=0.9, T=2; single seed-0 run.
+## Log
 
-## Implementation / verification pass (2026-08-04)
+- 2026-08-04 — Ingest: workspace set up; branch pushed; paper text saved;
+  `arxiv_id` unknown recorded; fresh REPRODUCTION.md started for this run.
+- 2026-08-04 — Comprehension (SPEC): re-derived from `paper/paper.md`, not from
+  the prior run's notes. Independently re-verified: all 11 claims.json quotes
+  verbatim (11/11), all 24 grep anchors, Eq. (2)'s `s` valueless (tokens only at
+  paper.md:139/:162; hyperparameter sentence lists λ=1, τ=0.9, T=2 and stops);
+  no figures (nothing for `read-figure`); no URLs in paper; GitHub
+  repo+user searches all `total_count: 0` (no upstream code). Arms re-run on a
+  fresh pinned env (numpy 2.5.1, sklearn 1.9.0, Python 3.12.13): baseline
+  0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556 (seeds 0/1/2) — byte-identical
+  to committed `measured.json`; baseline seed 0 matches Table 1 exactly; ordering
+  holds at every seed. Structural predicates all pass (degeneracy errors 0.0
+  bitwise; gate/target/stop-grad bounds as claimed). Calibration evidence
+  re-measured: rng-layout spawned 0.9315 / noise-first 0.9426; s sensitivity
+  0.12→0.9593 … 0.18→0.9648; λ=0 bitwise s-independent. `pytest -q tests` →
+  48 passed. SPEC.md rewritten with the single-pass verification note;
+  claims.json unchanged (still correct per this pass).
+- 2026-08-04 — Implementation pass (adversarial review → fix). An orchestration
+  of 5 component reviewers (data pipeline, method core, training loop,
+  evaluation metric, baseline/degeneracy arm) against `paper/paper.md`, each
+  finding verified by a second refuter agent, surfaced ONE confirmed real
+  (minor, validation-only) defect: `_stopgrad_grad_err` and
+  `test_gradient_matches_finite_differences` finite-differenced the scalar loss
+  value, but `loss_and_grads` recomputes the target `t` from the perturbed `z`
+  on every call, so the value-FD returned the FULL no-stopgrad gradient — the
+  check passed only by coincidence on a near-uniform tiny net (p≈uniform ⇒ the
+  dt/dz chain term vanished). The core method (lines 130-198) was always
+  correct (stop-grad structural via the hand-derived `dz=(p-t)/B` with `t` a
+  plain detached array); only the validation check's evidentiary claim was
+  wrong. FIX: added `_loss_with_frozen_target` (freezes `t` at unperturbed
+  params, FDs only the log-p term); both checks now use it on a PEAKED net
+  (W2×8, p non-uniform) where the no-stopgrad gradient diverges by ~6.1 — so
+  the check now actually distinguishes a correct stop-grad from a no-stopgrad
+  implementation. Added `test_stopgrad_grad_err_is_nonvacuous` proving the
+  frozen-target FD matches the stopgrad analytic while the recomputing-t FD
+  diverges; added mutation M6 (a no-stopgrad gradient `dz=(p-t)/B +
+  lam*(p_tilde-p)/B` that is INVISIBLE to the λ=0 degeneracy gate by
+  construction, since the extra term is `0` at λ=0) caught by
+  `test_gradient_matches_finite_differences`. Suite 51 passed (was 48).
+  `measured.json` regenerated: accuracy arms byte-identical; `stopgrad_grad_err`
+  now 1.16e-3 (was 8.93e-4, both < 5e-3). Added `selfcheck_claims.py` →
+  `selfcheck.json` (local evaluator; deliberately NOT `claims_result.json`,
+  which the gate owns): 9/9 claims pass at all 3 seeds. Removed stale
+  `claims_result.json` committed by a prior run (the gate refuses any copy it
+  did not produce). All four other components cleared review with no confirmed
+  issues.
+- 2026-08-04 — Implementation pass 2 (adversarial REJECTION → blocking fix). A
+  follow-up adversarial review REJECTED the above on one blocking,
+  outcome-determinative finding (verified by independent re-execution, not
+  from docs): the implementation applied the stop-gradient to the WHOLE target
+  `t`, but Eq. (3) marks stopgrad ONLY on `p_tilde` ("the latter [= p_tilde]
+  treated as a constant", paper/paper.md:171-174, :198). Under the paper-LITERAL
+  gradient (stopgrad on `p_tilde` only; the gate weight `w = λσ((c−τ)/s)` is
+  differentiable in `z` through `c = max_k p_k`, so the `L → t → w → c → z`
+  path is included) the Table-1 headline +2.5 points and the central
+   `cwsd > baseline` ordering do NOT reproduce at the gated `s=0.15` — re-measured at seeds 0/1/2:
+   CWSD-LITERAL 0.9407 / 0.9296 / 0.9333 vs baseline 0.9370 / 0.9407 / 0.9315,
+   i.e. the ordering flips at seed 1 and is within noise at seeds 0/2. (This
+   pass stated the non-reproduction as a universal over `s`; the 2026-08-05
+   entry below falsifies that — the literal gradient DOES reproduce for
+   `s >= ~0.7-2.0`.) The
+   detached-t variant (the prior primary arm) reproduces Table 1 (0.9611 /
+   0.9481 / 0.9556), but it is the standard self-distillation convention the
+   paper does NOT mark on `w`. The prior pass therefore reached the paper's
+   number through a mechanism the paper forbids by omission — exactly what the
+   gate exists to prevent.
 
-The prior run's implementation was re-verified end-to-end against the paper
-rather than trusted. `run_all_arms.sh` was re-run on the pinned env (numpy
-2.5.1, scikit-learn 1.9.0, Python 3.13): seeds 0/1/2 → baseline
-0.9370/0.9407/0.9315, CWSD 0.9611/0.9481/0.9556; `measured.json` reproduced
-byte-identically; `pytest -q tests` → 48 passed; smoke `FINAL smoke=0.8370`
-(50-step, not a result). The numbers gate re-ran on the regenerated
-`measured.json` and reported 9/9 reproduced (gate_pass), with
-`claims_result.json` carrying the `produced_by: reproduce-paper numbers gate`
-stamp — i.e. the gate wrote it, not this step.
+  FIX (this pass):
+  (1) Added `--grad-mode literal|detached` (default **literal**, paper-faithful):
+  stopgrad ONLY on `p_tilde`, gate weight `w` differentiable; the full literal
+  gradient `dL/dz = (p − t)/B + gate-path term` is hand-derived
+  (`_gate_path_grad`) and verified against a frozen-`p_tilde` finite-difference
+  to ~1e-3 on a peaked net. The DETACHED variant (whole target constant) is kept
+  as a documented COUNTERFACTUAL — a variant under which Table 1 is reachable
+  (the literal gradient also reaches it for shallow gates; see 2026-08-05)
+  — reported in `selfcheck.json` / REPRODUCTION.md, NOT as the gated arm.
+  (2) Rewrote the stop-grad FD check to freeze `p_tilde` (not the whole `t`),
+  with `w` recomputed; it now discriminates BOTH failure modes — a no-stopgrad
+  (through `p_tilde`) FD diverges (~2.1) and a detached (no gate path) analytic
+  diverges (~4.0) on the peaked net.
+  (3) Replaced the prior M6 mutation with two: M6 (detached, drop the gate-path
+  term — the exact divergence the review rejected) and M7 (no stop-grad on
+  `p_tilde`, the trivial-solution hazard the paper warns about); both caught by
+  the rewritten FD check.
+  (4) `param_count` is now COMPUTED (`len(params)`) rather than a hardcoded
+  literal `4` (a prior review noted the literal would report 4 even if
+  parameters were added).
+   (5) `claims.json` cwsd arm uses `--grad-mode literal`; the value/ordering
+   claims are retained as the paper's claims so the gate adjudicates them
+   honestly against the literal arm (they fail at the gated `s=0.15`); the
+   detached counterfactual is in `not_tested`. `--s` is no longer described as
+   "calibrated to Table 1" (the literal arm does not reproduce Table 1 at the
+   gated `s=0.15`; the s-sweep shows it DOES reproduce at `s >= ~0.7-2.0`).
 
-## Adversarial review (orchestrate, 5 components × 2 reviewers)
+   Result (re-measured this pass, seeds 0/1/2): baseline 0.9370/0.9407/0.9315
+   (grad-mode-independent at λ=0, degeneracy holds under literal too — the
+   gate-path term is `λ·...=0`); CWSD-LITERAL 0.9407/0.9296/0.9333; CWSD-DETACHED
+   (counterfactual) 0.9611/0.9481/0.9556. `selfcheck.json`: 6 pass (5 high
+   structural invariants + baseline value) / 2 fail (cwsd value, improvement
+   magnitude, refuted at the gated `s=0.15`) / 1 untested (central ordering:
+   within noise, flips at seed 1, under the declared spread heuristic) / 0
+   blocked. `pytest -q tests` → 53 passed. The reproduction's honest conclusion:
+   the paper's headline is `s`-dependent under the literal gradient — it does
+   NOT reproduce at the prose-aligned sharp-gate default `s=0.15`, but DOES for
+   shallow gates `s >= ~0.7-2.0` (literal → detached) and under the detached
+   variant at `s=0.15`; because the paper states neither `s` nor the stop-grad
+   scope on `w`, the headline is under-specified, not uniformly refuted.
 
-An `orchestrate` workflow reviewed the five independent components (data
-pipeline, method core, training loop, evaluation metric, baseline/degeneracy
-arm) against `paper/paper.md` and `SPEC.md`, each with two reviewers under
-distinct lenses (correctness-against-the-paper; silent-failure-modes).
-Result: 0 blockers, 0 majors; 3 minors/nits fixed, 2 deferred with rationale.
+- 2026-08-05 — Adversarial review → claims-adjudication fix. A follow-up
+  adversarial review REJECTED the pass above on one blocking,
+  outcome-determinative finding (verified by independent re-execution in the
+  repo venv, not from docs): the repo's headline conclusion — "the paper-LITERAL
+  gradient does NOT reproduce Table 1 at any `s`; the headline is reachable
+  only under the DETACHED variant" — was empirically FALSE. The reviewer
+  re-ran CWSD under `--grad-mode literal` at the unstated `s=2.0` and got
+  0.9648/0.9481/0.9611 at seeds 0/1/2 vs baseline 0.9370/0.9407/0.9315, so the
+  ordering, value and magnitude claims ALL pass at every seed. The mechanism is
+  structural: the gate-path gradient term is `∝ 1/s`, so the literal gradient
+  converges to the detached one as `s` grows; the prior pass's own sensitivity
+  sweep stopped at `s=0.30`, exactly before the regime that falsifies the
+  universal. The implementation of Eqs. (1)-(4) was faithful in both grad modes
+  (all three reviews concur; 53 tests pass; degeneracy bitwise exact); the
+  failure was in the claims-adjudication layer.
 
-### Fixes applied from review
+  FIX (this pass):
+  (1) Extended the s-sweep to `s=5.0` across seeds 0/1/2 in BOTH grad modes
+  (`sweep_s.py` -> `s_sweep.json`); documented crossover (ordering at `s~0.7`,
+  value/magnitude at `s~2.0`) in SPEC §4 item 1.
+  (2) Corrected every "at any `s`" / "only under detached" universal at
+  claims.json, SPEC.md, VERIFICATION.md, run_experiment.py help text and this
+  file to the `s`-dependent truth.
+  (3) Re-adjudicated the cwsd arm under a STATED `s` policy: pin `s=0.15`
+  (sharp-gate default, prose-aligned, provably non-tuning — the headline fails
+  there). The value/magnitude claims are REFUTED at the gated `s`; the ordering
+  is UNTESTED under the declared spread heuristic.
+  (4) Declared ONE verdict rule for the ordering claim (a spread heuristic:
+  within-noise → `untested`, not `refuted`), now consistent between
+  `claims.json`, the numbers gate, and `selfcheck_claims.py`.
+  (5) Removed the stale committed `claims_result.json` (the gate owns it).
+   `measured.json` regenerated (byte-identical: the gated `s=0.15` is
+   unchanged); `pytest -q tests` → 53 passed; `selfcheck.json` → 6 pass / 2 fail
+   / 1 untested / 0 blocked.
 
-1. **`evaluate()` now raises on an empty test set** (`run_experiment.py:346`).
-   The prior code returned `nan` (a `RuntimeWarning`), which the
-   `instruments.json` contract describes as "a grader that cannot run must
-   raise, never return a negative verdict". `nan` is not a fabricated 0.0, but
-   it is not a raise either; the contract is now honoured literally.
-   `test_accuracy_scorer_must_raise_on_empty` asserts `pytest.raises(ValueError)`
-   instead of accepting `nan`. (minor, evaluation-metric.)
+- 2026-08-05 — Finalization / publish. Arms re-run by `./run_all_arms.sh`
+  (`/tmp/arms.log`): baseline 0.9370/0.9407/0.9315, cwsd-literal 0.9407/0.9296/
+  0.9333 (seeds 0/1/2) — byte-identical to `measured.json`; baseline seed 0 =
+  Table 1 exactly. The numbers gate ran on this run's `measured.json` and
+  produced `claims_result.json` (6 reproduced / 2 refuted / 1 untested / 0
+  blocked — the AUTHORITATIVE COUNTS line is the gate's, off this run's
+  journal). Rung set to **numbers** (the gate ran and adjudicated). Added the
+  `## Measured vs paper-claimed (this run's arms)` section leading with the
+  within-noise finding (the gated arms' ranges overlap fully; the gap spread
+  0.0148 ≫ |mean gap| 0.0019 and straddles zero), the exact commands, the data
+  provenance (`load_digits`, the paper's own dataset, fingerprinted — not a
+  synthetic stand-in), and the full-horizon note (4000 steps, not shortened).
+  Added the `## Research-readiness gates` table (5 pass / 3 partial: build
+  without Docker, reproducible number that does not reproduce the headline at
+  the gated `s`, adversarial review with `$HOME/.review_rounds` = 2). Added the
+  `## Review-rounds note` correcting the prior docs' stale "no review_rounds
+  file" claim. Updated `VERIFICATION.md` rung → `numbers` and the same
+  review-rounds correction. `pytest -q tests` → 53 passed. Branch pushed and
+  the default branch brought up to it (merge, not force).
 
-2. **`parse_final_line` regex tightened to reject negatives**
-   (`tests/test_instruments.py:183`). The prior pattern
-   `^FINAL accuracy=(-?\d+\.?\d*)$` would parse a fabricated `FINAL accuracy=-0.5`
-   as a float; accuracy is in `[0,1]`, so the optional leading minus is dropped
-   and a negative line is rejected to BLOCKED. A new negative-case assertion is
-   added to `test_final_line_parser_negative`. (nit, evaluation-metric.)
+## Literal vs detached, and the unstated `s` — the central finding
 
-3. **`mutations.json` `_comment` made honest about M5**. The blanket claim
-   "Each defect covers `core` and `degeneracy`" was false for M5
-   (`M5-target-not-in-simplex`): at `λ=0` the gate weight `w=0` makes the doubled
-   `p_tilde` term inert, so M5 is invisible to the λ=0 degeneracy gate and is
-   instead caught by the `test_target_sums_to_one` simplex invariant. The
-   `_comment` now states that M1-M4 cover `core`+`degeneracy` and M5 covers
-   `core`+`simplex`. No defect escapes the suite; the metadata no longer
-   overstates the degeneracy coverage. (minor, baseline-degeneracy-arm.)
+The paper's Eq. (3) annotates `stopgrad` ONLY on `p_tilde`
+(`paper/paper.md:198`, "the latter treated as a constant", `:171-174`). The
+gate weight `w = λσ((c−τ)/s)` is unmarked and is a function of `θ` through
+`c = max_k p_k`. Two faithful readings of the under-specified stop-grad, AND one
+unstated hyperparameter `s` (Eq. 2 defines it; §3 never assigns it), combine:
 
-### Deferred (with rationale)
+| reading | stop-grad on | gate path `w` | `s` | CWSD seed 0/1/2 | ordering | Table 1 (0.9620) |
+|---|---|---|---|---|---|---|
+| **literal** (default, paper's letter) | `p_tilde` only | differentiable (included) | 0.15 (gated default) | 0.9407 / 0.9296 / 0.9333 | within noise (flips s1) | NOT reachable at this `s` |
+| **literal** | `p_tilde` only | differentiable (included) | 2.0 | 0.9648 / 0.9481 / 0.9611 | holds all seeds | reachable |
+| **detached** (standard convention, counterfactual) | `p_tilde` AND `w` | constant (dropped) | 0.15 | 0.9611 / 0.9481 / 0.9556 | holds all seeds | reachable (±0.001) |
 
-- **`--steps 0` misuse path** (training-loop, minor): `main()` does not guard
-  against a zero-step budget, so a hypothetical `--steps 0` prints a
-  `FINAL accuracy=<untrained>` line. This is never reachable in the actual
-  pipeline (`run_all_arms.sh` and `smoke.sh` both use a positive budget; the
-  paper fixes 4000), and `test_training_step_count_is_exact` already asserts
-  the exact-step-count invariant. Not fixed to avoid changing the step-count
-  contract the test pins; flagged here for honesty.
-- **`run_all_arms.sh` relies on `run_experiment.py` defaults**
-  (training-loop, nit): the script passes only `--lambda --seed --metrics-out`
-  and relies on argparse defaults for the other hyperparameters. The defaults
-  provably match `claims.json` config exactly (verified: steps 4000, lr 0.1,
-  batch 64, s 0.15, tau 0.9, T 2.0, noise 0.2 uniform-all, init he,
-  batch-mode epoch-permutation, rng-layout init-first), so the full paper
-  config IS run. Pinning every field explicitly would guard against a future
-  default drift but is not a current correctness issue.
-- **`data-pipeline` and `method-core` reviewer stalls**: two of the ten
-  reviewers returned no verdict. The covered components (training-loop,
-  evaluation-metric, baseline-degeneracy-arm) all passed; the two stalled
-  components were re-verified by direct inspection during the fixes above
-  (data loader fingerprinted by `test_data_loader_*`; Eq.2/3/4 operator
-  precedence, axis reductions, temperature scope, and stop-grad confirmed
-  against `run_experiment.py:144-198` and `paper/paper.md:108-252`).
-
----
-
-## Measured results vs. paper claims
-
-**Data source:** the paper's own `scikit-learn.datasets.load_digits` corpus
-(1797 8x8 digits), loaded by the pinned library call (scikit-learn 1.9.0),
-not a synthetic stand-in. **Horizon:** the full 4000-step budget the paper
-states (sec. 3) was used at every seed — no horizon was shortened to fit the
-machine (one full arm runs in ~0.8 s on CPU).
-
-### At the paper's own seed (seed 0) — single run, as the paper reports
-
-| Method | λ | Paper claims | Measured (this run) | Difference (meas − claim) | Command |
-|---|---|---|---|---|---|
-| Cross-entropy (baseline) | 0 | 0.9370 | 0.9370 | 0.0000 | `.venv/bin/python run_experiment.py --lambda 0.0 --seed 0` |
-| CWSD (ours) | 1 | 0.9620 | 0.9611 | −0.0009 | `.venv/bin/python run_experiment.py --lambda 1.0 --seed 0` |
-| Improvement (CWSD − baseline) | — | 0.0250 | 0.0241 | −0.0009 | (difference of the two runs above) |
-
-The seed-0 baseline equals the paper's 0.9370 exactly; this is the paper's
-own verification gate (λ=0 ⇒ `t = y` ⇒ Eq. (4) is plain cross-entropy) and is
-the load-bearing correctness check (it does not depend on the unstated `s`).
-The seed-0 CWSD arm is within 0.001 of the paper.
-
-### Across seeds {0, 1, 2} — a robustness check the paper did NOT perform
-
-The paper reports a single seed-0 run; seeds 1 and 2 were added here to
-quantify seed-sensitivity. Command per arm-seed (from `run_all_arms.sh`):
-`.venv/bin/python run_experiment.py --lambda <lam> --seed <seed> --metrics-out <tmp>`;
-the full grid is reproduced by `./run_all_arms.sh`, which writes
-`measured.json` and prints the six `FINAL` lines logged in `/tmp/arms.log`.
-
-| Seed | baseline | cwsd | gap (cwsd − baseline) |
-|---|---|---|---|
-| 0 | 0.9370 | 0.9611 | +0.0241 |
-| 1 | 0.9407 | 0.9481 | +0.0074 |
-| 2 | 0.9315 | 0.9556 | +0.0241 |
-| mean | 0.9364 | 0.9549 | +0.0185 |
-| within-seed spread (max−min) | 0.0092 | 0.0130 | 0.0167 |
-
-### How to read these numbers (no tolerance is asserted here)
-
-The ordering the paper claims (CWSD > baseline) **holds at every seed** — the
-gap is positive at seeds 0, 1, and 2; it never reverses. But the gap is
-seed-sensitive, and **at seed 1 the two arms are within noise of each
-other**: the seed-1 gap (+0.0074) is smaller than the baseline arm's own
-within-seed spread (0.0092), so that single extra seed does not by itself
-test the paper's comparison. At the seed the paper actually ran (seed 0), and
-at seed 2, the gap (+0.0241) clearly exceeds both arms' within-seed spreads
-(0.0092 and 0.0130), so those seeds do separate the arms and agree with the
-paper to within 0.001 on every claimed quantity. Whether this constitutes a
-reproduction is left to the reader; the numbers and differences are stated,
-not judged.
-
-The CWSD arm's absolute number depends on the one hyperparameter the paper
-never states — the gate sharpness `s` in Eq. (2). It was calibrated to
-`s = 0.15` against the paper's own reported CWSD accuracy under the RNG
-layout (`init-first`) that already reproduces the baseline 0.9370 exactly;
-a sweep (in `SPEC.md` sec. 4) shows the ordering survives across two orders
-of magnitude of `s`, so the result is not a knife-edge of `s`, but the
-absolute CWSD number is not pinned by anything the paper wrote.
-
----
-
-## Research-readiness gates
-
-Walked against the skill's 10 gates; `partial` is recorded where honest.
-
-| # | Gate | Verdict | Evidence |
-|---|---|---|---|
-| 1 | Builds from scratch | **partial** | `Dockerfile` is present and self-contained, but `docker` is not installed in this environment so `docker build`/`docker run` were NOT exercised. A fresh `uv venv --python 3.13 --clear .venv` + `uv pip install -r requirements.txt` build from clean WAS verified: `pytest -q` -> 48 passed, `run_experiment.py --lambda 1.0` -> 0.9611 (VERIFICATION sec. 2.7). |
-| 2 | README is accurate | **pass** | The `uv` quickstart run verbatim (the documented `.venv/bin/python run_experiment.py --lambda 0.0` / `--lambda 1.0` commands) reproduces the seed-0 numbers this pass; the single-arm and `./run_all_arms.sh` paths both work as documented. |
-| 3 | Packages are clear | **pass** | `requirements.txt` pins every dependency with a version (numpy 2.5.1, scikit-learn 1.9.0, scipy 1.18.0, joblib 1.5.3, threadpoolctl 3.6.0, narwhals 2.24.0, pytest 9.1.1 + its transitives). Fresh install succeeds; code imports cleanly with no missing-import failures. |
-| 4 | Entrypoint is obvious | **pass** | One documented command, `python run_experiment.py --lambda FLOAT`, takes flags (`--seed`, `--steps`, `--s`, `--tau`, `--temperature`, `--metrics-out`, ...); no source edits are required to run either arm. |
-| 5 | Fast path exists | **pass** | `smoke.sh` runs the whole code path (data -> corrupt -> init -> train -> evaluate -> print) at a 50-step budget in <1 s. It is labelled `FINAL smoke=` (not the `FINAL accuracy=` contract line) so it cannot be mistaken for a result. |
-| 6 | Deterministic / noise quantified | **pass** | Same command, same seed -> same number: `run_all_arms.sh` was run twice this lineage and produced byte-identical `FINAL` lines and `measured.json`. The run-to-run spread across seeds is measured and recorded (baseline 0.0092, cwsd 0.0130). |
-| 7 | Degeneracy test in the repo | **pass** | `tests/test_degeneracy.py` (4 tests): the λ=0 path is bitwise identical to an independently written cross-entropy routine, per-step (loss + every grad) and end-to-end (300-step SGD loop with identical params + accuracy), swept over `s in {0.01,0.15,1.0,10.0}` so the no-op=baseline gate cannot be fit via the unstated `s`. `pytest -q` -> 48 passed. |
-| 8 | Data provenance stated | **pass** | Data is the paper's own `sklearn.datasets.load_digits` (n_total=1797, 64 features, K=10), obtained by the pinned library call; `instruments.json` fingerprints it (shapes + SHA-256 of the split arrays) so a silent fallback to a synthetic corpus would be caught. |
-| 9 | Recorded number is reproducible | **pass** | The exact command is recorded beside each number (table above); re-running `.venv/bin/python run_experiment.py --lambda 0.0 --seed 0` -> 0.9370 and `--lambda 1.0 --seed 0` -> 0.9611 this pass reproduces the recorded numbers within the quantified noise (here, exactly). |
-| 10 | Nothing depends on hidden local state | **partial** | A fresh venv in a clean build reproduces the numbers (gate 1 evidence); but the full fresh-clone-in-a-container check subsumed by this gate is not exercised because `docker` is absent — same `partial` reason as gate 1. |
-
----
-
-## Build / environment / review budget
-
-- **`$HOME/.build_attempts`** does not exist — no build budget is recorded as
-  spent on a still-failing gate. The build is clean: `run_all_arms.sh` writes
-  a well-formed `measured.json`, the numbers gate returns 9/9, `pytest -q` ->
-  48 passed.
-- **`$HOME/.env_attempts`** does not exist — the environment is reproducible
-  from the pinned `requirements.txt` (fresh venv verified, gate 1).
-- **`$HOME/.review_rounds`** does not exist — the adversarial review approved
-  all components and went quiet; no review budget was spent without
-  resolution. There is therefore no list of objections to record here.
+The literal gradient is the default because it is what Eqs. (2)–(4) literally
+state. Its gate-path term is `∝ 1/s`, so it CONVERGES to the detached gradient
+as `s` grows: the headline that does NOT reproduce at the sharp-gate default
+`s=0.15` DOES reproduce under the literal gradient for shallow gates (ordering
+from `s ≈ 0.7`, value/magnitude from `s ≈ 2.0` across seeds 0/1/2 —
+`sweep_s.py` -> `s_sweep.json`), and the detached variant reproduces it already
+at `s=0.15`. Because the paper states NEITHER `s` NOR the stop-grad scope on
+`w`, the headline is **under-specified**: reachable under the paper's equations
+for a range of `(s, grad-mode)`, but not at the prose-aligned sharp-gate default
+under the literal gradient. The gated cwsd arm therefore pins `s=0.15` (a
+disclosed, provably non-tuning choice — the headline fails there) and reports
+the value/magnitude claims as REFUTED at the gated `s` and the ordering as
+UNTESTED (within noise) under the declared spread heuristic; the detached
+variant is implemented (`--grad-mode detached`) and reported as a
+counterfactual (`selfcheck.json`), not as the gated arm. The `s`-dependence of
+the headline under the paper's literal equations IS the reproduction's central
+finding about the paper: its headline rests on two quantities it does not state
+(`s` and the stop-grad scope on `w`). (Both readings agree at `λ = 0` — the
+gate-path term is `λ·...=0` — so the paper's degeneracy gate holds under either,
+at every `s`.)

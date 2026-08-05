@@ -18,10 +18,10 @@
       "quote": "CWSD improves over the cross-entropy baseline by 2 . 5 accuracy points.",
       "citation": "paper/paper.md:416-427 (grep 'improves over the cross-entropy' resolves to line 420)",
       "compute_invariance": "high",
-      "measured": 0.01853333333333333,
-      "spread_across_seeds": 0.016699999999999937,
-      "verdict": "reproduced",
-      "why": "quantity 0.0185333 against direction >0, spread 0.0167"
+      "measured": -0.0018666666666666831,
+      "spread_across_seeds": 0.014799999999999924,
+      "verdict": "untested",
+      "why": "the quantity is -0.00186667 and the spread across seeds is 0.0148, so the arms are not separated"
     },
     {
       "id": "baseline-accuracy-value",
@@ -42,12 +42,12 @@
       "quote": "CWSD reaches 0 . 9620 against the baseline\u2019s 0 . 9370 , an improvement of 2 . 5 points",
       "citation": "paper/paper.md:428-445 (grep '9620' resolves to lines 414 and 432; Table 1 second-row tokens at paper/paper.md:408-414)",
       "compute_invariance": "low",
-      "measured": 0.9549333333333333,
-      "spread_across_seeds": 0.0129999999999999,
+      "measured": 0.9345333333333333,
+      "spread_across_seeds": 0.011099999999999999,
       "claimed": 0.962,
-      "gap": 0.0070666666666666655,
-      "verdict": "reproduced",
-      "why": "gap 0.00706667 within tolerance 0.015"
+      "gap": 0.02746666666666664,
+      "verdict": "refuted",
+      "why": "gap 0.0274667 exceeds tolerance 0.015 and the spread 0.0111"
     },
     {
       "id": "improvement-magnitude-2p5-points",
@@ -55,12 +55,12 @@
       "quote": "it improves test accuracy by 2 . 5 points over standard cross-entropy.",
       "citation": "paper/paper.md:24-36 (grep 'points over standard' resolves to line 34)",
       "compute_invariance": "low",
-      "measured": 0.01853333333333333,
-      "spread_across_seeds": 0.016699999999999937,
+      "measured": -0.0018666666666666831,
+      "spread_across_seeds": 0.014799999999999924,
       "claimed": 0.025,
-      "gap": 0.006466666666666673,
-      "verdict": "reproduced",
-      "why": "gap 0.00646667 within tolerance 0.02"
+      "gap": 0.026866666666666685,
+      "verdict": "refuted",
+      "why": "gap 0.0268667 exceeds tolerance 0.02 and the spread 0.0148"
     },
     {
       "id": "lambda-zero-is-exact-cross-entropy",

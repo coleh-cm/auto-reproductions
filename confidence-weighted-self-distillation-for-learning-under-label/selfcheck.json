@@ -1,0 +1,123 @@
+{
+  "seeds": [
+    "0",
+    "1",
+    "2"
+  ],
+  "claims": [
+    {
+      "id": "cwsd-improves-over-baseline",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "fail",
+        "2": "pass"
+      },
+      "verdict": "untested",
+      "mean_gap": -0.0018666666666666831,
+      "spread_gap": 0.014799999999999924
+    },
+    {
+      "id": "baseline-accuracy-value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "cwsd-accuracy-value",
+      "kind": "value",
+      "compute_invariance": "low",
+      "per_seed": {
+        "0": "fail",
+        "1": "fail",
+        "2": "fail"
+      },
+      "verdict": "fail"
+    },
+    {
+      "id": "improvement-magnitude-2p5-points",
+      "kind": "value",
+      "compute_invariance": "low",
+      "per_seed": {
+        "0": "fail",
+        "1": "fail",
+        "2": "fail"
+      },
+      "verdict": "fail"
+    },
+    {
+      "id": "lambda-zero-is-exact-cross-entropy",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "gate-weight-bounded-by-lambda",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "target-is-convex-combination",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "stop-gradient-holds-target-constant",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": "single-network-no-extra-parameters",
+      "kind": "existence",
+      "compute_invariance": "high",
+      "per_seed": {
+        "0": "pass",
+        "1": "pass",
+        "2": "pass"
+      },
+      "verdict": "pass"
+    }
+  ],
+  "counterfactual_detached": {
+    "baseline": {
+      "0": 0.937,
+      "1": 0.9407,
+      "2": 0.9315
+    },
+    "cwsd": {
+      "0": 0.9611,
+      "1": 0.9481,
+      "2": 0.9556
+    }
+  },
+  "counterfactual_detached_note": "DETACHED gradient (grad_mode detached, whole target constant) accuracy at each seed -- the standard self-distillation convention the paper does NOT mark on w (Eq. 3 marks stopgrad ONLY on p_tilde). This is ONE configuration under which Table 1 (0.9620) and the +2.5-point headline are reachable (already at the default s=0.15). The paper-LITERAL gradient (the gated cwsd arm) ALSO reaches the headline for shallow gates (s >= ~0.7 ordering, s >= ~2.0 value/magnitude; see s_sweep.json from sweep_s.py), because its gate-path term (proportional to 1/s) vanishes as s grows and the two gradients converge. NOT the gated arm: the gated cwsd arm uses the paper-LITERAL gradient at the sharp-gate default s=0.15 (the prose-aligned regime where 's controls how sharply the gate opens'), under which the headline does NOT reproduce at the gated s. Because the paper states neither s nor the stop-grad scope on w, the headline is under-specified: reachable under the paper's equations for a range of (s, grad-mode) but not at the prose-aligned sharp-gate default under literal."
+}

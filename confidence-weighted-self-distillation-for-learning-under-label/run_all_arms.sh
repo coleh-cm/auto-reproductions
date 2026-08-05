@@ -52,17 +52,23 @@ lambda_for_arm() {
   $PY -c "import json,sys;print(json.load(open('claims.json'))['arms'][sys.argv[1]]['config']['lambda'])" "$1"
 }
 
+# grad-mode for an arm (literal | detached), read from claims.json config.
+gradmode_for_arm() {
+  $PY -c "import json,sys;print(json.load(open('claims.json'))['arms'][sys.argv[1]]['config'].get('grad_mode','literal'))" "$1"
+}
+
 # Run one arm at one seed. Prints two lines:
 #   line1: "FINAL <arm>=<accuracy>" (or "FINAL <arm>=BLOCKED")
 #   line2: the path to the --metrics-out JSON (or empty if BLOCKED)
 run_one() {
-  local arm="$1" seed="$2" lam
+  local arm="$1" seed="$2" lam gm
   if ! lam="$(lambda_for_arm "$arm")"; then
     echo "FINAL ${arm}=BLOCKED"; echo ""; return
   fi
+  gm="$(gradmode_for_arm "$arm")"
   local tmpf rc headline out
   tmpf="$(mktemp)"
-  out="$($PY run_experiment.py --lambda "$lam" --seed "$seed" --metrics-out "$tmpf" 2>/dev/null)"
+  out="$($PY run_experiment.py --lambda "$lam" --grad-mode "$gm" --seed "$seed" --metrics-out "$tmpf" 2>/dev/null)"
   rc=$?
   headline="$(printf '%s\n' "$out" | grep -E '^FINAL accuracy=' | head -1 | sed 's/^FINAL accuracy=//')"
   if [ $rc -ne 0 ] || [ -z "$headline" ] || [ ! -s "$tmpf" ]; then

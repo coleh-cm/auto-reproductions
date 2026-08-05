@@ -85,6 +85,7 @@ def test_train_leaves_test_set_clean():
         seed=0, steps=5, lr=0.1, batch_size=64, init="he",
         noise_mode="uniform-all", noise_rate=0.2, batch_mode="epoch-permutation",
         rng_layout="init-first", lambda_=1.0, tau=0.9, s=0.15, temperature=2.0,
+        grad_mode="literal",
     )
     r.train(cfg)
     # re-derive the test labels the way train() sees them: same split (sklearn stream,
