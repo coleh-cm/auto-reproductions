@@ -270,8 +270,11 @@ resolution stated), each item must be chosen by the implementation and logged in
     (`:343-345`). RESOLVED: GCN variant chosen to give global std ≈ 0.5; exact recipe logged as
     ours. The conv-maxout stages use **NO post-ReLU** (maxout is itself the nonlinearity, per
     Goodfellow et al. 2013c; an earlier version inserted `F.relu` after each stage, an extra
-    nonlinearity the paper never describes — removed). Targeted-fooling uses **1,000 samples per
-    class** (§4.14); the run previously used 200 (underpowered) and now matches §4.14.
+    nonlinearity the paper never describes — removed). The conv net uses **NO dropout** (the
+    paper's maxout networks were dropout-regularized, but the paper does not describe the CIFAR
+    conv arch; dropping dropout is an arch-ours choice for the CPU sub-scale net, logged here).
+    Targeted-fooling uses **1,000 samples per class** (§4.14); the run previously used 200
+    (underpowered) and now matches §4.14.
 25. Whether control-noise is resampled per minibatch/epoch (`:555-557`): unstated. RESOLVED:
     resampled at every minibatch presentation.
 26. Adversarial-training minibatch composition: whether the α-weighted halves share one batch —
@@ -1623,7 +1626,7 @@ with ≥ 80% of consecutive diffs ≥ 0; `matches` = elementwise within `toleran
       ],
       "compute_invariance": "low",
       "predicate": "measured.cifar_conv_maxout.fool_success_0 <= min(measured.cifar_conv_maxout.fool_success_0, measured.cifar_conv_maxout.fool_success_1, measured.cifar_conv_maxout.fool_success_2, measured.cifar_conv_maxout.fool_success_3, measured.cifar_conv_maxout.fool_success_4, measured.cifar_conv_maxout.fool_success_5, measured.cifar_conv_maxout.fool_success_6, measured.cifar_conv_maxout.fool_success_7, measured.cifar_conv_maxout.fool_success_8, measured.cifar_conv_maxout.fool_success_9)",
-      "note": "airplane is the hardest class: its success rate is the minimum over classes. RECLASSIFIED high->low after a 3-seed sweep: this is a single-run class-ordering observation, not a structural invariant. REFUTED -- dog (class 5) was consistently the hardest fooling class across all 3 seeds (5.0%, 6.0%, 5.0% success) while airplane varied widely (11.0%, 51.5%, 68.0%); the verdict did not survive the sweep. The load-bearing claim from the same sentence (c62, frog & truck = 100% per-step success) does reproduce and remains HIGH. See REPRODUCTION.md.",
+      "note": "airplane is the hardest class: its success rate is the minimum over classes. RECLASSIFIED high->low after a 3-seed sweep: this is a single-run class-ordering observation, not a structural invariant. REFUTED -- dog (class 5) was consistently the hardest fooling class across the 3 seeds while airplane (class 0) varied widely (even at 1,000 samples/class the per-class success rate has high variance on the sub-scale conv net). The companion claim from the same sentence, c62 (frog & truck = 100% per-step success), is rated medium (a single-run observation on the paper's conv net, not a structural invariant) and at this run's sub-scale conv net does NOT hold at every seed (frog is 100% at all seeds but truck varies), so c62 fails honestly at sub-scale. See REPRODUCTION.md.",
       "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling",
       "citation": "paper/source/iclr2015.tex:940"
     },
