@@ -20,7 +20,12 @@ paper/source/*
 *.tar.gz
 eprint*
 
-# self-check grader output (reproducible via selfcheck_claims.py); the workflow
-# owns claims_result.json -- never commit either here.
-selfcheck.json
-claims_result.json
+# self-check grader output is reproducible via selfcheck_claims.py, but it is
+# the evidence a reader checks our self-claimed verdicts against, so it is
+# COMMITTED (not gitignored) -- a number whose output file is ignored is a
+# claim with its evidence deleted.
+#
+# claims_result.json is the workflow's numbers-gate verdict table. The
+# workflow writes it and we commit it; it must NEVER be gitignored (a
+# reproduction without it in the repo has published its summary and withheld
+# its evidence). It is absent now only because the publish step has not run.
