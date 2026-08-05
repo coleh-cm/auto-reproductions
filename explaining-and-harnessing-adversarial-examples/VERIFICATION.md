@@ -186,12 +186,14 @@ by the workflow's `result_check` off its own journal (not writable from this
 sandbox); the matching `claims_result.json` it derives from is committed
 beside this file.
 
-### Budget spent this run
+### Budget spent this run (final/publish step)
 
-`$HOME/.build_attempts` = 4 (build/env retries during the run; the build
-succeeded and **no gate is currently failing** — the venv builds, 38 tests
-pass, selfcheck gate PASS, numbers gate 0 blocked). `$HOME/.env_attempts` =
-empty (no environment-budget exhaustion). `$HOME/.review_rounds` = 1 (one
-review-budget unit spent this pass; the four documented review rounds
-concluded with the reviewers quiet at round 4 and a green gate — not a
-run that ran out of review rounds).
+`$HOME/.build_attempts`, `$HOME/.env_attempts`, and `$HOME/.review_rounds`
+are **all absent/empty** this step: no build/env budget was spent with a gate
+still failing, no environment budget was exhausted, and no review budget was
+spent without the reviewers going quiet. The venv builds from the pinned
+closure, 38 tests pass (37 pass / 1 skip), the selfcheck gate is PASS
+(14/14 HIGH), and the numbers gate has 0 blocked / 0 unevaluable — **no gate
+is currently failing**. The four documented adversarial-review rounds (in
+REPRODUCTION.md) concluded with the reviewers quiet at round 4 and a green
+gate; this step did not run out of review rounds.
