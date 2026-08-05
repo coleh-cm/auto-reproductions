@@ -429,10 +429,10 @@
         4
       ],
       "compute_invariance": "low",
-      "predicate": "max(measured.maxout_large_adv.clean_err) <= 1.1",
+      "predicate": "measured.maxout_large_adv.clean_err <= 1.1",
       "quote": "four trials that each had an error rate of 0.77\\% on the test set and one trial that had",
       "citation": "paper/source/iclr2015.tex:509",
-      "note": "reformulated from the paper's \"4 trials at 0.77%, 1 at 0.83%\" (which used disallowed count/mean) to the evaluable core: every trial's clean error <= 1.1% (all five paper trials are 0.77-0.83%). Our sub-scale CPU 1600-unit adv model reaches ~1.8% so this is refuted, documenting the training-budget gap rather than gating."
+      "note": "reformulated from the paper's \"4 trials at 0.77%, 1 at 0.83%\" (which used disallowed count/mean) to the evaluable core: every trial's clean error <= 1.1% (all five paper trials are 0.77-0.83%). The predicate is per-seed (existence = holds at every seed = every trial's clean err <= 1.1%); an earlier `max(measured...clean_err)` wrapper made the gate resolve a single float per seed and fail with `TypeError: 'float' object is not iterable` (gate verdict unevaluable). Our sub-scale CPU 1600-unit adv model reaches ~1.8% so this is refuted, documenting the training-budget gap rather than gating."
     },
     {
       "id": "c19",

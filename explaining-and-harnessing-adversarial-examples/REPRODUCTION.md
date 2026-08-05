@@ -25,6 +25,7 @@ see SPEC §0). The self-check grader adjudicates all 70 claims.
 - [x] CIFAR-10 arm — runs on the real dataset (download completed in this env; see Data provenance)
 - [x] Adversarial review round 1 clean — 5/7 approved, 2 findings fixed + guarded (see "Adversarial review")
 - [x] Gate-feedback round 2 — CIFAR un-blocked; curve claims c65–c70 resolve; c63 reclassified high→low (refuted, see below)
+- [x] Gate-feedback round 3 — c18 unevaluable fixed (per-seed predicate); 0 unevaluable claims remain
 
 ## Self-check grader (NOT claims_result.json)
 
@@ -255,6 +256,24 @@ refuted; 2 surviving correctness findings fixed + guarded with tests:
   primary metric now prints the mean with no suffix (`FINAL eps_trace=<mean>`);
   the full per-ε sequence the curve claims (c65–c70) actually evaluate lives in
   `measured.json` under the arm. All six eps_trace curve claims pass.
+
+- **Gate-feedback round 3 — c18 was unevaluable (`TypeError: 'float' object is
+  not iterable`).** c18 (existence, `maxout_large_adv`, "four trials at 0.77%, one
+  at 0.83%") had predicate `max(measured.maxout_large_adv.clean_err) <= 1.1`. The
+  numbers gate resolves `measured.<arm>.<metric>` to a single float **per seed**
+  and evaluates existence claims seed-by-seed ("held at N of M seeds"); wrapping
+  that per-seed float in `max(...)` then raised `TypeError: 'float' object is not
+  iterable` and the verdict came back `unevaluable` — a defect, not a result. The
+  note already stated the intent ("every trial's clean error <= 1.1%"), so the
+  fix is to drop the wrapper: predicate is now
+  `measured.maxout_large_adv.clean_err <= 1.1` (per-seed, exactly the note's
+  intent). **Fixed** in both `claims.json` and `SPEC.md`'s c18 block. The claim
+  now adjudicates: at all 5 seeds `clean_err` ≈ 1.7–2.04 > 1.1, so it is
+  **refuted** (held at 0 of 5) — the honest sub-scale result the note documents
+  (the 1600-unit model is CPU-capped at 6 epochs with no 60k retrain). No HIGH
+  claim depends on c18 (it is `low`). The reproduction now has **0 unevaluable**
+  claims; the remaining refuted/untested verdicts are honest (sub-scale value
+  gaps, and gaps inside the cross-seed spread respectively), not defects.
 
 - **Mutation-target files must be committed before `pytest`.** `tests/test_mutations.py`
   `git checkout HEAD --`s each mutation target (`models.py`, `train.py`,
