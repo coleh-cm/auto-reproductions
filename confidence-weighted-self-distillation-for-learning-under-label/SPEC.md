@@ -10,21 +10,30 @@ a convex combination; Eq. 4 must reduce to plain cross-entropy at `λ = 0` — a
 paper itself supplies the prose for). Every citation below is `paper/paper.md:LINE` plus a grep
 anchor; all anchors were re-executed and resolve (2026-08-04).
 
-**Verification note (this SPEC pass, 2026-08-04, post-adversarial-review fix).**
+**Verification note (this SPEC pass, 2026-08-05, post-adversarial-review fix).**
 A prior run of this same workflow left a complete reproduction in this folder; an
 adversarial review REJECTED it on one blocking, outcome-determinative finding:
-the implementation applied the stop-gradient to the WHOLE target `t`, but Eq. (3)
-marks stopgrad ONLY on `p_tilde` (`paper/paper.md:198`, "the latter treated as a
-constant", `:171-174`). Under the paper-LITERAL gradient (stopgrad on `p_tilde`
-only; the gate weight `w` differentiable through `c = max_k p_k`) the +2.5-point
-headline and the central `cwsd > baseline` ordering do NOT reproduce (CWSD
-0.9407/0.9296/0.9333 at seeds 0/1/2 vs baseline 0.9370/0.9407/0.9315 — the
-ordering flips at seed 1). This pass fixes that: the default `--grad-mode literal`
-implements the paper's equations as written; the `detached` variant (whole target
-constant) is kept as a documented counterfactual (the standard self-distillation
-convention the paper does not mark on `w`, and the only variant under which Table
-1's 0.9620 is reachable). The `param_count` metric is now COMPUTED from the params
-dict (was a hardcoded literal). Everything below was re-verified in this pass:
+the repo's headline conclusion — "the paper-LITERAL gradient (stopgrad only on
+`p_tilde`) does NOT reproduce Table 1 at any `s`; the headline is reachable only
+under the DETACHED variant" — was empirically FALSE. The reviewer re-executed
+CWSD under `--grad-mode literal` at the unstated sharpness `s = 2.0` and got
+0.9648/0.9481/0.9611 at seeds 0/1/2 (vs baseline 0.9370/0.9407/0.9315), so the
+`cwsd > baseline` ordering, the value and the magnitude claims ALL pass at every
+seed. The mechanism is structural: the gate-path gradient term is proportional
+to `1/s`, so the LITERAL gradient converges to the DETACHED one as `s` grows;
+the prior pass's own sensitivity sweep stopped at `s = 0.30`, exactly before the
+regime that falsifies the universal. This pass fixes that: the s-sweep is
+extended to `s = 5.0` across seeds 0/1/2 in BOTH grad modes (`sweep_s.py` ->
+`s_sweep.json`), every "at any `s`" / "only under detached" statement is
+corrected to the s-dependent truth, and the cwsd arm is re-adjudicated under a
+STATED `s` policy (the sharp-gate default `s = 0.15`, prose-aligned and provably
+non-tuning — the headline FAILS there under literal, so `s = 0.15` was not
+chosen to pass). The default `--grad-mode literal` still implements the paper's
+equations as written; the `detached` variant is kept as a documented
+counterfactual. The `param_count` metric is COMPUTED from the params dict. The
+`ordering` claim's verdict rule is now declared once (a spread heuristic: a
+within-noise ordering is `untested`, not `refuted`), matching the gate. Everything
+below was re-verified in this pass:
 
 - **Quotes:** all 11 `claims.json` quotes re-checked verbatim against `paper/paper.md` under the
   §8 normalization (11/11 PASS); all 24 grep anchors cited below re-executed and resolve to the
@@ -34,14 +43,22 @@ dict (was a hardcoded literal). Everything below was re-verified in this pass:
   hyperparameter sentence (`:361-375`) lists exactly `λ = 1`, `τ = 0.9`, `T = 2` and stops.
   Eq. (2)'s stacked token layout (`τ` at `:138` over `s` at `:139` inside the parentheses)
   confirms the fractional reading `(c − τ)/s`.
-- **Arms re-executed** on the pinned env (numpy 2.5.1, scikit-learn 1.9.0, Python 3.12.13):
+- **Arms re-executed** on the pinned env (numpy 2.5.1, scikit-learn 1.9.0, Python 3.13.5):
   seeds 0/1/2 → baseline `0.9370` / `0.9407` / `0.9315` (grad-mode-independent at λ=0),
-  CWSD-LITERAL `0.9407` / `0.9296` / `0.9333` — byte-identical to `measured.json`. The
-  paper-LITERAL CWSD arm does NOT reproduce Table 1 at any seed; the ordering `cwsd > baseline`
-  holds at seeds 0/2 (+0.0037, +0.0019, within noise) and FLIPS at seed 1 (−0.0111). The
-  DETACHED counterfactual (`--grad-mode detached`) measures `0.9611` / `0.9481` / `0.9556`
-  and reproduces Table 1 within 0.001; it is reported in `selfcheck.json` / REPRODUCTION.md,
-  not as the gated arm.
+  CWSD-LITERAL `0.9407` / `0.9296` / `0.9333` at the gated sharp-gate `s = 0.15` —
+  byte-identical to `measured.json`. At the gated `s = 0.15` the paper-LITERAL CWSD
+  arm does NOT reproduce Table 1 at any seed; the ordering `cwsd > baseline` is
+  within noise (holds at seeds 0/2 by +0.0037/+0.0019 = +2/+1 test examples,
+  FLIPS at seed 1 by −0.0111), so under the declared spread heuristic the
+  ordering verdict is `untested` (arms not separated), not refuted. This is
+  `s`-DEPENDENT, not a universal: the full sweep (`sweep_s.py` -> `s_sweep.json`,
+  §4 item 1) shows the headline REPRODUCES under the literal gradient for
+  shallow gates — ordering holds at every seed for `s ≥ ~0.7`, value and
+  magnitude for `s ≥ ~2.0` (e.g. `s = 2.0`: 0.9648/0.9481/0.9611, gaps
+  +0.0278/+0.0074/+0.0296) — because the gate-path term (`∝ 1/s`) vanishes and
+  literal → detached. The DETACHED counterfactual (`--grad-mode detached`)
+  reproduces Table 1 already at the default `s = 0.15` (0.9611/0.9481/0.9556);
+  it is reported in `selfcheck.json` / REPRODUCTION.md, not as the gated arm.
 - **Structural metrics re-measured** (`--metrics-out`, seeds 0/1/2): baseline `gate_w_max = 0.0`,
   `degeneracy_loss_err = 0.0`, `degeneracy_grad_err = 0.0` (bitwise, holds under literal too —
   the gate-path term is `lam*...=0` at λ=0); CWSD-LITERAL `param_count = 4` (COMPUTED via
@@ -53,11 +70,18 @@ dict (was a hardcoded literal). Everything below was re-verified in this pass:
   (no gate path) diverges (~4.0) on the peaked net.
 - **Calibration evidence re-measured:** baseline RNG layouts `spawned` → 0.9315 and
   `noise-first` → 0.9426 (falsify themselves against Table 1's 0.9370; `init-first` reproduces
-  it exactly); CWSD-LITERAL seed-0 sensitivity `s = 0.05→0.9537, 0.10→0.9370 (tie), 0.15→0.9407,
-  0.20→0.9352, 0.30→0.9426` — the literal gap is fragile and s-dependent even at seed 0 (zero at
-  s=0.1, negative at s=0.2); at seed 1 the literal gap is NEGATIVE for every s ∈ {0.05…0.3}, so
-  the ordering robustly fails at seed 1 under the literal equations. The `λ = 0` arm is bitwise
-  insensitive to `s` and to `grad-mode` (s=0.01/s=10.0, literal/detached all → 0.9370).
+  it exactly); CWSD-LITERAL s-sweep (seeds 0/1/2, `sweep_s.py` -> `s_sweep.json`,
+  full table in §4 item 1): `s = 0.05→0.9537/0.9315/0.9426, 0.10→0.9370/0.9389/0.9333,
+  0.15→0.9407/0.9296/0.9333, 0.20→0.9352/0.9352/0.9370, 0.30→0.9426/0.9389/0.9370,
+  0.50→0.9519/0.9407/0.9444, 0.70→0.9556/0.9444/0.9500, 1.00→0.9611/0.9444/0.9537,
+  2.00→0.9648/0.9481/0.9611, 5.00→0.9648/0.9500/0.9611`. The literal gap is `s`-dependent:
+  the ordering `cwsd > baseline` flips at seed 1 for small `s` (sharp gate) and
+  becomes positive at every seed for `s ≥ 0.7`; the value/magnitude pass at every
+  seed for `s ≥ 2.0`. The gate-path gradient term is `∝ 1/s`, so the literal
+  gradient converges to the detached one as `s` grows — the prior pass truncated
+  this sweep at `s = 0.30` and wrongly concluded the literal gradient never
+  reproduces. The `λ = 0` arm is bitwise insensitive to `s` and to `grad-mode`
+  (s=0.01/s=10.0, literal/detached all → 0.9370).
 - **Test suite:** `python -m pytest -q tests` → 53 passed (was 51; +2 from the M6 detached /
   M7 no-stopgrad-on-p_tilde mutations, both caught by the rewritten frozen-`p_tilde` FD check).
 - **Figures:** `paper/` contains only `paper.md`; `grep -niE "figure|fig\.|curve|plot"
@@ -175,7 +199,9 @@ where `u_i = (c_i − τ)/s`, `m* = argmax_m p_im`, `g_i = Σ_m (p̃_im − y_im
 `p̃ = softmax(z/T)` is held constant. The gate-path term is `λ·...` and vanishes exactly at
 `λ = 0`, so the degeneracy (== plain CE) holds bitwise. `--grad-mode detached` treats the
 WHOLE target `t` as constant (`dL/dz = (p − t)/B` only); that is the standard self-distillation
-convention the paper does NOT mark on `w`, and the variant under which Table 1 is reachable.
+convention the paper does NOT mark on `w`, and a variant under which Table 1 is reachable
+(already at the default `s=0.15`); the literal gradient also reaches it for shallow gates
+(`s ≥ ~2.0`) where its gate-path term (`∝ 1/s`) vanishes (§4 item 1).
 Cross-checked by central finite differences of the loss with `p̃` frozen (w recomputed), on a
 peaked net (`tests/test_invariants.py::test_gradient_matches_finite_differences`,
 `stopgrad_grad_err ≈ 1.08e-3 < 5e-3`); the check discriminates both a no-stopgrad (through
@@ -187,19 +213,48 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
 
 1. **`s`, the gate sharpness in Eq. (2), has no value anywhere.** §3 of the paper lists
    `λ = 1`, `τ = 0.9`, `T = 2` and stops (`paper/paper.md:361-375`). The CWSD arm cannot run
-   without choosing `s`, and its value matters.
-   → **Choice: `s = 0.15` (CLI default, exposed as `--s`).** NOT calibrated to Table 1 in this
-   pass: the paper-LITERAL CWSD arm (the default `--grad-mode literal`) does NOT reproduce
-   Table 1 at any `s` (it lands ~baseline), so there is no headline to calibrate `s` against
-   under the faithful gradient. `s = 0.15` is a middle value of an unstated free parameter.
-   Sensitivity at seed 0 (literal): `s = 0.05→0.9537, 0.10→0.9370 (tie), 0.15→0.9407,
-   0.20→0.9352, 0.30→0.9426` — the literal gap is fragile (zero at s=0.1, negative at s=0.2).
-   At seed 1 the literal gap is NEGATIVE for every `s ∈ {0.05…0.3}`, so the ordering robustly
-   fails at seed 1 under the literal equations. The `λ = 0` arm is bitwise insensitive to `s`
-   (and to grad-mode), so the degeneracy check is not touched by this choice. (A prior pass
-   calibrated `s = 0.15` against Table 1 under the DETACHED gradient; that calibration is moot
-   under the literal default, and the detached variant is now a documented counterfactual, not
-   the gated arm.)
+   without choosing `s`, and its value matters — it is **outcome-determinative for the
+   headline under the paper-LITERAL gradient**.
+   → **Choice: `s = 0.15` (CLI default, exposed as `--s`).** Rationale: `0.15` is the
+   sharp-gate regime the paper's prose describes ("`s` controls how sharply the gate opens
+   around `τ`", `paper/paper.md:164` — small `s` = sharp gate), and it is **provably
+   non-tuning**: at `s = 0.15` the paper-LITERAL CWSD arm lands ≈ baseline, so the headline
+   FAILS there — `s = 0.15` was not chosen to make the headline pass. (A prior pass
+   calibrated `s = 0.15` against Table 1 under the DETACHED gradient; that calibration is
+   moot under the literal default and is disclosed for honesty, not relied on.)
+   → **The CWSD headline is `s`-DEPENDENT under the literal gradient, NOT a universal.**
+   The gate-path gradient term is `∝ 1/s` (see `_gate_path_grad`), so the literal gradient
+   converges to the detached one as `s` grows. The full s-sweep (`sweep_s.py` ->
+   `s_sweep.json`, re-run 2026-08-05) across seeds 0/1/2 in BOTH grad modes:
+
+   | `s` | literal CWSD (s0/s1/s2) | literal gaps (s0/s1/s2) | ord>0 all | value ≤0.015 all | mag ≤0.02 all | detached CWSD (s0/s1/s2) |
+   |---|---|---|---|---|---|---|
+   | 0.05 | 0.9537/0.9315/0.9426 | +0.0167/−0.0092/+0.0111 | no | no | no | 0.9519/0.9481/0.9444 |
+   | 0.10 | 0.9370/0.9389/0.9333 | +0.0000/−0.0018/+0.0018 | no | no | no | 0.9574/0.9481/0.9444 |
+   | 0.15 | 0.9407/0.9296/0.9333 | +0.0037/−0.0111/+0.0018 | no | no | no | 0.9611/0.9481/0.9556 |
+   | 0.20 | 0.9352/0.9352/0.9370 | −0.0018/−0.0055/+0.0055 | no | no | no | 0.9630/0.9500/0.9556 |
+   | 0.30 | 0.9426/0.9389/0.9370 | +0.0056/−0.0018/+0.0055 | no | no | no | 0.9630/0.9519/0.9611 |
+   | 0.50 | 0.9519/0.9407/0.9444 | +0.0149/+0.0000/+0.0129 | no | no | no | 0.9648/0.9481/0.9593 |
+   | 0.70 | 0.9556/0.9444/0.9500 | +0.0186/+0.0037/+0.0185 | **yes** | no | no | 0.9611/0.9519/0.9611 |
+   | 1.00 | 0.9611/0.9444/0.9537 | +0.0241/+0.0037/+0.0222 | **yes** | no | no | 0.9667/0.9481/0.9630 |
+   | 2.00 | 0.9648/0.9481/0.9611 | +0.0278/+0.0074/+0.0296 | **yes** | **yes** | **yes** | 0.9630/0.9500/0.9611 |
+   | 5.00 | 0.9648/0.9500/0.9611 | +0.0278/+0.0093/+0.0296 | **yes** | **yes** | **yes** | 0.9667/0.9519/0.9611 |
+
+   (baseline = 0.9370/0.9407/0.9315, grad-mode- and s-independent at λ=0.) **Crossover under
+   the literal gradient: ordering `cwsd > baseline` at every seed from `s ≈ 0.7`; value
+   `|cwsd − 0.962| ≤ 0.015` and magnitude `|gap − 0.025| ≤ 0.02` at every seed from
+   `s ≈ 2.0`.** Under DETACHED the headline reproduces already at the default `s = 0.15`.
+   The prior pass's sweep stopped at `s = 0.30` and concluded the literal gradient "does NOT
+   reproduce at any `s`" — the sweep above, extended to `s = 5.0`, falsifies that universal:
+   Table 1 reproduces under the literal equations for shallow gates (where literal →
+   detached) and under the detached convention at the default `s`. Because the paper states
+   neither `s` nor the stop-grad scope on `w`, the headline is **under-specified**: reachable
+   under the paper's equations for a range of `(s, grad-mode)`, but NOT at the prose-aligned
+   sharp-gate default `s = 0.15` under the literal gradient. The gated cwsd arm therefore pins
+   `s = 0.15` (the disclosed non-headline rationale above): the value/magnitude claims are
+   REFUTED at the gated `s`, and the ordering is UNTESTED (within noise, flips at seed 1). The
+   `λ = 0` arm is bitwise insensitive to `s` (and to grad-mode), so the degeneracy check is
+   not touched by this choice.
 2. **Weight initialisation.** Only "the parameter initialisation [is] drawn from that seed"
    (`paper/paper.md:385-389`). No distribution, scale, or scheme; biases never mentioned
    (assumed present, zero-init — the architecture sentence `:339-343` doesn't say biases exist
@@ -211,23 +266,27 @@ Ranked by impact. Each bullet is a place the implementation must choose where th
 4. **Minibatch sampling.** 4000 steps × 64 over 1257 examples ≈ 203.7 epochs; with-replacement
    vs shuffled-epoch cycling and the short final batch (41 examples) are all unstated.
    → Choice: reshuffled permutation per pass, short final batch kept (`--batch-mode`).
-5. **Scope of the stop-gradient (the BLOCKING finding of the adversarial review).** Eq. (3)
+5. **Scope of the stop-gradient (a finding of the adversarial review).** Eq. (3)
    annotates `stopgrad` ONLY on `p̃` (`paper/paper.md:198`) and says only "the latter [= p̃]
    treated as a constant with respect to θ" (`:171-174`). The gate weight `w = λσ((c−τ)/s)` is
    a function of `θ` through `c = max_k p_k` and is NOT marked stopped; "Gradients are those of
    Eq. (4)" (`:359`) under the literal reading therefore includes the `L → t → w → c → z` path.
    → **Choice (DEFAULT, paper-faithful): `--grad-mode literal` — stopgrad ONLY on `p̃`; `w` is
    differentiable and the gate path is included** (the literal gradient derived in §3). This is
-   what Eqs. (2)–(4) literally state. Under it the paper's Table-1 CWSD number (0.9620) and the
-   `cwsd > baseline` ordering do NOT reproduce (CWSD ≈ baseline; the ordering flips at seed 1).
+   what Eqs. (2)–(4) literally state. Whether the Table-1 CWSD number (0.9620) and the
+   `cwsd > baseline` ordering reproduce under it is `s`-DEPENDENT (the paper never states `s`):
+   at the sharp-gate default `s = 0.15` the headline does NOT reproduce (CWSD ≈ baseline; the
+   ordering flips at seed 1), but for shallow gates it DOES — ordering from `s ≈ 0.7`, value
+   and magnitude from `s ≈ 2.0` (§4 item 1) — because the gate-path term is `∝ 1/s` and the
+   literal gradient converges to the detached one as `s` grows.
    → **Counterfactual (NOT the default, NOT the gated arm): `--grad-mode detached` — the WHOLE
    target `t` is constant (stopgrad on `p̃` AND `w`)**, so `dL/dz = (p − t)/B` only. This is the
-   standard self-distillation convention the paper does NOT mark on `w`; it is the variant under
-   which Table 1 IS reachable (0.9611/0.9481/0.9556), reported in `selfcheck.json` /
-   REPRODUCTION.md. An adversarial review found the prior run used the detached gradient as the
-   primary arm while marking the headline "reproduced" — outcome-determinative and not what the
-   paper states — so this pass makes the literal gradient the default and reports the detached
-   variant honestly as the counterfactual. At `λ = 0` both modes are bit-identical (the gate-path
+   standard self-distillation convention the paper does NOT mark on `w`; it reproduces Table 1
+   already at the default `s = 0.15` (0.9611/0.9481/0.9556), reported in `selfcheck.json` /
+   REPRODUCTION.md. A prior adversarial review found an earlier run used the detached gradient
+   as the primary arm while marking the headline "reproduced" — outcome-determinative and not
+   what the paper states — so the literal gradient is the default and the detached variant is
+   reported honestly as a counterfactual. At `λ = 0` both modes are bit-identical (the gate-path
    term is `λ·... = 0`), so the paper's degeneracy gate holds under either.
 6. **SGD flavour.** No momentum, weight decay, clipping, or LR schedule is mentioned
    (`paper/paper.md:344-359`). → Choice: vanilla constant-LR SGD.
@@ -307,7 +366,7 @@ exactly one flag.
 | Arm | λ | Command | Config |
 |---|---|---|---|
 | `baseline` ("Cross-entropy (baseline)") | 0.0 | `python run_experiment.py --lambda 0.0 --grad-mode literal --seed {seed} --metrics-out <tmp>` | Paper-stated: lr 0.1, batch 64, 4000 steps, 20% symmetric noise, seed 0. `τ/s/T/grad-mode` are **inert** at λ=0 (`w ≡ 0` and the gate-path term is `λ·...=0`, `:253-280`); the baseline is bit-identical under literal or detached. Defaults per §4: s 0.15, init he, noise-mode uniform-all, batch-mode epoch-permutation, rng-layout init-first. |
-| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --grad-mode literal --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (`:361-375`), same optimiser/steps/noise as baseline. `--grad-mode literal` is the paper-faithful gradient (stopgrad ONLY on `p̃`, gate path active; §4 item 5). `s=0.15` unstated, NOT calibrated to Table 1 (the literal arm does not reproduce Table 1 at any s; §4 item 1). Under this arm the headline +2.5 and the ordering do NOT reproduce; the DETACHED counterfactual (`--grad-mode detached`, same config) reproduces Table 1 and is reported in `selfcheck.json` / REPRODUCTION.md. |
+| `cwsd` ("CWSD (ours)") | 1.0 | `python run_experiment.py --lambda 1.0 --grad-mode literal --seed {seed} --metrics-out <tmp>` | Paper-stated: λ=1, τ=0.9, T=2 (`:361-375`), same optimiser/steps/noise as baseline. `--grad-mode literal` is the paper-faithful gradient (stopgrad ONLY on `p̃`, gate path active; §4 item 5). `s=0.15` unstated; pinned to the sharp-gate default with a disclosed non-headline rationale (provably non-tuning — the headline FAILS at `s=0.15` under literal; §4 item 1). The CWSD result is `s`-DEPENDENT under literal: at the gated `s=0.15` the headline +2.5 and the value/magnitude do NOT reproduce and the ordering is within noise (UNTESTED, flips at seed 1); the s-sweep (`sweep_s.py` -> `s_sweep.json`, §4 item 1) shows the headline REPRODUCES under literal for `s ≥ ~0.7` (ordering) / `s ≥ ~2.0` (value, magnitude) and under the DETACHED counterfactual at `s=0.15`. The DETACHED counterfactual (`--grad-mode detached`, same config) reproduces Table 1 and is reported in `selfcheck.json` / REPRODUCTION.md. |
 
 Metric (both arms): held-out test accuracy from the single `FINAL accuracy=<float>` line.
 Each run additionally emits the structural-invariant metrics of Eqs. 1–4 via `--metrics-out`
@@ -340,9 +399,9 @@ kept (so `temperature-softened` survives and `dispropor-tionately` keeps its hyp
 
 The claims:
 
-| id | kind | compute_invariance | settles | literal-arm verdict |
+| id | kind | compute_invariance | settles | literal-arm verdict (gated `s=0.15`) |
 |---|---|---|---|---|
-| `cwsd-improves-over-baseline` | ordering | **high** | `measured.cwsd.accuracy - measured.baseline.accuracy > 0` at every seed | FAIL (flips at seed 1: +0.0037/−0.0111/+0.0019) |
+| `cwsd-improves-over-baseline` | ordering | **high** | `measured.cwsd.accuracy - measured.baseline.accuracy > 0` at every seed (spread-heuristic: within-noise → `untested`) | UNTESTED (within noise: +0.0037/−0.0111/+0.0019; mean −0.0019 ≤ spread 0.0148; flips at seed 1) |
 | `baseline-accuracy-value` | value | low | `abs(measured.baseline.accuracy − 0.9370) ≤ 0.01` at every seed | PASS (0.9370/0.9407/0.9315) |
 | `cwsd-accuracy-value` | value | low | `abs(measured.cwsd.accuracy − 0.9620) ≤ 0.015` at every seed | FAIL (0.9407/0.9296/0.9333; dev 0.021–0.032) |
 | `improvement-magnitude-2p5-points` | value | low | `abs((cwsd−baseline) − 0.025) ≤ 0.02` at every seed | FAIL (gap ≈0; dev 0.021–0.036) |
@@ -354,25 +413,37 @@ The claims:
 
 Compute-invariance rationale: the ordering claim is sign-only and the five invariant/existence
 claims are structural, so all six are high; the three value claims are exact magnitudes from
-single seed-0 runs and are low. Under the paper-LITERAL gradient (the default cwsd arm), the
-5 high structural claims + the baseline value PASS, and the central ordering + the two CWSD
-value claims FAIL — i.e. the paper's headline and central ordering do NOT reproduce under the
-paper's stated equations. The DETACHED counterfactual (`--grad-mode detached`, not the gated
-arm) reproduces Table 1 (0.9611/0.9481/0.9556, ordering +0.0241/+0.0074/+0.0241); it is the
-standard self-distillation convention the paper does NOT mark on `w`. Measured evidence
-re-derived this pass (2026-08-04, seeds 0/1/2): baseline 0.9370/0.9407/0.9315, CWSD-LITERAL
+single seed-0 runs and are low. Under the paper-LITERAL gradient at the gated sharp-gate
+`s=0.15`, the 5 high structural claims + the baseline value PASS, the two CWSD value claims
+FAIL (refuted at the gated `s`), and the central ordering is UNTESTED (within noise,
+flips at seed 1) under the declared spread heuristic. These are verdicts about the gated
+`s=0.15`, NOT universals: the CWSD headline is `s`-DEPENDENT under the literal gradient
+(`sweep_s.py` -> `s_sweep.json`, §4 item 1) — the ordering holds at every seed for `s ≥ ~0.7`
+and the value/magnitude for `s ≥ ~2.0` (e.g. `s=2.0`: 0.9648/0.9481/0.9611, gaps
++0.0278/+0.0074/+0.0296), because the gate-path term (`∝ 1/s`) vanishes and literal → detached.
+The DETACHED counterfactual (`--grad-mode detached`, not the gated arm) reproduces Table 1
+already at the default `s=0.15` (0.9611/0.9481/0.9556, ordering +0.0241/+0.0074/+0.0241); it is
+the standard self-distillation convention the paper does NOT mark on `w`. Because the paper
+states neither `s` nor the stop-grad scope on `w`, the headline is under-specified: reachable
+under the paper's equations for a range of `(s, grad-mode)`, but not at the prose-aligned
+sharp-gate default under the literal gradient. Measured evidence re-derived this pass
+(2026-08-05, seeds 0/1/2): baseline 0.9370/0.9407/0.9315, CWSD-LITERAL (gated s=0.15)
 0.9407/0.9296/0.9333; CWSD-DETACHED (counterfactual) 0.9611/0.9481/0.9556.
 
 **Deliberately not tested** (`claims.json.not_tested`): (a) the attribution claim
 ("We attribute the gain to the gate suppressing…", `paper/paper.md:445-447`) — a mechanism claim
 the paper itself phrases as attribution, needing per-example gate-weight logging that the output
 contract (one `FINAL accuracy=` line) does not expose; (b) Table-1 magnitudes at seeds ≠ 0
-(`paper/paper.md:385`) — under the literal gradient the value claims fail at every seed
-(including 0), so the widened tolerances are not the reason they fail here; (c) the DETACHED
-counterfactual — the standard self-distillation convention (whole target constant) the paper
-does NOT mark on `w`, implemented as `--grad-mode detached` and reported in `selfcheck.json` /
-REPRODUCTION.md as the variant under which Table 1 IS reachable, but NOT the gated arm (the
-gated cwsd arm is the paper-literal gradient, faithful to Eq. 3 as written).
+(`paper/paper.md:385`) — at the gated `s=0.15` under the literal gradient the value claims fail
+at every seed (including 0), so the widened tolerances are not the reason they fail here (the
+gated `s` is); the CWSD headline IS reachable under the literal gradient for shallow gates
+(`s ≥ ~0.7` ordering, `s ≥ ~2.0` value/magnitude) and under the DETACHED variant at `s=0.15`
+(`sweep_s.py` -> `s_sweep.json`, §4 item 1); (c) the DETACHED counterfactual — the standard
+self-distillation convention (whole target constant) the paper does NOT mark on `w`,
+implemented as `--grad-mode detached` and reported in `selfcheck.json` / REPRODUCTION.md as ONE
+configuration under which Table 1 is reachable (the literal gradient ALSO reaches it for
+shallow gates), but NOT the gated arm (the gated cwsd arm is the paper-literal gradient at the
+sharp-gate default `s=0.15`, faithful to Eq. 3 as written).
 
 ## 9. Upstream code — searched, none found (re-verified 2026-08-04)
 
@@ -389,16 +460,24 @@ against §1/§5. (Prior runs reported the same.)
 
 ## 10. Validation targets
 
-| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This pass 2026-08-04 (seed 0, LITERAL) | This pass (seed 0, DETACHED counterfactual) |
-|---|---|---|---|---|
-| Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 (exact, 506/540) | 0.9370 (same; λ=0 is grad-mode-independent) |
-| CWSD | 1.0 | 0.9620 | 0.9407 (does NOT reproduce; +0.0037 over baseline) | 0.9611 (within 0.001; +0.0241) |
+| Arm | λ | Paper (Table 1, `paper/paper.md:400-414`) | This pass 2026-08-05 (seed 0, LITERAL, gated `s=0.15`) | seed 0, LITERAL `s=2.0` | seed 0, DETACHED `s=0.15` (counterfactual) |
+|---|---|---|---|---|---|
+| Cross-entropy baseline | 0.0 | 0.9370 | 0.9370 (exact, 506/540) | 0.9370 (same; λ=0 is s- and grad-mode-independent) | 0.9370 (same) |
+| CWSD | 1.0 | 0.9620 | 0.9407 (does NOT reproduce at gated `s=0.15`; +0.0037 over baseline) | 0.9648 (reproduces; +0.0278) | 0.9611 (reproduces; +0.0241) |
 
-The paper's Table-1 CWSD number (0.9620) is NOT reachable under the paper-LITERAL gradient
-(stopgrad only on `p̃`, as Eq. 3 marks it) at any seed; it is reachable only under the DETACHED
-variant (whole target constant), which the paper does not state on `w`. The faithful
-reproduction therefore reports the headline as NOT reproduced under the paper's equations,
-with the detached variant documented as the counterfactual that matches the table.
+The paper's Table-1 CWSD number (0.9620) is **`s`-DEPENDENT under the paper-LITERAL gradient**
+(stopgrad only on `p̃`, as Eq. 3 marks it), NOT a universal: at the gated sharp-gate default
+`s=0.15` it does NOT reproduce at any seed (CWSD ≈ baseline); but because the gate-path term is
+`∝ 1/s`, the literal gradient converges to the DETACHED one as `s` grows, and the headline
+REPRODUCES under the literal gradient for shallow gates (`s ≥ ~0.7` ordering, `s ≥ ~2.0`
+value/magnitude across seeds 0/1/2; e.g. `s=2.0` → 0.9648/0.9481/0.9611). It also reproduces
+under the DETACHED variant (whole target constant) already at `s=0.15`. The paper states
+neither `s` nor the stop-grad scope on `w`, so the headline is under-specified: reachable
+under the paper's equations for a range of `(s, grad-mode)` but not at the prose-aligned
+sharp-gate default under the literal gradient. The faithful gated arm pins `s=0.15` (a
+disclosed, provably non-tuning choice — the headline fails there) and reports the headline
+as NOT reproduced AT THE GATED `s`, with the full `s`-sweep (`sweep_s.py` -> `s_sweep.json`,
+§4 item 1) and the detached counterfactual documented.
 
 Structural gates (all implemented in `tests/`, 53 tests, passing 2026-08-04):
 (a) `λ = 0` path is exact CE, asserted bitwise (per-step loss+grads and a 300-step SGD loop)
@@ -459,11 +538,17 @@ by a constructed truth that does not depend on the 4000-step budget.
   method's limiting case, AND the gradient-mode contrast is itself a limiting-
   case argument: the LITERAL gradient (stopgrad on `p̃` only, the paper's
   letter) vs the DETACHED gradient (whole target constant, the standard
-  convention) are two limiting readings of the under-specified stop-grad; the
-  literal one is the default (faithful) and the detached one is the
-  counterfactual that reproduces Table 1. Their divergence (headline
-  reproduces under detached, not under literal) IS the reproduction's central
-  finding about the paper.
+  convention) are two limiting readings of the under-specified stop-grad. The
+  literal gradient's gate-path term is `∝ 1/s`, so the two readings CONVERGE as
+  `s → ∞`: the headline reproduces under detached already at `s = 0.15` and
+  under literal for shallow gates (`s ≥ ~0.7` ordering, `s ≥ ~2.0` value/
+  magnitude). The `s`-sweep (`sweep_s.py` -> `s_sweep.json`, §4 item 1) over
+  `s ∈ {0.05…5.0}` records whether each gated claim's verdict survives across
+  the unstated `s` — it does NOT survive at the sharp-gate default `s = 0.15`
+  under literal but DOES for `s ≥ ~0.7–2.0`. Because the paper states neither
+  `s` nor the stop-grad scope on `w`, the headline's reachability is
+  `s`-dependent (under-specified), not uniformly refuted or reproduced — this
+  `s`-dependence IS the reproduction's central finding about the paper.
 - **The paper's standard baseline as a common-knowledge oracle.** YES — the
   baseline `0.9370` (Table 1) is common knowledge from the paper, and the
   `init-first` RNG layout (§4 item 7) was selected precisely because it is the
@@ -496,6 +581,10 @@ naive-vs-fast, limiting-cases, baseline-as-oracle); two are honestly N/A
 an instrument, not as gate evidence (planted structure). The reproduction's
 evidence is the structural / sign-only high claims, each tied to one of the
 applying strategies, not the seed-0 magnitudes. The literal-vs-detached
-limiting-case contrast is itself the reproduction's central finding: the
-paper's headline reproduces only under the detached reading the paper does not
-state, not under the literal reading Eq. (3) marks.
+limiting-case contrast — combined with the `s`-sweep over the unstated gate
+sharpness — is itself the reproduction's central finding: the paper's headline
+is `s`-dependent under the literal reading Eq. (3) marks (reproduces for
+shallow gates `s ≥ ~0.7–2.0` where literal → detached, and under the detached
+reading at the default `s=0.15`, but NOT at the prose-aligned sharp-gate
+default `s=0.15` under literal), so its reachability is under-specified by a
+paper that states neither `s` nor the stop-grad scope on `w`.

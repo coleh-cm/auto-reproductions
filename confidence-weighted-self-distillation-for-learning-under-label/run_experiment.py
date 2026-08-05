@@ -19,15 +19,23 @@ Implementation notes (see SPEC.md, §4–§5):
   weight ``w = lam*sigma((c-tau)/s)`` is NOT stopped -- it is differentiable in
   ``z`` through ``c = max_k p_k`` -- so the gradient includes the
   ``L -> t -> w -> c -> z`` path. The full literal gradient is
-  ``dL/dz = (p - t)/B + gate_path_term`` (see ``_gate_path_grad``). This is
-  what Eqs. (2)-(4) literally state. Under this gradient the paper's Table-1
-  CWSD number (0.9620) does NOT reproduce (CWSD ~= baseline, ordering flips at
-  seed 1); see REPRODUCTION.md / SPEC §4 item 5.
+  ``dL/dz = (p - t)/B + gate_path_term`` (see ``_gate_path_grad``); the
+  gate-path term is proportional to ``1/s``. This is what Eqs. (2)-(4) literally
+  state. The paper never states ``s`` (Eq. 2 defines it; §3 lists only
+  lambda=1, tau=0.9, T=2). Whether the Table-1 CWSD number (0.9620) reproduces
+  under this gradient is therefore ``s``-DEPENDENT, not a universal: at the
+  sharp-gate default ``s=0.15`` the headline does NOT reproduce (CWSD ~=
+  baseline, ordering flips at seed 1), but as ``s`` grows the gate-path term
+  vanishes and the literal gradient approaches the detached one, so the
+  headline DOES reproduce for shallow gates (s >= ~0.7 for the ordering,
+  s >= ~2.0 for the value/magnitude). See ``sweep_s.py`` -> ``s_sweep.json``,
+  REPRODUCTION.md / SPEC §4 item 1.
 - ``--grad-mode detached`` (the VARIANT, NOT the default): the whole target
   ``t`` is treated as constant (stop-gradient on ``p_tilde`` AND on the gate
   weight ``w``), so ``dL/dz = (p - t)/B`` only. This is the standard
-  self-distillation convention; the paper does NOT mark ``w`` as stopped, but
-  this variant is the one under which Table 1's 0.9620 is reachable. It is
+  self-distillation convention; the paper does NOT mark ``w`` as stopped. It
+  reproduces Table 1's 0.9620 already at the default ``s=0.15`` (it lacks the
+  gate-path term that the literal gradient carries at small ``s``). It is
   provided as a counterfactual arm (``cwsd_detached`` in selfcheck), not as the
   faithful reproduction.
 - At ``lambda = 0`` both modes are bit-identical (the gate-path term is
@@ -229,8 +237,10 @@ def loss_and_grads(
         ``dL/dz = (p - t)/B + gate_path_term``.
     grad_mode="detached": the WHOLE target ``t`` is constant (stopgrad on
         ``p_tilde`` AND ``w``); ``dL/dz = (p - t)/B`` only. This is the standard
-        self-distillation convention, NOT what Eq. (3) marks; it is the variant
-        under which Table 1's 0.9620 is reachable (see REPRODUCTION.md).
+        self-distillation convention, NOT what Eq. (3) marks; it reproduces
+        Table 1's 0.9620 already at the default ``s=0.15`` (the literal gradient
+        also reaches it for shallow gates ``s >= ~2`` where its gate-path term,
+        proportional to ``1/s``, vanishes; see ``sweep_s.py``).
 
     At ``lam = 0`` the gate-path term is identically 0, so both modes are
     bit-identical and reduce to plain cross-entropy (the paper's degeneracy).
@@ -572,12 +582,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--s", type=float, default=0.15,
                    help="gate sharpness in Eq. (2); paper does not state it. "
                         "Default 0.15 is a middle value of an unstated free "
-                        "parameter; the paper-LITERAL CWSD arm (grad-mode "
-                        "literal, the default) does NOT reproduce Table 1 at any "
-                        "s (it lands ~baseline), so --s is not calibrated to the "
-                        "headline here. The baseline (lambda=0) arm is "
-                        "independent of --s. Sensitivity is grid-reported in "
-                        "REPRODUCTION.md / SPEC §4 item 1.")
+                        "parameter and is NOT calibrated to Table 1 here (at "
+                        "s=0.15 the literal CWSD arm lands ~baseline, so the "
+                        "headline fails -- the choice is provably non-tuning). "
+                        "The CWSD result is s-DEPENDENT under the literal "
+                        "gradient: the gate-path term is proportional to 1/s, "
+                        "so the literal gradient converges to the detached one "
+                        "as s grows -- the headline reproduces under literal "
+                        "for s >= ~0.7 (ordering) and s >= ~2.0 (value, "
+                        "magnitude); under detached it reproduces at the "
+                        "default s=0.15. The baseline (lambda=0) arm is "
+                        "independent of --s. Full sweep in s_sweep.json "
+                        "(sweep_s.py); sensitivity summarised in REPRODUCTION.md "
+                        "/ SPEC §4 item 1.")
     p.add_argument("--tau", type=float, default=0.9, help="confidence threshold")
     p.add_argument("--temperature", type=float, default=2.0,
                    help="distillation temperature T")
@@ -586,13 +603,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="gradient of Eqs. (2)-(4). 'literal' (DEFAULT, "
                         "paper-faithful): stopgrad ONLY on p_tilde, exactly as "
                         "Eq. (3) marks it; the gate weight w is differentiable in "
-                        "z (the L->t->w->c->z path is included). This is what the "
-                        "paper literally states; under it Table 1's 0.9620 does "
-                        "NOT reproduce (CWSD ~= baseline, ordering flips at seed "
-                        "1). 'detached': the WHOLE target is constant (stopgrad "
-                        "on p_tilde AND w); dL/dz=(p-t)/B only -- the standard "
-                        "self-distillation convention the paper does NOT mark, "
-                        "and the variant under which Table 1 IS reachable. At "
+                        "z (the L->t->w->c->z path is included), and the gate-path "
+                        "term is proportional to 1/s. This is what the paper "
+                        "literally states. Whether Table 1's 0.9620 reproduces "
+                        "under it is s-DEPENDENT (s is unstated by the paper): "
+                        "at the sharp-gate default s=0.15 the headline does NOT "
+                        "reproduce (CWSD ~= baseline, ordering flips at seed 1), "
+                        "but it DOES reproduce for shallow gates (s >= ~0.7 "
+                        "ordering, s >= ~2.0 value/magnitude) as the gate-path "
+                        "term vanishes and literal -> detached (sweep_s.py). "
+                        "'detached': the WHOLE target is constant (stopgrad on "
+                        "p_tilde AND w); dL/dz=(p-t)/B only -- the standard "
+                        "self-distillation convention the paper does NOT mark; "
+                        "it reproduces Table 1 already at the default s=0.15. At "
                         "lambda=0 both modes are bit-identical (the gate-path "
                         "term is lam*... and vanishes).")
     p.add_argument("--seed", type=int, default=0)
