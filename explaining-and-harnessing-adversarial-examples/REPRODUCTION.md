@@ -118,3 +118,74 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
   `transfer_mnist`) from real data with the fixes applied; the prior
   `measured.json` was the published run's output (these two arms' values
   were produced by the buggy code and are being replaced).
+
+- 2026-08-06 — Review-findings fix pass. The adversarial review of the
+  F1/F2-fixed state (HEAD `ce02584`) raised three BLOCKING items and several
+  recommended ones; this pass addresses them:
+  - **B1 (blocking, review_divergence) — CIFAR preprocessing was not the
+    referenced pipeline.** `data.py:_gcn_preprocess` subtracted the
+    training-set *per-pixel* mean and applied one global scale; the paper's
+    footnote 2 (tex:343-345) defers to the pylearn2 maxout scripts whose
+    `GlobalContrastNormalization` centers and scales *each image
+    independently*. Fixed: per-image GCN (subtract each image's own mean over
+    its 3072 pixels, then one global scale `s = 0.5/std(centered)` so the
+    train std is ~0.5, the paper's only stated property). The fingerprint no
+    longer asserts the std~0.5 the recipe forces by construction (circular);
+    it now asserts a RAW uint8 pixel-sum checksum in `_load_cifar_raw` (a
+    property the GCN recipe cannot force — the CIFAR analogue of the MNIST
+    checksum) plus the existing per-pixel-variance structural check. SPEC
+    G20 updated. The CIFAR arm is rerun under the new preprocessing (real
+    data re-downloaded here; ~170 MB at ~75 KB/s).
+  - **B2 (blocking, review_divergence) — `maxout_large_adv` skipped the
+    paper's Phase-2 60k retrain.** `arm_maxout_large_adv` ran `full60k=False`
+    while the claims c14/c18/c19/c20 quote the *post-retrain* model's numbers
+    (17.9% / 0.782% / 81.4%, tex:510/506/523). Fixed: `full60k=True`
+    (the from-scratch 60k retrain, tex:505-506). Rerun at all 5 seeds
+    [0..4]. (`transfer_mnist` already used `full60k=True`; its measured
+    values are unchanged-code and remain valid.)
+  - **B3 (blocking, review_faithful/review_divergence) — `claims_result.json`
+    stale vs `measured.json`/`selfcheck.json`.** `claims_result.json` is the
+    workflow's numbers-gate verdict table (`produced_by: reproduce-paper
+    numbers gate`); it is NOT writable from this repo (a script here writing
+    that filename would collide with the gate and be refused). It was last
+    regenerated at the 2026-08-05 publish and predates the F1/F2 fixes and
+    this pass's measured.json. The in-repo current-verdict evidence is
+    `selfcheck.json` (written by `selfcheck_claims.py`, the reproduction's
+    own grader), which is regenerated from the current `measured.json` in
+    this pass. The numbers gate / publish step regenerates
+    `claims_result.json` from the then-current `measured.json`; it must not
+    be hand-edited here.
+  - **R1 (recommended) — Ensemble attack objective mismatched the evaluated
+    decision rule.** `Ensemble.loss` was cross-entropy of the MEAN LOGITS
+    while `predict` uses mean-PROBABILITY argmax — the loss of a different
+    classifier than the one evaluated on c34–c37. Fixed: `Ensemble.loss` is
+    now the NLL of the mean-probability classifier (`-log mean_k p_k[y]`),
+    so the FGSM ensemble-attack target matches the evaluated decision rule
+    (tex:822-823). Guarded by `test_ensemble_loss_is_mean_prob_nll` /
+    mutation `mut_ensemble_loss_mean_logits`. (c36 is HIGH; the ensemble12
+    arm is rerun for consistency.)
+  - **R2 (recommended) — `LogisticRegression3v7.confidence` returned
+    `sigmoid(margin)` = P(y=+1) regardless of the predicted sign** (~0 for
+    confident y=−1 predictions; a latent wrong-metric bug no claim consumed
+    today). Fixed: `sigmoid(|margin|)` = confidence in the PREDICTED class.
+    Guarded by `test_logreg_confidence_on_predicted_class` / mutation
+    `mut_logreg_confidence_p_y_plus_one`.
+  - **R3 (recommended) — SPEC G1/G2 proclaimed pylearn2 `mnist_pi.yaml`
+    fill-ins the code does not implement** (lr .1 / batch 100 / momentum
+    .5→.7 / `irange .005` / `max_col_norm 1.9365` vs the code's lr 0.05 /
+    batch 128 / constant momentum 0.9 / `N(0, 0.5/√fan_in)` / no max-col-norm).
+    Reconciled: SPEC G1/G2 "Resolution" prose now describes what the code
+    actually does (code-as-run), with the earlier pylearn2 claim recorded as
+    superseded.
+  - **R4 (recommended) — c65 satisfied by construction.** c65 (correct-class
+    logit > max-wrong at ε=0) holds by the eps_trace example's *selection*
+    (the example is chosen correctly classified, as the paper's Fig 4
+    caption assumes "The correct class is 4"), so it is not an independent
+    test. Moved c65 to `not_tested`; the tail/shape claims c66–c70 remain
+    genuinely tested on the same example (c66 fails honestly on it).
+  Test suite: 41 passed + 1 skip (CIFAR, gated on the local tar) after the
+  fixes; 14 mutations all caught (12 prior + 2 new). `measured.json` is
+  regenerated for the changed-code arms (`maxout_large_adv`, `ensemble12`,
+  `cifar_conv_maxout`); unchanged-code arms keep their prior real-data
+  values. `selfcheck.json` is regenerated from the new `measured.json`.
+  `claims_result.json` is left for the numbers-gate/publish step.

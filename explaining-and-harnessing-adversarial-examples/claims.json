@@ -167,7 +167,7 @@
     },
     "maxout_large_adv": {
       "kind": "narrows_situations",
-      "detail": "1600 units/layer + adversarial training; 5 seeds [0..4] matching the paper's five trials (tex:508-510); early stop on the adversarial validation error as stated (tex:504-505). Narrowed horizon: 6-epoch cap, patience 8 vs the stated patience 100, and in this arm's sub-scale run the paper's Phase-2 retrain-on-60,000 (tex:505-506) is skipped for CPU tractability (the from-scratch retrain protocol is implemented and asserted by tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch, and transfer_mnist runs it with full60k=True). Same metric definitions and eps. Supports c16 (high) and c14/c20 proportionally to horizon; c18/c19 (0.77-0.83 clean) horizon-bound, rated low, expected to fail at sub-scale."
+      "detail": "1600 units/layer + adversarial training; 5 seeds [0..4] matching the paper's five trials (tex:508-510); early stop on the adversarial validation error as stated (tex:504-505). Narrowed horizon: 6-epoch cap, patience 8 vs the stated patience 100, and this arm now runs the paper's Phase-2 retrain-on-60,000 (tex:505-506, full60k=True) so c14/c18/c19/c20 measure the post-retrain model (review fix; an earlier run skipped it)tability (the from-scratch retrain protocol is implemented and asserted by tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch, and transfer_mnist runs it with full60k=True). Same metric definitions and eps. Supports c16 (high) and c14/c20 proportionally to horizon; c18/c19 (0.77-0.83 clean) horizon-bound, rated low, expected to fail at sub-scale."
     },
     "maxout_sigmoid": {
       "kind": "narrows_situations",
@@ -191,7 +191,7 @@
     },
     "ensemble12": {
       "kind": "narrows_situations",
-      "detail": "12 members with distinct seeds as stated (tex:819-821); narrowed per-member budget (8 epochs each) and 3 seed-sets. Attack target = mean-logits ensemble cross-entropy and single-member = member 0: both unstated in the paper (SPEC G9 fill-ins, not metric redefinitions); decision by mean-probability argmax; error definitions unchanged. Supports c34/c35 (medium), c36 (high), c37 (medium) - which is why the ensemble value claims are medium, not high."
+      "detail": "12 members with distinct seeds as stated (tex:819-821); narrowed per-member budget (8 epochs each) and 3 seed-sets. Attack target = mean-probability ensemble NLL (the NLL of the same mean-prob classifier predict() evaluates, SPEC G9; an earlier mean-logits CE was the loss of a different classifier \u2014 fixed) and single-member = member 0: both unstated in the paper (SPEC G9 fill-ins, not metric redefinitions); decision by mean-probability argmax; error definitions unchanged. Supports c34/c35 (medium), c36 (high), c37 (medium) - which is why the ensemble value claims are medium, not high."
     },
     "agreement_mnist": {
       "kind": "narrows_situations",
@@ -207,7 +207,7 @@
     },
     "cifar_conv_maxout": {
       "kind": "narrows_situations",
-      "detail": "CIFAR-10 GCN-preprocessed to std ~0.5 as footnote 2 requires (tex:343-345). Conv-maxout architecture wholly unstated in the paper - ours, logged (SPEC G20: a fill-in of an unstated architecture, not a metric change); patience 5, 25-epoch cap, 3 seeds. eps=0.1 as stated; rubbish rule (any prob > 0.5 on 1,000 N(0, I3072) samples, tex:911) and targeted-fooling success rule (p(y = i | x) > 0.5, tex:955-956) unchanged; 1,000 samples per class for fooling. Supports c56-c63, all medium/low - none gate."
+      "detail": "CIFAR-10 PER-IMAGE global-contrast-normalized (subtract per-image mean, one global scale to std ~0.5) as footnote 2 requires (tex:343-345; the pylearn2 GlobalContrastNormalization form, SPEC G20; an earlier per-pixel/dataset mean was a different transform \u2014 fixed). Conv-maxout architecture wholly unstated in the paper - ours, logged (SPEC G20: a fill-in of an unstated architecture, not a metric change); patience 5, 25-epoch cap, 3 seeds. eps=0.1 as stated; rubbish rule (any prob > 0.5 on 1,000 N(0, I3072) samples, tex:911) and targeted-fooling success rule (p(y = i | x) > 0.5, tex:955-956) unchanged; 1,000 samples per class for fooling. Supports c56-c63, all medium/low - none gate."
     },
     "mp_dbm": {
       "kind": "narrows_situations",

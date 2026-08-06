@@ -216,15 +216,25 @@ paper's**.
   everywhere in this paper; `tex:498` only defers to "the original maxout network", and "trained
   with SGD" appears only for the quadratic models (`tex:616-617`). Permitted readings: any
   gradient-based optimizer and any schedule. **Weakest:** any gradient descent on the stated
-  objectives. **Resolution:** adopt the maxout paper's pylearn2 `mnist_pi.yaml` reference
-  defaults (SGD lr .1, batch 100, momentum .5→.7 saturating epoch 250, exp decay 1.000004,
-  patience-100 early stop on valid misclass — values fetched 2026-08-06, §0) as a
-  provenance-documented fill-in; strictly stronger than weakest, logged as ours.
+  objectives. **Resolution (ours, code-as-run):** plain SGD with momentum 0.9 (constant,
+  no schedule), lr 0.05 for the maxout arms / 0.5 for softmax & logistic regression / 0.01 for
+  the RBF arm, batch size 128 (256 for the CIFAR conv arm), early-stop patience 8 (5 for CIFAR),
+  hard epoch caps EPOCHS_* (CPU sub-scale; REPRODUCTION.md). An earlier draft of this entry
+  claimed the pylearn2 `mnist_pi.yaml` defaults (lr .1, batch 100, momentum .5→.7 saturating,
+  exp decay, patience 100) as the resolution; the code does NOT use those — this entry now
+  describes what the code actually does (review finding: SPEC-code divergence). Strictly
+  stronger than weakest, logged as ours.
 - **G2 — Maxout architecture detail.** Number of linear **pieces** per maxout unit, number of
   hidden **layers**, dropout rates, init scheme: all unstated here ("240/1600 units per layer",
   `tex:498`). Permitted: any pieces ≥ 2, ≥1 hidden layers, any init. **Weakest:** unconstrained.
-  **Resolution:** 2 hidden layers, 5 pieces, `irange .005` init, `max_col_norm 1.9365`, dropout
-  include-probs input .8 / hidden .5 (mnist_pi.yaml reference defaults), logged as ours.
+  **Resolution (ours, code-as-run):** 2 hidden layers, 5 pieces, dropout include-prob input
+  0.8 / hidden 0.5 (i.e. drop probs 0.2 / 0.5; hidden dropout is NOT applied after the last
+  hidden block — models.py:147 `i < len(self.blocks)-1`), weight init `N(0, (0.5/sqrt(fan_in))**2)`
+  (MaxoutLinear, std = 0.5/sqrt(in_features)), NO max-col-norm constraint. An earlier draft
+  claimed `irange .005` init + `max_col_norm 1.9365` (pylearn2 `mnist_pi.yaml`); the code does
+  NOT apply a max-col-norm — this entry now describes what the code does (review finding:
+  SPEC-code divergence; the absent max-norm constraint changes training dynamics, paper-silent
+  so not a paper violation). Logged as ours.
 - **G3 — Softmax/logistic/RBF training hyperparameters.** Entirely unstated. Permitted: any.
   **Weakest:** any optimizer that fits the training data. **Resolution:** same SGD family as G1;
   logged as ours.
@@ -271,10 +281,13 @@ paper's**.
   test examples is 60.6%" (`:604`) read as mean max-prob; unstated.
 - **G9 — Ensemble attack objective.** "designed to perturb the entire ensemble" (`:822-823`) —
   what is differentiated is unstated. Permitted: any differentiable joint scalar (mean-logits
-  CE, mean-probability NLL, ...). **Resolution:** FGSM on the mean-logits ensemble CE (sends
-  gradients to all members); single-member attacks use member 0's gradient (`:823-824`).
-  Decision rule: mean-probability argmax; unstated, assumed. All logged as ours. These
-  choices sit behind c34–c37, which is why the ensemble value claims are medium, not high.
+  CE, mean-probability NLL, ...). **Resolution:** FGSM on the MEAN-PROBABILITY NLL of the
+  ensemble — the NLL of the SAME mean-probability classifier that predict() evaluates, so the
+  attack targets the decision rule whose error is measured (review finding: an earlier
+  mean-logits CE was the loss of a *different* classifier than the mean-prob one being
+  evaluated); single-member attacks use member 0's gradient (`:823-424`). Decision rule:
+  mean-probability argmax; unstated, assumed. All logged as ours. These choices sit behind
+  c34–c37, which is why the ensemble value claims are medium, not high.
 - **G13 — Transfer pair** (19.6% / 40.9%, `:519-520`): which architectures "the original model"
   and "the new model" are is not explicit (§6 discusses both the 240-unit 0.94→0.84 result and
   the 1600-unit 0.782 result). Permitted: {(240u naive, 240u adv), (1600u naive, 1600u adv)}.
@@ -327,12 +340,21 @@ paper's**.
   standard, logged as ours.
 - **G20 — CIFAR conv-maxout architecture and its clean test error.** Both unstated;
   preprocessing referenced only to the pylearn2 maxout scripts yielding std ≈ 0.5
-  (`:343-345`). **Resolution:** GCN variant chosen to give global std ≈ 0.5; exact recipe logged
-  as ours. The conv-maxout stages use **NO post-ReLU** (maxout is itself the nonlinearity, per
-  Goodfellow et al. 2013c; an earlier draft inserted `F.relu` after each stage, an extra
-  nonlinearity the paper never describes — removed). The conv net uses **NO dropout** (the
-  paper's maxout networks were dropout-regularized, but the paper does not describe the CIFAR
-  conv arch; dropping dropout is an arch-ours choice for the CPU sub-scale net, logged).
+  (`:343-345`). **Resolution:** CIFAR preprocessing is PER-IMAGE global contrast
+  normalization — subtract each image's own mean over its 3072 pixels, then apply one global
+  scale `s = 0.5 / std(per-image-centered train pixels)` so the train split's global std is
+  ~0.5 (the paper's only stated property). This is the form the referenced pylearn2
+  ``GlobalContrastNormalization`` takes (per-image centering, NOT a per-pixel/dataset mean —
+  review_divergence BLOCKING #1; an earlier draft used a per-pixel/dataset mean, a different
+  transform). Exact recipe in data.py:_gcn_preprocess, logged as ours. The fingerprint no
+  longer asserts the std~0.5 the recipe forces by construction; it asserts a RAW uint8
+  pixel-sum checksum (a property the GCN recipe cannot force, the CIFAR analogue of the
+  MNIST checksum) plus the per-pixel-variance structural check. The conv-maxout stages use
+  **NO post-ReLU** (maxout is itself the nonlinearity, per Goodfellow et al. 2013c; an earlier
+  draft inserted `F.relu` after each stage, an extra nonlinearity the paper never describes
+  — removed). The conv net uses **NO dropout** (the paper's maxout networks were
+  dropout-regularized, but the paper does not describe the CIFAR conv arch; dropping dropout
+  is an arch-ours choice for the CPU sub-scale net, logged).
   Targeted-fooling uses **1,000 samples per class** (G14).
 - **G21 — Adversarial-training minibatch composition.** Whether the α-weighted halves share one
   batch: unstated. Permitted: {same batch, separate batches}. **Weakest:** same batch — the
