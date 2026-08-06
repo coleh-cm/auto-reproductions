@@ -440,7 +440,7 @@ stop-grad scope on `w`, so the headline is under-specified: reachable under the 
 equations for a range of `(s, grad-mode)` but not at the prose-aligned sharp-gate default
 under the literal gradient. That `s`-dependence is the reproduction's central finding.
 
-Structural gates (all implemented in `tests/`, 53 tests, passing 2026-08-06):
+Structural gates (all implemented in `tests/`, 54 tests, passing 2026-08-06):
 (a) `λ = 0` path is exact CE, asserted bitwise (per-step loss+grads and a 300-step SGD loop)
 against an independently written CE routine, swept over `s ∈ {0.01…10.0}` so the gate cannot
 be fit through the unstated sharpness — holds under BOTH grad modes; (b) `t = y` at `w = 0`;
@@ -448,6 +448,80 @@ be fit through the unstated sharpness — holds under BOTH grad modes; (b) `t = 
 gate-path` vs finite differences with `p̃` frozen (w recomputed), on a peaked net where a
 no-stopgrad and a detached implementation both diverge; (e) the loop performs exactly
 `--steps` updates; (f) the data loader is fingerprinted against a re-derivation
-(`tests/test_instruments.py`). Sensitivity over the §4 choices (`s`, init, noise-mode,
+(`tests/test_instruments.py`); (g) the baseline seed-0 accuracy reproduces the paper's
+Table 1 value `0.9370` exactly (506/540). Sensitivity over the §4 choices (`s`, init, noise-mode,
 batch-mode, rng-layout, grad-mode) is reported, not adjudicated — the paper cannot
 adjudicate it; see REPRODUCTION.md and `s_sweep.json`.
+
+## 11. Constructed truth
+
+Which of the standard constructed-truth strategies this reproduction uses, and
+where one does not apply, why. (Each is a cheap, deterministic check that lets a
+reader verify correctness without trusting the implementer or the paper's
+numbers; re-verified 2026-08-06.)
+
+- **Degeneracy (the method's no-op setting reproduces the baseline EXACTLY) —
+  USED.** This is the paper's own verification gate (`paper/paper.md:253-280`:
+  "λ = 0 ⇒ w = 0 ⇒ t = y ⇒ Eq. (4) = standard cross-entropy … any
+  implementation can be checked by confirming that λ = 0 reproduces the baseline
+  result exactly"). At `λ = 0` the gate weight `w = λσ(…) = 0` exactly, so the
+  target `t` equals the one-hot label `y` and Eq. (4) is plain CE. Asserted at
+  three levels in `tests/test_degeneracy.py`: (1) structural `t == y` bitwise,
+  swept over `s ∈ {0.01,0.05,0.15,0.5,1.0,10.0}` so the gate cannot be fit
+  through the one unstated hyperparameter; (2) per-step loss + all four
+  parameter gradients bitwise identical to an **independently written** CE
+  routine, swept over `s` AND over `grad_mode ∈ {literal, detached}` (the
+  gate-path term is `λ·…=0`, so both modes are bit-identical at `λ=0`);
+  (3) end-to-end: a 300-step `λ=0` SGD loop produces bit-identical parameters
+  and accuracy to an independent CE SGD loop with the same RNG stream. This is
+  the cheapest real correctness evidence there is, and a reader can run it.
+- **The same quantity derived two ways — USED.** The `λ = 0` loss and gradients
+  are computed two independent ways: (a) `loss_and_grads(…, lam=0)` (the method
+  code path) and (b) `ce_loss_and_grads_independent` / `ce_loss_and_grads` in
+  `tests/test_degeneracy.py` (different surface forms: `np.max` + a named
+  `relu_mask` + `Y_onehot` instead of `t`, no shared mutation anchors). They
+  agree bitwise. The gradient is also derived two ways: the hand-derived
+  analytic `∂L/∂z` vs a central finite-difference of the loss with `p̃` frozen
+  (`tests/test_invariants.py::test_gradient_matches_finite_differences`), agreeing
+  to ~1.08e-3 (float32 FD noise) on a peaked net where both a no-stopgrad and a
+  detached implementation diverge.
+- **The naive implementation agreeing with the fast one — USED.** Same evidence
+  as above: the independent (naive, differently-written) CE routine agrees
+  bitwise with the fast method path at `λ = 0`; and the slow central
+  finite-difference gradient agrees with the fast analytic gradient.
+- **The method's limiting cases — USED (one of two).** `λ = 0` is a limiting
+  case and is the degeneracy gate above. The other limit, `s → ∞` (gate-path
+  term `∝ 1/s → 0`, literal gradient → detached), is **observed in the sweep**
+  (`s_sweep.json`: literal CWSD converges to detached as `s` grows) but is
+  **not asserted as a constructed-truth test** — it is a reported sensitivity,
+  not a correctness gate, because `s` is valueless in the paper and no
+  specific `s` is a "limiting case the method must hit".
+- **The paper's standard baseline, whose value is common knowledge and
+  therefore an oracle you already have — USED.** The paper states the baseline
+  value explicitly (Table 1: `0.9370` = 506/540, `paper/paper.md:400-406,
+  :434-438`). `tests/test_degeneracy.py::test_baseline_seed0_reproduces_paper_
+  table1_value` pins it: a full 4000-step `λ = 0` run at seed 0 must print
+  `0.9370`. A regression that perturbs the baseline accuracy without breaking
+  the bitwise-CE degeneracy test (e.g. an RNG-stream-layout change) is caught
+  here. (Overlaps with degeneracy — the baseline IS the `λ = 0` arm — but the
+  oracle framing adds the specific paper-stated value as a pin.)
+- **Brute force at toy scale against a closed form claiming a maximum /
+  minimum / worst case — DOES NOT APPLY.** CWSD makes no max/min/worst-case
+  claim; it reports a single test accuracy. The toy-scale brute force we DO
+  perform (central finite differences of the gradient on a 3-example peaked
+  net) verifies a derived expression (the analytic gradient) against a naive
+  numerical one — that is the "naive agrees with fast" strategy above, not a
+  closed-form extremum claim.
+- **Planting a known structure in synthetic input and requiring the pipeline
+  to recover it — DOES NOT APPLY.** The paper's dataset (`sklearn load_digits`)
+  is obtainable, so no synthetic substitution is needed or wanted: a
+  closed-book run that silently fell back to a synthetic corpus would pass
+  every gate and mean nothing. The data-loader instrument
+  (`instruments.json`) fingerprints the real corpus by size, vocabulary, value
+  range, dtype, and SHA-256 of the split arrays at seed 0; a synthetic
+  fixture is used by `smoke.sh` only and is never reported as a result.
+- **A slow exact or convex reference solver — DOES NOT APPLY.** CWSD is a
+  non-convex SGD-trained MLP; there is no closed-form or convex reference
+  solver for the trained network. The reference we use is an independent
+  re-implementation of the *same* algorithm (degeneracy + two-ways), not a
+  different solver that is exact or convex.
