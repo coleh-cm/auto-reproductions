@@ -144,6 +144,80 @@
       "status": "NOT BUILT - see not_tested"
     }
   },
+  "restrictions": {
+    "softmax_reg": {
+      "kind": "narrows_situations",
+      "detail": "Same MNIST [0,1] data, full 10,000-example test set, eps=0.25, and the paper's error/confidence/rubbish(any prob > 0.5) metric definitions (iclr2015.tex:333-337, 906-907); no clipping added to FGSM (SPEC G4). Narrowed only in training protocol (30-epoch cap, patience 8; paper silent, SPEC G3) and seed count (3; paper's count unstated). A linear model reaches its plateau quickly, so the core of c01/c03 is budget-insensitive; c02's exact 79.3 confidence rides on fit quality (rated low). Supports c01-c03, c50-c51."
+    },
+    "logreg_3v7": {
+      "kind": "narrows_situations",
+      "detail": "Convex objective exactly as tex:402 on the MNIST 3-vs-7 subset (y in {-1,+1}), full 3v7 test examples, eps=0.25; metric definitions unchanged. Narrowed only in seed count (3; unstated in the paper) and a 30-epoch cap that a converged convex fit does not bind. Supports c04-c07 fully; c07 is algebraic and budget-free."
+    },
+    "maxout_naive": {
+      "kind": "narrows_situations",
+      "detail": "240 units/layer as stated (tex:498); early stop on val_err as stated (tex:501-503) but patience capped 100->8 and epochs capped at 25 (CPU sub-scale); 3 seeds (paper's count unstated). Same MNIST [0,1], full test set, eps=0.25, same error/confidence/rubbish definitions. Supports c09/c10/c13/c46/c47 and the high-invariance directions; tight clean value c08 (0.94 tol 0.3) cannot be separated at this horizon - rated low, reported as cannot-speak if unreached."
+    },
+    "maxout_adv": {
+      "kind": "narrows_situations",
+      "detail": "Adversarial-training objective exactly as tex:486-488 (alpha=0.5, eps=0.25, single shared batch, eval-mode FGSM direction per SPEC G7/G21); same budget caps as maxout_naive (patience 8, 25 epochs, 3 seeds); same datasets, eps, metric definitions. Supports c13 (high ordering, same-architecture version of 89.4 -> 17.9); c11 (0.84 tol 0.25) and c12 horizon-bound, rated low/medium."
+    },
+    "maxout_large_naive": {
+      "kind": "narrows_situations",
+      "detail": "1600 units/layer as stated (tex:498); 6-epoch cap vs the paper's unstated GPU budget; 3 seeds; same data, eps, metric definitions. Supports c15 (medium) and c16 (high ordering vs maxout_large_adv); c17 (clean 1.14 tol 0.3) horizon-bound, rated low."
+    },
+    "maxout_large_adv": {
+      "kind": "narrows_situations",
+      "detail": "1600 units/layer + adversarial training; 5 seeds [0..4] matching the paper's five trials (tex:508-510); early stop on the adversarial validation error as stated (tex:504-505). Narrowed horizon: 6-epoch cap, patience 8 vs the stated patience 100, and in this arm's sub-scale run the paper's Phase-2 retrain-on-60,000 (tex:505-506) is skipped for CPU tractability (the from-scratch retrain protocol is implemented and asserted by tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch, and transfer_mnist runs it with full60k=True). Same metric definitions and eps. Supports c16 (high) and c14/c20 proportionally to horizon; c18/c19 (0.77-0.83 clean) horizon-bound, rated low, expected to fail at sub-scale."
+    },
+    "maxout_sigmoid": {
+      "kind": "narrows_situations",
+      "detail": "Maxout backbone + 10 independent sigmoid outputs per tex:909; training as maxout_naive (same caps, 3 seeds). Rubbish rule unchanged: any independent sigmoid > 0.5 on x ~ N(0, I784), 10,000 samples (tex:905-907). Supports c48/c49 (low)."
+    },
+    "noise_rademacher": {
+      "kind": "narrows_situations",
+      "detail": "maxout_naive config + per-pixel eps*{-1,+1} noise during training per tex:555-556, resampled per minibatch (cadence unstated in the paper, SPEC G16); same epoch/patience caps and seeds; eval unchanged (FGSM eps=0.25 on the full test set). Supports c24 (medium), c25 (low), and c28 (high ordering, via min of both noise arms vs maxout_large_adv)."
+    },
+    "noise_uniform": {
+      "kind": "narrows_situations",
+      "detail": "maxout_naive config + per-pixel U(-0.25, 0.25) noise per tex:556, resampled per minibatch (SPEC G16); same budget caps and seeds; eval unchanged. Supports c26 (medium), c27 (low), c28 (high)."
+    },
+    "l1_maxout": {
+      "kind": "narrows_situations",
+      "detail": "L1 weight decay coefficient 0.0025 applied to the FIRST layer exactly as tex:429-430; same budget caps; train_err definition unchanged (percent on the training set). Negative control only. Supports c64 (medium: train err > 5%)."
+    },
+    "rbf_shallow": {
+      "kind": "narrows_situations",
+      "detail": "Shallow 10-unit RBF, no hidden layer, p_k = exp((x - mu_k)' beta_k (x - mu_k)) per tex:595 with beta_k negative-semidefinite (SPEC G8; training recipe unstated in the paper - filled in, logged as ours). Same MNIST eval, eps=0.25, confidence = max_k p_k with rows NOT renormalized (the only reading under which 1.2% confidence on mistakes is possible). Supports c29 (medium), c32/c33 (high orderings), c52/c53 (rubbish), c30/c31 (low)."
+    },
+    "ensemble12": {
+      "kind": "narrows_situations",
+      "detail": "12 members with distinct seeds as stated (tex:819-821); narrowed per-member budget (8 epochs each) and 3 seed-sets. Attack target = mean-logits ensemble cross-entropy and single-member = member 0: both unstated in the paper (SPEC G9 fill-ins, not metric redefinitions); decision by mean-probability argmax; error definitions unchanged. Supports c34/c35 (medium), c36 (high), c37 (medium) - which is why the ensemble value claims are medium, not high."
+    },
+    "agreement_mnist": {
+      "kind": "narrows_situations",
+      "detail": "Reuses this run's maxout_naive (FGSM generator) + softmax_reg + rbf_shallow of the same seed (inherits their budgets, 3 seeds). Agreement metric exactly as tex:682-688: share of maxout mistakes where the other model predicts maxout's class; *_cond conditioned on both models wrong; rbf-on-softmax conditioned likewise (SPEC G15). Supports c38-c42 values (medium/low) and c43/c44/c45 (high directions / far-above-chance existence)."
+    },
+    "transfer_mnist": {
+      "kind": "narrows_situations",
+      "detail": "Pair = (maxout_large_naive, maxout_large_adv); which architecture size the paper means is unstated (SPEC G13 permits either) - took the 1600-unit pair. This arm DOES run the paper's from-scratch 60k retrain (full60k=True) but at the 6-epoch sub-scale cap; eps=0.25 and error definitions unchanged; 3 seed-pairs. Supports c21/c22 (medium, tol 8-10) and c23 (high ordering)."
+    },
+    "eps_trace": {
+      "kind": "narrows_situations",
+      "detail": "Same one-example scope as the paper's illustrative Fig.4 (tex:768): one DETERMINISTIC example - the lowest-index class-4 test example all seed models classify correctly - chosen by index with NO selection on the claim predicates (SPEC G22). eps axis narrowed from the figure's -15..+15 to -10..+10 sampled at 21 points (a strict subset of the paper's situations); FGSM direction fixed at eps=0; curve comparison definitions unchanged. Supports c65-c70, all rated low (single illustrative example); the c69/c70 magnitude anchors carry tol +-400 covering figure-reading error plus reproduction spread."
+    },
+    "cifar_conv_maxout": {
+      "kind": "narrows_situations",
+      "detail": "CIFAR-10 GCN-preprocessed to std ~0.5 as footnote 2 requires (tex:343-345). Conv-maxout architecture wholly unstated in the paper - ours, logged (SPEC G20: a fill-in of an unstated architecture, not a metric change); patience 5, 25-epoch cap, 3 seeds. eps=0.1 as stated; rubbish rule (any prob > 0.5 on 1,000 N(0, I3072) samples, tex:911) and targeted-fooling success rule (p(y = i | x) > 0.5, tex:955-956) unchanged; 1,000 samples per class for fooling. Supports c56-c63, all medium/low - none gate."
+    },
+    "mp_dbm": {
+      "kind": "narrows_situations",
+      "detail": "NOT BUILT (SPEC section 9): a multi-prediction deep Boltzmann machine is outside this reproduction's compute scope. The evaluated situation set is empty; its claims (clean 0.88% tex:794, FGSM eps=.25 -> 97.5% tex:800) are recorded under not_tested and nothing is reported under the paper's name for it. No metric is redefined because nothing is measured."
+    },
+    "googlenet_imagenet": {
+      "kind": "narrows_situations",
+      "detail": "NOT BUILT (SPEC section 9): the Fig.1 demo (tex:364-383) needs pretrained GoogLeNet + an ImageNet pipeline; it is illustrative and not load-bearing for the paper's argument. Empty evaluated situation set; recorded under not_tested; no metric redefined."
+    }
+  },
   "claims": [
     {
       "id": "c01",
