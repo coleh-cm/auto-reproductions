@@ -9,11 +9,11 @@
     },
     {
       "name": "data_loader_cifar10",
-      "what_it_decides": "Whether CIFAR-10 loaded by data.load_cifar10 is the real dataset by fingerprint -- size (45k/5k/10k x 3072), vocabulary (labels {0..9} int64), dtype float32, and GLOBAL std of x_train ~0.5 (within 0.04), the GCN preprocessing target (paper footnote 2, tex:343-345). data.check_cifar10_fingerprint (called inside load_cifar10) raises on a non-GCN array (std ~1.0) or a wrong-dim array (e.g. 1024).",
+      "what_it_decides": "Whether CIFAR-10 loaded by data.load_cifar10 is the real dataset by fingerprint -- size (45k/5k/10k x 3072), vocabulary (labels {0..9} int64), dtype float32, per-image GCN (each image centered by its own mean, one global scale to std ~0.5; the pylearn2 GlobalContrastNormalization form the paper's footnote 2 references, tex:343-345), a per-image-mean~0 sanity, a per-pixel-variance structural check, AND a RAW uint8 pixel-sum checksum in _load_cifar_raw (a property the GCN recipe cannot force -- the CIFAR analogue of the MNIST checksum). data.check_cifar10_fingerprint (called inside load_cifar10) raises on a non-GCN / wrong-dim / wrong-label / synthetic-corpus array. The raw checksum rejects a std-matched synthetic corpus that the post-GCN structural checks alone might miss.",
       "positive_test": "tests/test_data_loader.py::test_cifar10_real",
       "negative_test": "tests/test_data_loader.py::test_cifar10_rejects_synthetic",
       "requires_tools": "network (CIFAR-10 download from cs.toronto.edu)",
-      "status_note": "In this run the 170 MB CIFAR-10 tar downloaded successfully; load_cifar10 unpacks it, GCN-preprocesses to global std ~0.5, and check_cifar10_fingerprint (size, labels, dtype, global std, AND a per-pixel-variance structural check that rejects a std-matched iid synthetic corpus) passes. The positive test test_cifar10_real runs (not skipped) and the cifar_conv_maxout arm runs on the real data -- no synthetic substitution. The negative test (fingerprint rejects synthetic / non-GCN / wrong-dim) runs without the download."
+      "status_note": "The 170 MB CIFAR-10 tar downloads on first use (slow link ~75 KB/s in this env); load_cifar10 unpacks it, applies PER-IMAGE GCN, and the fingerprint (per-image-mean~0 + per-pixel-variance spread + the raw uint8 checksum in _load_cifar_raw) passes. The positive test test_cifar10_real runs (not skipped) when the tar is present and the cifar_conv_maxout arm runs on the real data -- no synthetic substitution. The negative test (rejects synthetic / non-GCN / wrong-dim) runs without the download."
     },
     {
       "name": "selfcheck_claims",

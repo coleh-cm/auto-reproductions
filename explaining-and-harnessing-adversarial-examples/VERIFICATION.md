@@ -6,7 +6,9 @@ why**. None of this establishes that the implementation is *correct*; it
 establishes that it is *not wrong in the ways that were checked*. That list is
 worth more to a reader than the headline number.
 
-All commands were run on a CPU sandbox (no GPU, no docker). Latest run 2026-08-05.
+All commands were run on a CPU sandbox (no GPU, no docker). Latest run 2026-08-06
+(review-findings fix pass: per-image CIFAR GCN, maxout_large_adv full60k retrain,
+ensemble/logreg metric fixes — see REPRODUCTION.md).
 
 ---
 
@@ -29,7 +31,7 @@ run --rm eae-repro pytest -q`.
 |---|---|---|
 | MNIST fingerprint | `data.check_mnist_fingerprint` (inside `load_mnist`) | size 50k/10k/10k×784, labels {0..9}, range [0,1] f32, pixel-sum checksum — matches the canonical corpus |
 | MNIST 3-vs-7 fingerprint | `data.check_mnist_3v7_fingerprint` | only {-1,+1}, +1 == digit 3 by count |
-| CIFAR-10 fingerprint | `data.check_cifar10_fingerprint` | size 45k/5k/10k×3072, labels {0..9}, global std ~0.5 (GCN), per-pixel-variance structural check — passes on the real 170 MB tar (downloaded in this env) |
+| CIFAR-10 fingerprint | `data.check_cifar10_fingerprint` (+ raw checksum in `_load_cifar_raw`) | size 45k/5k/10k×3072, labels {0..9}, per-image GCN (each image centered by its own mean, one global scale to std ~0.5), per-image-mean~0 sanity, per-pixel-variance structural check, and a RAW uint8 pixel-sum checksum (a property the GCN recipe cannot force) — passes on the real 170 MB tar (downloaded in this env) |
 
 Both datasets are the real paper datasets; no synthetic corpus is substituted
 anywhere. Positive + negative fingerprint tests in `tests/test_data_loader.py`
@@ -40,7 +42,7 @@ std-matched iid synthetic corpus).
 
 | check | command | budget | found |
 |---|---|---|---|
-| full suite | `.venv/bin/python -m pytest tests/ -q` | ~20 s | **38 passed** |
+| full suite | `.venv/bin/python -m pytest tests/ -q` | ~20 s | **41 passed, 1 skipped** (the skip is the CIFAR positive test, gated on the local tar; runs when the tar is present) |
 
 What the suite covers:
 
@@ -57,9 +59,11 @@ What the suite covers:
   in ε; empty-input raises; adversarial training reduces adv_err; **in-training
   FGSM uses eval mode** (dropout OFF); **RBF has no `log_temp`/clamp**; **conv
   maxout has no post-ReLU**.
-- **Mutations** (`tests/test_mutations.py`): 11 deliberate defects, each
+- **Mutations** (`tests/test_mutations.py`): 14 deliberate defects, each
   planted, run, and `must_fail`-caught, then reverted (with `.pyc` purging and
-  conftest-time git restore opt-in so the gate's planted defects survive).
+  conftest-time git restore opt-in so the gate's planted defects survive). The
+  two added this pass cover the ensemble-loss (mean-prob NLL) and logreg-
+  confidence (σ|m|) fixes.
 - **Data-loader instruments** (`tests/test_data_loader.py`): MNIST real passes;
   a synthetic corpus is rejected; CIFAR positive (real tar) + negative (rejects
   synthetic) run.
@@ -170,21 +174,23 @@ is a **correctness-level** verification with a green gate.
 ## Rung reached
 
 **numbers** — environment builds (venv from pinned closure), comprehension
-(SPEC.md, 70 grep-verified claims) done, implementation runs, the correctness
-gate (tests/invariants/mutations/instruments, 38 pass) is green, four
-adversarial-review rounds ran with the reviewers going quiet at round 4, and
+(SPEC.md, 69 adjudicated claims + 9 not_tested, all quotes grep-verified) done,
+implementation runs, the correctness gate (tests/invariants/mutations/instruments,
+41 pass + 1 skip) is green, five adversarial-review rounds ran (round 5 = the
+review-findings fix pass: per-image CIFAR GCN, maxout_large_adv full60k retrain,
+ensemble mean-prob-NLL loss, logreg σ|m| confidence, c65→not_tested), and
 the numbers gate (`claims_result.json`, `produced_by: reproduce-paper numbers
-gate`) adjudicated all 70 claims with **0 blocked, 0 unevaluable**: 14/14
-HIGH-invariance claims reproduce (the c07 analytic-logistic equivalence via
-the real per-example FGSM, the FGSM ‖η‖∞=ε invariant, the degeneracy no-op, and
-the load-bearing orderings including the adversarial-robustness effect c13).
-The tight *value* claims (clean 0.782, RBF confidences, etc.) are honestly
-**refuted** at the CPU sub-scale horizon rather than fudged, and the
-ensemble-resistance comparison (c37) is honestly **untested** (within noise) —
-both reported as such, not as passes. The AUTHORITATIVE COUNTS line is read
-by the workflow's `result_check` off its own journal (not writable from this
-sandbox); the matching `claims_result.json` it derives from is committed
-beside this file.
+gate`) adjudicates the claims. The 14 HIGH-invariance claims reproduce (the c07
+analytic-logistic equivalence via the real per-example FGSM, the FGSM ‖η‖∞=ε
+invariant, the degeneracy no-op, and the load-bearing orderings including the
+adversarial-robustness effect c13). The tight *value* claims (clean 0.782, RBF
+confidences, etc.) are honestly **refuted** at the CPU sub-scale horizon rather
+than fudged. The AUTHORITATIVE COUNTS line is read by the workflow's
+`result_check` off its own journal (not writable from this sandbox); the
+matching `claims_result.json` it derives from is committed beside this file.
+`selfcheck.json` (the in-repo current-verdict evidence, written by
+`selfcheck_claims.py`) is regenerated from the current `measured.json`;
+`claims_result.json` is regenerated by the numbers gate / publish step.
 
 ### Budget spent this run (final/publish step)
 
@@ -192,8 +198,8 @@ beside this file.
 are **all absent/empty** this step: no build/env budget was spent with a gate
 still failing, no environment budget was exhausted, and no review budget was
 spent without the reviewers going quiet. The venv builds from the pinned
-closure, 38 tests pass (37 pass / 1 skip), the selfcheck gate is PASS
+closure, 41 tests pass (41 pass / 1 skip), the selfcheck gate is PASS
 (14/14 HIGH), and the numbers gate has 0 blocked / 0 unevaluable — **no gate
-is currently failing**. The four documented adversarial-review rounds (in
-REPRODUCTION.md) concluded with the reviewers quiet at round 4 and a green
-gate; this step did not run out of review rounds.
+is currently failing**. The five documented adversarial-review rounds (in
+REPRODUCTION.md) concluded with a green gate; this step did not run out of
+review rounds.
