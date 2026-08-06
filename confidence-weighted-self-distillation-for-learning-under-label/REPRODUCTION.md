@@ -11,8 +11,8 @@
 
 ## Status
 
-Current rung: **environment** — workspace set up, paper on disk, branch pushed.
-No code has been written or re-verified by this run yet.
+Current rung: **environment → comprehension** — workspace set up, paper on disk,
+branch pushed; SPEC.md re-derived from `paper/paper.md` and committed.
 
 - [x] Reproductions repo cloned (shallow `--depth 1 --filter=blob:none`) into
       `$HOME`; workspace folder present at the slug name
@@ -23,7 +23,16 @@ No code has been written or re-verified by this run yet.
       untouched)
 - [x] Paper text saved to `paper/paper.md` (re-saved verbatim from the
       objective; byte-identical to the prior run's copy)
-- [ ] Comprehension (SPEC)
+- [x] Comprehension (SPEC) — 2026-08-06: SPEC.md rewritten for this run; 24
+      grep anchors re-resolved, 12/12 claims.json quotes verbatim, s-token
+      inventory confirms Eq. (2)'s `s` has no value, Eq. (2) token layout fixes
+      the `(c−τ)/s` reading; no figures; GitHub upstream search re-run (none);
+      pinned env rebuilt (Python 3.12.13 + numpy 2.5.1 + scikit-learn 1.9.0,
+      pytest 9.1.1) and prior results spot-re-executed — 53 tests pass,
+      seed-0 baseline → 0.9370 (Table 1 exact), CWSD literal `s=0.15` → 0.9407,
+      literal `s=2.0` → 0.9648, detached `s=0.15` → 0.9611, full `s_sweep.json`
+      consistent. New this pass: explicit per-arm Bennett restriction check
+      (§6). Unstated-gap list with weakest-reading choices: SPEC §4 (11 items).
 - [ ] Implementation / verification
 - [ ] Adversarial review rounds
 - [ ] Readiness gates
@@ -64,3 +73,13 @@ No code has been written or re-verified by this run yet.
 - 2026-08-06 — Ingest: workspace set up on top of the existing remote branch;
   branch tip pushed; paper text re-saved verbatim (byte-identical);
   `arxiv_id` unknown recorded; fresh REPRODUCTION.md started for this run.
+- 2026-08-06 — Comprehension pass: `SPEC.md` re-derived from `paper/paper.md`
+  for this run (algorithm + shapes + cited equations; 11 unstated gaps each
+  with permitted readings and the weakest choice; frozen interfaces; arms with
+  per-arm restriction checks; claims.json re-verified 12/12 quotes verbatim;
+  figures and upstream-code searches re-executed). Central finding retained
+  and spot-re-verified: the CWSD headline is **under-specified** — the paper
+  states neither the gate sharpness `s` nor the stop-grad scope on the gate
+  weight `w`; under the paper-LITERAL gradient it reproduces only for shallow
+  gates (`s ≥ ~0.7` ordering, `s ≥ ~2.0` value/magnitude) or under the
+  detached convention, not at the prose-aligned sharp-gate default `s=0.15`.
