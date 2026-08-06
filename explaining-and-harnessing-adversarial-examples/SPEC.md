@@ -3,87 +3,72 @@
 - **Paper:** Ian J. Goodfellow, Jonathon Shlens, Christian Szegedy, *Explaining and Harnessing
   Adversarial Examples*, ICLR 2015 (arXiv:1412.6572v3, 20 Mar 2015).
 - **Authoritative source on disk:** `paper/source/iclr2015.tex` (arXiv LaTeX, 975 lines). Every
-  citation in this SPEC is `<file>:<line>` into that file and was grep-verified by script
-  (all 70 claim quotes resolve verbatim at their cited lines; re-verified 2026-08-05 in the
-  fresh run: 0 failures). Math macros in the preamble resolve as `\eps`→ε, `\sign`→sign,
-  `\veta`→**η**, `\vtheta`→**θ**, `\vx`→**x**, `\vw`→**w** (`iclr2015.tex:14-55`).
-- **Paper figures:** the arXiv e-print ships the figure files (`panda_577.png`,
-  `nematode_082.png`, `gibbon_993.png`, `logreg_*.png`, `naive_weights.png`, `adv_weights.png`,
-  `eps_curve.pdf` + `eps_curve_raster.png` (4× pymupdf render), `eps_curve_inputs.png`, `airplane.png`).
-  They sit unpacked under `paper/source/` (gitignored by design — `.gitignore` tracks only
-  `.tex`/`.bbl` from the e-print; the committed read-figure transcript is the auditable record).
+  citation in this SPEC is `<file>:<line>` into that file, and all 70 claim quotes in
+  `claims.json` were re-verified verbatim at their cited lines by script on 2026-08-06 (0
+  failures; verifier: load claims.json, normalize whitespace, require substring at the cited
+  line). The `.tex` was additionally verified byte-identical on 2026-08-06 against a fresh
+  download of the arXiv e-print `1412.6572`. Math macros in the preamble resolve as
+  `\eps`→ε, `\sign`→sign, `\veta`→**η**, `\vtheta`→**θ**, `\vx`→**x**, `\vw`→**w**
+  (`iclr2015.tex:14-55`).
+- **Paper figures:** the arXiv e-print's figure files are preserved at `figures/paper/`
+  (`panda_577.png`, `nematode_082.png`, `gibbon_993.png`, `logreg_*.png`, `naive_weights.png`,
+  `adv_weights.png`, `eps_curve.pdf` + `eps_curve_raster.png` (220-dpi pymupdf render, 2159×1656),
+  `eps_curve_inputs.png`, `airplane.png`). Figure readings for THIS run are committed at
+  `figures/read-figure_2026-08-06.jsonl`; the reader transcript fields `figure_bytes`
+  (e.g. 131825 = `eps_curve_raster.png`) tie every exchange to a file in this repo. Prior-run
+  transcripts remain at `figures/read-figure.jsonl` for lineage. Values that enter claims come
+  from figure reads and are listed in §7.
 - **Convenience copy:** `paper/paper.md` (PDF extraction; prose reliable, maths not — never cited).
 - **Percent convention:** every error / confidence / agreement metric is a **percent** in
   [0, 100] so `measured` values compare directly against the paper's printed numbers.
-- **This SPEC is authored from the LaTeX source**; where a numeric value could only
-  come from a figure, it was read with `read-figure` and the exchange is committed at
-  `figures/read-figure.jsonl` (see §7). The figures were re-read in the 2026-08-05 run
-  (13 new transcript exchanges, including re-reads of every quantitative read); the reads
-  agree with the 2026-08-04 run's and the claims c65–c70 stand unchanged (§7).
+- **Lineage:** this repo carries two earlier reproductions of the same paper (2026-08-04,
+  2026-08-05; see REPRODUCTION.md). This SPEC is the 2026-08-06 run's authoritative contract:
+  authored fresh from the LaTeX, re-verified end to end (quotes, figure reads, upstream-code
+  check), and corrected where verification disagreed with the prior text (the prior SPEC's §0
+  appeared twice; merged here). The component interfaces (§5) and claims (§8) are unchanged
+  from the verified prior state because the repo's code implements exactly these interfaces and
+  every claim quote re-verified.
 
 ## 0. Upstream code status
 
-Checked first 2026-08-04; **re-checked live in the fresh run 2026-08-05 with the same findings**
-(GitHub search API on the exact title: 13 repos, all attack-only third-party reimplementations;
-`goodfeli/adversarial` = the GAN paper's code, pushed 2020, description "Code and hyperparameters
-for the paper Generative Adversarial Networks"; the pylearn2 maxout-scripts directory exists and
-contains the maxout paper's YAML configs — `mnist_pi.yaml` is the 240-unit permutation-invariant
-config this paper's `:498` defers to). Detail:
+Checked 2026-08-04 and 2026-08-05; **re-checked live 2026-08-06 with the same findings**:
 
 - **The paper's only code link** is the CIFAR-10 preprocessing footnote:
   `https://github.com/lisa-lab/pylearn2/tree/master/pylearn2/scripts/papers/maxout`
-  (`iclr2015.tex:343-345`). Fetched: the repo exists but that directory's README recreates the
-  **maxout paper** (Goodfellow et al. 2013c) experiments ("The files in this directory recreate
-  some of the experiments reported in the paper Maxout Networks"), not this paper's. The stack is
-  Theano/Pylearn2 (Python 2, archived; Theano unmaintained) and cannot execute today. No FGSM or
-  adversarial-training code from this paper ships anywhere in it.
-- **`github.com/goodfeli/adversarial`** (lead author's account) is the GAN paper's code
-  ("Generative Adversarial Nets"), not this paper's. Not usable here.
-- **GitHub search on the exact title** (`"explaining and harnessing adversarial examples"`,
-  repositories): 13 hits, all third-party partial reimplementations of the *attack only*
-  (e.g. Harry24k/FGSM-pytorch, 70 stars, Jupyter notebook; rodgzilla/
-  machine_learning_adversarial_examples, 55 stars). None implements FGSM adversarial training,
-  none of the paper's arms (maxout adversarial training, agreement/transfer/rubbish/ensemble
-  experiments), and none carries the paper's configs.
+  (`iclr2015.tex:343-345`). Fetched 2026-08-06: the directory exists
+  (`cifar10.yaml`, `mnist_pi.yaml`, `compute_test_err.py`, `svhn_preprocessing.py`, ...) but its
+  README recreates the **maxout paper** (Goodfellow et al. 2013c) experiments, not this paper's.
+  The stack is Theano/Pylearn2 (Python 2; Theano unmaintained, Pylearn2 carries the notice
+  "This project does not have any current developer") and cannot execute today. No FGSM or
+  adversarial-training code from this paper ships in it.
+- **`github.com/goodfeli/adversarial`** (lead author's account): fetched 2026-08-06 —
+  description "Code and hyperparameters for the paper *Generative Adversarial Networks*",
+  pushed 2020. That is the GAN paper's code, not this paper's.
+- **GitHub search on the exact title** (`explaining and harnessing adversarial examples`,
+  repositories, 2026-08-06): 13 hits, all third-party partial reimplementations of the *attack
+  only* (e.g. Harry24k/FGSM-pytorch, 70 stars, Jupyter notebook;
+  rodgzilla/machine_learning_adversarial_examples, 55 stars). None implements FGSM adversarial
+  training, none of the paper's arms (adversarially trained maxout, agreement/transfer/
+  rubbish/ensemble experiments), and none carries the paper's configs.
 - **`github.com/cleverhans-lab/cleverhans`** (later library co-authored by the lead author)
-  contains `cleverhans/torch/attacks/fast_gradient_method.py` — verified by fetch: its docstring
-  cites `https://arxiv.org/abs/1412.6572` and it implements the single-step sign attack with
-  optional clipping. It is a generic library primitive; it contains none of this paper's models,
-  training procedures, or numbers. Not upstream code for the experiments.
-- **Decision:** no usable upstream code exists for this paper's experiments. We implement from
-  this SPEC.
-- **Reference-only material:** the maxout MLP training details this paper defers to ("the 240
-  used by the original maxout network", `iclr2015.tex:498`) live in the maxout paper's pylearn2
-  YAML configs (`mnist_pi.yaml` et al.). Where this paper is silent (§4), those configs may be
-  consulted as *reference defaults*; every such fill-in is logged as **our choice, not the
-  paper's**.
-
-- **The paper's only code link** is the CIFAR-10 preprocessing footnote:
-  `https://github.com/lisa-lab/pylearn2/tree/master/pylearn2/scripts/papers/maxout`
-  (`iclr2015.tex:343-345`). Fetched: the repo exists but that directory's README recreates the
-  **maxout paper** (Goodfellow et al. 2013c) experiments ("The files in this directory recreate
-  some of the experiments reported in the paper Maxout Networks"), not this paper's. The stack is
-  Theano/Pylearn2 (Python 2, archived; Theano unmaintained) and cannot execute today. No FGSM or
-  adversarial-training code from this paper ships anywhere in it.
-- **`github.com/goodfeli/adversarial`** (lead author's account) is the GAN paper's code
-  ("Generative Adversarial Nets"), not this paper's. Not usable here.
-- **GitHub search on the exact title** (`"explaining and harnessing adversarial examples"`,
-  repositories): 13 hits, all third-party partial reimplementations of the *attack only*
-  (e.g. Harry24k/FGSM-pytorch, 70 stars, Jupyter notebook; rodgzilla/
-  machine_learning_adversarial_examples, 55 stars). None implements FGSM adversarial training,
-  none of the paper's arms (maxout adversarial training, agreement/transfer/rubbish/ensemble
-  experiments), and none carries the paper's configs.
-- **`github.com/cleverhans-lab/cleverhans`** (later library co-authored by the lead author)
-  contains `cleverhans/torch/attacks/fast_gradient_method.py` — verified by fetch: its docstring
-  cites `https://arxiv.org/abs/1412.6572` and it implements the single-step sign attack with
-  optional clipping. It is a generic library primitive; it contains none of this paper's models,
-  training procedures, or numbers. Not upstream code for the experiments.
-- **Decision:** no usable upstream code exists for this paper's experiments. We implement from
-  this SPEC.
-- **Reference-only material:** the maxout MLP training details this paper defers to ("the 240
-  used by the original maxout network", `iclr2015.tex:498`) live in the maxout paper's pylearn2
-  YAML configs. Where this paper is silent (§4), those configs may be consulted as *reference
+  contains `cleverhans/torch/attacks/fast_gradient_method.py` — verified by fetch on
+  2026-08-05: its docstring cites `https://arxiv.org/abs/1412.6572` and it implements the
+  single-step sign attack with optional clipping. It is a generic library primitive; it
+  contains none of this paper's models, training procedures, or numbers. Not upstream code for
+  the experiments.
+- **Reference-only material (used for §4 fill-in provenance):** the maxout MLP training details
+  this paper defers to ("the 240 used by the original maxout network", `iclr2015.tex:498`) live
+  in the maxout paper's pylearn2 YAML configs. Fetched 2026-08-06,
+  `mnist_pi.yaml` (the permutation-invariant config) specifies: 2 hidden maxout layers,
+  240 units/layer, **5 pieces**/unit, `irange: .005` init, `max_col_norm: 1.9365`, softmax top
+  (`irange .005`, same norm constraint), SGD batch **100**, lr **.1**, momentum **.5 → .7**
+  linearly saturating at epoch 250, exponential lr decay factor **1.000004** (min 1e-6), dropout
+  cost with input include-prob **0.8** (visible; hidden default 0.5), early stopping on
+  `valid_y_misclass` with patience **100**, train split = examples 0–50,000, valid = 50,000–
+  60,000. Where this paper is silent (§4), those values may be consulted as *reference
   defaults*; every such fill-in is logged as **our choice, not the paper's**.
+- **Decision:** no usable upstream code exists for this paper's experiments. We implement from
+  this SPEC.
 
 ## 1. The method as an explicit algorithm
 
@@ -99,8 +84,8 @@ Output: adversarial examples x̃.
 
 This is "an optimal max-norm constrained perturbation" under the linearization of J in x
 (`iclr2015.tex:305-311`). **No clipping** of x̃ back into [0,1] is stated anywhere in the paper;
-the default here is **no clipping** (§4.9). The gradient is w.r.t. x only; θ is constant during
-attack generation.
+the default here is **no clipping** (§4, G3). The gradient is w.r.t. x only; θ is constant
+during attack generation.
 
 ### 1.2 FGSM adversarial training (the harness)
 
@@ -113,18 +98,17 @@ Repeat per minibatch (x, y):
      The FGSM direction is computed with f_θ in EVAL mode (dropout OFF) — the paper's
      FGSM (tex:309, Fig.1) is defined on the deterministic network; computing it under an
      active dropout mask zeroes the input gradient on masked pixels and yields a weaker/
-     different perturbation. The adversarial-half LOSS J(θ, x̃, y) is then evaluated in
+     different perturbation (G7). The adversarial-half LOSS J(θ, x̃, y) is then evaluated in
      TRAIN mode (with dropout), as part of training.
   2. L ← α · mean_i J(θ, x_i, y_i) + (1−α) · mean_i J(θ, x̃_i, y_i)
   3. θ ← θ − lr · ∇_θ L
 ```
 
-
 α = 0.5 in **all** the paper's experiments (`iclr2015.tex:488`). ε for adversarial training is
 stated only for MNIST maxout: ε = 0.25 (`iclr2015.tex:428-429`). Both halves reuse the **same**
 labels y (the printed equation drops the y in the second term — typo, see §3 eq. 6).
 
-### 1.3 Adversarial logistic regression (analytic special case, §5)
+### 1.3 Adversarial logistic regression (analytic special case, §5 of the paper)
 
 Binary logistic regression, y ∈ {−1, +1}, P(y=1) = σ(wᵀx + b), trained by gradient descent on
 E ζ(−y(wᵀx + b)) with ζ(z) = log(1 + e^z) (`iclr2015.tex:399-404`). The sign of the input
@@ -159,8 +143,8 @@ and the correct closed form and assert their numerical equality (claim c07, §8)
 - **Targeted fooling (CIFAR-10):** to fool class i, take one **gradient-sign step** from a
   Gaussian sample toward increasing p(y = i | x). The Fig. 5 caption states the sign step
   (`iclr2015.tex:953-955`); the body text writes the step without `sign` (`iclr2015.tex:936`) —
-  we implement the caption's sign-step version (§4). Success := p(y = i | x̃) > 0.5
-  (`iclr2015.tex:955-956`). Per-class per-step success rate over ≥ 1,000 fresh samples.
+  we implement the caption's sign-step version (§4, G14). Success := p(y = i | x̃) > 0.5
+  (`iclr2015.tex:955-956`). Per-class per-step success rate over 1,000 fresh samples.
 
 ## 2. Symbols with shapes
 
@@ -174,7 +158,7 @@ classes. All arrays float32 unless noted.
 | θ | parameter pytree | all model parameters (`iclr2015.tex:305`) |
 | J(θ, x, y) | scalar f32 | mean cost over the batch: softmax NLL for K-class models; mean ζ(−y(wᵀx+b)) for logistic regression (`iclr2015.tex:306, 401-404`) |
 | ∇_x J | `[B, D]` f32 | gradient of the scalar batch cost w.r.t. the input |
-| sign(∇_x J) | `[B, D]` in {−1,0,1} | elementwise; sign(0) := 0 (§4.22) |
+| sign(∇_x J) | `[B, D]` in {−1,0,1} | elementwise; sign(0) := 0 (§4, G12) |
 | η | `[B, D]` f32 | ε·sign(∇_x J); ‖η‖_∞ = ε by construction |
 | x̃ = x + η | `[B, D]` f32 | adversarial example (`\tilde{\vx} = \vx + \veta`, `iclr2015.tex:235`) |
 | ε | scalar f32 | max-norm ball radius; 0.25 MNIST, 0.1 CIFAR-10, 0.007 ImageNet demo (`iclr2015.tex:333, 340, 381`) |
@@ -184,9 +168,9 @@ classes. All arrays float32 unless noted.
 | p = softmax(a) | `[B, K]` f32 | class probabilities; **confidence** of one example := max_k p_k |
 | α | scalar | adversarial-training mixing constant, 0.5 (`iclr2015.tex:488`) |
 | maxout W^(l) | `[fan_in, units, pieces]` | per-unit max over `pieces` affine slices (`iclr2015.tex:298` cites the maxout paper for the unit def); units/layers per arm (§6) |
-| μ_k, β_k (RBF) | `[D]`, `[D, D]` | class template and quadratic form for class k; **β_k negative-semidefinite** (§4.4; printed eq. `iclr2015.tex:595` has no minus sign) |
+| μ_k, β_k (RBF) | `[D]`, `[D, D]` | class template and quadratic form for class k; **β_k negative-semidefinite** (§4, G8; printed eq. `iclr2015.tex:595` has no minus sign) |
 | noise (controls) | `[B, D]` f32 | per-pixel ±ε (Rademacher) or U(−ε, ε), resampled per minibatch (`iclr2015.tex:555-557`) |
-| ε grid (Fig. 4) | `[21]` | ε ∈ {−10, …, +10} for the logit trace arm (§5, §7) |
+| ε grid (Fig. 4) | `[21]` | ε ∈ {−10, …, +10} for the logit trace arm (§4, G13; §7) |
 
 ## 3. Equations to implement, each with a citation that resolves
 
@@ -197,9 +181,11 @@ classes. All arrays float32 unless noted.
 3. **Logistic-regression training:** minimize `E ζ(−y(wᵀx + b))`, ζ softplus —
    `paper/source/iclr2015.tex:402` (loss), `:404` (ζ def), `:399` (P(y=1)=σ(wᵀx+b), y∈{−1,1}).
 4. **FGSM exact for logreg:** sign(∇_x J) = −y·sign(w), wᵀsign(w) = ‖w‖₁ —
-   `paper/source/iclr2015.tex:407`.
+   `paper/source/iclr2015.tex:407` (label factor restored, §1.3).
 5. **Adversarial logistic regression:** minimize `E ζ(y(ε‖w‖₁ − wᵀx − b))` —
-   `paper/source/iclr2015.tex:411`.
+   `paper/source/iclr2015.tex:411` (with the §1.3 sign-slip caveat: correct worst-case form is
+   `E ζ(ε‖w‖₁ − y(wᵀx + b))`; both are checked against each other for y=+1, and c07 checks the
+   corrected form against real FGSM on mixed labels).
 6. **Adversarial training of deep nets:**
    `J̃(θ,x,y) = αJ(θ,x,y) + (1−α)J(θ, x + ε sign(∇_x J(θ,x,y)), y)` —
    `paper/source/iclr2015.tex:486-487` (**as printed, the second J is missing its `y` argument
@@ -207,139 +193,198 @@ classes. All arrays float32 unless noted.
    `iclr2015.tex:306`). α = 0.5 — `:488`.
 7. **Shallow RBF:** `p(y=1|x) = exp((x − μ)ᵀ β (x − μ))` — `paper/source/iclr2015.tex:595`.
    As printed this only *decays* away from μ if β is negative (semi)definite; the paper never
-   says so. We parametrize β_k = −ψ_k ψ_kᵀ − ν·I, ν ≥ 0 (§4.4).
+   says so. We parametrize β_k = −ψ_k ψ_kᵀ − ν·I, ν ≥ 0 (§4, G8).
 8. **Targeted fooling:** x̃ = x + ε·sign(∇_x p(y = i | x)) with x ~ N(0, I_D) — body text
    without sign: `paper/source/iclr2015.tex:936`; Fig. 5 caption with sign step:
-   `paper/source/iclr2015.tex:953-955`. We implement the caption's sign-step version.
+   `paper/source/iclr2015.tex:953-955`. We implement the caption's sign-step version (§4, G14).
 9. **Rubbish error rule:** error ⇔ any class prob > 0.5 on x ~ N(0, I₇₈₄) (10,000 samples,
    MNIST) or x ~ N(0, I₃₀₇₂) (1,000 samples, CIFAR-10) —
    `paper/source/iclr2015.tex:905-907, 911`.
 
 ## 4. What the paper does NOT state
 
-This list is the gap between the paper and any implementation. Unless marked RESOLVED (with the
-resolution stated), each item must be chosen by the implementation and logged in README.md as
-**our choice, not the paper's**.
+This list is the gap between the paper and any implementation. For each gap: the readings the
+text actually permits, then the **weakest** reading (the one committing to least beyond the
+text — Bennett weakness: the reading whose extension is largest), then the resolution this
+implementation actually takes. Where the build must commit to something stronger than the
+weakest reading, the tie-break is stated and logged in README.md as **our choice, not the
+paper's**.
 
-**Training protocol (all arms)**
-1. Optimizer, learning rate, momentum, LR schedule, batch size, number of epochs: **unstated
-   everywhere** in this paper (`iclr2015.tex:498` only defers to "the original maxout network").
-2. Maxout architecture detail: number of linear **pieces per maxout unit**, number of hidden
-   layers ("240/1600 units per layer", `:498`, never says which layers), dropout rates
-   (input/hidden), weight initialization scheme — all unstated here.
-3. Softmax-regression and logistic-regression training hyperparameters: entirely unstated.
-4. RBF network: training procedure, class bias/prior term, parametrization/sign of β (eq. 7 is
-   printed without the needed negative sign), and how the 10 binary class-conditionals yield one
-   predicted class — all unstated. RESOLVED: 10 units p_k = exp((x−μ_k)ᵀβ_k(x−μ_k)), β_k
-   negative-semidefinite, predict argmax_k p_k, confidence = max_k p_k. This is the only reading
-   consistent with "confidence on mistaken examples is only 1.2%" (`:603`): under a 10-way
-   softmax the minimum possible confidence is 10%.
-5. Whether RBF "average confidence on clean test examples is 60.6%" (`:604`) is mean max-prob —
-   assumed yes.
-6. RBF FGSM cost: which J is differentiated to attack the RBF — unstated. RESOLVED: −log p_y.
-7. Ensemble training: members differ only by RNG seed (stated, `:819-821`); nothing else stated.
-8. L¹ weight-decay control: "to the first layer" is stated (`:429`); optimizer/epochs unstated;
-   smaller coefficients "permitted successful training but conferred no regularization benefit"
-   (`:431-432`) with no numbers.
+### Training protocol (all arms)
 
-**Attack / evaluation detail**
-9. **Clipping** of x̃ to [0,1] (MNIST) or the valid preprocessed range (CIFAR): never mentioned
-   anywhere. RESOLVED default: **no clipping**; a clipped variant may be run as sensitivity
-   analysis but the paper-comparable numbers are unclipped.
-10. "Average confidence" denominators: for softmax 79.3% (`:333-334`) and maxout 97.6% (`:339`)
-    it is unstated whether the mean is over all adversarial examples or mistakes only; for
-    CIFAR 96.6% "assigned to the incorrect labels" (`:340-341`) implies mistakes-only; RBF gives
-    both explicitly (`:603-604`). RESOLVED: record **both** `adv_conf_all` and
-    `adv_conf_mistakes`; value claims c02/c10 use `_all` (with 99.9%/89.4% error the two differ
-    little).
-11. Test-set coverage: FGSM metrics are "on the MNIST test set" (`:334`) — we use all 10,000
-    test examples; CIFAR-10 likewise (`:343`).
-12. Ensemble attack objective: "designed to perturb the entire ensemble" (`:822-823`) — what is
-    differentiated is unstated. RESOLVED: FGSM on the **mean-logits** ensemble NLL —
-    `cross_entropy(mean_member logits, y)`, a differentiable "perturb the whole ensemble"
-    objective (the paper is silent on the form; mean-probability NLL is the alternative; we
-    use mean-logits CE, which the code implements and which sends gradients to all members);
-    single-member attacks use member 0's gradient (`:823-824`). Prediction combines mean
-    PROBABILITIES (argmax of `mean_member softmax`), as stated.
-13. Ensemble decision rule: mean-probability argmax — unstated, assumed.
-14. Targeted-fooling ε (`:936`) and per-class sample count: unstated. RESOLVED: implementation
-    picks and logs ε; ≥ 1,000 samples per class.
-15. Fig. 4 trace: which test example (caption only says "The correct class is 4", `:768`), which
-    ε grid, and — implicitly but never stated — that the FGSM direction is computed **once at
-    ε = 0** and held fixed while ε sweeps (only this reading makes the logit curves exactly
-    piecewise linear). RESOLVED: Figure 4 reports ONE illustrative example, not a population
-    claim, so the arm uses a **deterministic** fixed example — the **first (lowest-index)
-    class-4 test example that ALL seed models classify correctly** — with **NO selection on the
-    thin-manifold predicates** (margin>0 at ε=0, <0 at the tails, monotone increase). The example
-    is chosen purely by index, so the curve claims (c65–c70, rated `low` — single-example
-    illustration, not a population invariant) can genuinely FAIL if this example does not
-    reproduce the figure shape. The FGSM direction is computed once at ε=0 and held fixed. Fall
-    back to the first correct class-4 example of seed 0 if no class-4 example is correct for all
-    seeds. (An earlier version selected the example by the very predicates the claims evaluate —
-    "pass by construction"; that selection is removed.)
-16. Transfer pair (19.6% / 40.9%, `:519-520`): which architectures "the original model" and
-    "the new model" are is not explicit (§6 discusses both the 240-unit 0.94→0.84 result and the
-    1600-unit 0.782 result). RESOLVED: primary pair = (maxout_large_naive, maxout_large_adv);
-    the small pair may be recorded as secondary.
-17. Agreement experiment (§8 of the paper): which maxout architecture generated the examples is
-    unstated; and the conditioning of "the RBF network can predict softmax regression's class
-    53.6% of the time" (`:687-688`) is unstated — read as both-models-wrong conditioned,
-    mirroring the preceding sentence.
+- **G1 — Optimizer, learning rate, momentum, LR schedule, batch size, epochs.** Unstated
+  everywhere in this paper; `tex:498` only defers to "the original maxout network", and "trained
+  with SGD" appears only for the quadratic models (`tex:616-617`). Permitted readings: any
+  gradient-based optimizer and any schedule. **Weakest:** any gradient descent on the stated
+  objectives. **Resolution (ours, code-as-run):** plain SGD with momentum 0.9 (constant,
+  no schedule), lr 0.05 for the maxout arms / 0.5 for softmax & logistic regression / 0.01 for
+  the RBF arm, batch size 128 (256 for the CIFAR conv arm), early-stop patience 8 (5 for CIFAR),
+  hard epoch caps EPOCHS_* (CPU sub-scale; REPRODUCTION.md). An earlier draft of this entry
+  claimed the pylearn2 `mnist_pi.yaml` defaults (lr .1, batch 100, momentum .5→.7 saturating,
+  exp decay, patience 100) as the resolution; the code does NOT use those — this entry now
+  describes what the code actually does (review finding: SPEC-code divergence). Strictly
+  stronger than weakest, logged as ours.
+- **G2 — Maxout architecture detail.** Number of linear **pieces** per maxout unit, number of
+  hidden **layers**, dropout rates, init scheme: all unstated here ("240/1600 units per layer",
+  `tex:498`). Permitted: any pieces ≥ 2, ≥1 hidden layers, any init. **Weakest:** unconstrained.
+  **Resolution (ours, code-as-run):** 2 hidden layers, 5 pieces, dropout include-prob input
+  0.8 / hidden 0.5 (i.e. drop probs 0.2 / 0.5; hidden dropout is NOT applied after the last
+  hidden block — models.py:147 `i < len(self.blocks)-1`), weight init `N(0, (0.5/sqrt(fan_in))**2)`
+  (MaxoutLinear, std = 0.5/sqrt(in_features)), NO max-col-norm constraint. An earlier draft
+  claimed `irange .005` init + `max_col_norm 1.9365` (pylearn2 `mnist_pi.yaml`); the code does
+  NOT apply a max-col-norm — this entry now describes what the code does (review finding:
+  SPEC-code divergence; the absent max-norm constraint changes training dynamics, paper-silent
+  so not a paper violation). Logged as ours.
+- **G3 — Softmax/logistic/RBF training hyperparameters.** Entirely unstated. Permitted: any.
+  **Weakest:** any optimizer that fits the training data. **Resolution:** same SGD family as G1;
+  logged as ours.
+- **G17 — L¹ weight-decay control.** "to the first layer" stated (`tex:429`); coefficient
+  .0025 stated as too large (`tex:429-431`); optimizer/epochs and the smaller coefficients
+  unstated. The arm tests only the stated coefficient (c64: train err > 5%).
 
-**Stopping / seed protocol**
-18. Validation split: not stated (50k train / 10k val inferred from "retrained on all 60,000
-    examples", `:505-506`). RESOLVED: standard last-10k-of-60k split.
-19. Early stopping: patience 100 epochs on validation error for the original maxout result
-    (`:501-503`); **adversarial validation set error** for the large adversarially trained model
-    (`:504-505`) — its ε (assumed 0.25) and refresh frequency (assumed every epoch) are unstated.
-    NOTE (sub-scale override): the paper's patience-100 budget is infeasible on CPU; the run caps
-    patience at **8** (MNIST arms) / **5** (CIFAR arm) with the same early-stopping monitor. This
-    is a CPU-horizon cap, not a method change; it is recorded in `run_all_arms.py` and does not
-    affect any HIGH-invariance claim. `train.py`'s default patience remains 100.
-20. Retrain-on-60k uses the early-stopped epoch count (`:505-506`) — that rule is stated; the
-    epoch counts themselves are not.
-21. Seeds: only "different seeds for the random number generators used to select minibatches of
-    training examples, initialize model weights, and generate dropout masks" (`:506-508`). No
-    seed values, no counts except the five runs of the large model (`:508-510`).
+### Attack / evaluation detail
 
-**Numerical / kernel minutiae**
-22. sign(0) convention: unstated. RESOLVED: 0.
-23. Numerical stabilizers (softmax max-subtraction, softplus overflow): unstated.
-24. CIFAR conv-maxout architecture (layers/channels/kernels) and its **clean test error**: both
-    unstated; preprocessing only referenced to the pylearn2 maxout scripts yielding std ≈ 0.5
-    (`:343-345`). RESOLVED: GCN variant chosen to give global std ≈ 0.5; exact recipe logged as
-    ours. The conv-maxout stages use **NO post-ReLU** (maxout is itself the nonlinearity, per
-    Goodfellow et al. 2013c; an earlier version inserted `F.relu` after each stage, an extra
-    nonlinearity the paper never describes — removed). The conv net uses **NO dropout** (the
-    paper's maxout networks were dropout-regularized, but the paper does not describe the CIFAR
-    conv arch; dropping dropout is an arch-ours choice for the CPU sub-scale net, logged here).
-    Targeted-fooling uses **1,000 samples per class** (§4.14); the run previously used 200
-    (underpowered) and now matches §4.14.
-25. Whether control-noise is resampled per minibatch/epoch (`:555-557`): unstated. RESOLVED:
-    resampled at every minibatch presentation.
-26. Adversarial-training minibatch composition: whether the α-weighted halves share one batch —
-    RESOLVED yes (single-batch reading of eq. 6) — and both halves receive gradient every step.
-26b. Adversarial-training FGSM mode: the paper defines FGSM on the cost J of the (deterministic)
-    network (`tex:309`, Fig.1) but does not state whether the in-training attack runs under the
-    model's active dropout mask. RESOLVED: the perturbation is computed with the model in **eval
-    mode** (dropout OFF); the adversarial-half loss is then evaluated in train mode (with
-    dropout). Computing the attack under an active mask zeroes ∇ₓ on masked pixels and yields a
-    materially weaker/different perturbation (the train-mode FGSM sign is exactly 0 on ~20% of
-    pixels); eval-mode attacks are the faithful reading. The clean half always runs in train mode.
-26c. RBF network: the printed equation (`tex:595`) has no per-class temperature and no loss clamp.
-    RESOLVED: no `log_temp` parameter (an earlier inert `log_temp` slot is removed) and no loss
-    clamp (RBF logits ≤ 0 ⇒ NLL ≥ 0 by construction, so a clamp is dead). Training procedure
-    (β/μ parametrization, ν floor, mean init) is paper-silent and logged as ours (§4.4).
-27. MP-DBM arm: all detail is external to this paper (`:793-800`); **not built** (§9).
-28. Fig. 1 ImageNet demo (ε = .007, `:381-383`): GoogLeNet weights/preprocessing not given;
-    **not built** (§9).
+- **G4 — Clipping** of x̃ to [0,1] (MNIST) or the valid preprocessed range (CIFAR): never
+  mentioned anywhere in the paper. Permitted: {clip, don't clip}. **Weakest:** no clipping —
+  it asserts exactly what the paper writes and nothing more. **Resolution:** no clipping; a
+  clipped variant may be run as sensitivity analysis but the paper-comparable numbers are
+  unclipped. (CleverHans' FGSM clips by default — the conventional reading, and the stronger
+  one: it restricts x̃ to a subset of the paper's permitted points. We do not take it.)
+- **G5 — "Average confidence" denominators.** For softmax 79.3% (`:333-334`) and maxout 97.6%
+  (`:339`) unstated whether the mean is over all adversarial examples or mistakes only; CIFAR
+  96.6% says "assigned to the incorrect labels" (`:340-341`) — mistakes only; RBF gives both
+  explicitly (`:603-604`). Permitted: {all, mistakes-only} per number. **Weakest:** measure
+  both — the reading that commits to neither. **Resolution:** record **both** `adv_conf_all`
+  and `adv_conf_mistakes`; value claims c02/c10 use `_all` (with 99.9%/89.4% error the two
+  differ little; both recorded so a reader can check either).
+- **G6 — Test-set coverage.** FGSM metrics "on the MNIST test set" (`:334`): we use all 10,000
+  test examples; CIFAR-10 likewise (`:343`). No restriction here.
+- **G7 — In-training attack mode.** FGSM is defined on J (the deterministic forward net;
+  `tex:309`, Fig. 1); the paper never says whether the *in-training* attack is computed under
+  the model's active dropout mask. Permitted: {deterministic net, under-mask}. Under-mask
+  zeroes ∇ₓ on masked pixels (~20% of inputs at include-prob .8) and yields a materially
+  different perturbation. **Weakest:** the definition as written — apply tex:309 to the network
+  as defined, i.e. deterministic/eval-mode; the under-mask reading adds a commitment (the mask
+  multiplies the gradient) that the text never states. **Resolution:** eval-mode attack; the
+  adversarial-half loss then runs in train mode. Logged.
+- **G8 — RBF parametrization.** Printed `p(y=1|x) = exp((x−μ)ᵀ β (x−μ))` (`tex:595`) has no
+  minus sign, no training procedure, no class-prior term, and no rule mapping 10 binary
+  class-conditionals to one prediction. Permitted readings consistent with "RBF units ...
+  responding only to a specific point in space" (`tex:613`) and "confidence on mistaken examples
+  is only 1.2%" (`:603`): β negative (semi)definite (else p grows with ‖x−μ‖ — not an RBF and
+  contradicts `:600-604`), and confidences NOT renormalized over classes (under a 10-way softmax
+  the minimum possible confidence is 10%, contradicting 1.2%). **Weakest consistent reading:**
+  10 independent units p_k = exp((x−μ_k)ᵀβ_k(x−μ_k)), β_k negative-semidefinite, predict
+  argmax_k p_k, confidence = max_k p_k, rows need not sum to 1. **Resolution:**
+  β_k = −ψ_kψ_kᵀ − ν·I with ν ≥ 0; NLL-style training procedure is ours, logged. RBF FGSM
+  cost (what to differentiate) unstated; resolution: −log p_y. "Average confidence on clean
+  test examples is 60.6%" (`:604`) read as mean max-prob; unstated.
+- **G9 — Ensemble attack objective.** "designed to perturb the entire ensemble" (`:822-823`) —
+  what is differentiated is unstated. Permitted: any differentiable joint scalar (mean-logits
+  CE, mean-probability NLL, ...). **Resolution:** FGSM on the MEAN-PROBABILITY NLL of the
+  ensemble — the NLL of the SAME mean-probability classifier that predict() evaluates, so the
+  attack targets the decision rule whose error is measured (review finding: an earlier
+  mean-logits CE was the loss of a *different* classifier than the mean-prob one being
+  evaluated); single-member attacks use member 0's gradient (`:823-424`). Decision rule:
+  mean-probability argmax; unstated, assumed. All logged as ours. These choices sit behind
+  c34–c37, which is why the ensemble value claims are medium, not high.
+- **G13 — Transfer pair** (19.6% / 40.9%, `:519-520`): which architectures "the original model"
+  and "the new model" are is not explicit (§6 discusses both the 240-unit 0.94→0.84 result and
+  the 1600-unit 0.782 result). Permitted: {(240u naive, 240u adv), (1600u naive, 1600u adv)}.
+  **Weakest:** either. **Resolution:** primary pair = (maxout_large_naive, maxout_large_adv);
+  the small pair may be recorded as secondary. Logged.
+- **G15 — Agreement experiment** (§8 of the paper): which maxout architecture generated the
+  examples is unstated (resolution: maxout_naive); and the conditioning of "the RBF network can
+  predict softmax regression's class 53.6% of the time" (`:687-688`) is unstated — read as
+  both-models-wrong conditioned, mirroring the preceding sentence.
+- **G16 — Control-noise resampling cadence** (`:555-557`): unstated. Permitted: {per
+  minibatch, per epoch, fixed sample}. **Weakest:** any cadence. **Resolution:** resampled at
+  every minibatch presentation — no committed schedule. Logged.
+
+### Stopping / seed protocol
+
+- **G10 — Validation split.** Not stated; "retrained on all 60,000 examples" (`:505-506`)
+  implies a held-out split during model selection. Permitted: any split. **Resolution:** the
+  maxout reference split — train 0–50,000, val 50,000–60,000 (mnist_pi.yaml), logged as ours.
+- **G11 — Early stopping and retrain-on-60k.** Patience 100 on validation error for the
+  original maxout result (`:501-503`), stated; **adversarial validation set error** as the
+  monitor for the large adversarially trained model (`:504-505`), stated; its ε (assumed 0.25),
+  refresh frequency (assumed every epoch), and patience for the adv model (assumed 100) all
+  unstated. That the epoch count so chosen is then used to retrain on all 60,000 (`:505-506`) is
+  stated; whether the retrain is from scratch is unstated. Permitted: {from scratch, continue
+  from Phase-1 weights}. **Weakest:** "retrained" as printed — a fresh run (continuing would
+  silently add the Phase-1 optimization trajectory). **Resolution:** from scratch, with fresh
+  optimizer state and RNG; asserted by
+  `tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch`. NOTE (sub-scale override):
+  the paper's patience-100 budget is infeasible on CPU; the run caps patience at **8** (MNIST
+  arms) / **5** (CIFAR arm) with the same early-stopping monitors. This is a horizon restriction
+  (§6), not a method change; recorded in `run_all_arms.py`. `train.py`'s default patience
+  remains 100.
+- **G12 — Seeds.** Only "different seeds for the random number generators used to select
+  minibatches of training examples, initialize model weights, and generate dropout masks"
+  (`:506-508`). No seed values, no counts except the five runs of the large model (`:508-510`).
+  **Resolution:** seeds [0,1,2] default; [0,1,2,3,4] for `maxout_large_adv` (matching the
+  paper's five trials); three RNG streams per seed (weight_init / minibatch_order /
+  dropout_masks) mirroring the three uses the paper names.
+
+### Numerical / kernel minutiae
+
+- **G14 — Targeted-fooling step.** Body: "adding ε∇ₓ p(y = i | x)" (`tex:936`); Fig. 5 caption:
+  "taking a gradient sign step" (`tex:954`). Permitted: {raw-gradient step, sign step}. Both are
+  literal readings; neither is weaker (they disagree on scale, not on commitment). **Resolution:**
+  the caption's sign-step version (self-consistent with the paper's FGSM family); ε unstated —
+  implementation picks and logs ε; per-class sample count unstated — we use 1,000/class. The
+  fooling value claims (c60–c63) are rated low/medium because they ride on this choice.
+- **G18 — sign(0) convention.** Unstated. **Resolution:** 0. Invariant-tested.
+- **G19 — Numerical stabilizers** (softmax max-subtraction, softplus overflow): unstated;
+  standard, logged as ours.
+- **G20 — CIFAR conv-maxout architecture and its clean test error.** Both unstated;
+  preprocessing referenced only to the pylearn2 maxout scripts yielding std ≈ 0.5
+  (`:343-345`). **Resolution:** CIFAR preprocessing is PER-IMAGE global contrast
+  normalization — subtract each image's own mean over its 3072 pixels, then apply one global
+  scale `s = 0.5 / std(per-image-centered train pixels)` so the train split's global std is
+  ~0.5 (the paper's only stated property). This is the form the referenced pylearn2
+  ``GlobalContrastNormalization`` takes (per-image centering, NOT a per-pixel/dataset mean —
+  review_divergence BLOCKING #1; an earlier draft used a per-pixel/dataset mean, a different
+  transform). Exact recipe in data.py:_gcn_preprocess, logged as ours. The fingerprint no
+  longer asserts the std~0.5 the recipe forces by construction; it asserts a RAW uint8
+  pixel-sum checksum (a property the GCN recipe cannot force, the CIFAR analogue of the
+  MNIST checksum) plus the per-pixel-variance structural check. The conv-maxout stages use
+  **NO post-ReLU** (maxout is itself the nonlinearity, per Goodfellow et al. 2013c; an earlier
+  draft inserted `F.relu` after each stage, an extra nonlinearity the paper never describes
+  — removed). The conv net uses **NO dropout** (the paper's maxout networks were
+  dropout-regularized, but the paper does not describe the CIFAR conv arch; dropping dropout
+  is an arch-ours choice for the CPU sub-scale net, logged).
+  Targeted-fooling uses **1,000 samples per class** (G14).
+- **G21 — Adversarial-training minibatch composition.** Whether the α-weighted halves share one
+  batch: unstated. Permitted: {same batch, separate batches}. **Weakest:** same batch — the
+  equation J̃(θ, x, y) is written over a single (x, y); separate batches add a data-sampling
+  commitment the text never makes. **Resolution:** single shared batch; both halves receive
+  gradient every step.
+- **G22 — eps-trace example and grid (Fig. 4).** Which test example (caption only says "The
+  correct class is 4", `tex:768`), which ε grid, and — implicitly but never stated — that the
+  FGSM direction is computed **once at ε = 0** and held fixed while ε sweeps (only this reading
+  makes the logit curves exactly piecewise linear, as the caption asserts, `tex:768`).
+  **Weakest reading of what Fig. 4 claims:** ONE illustrative example, not a population claim.
+  **Resolution:** a **deterministic** fixed example — the **first (lowest-index) class-4 test
+  example that ALL seed models classify correctly** — with **NO selection on the thin-manifold
+  predicates** (margin>0 at ε=0, <0 at the tails, monotone increase). The example is chosen
+  purely by index, so the curve claims (c65–c70, rated `low`) can genuinely FAIL if this example
+  does not reproduce the figure shape. FGSM direction computed once at ε=0 and held fixed.
+  Fallback: first correct class-4 example of seed 0. (An earlier draft selected the example by
+  the very predicates the claims evaluate — "pass by construction"; removed.)
+- **G23 — MP-DBM arm.** All detail external to this paper (`:793-800`); **not built** (§9).
+- **G24 — Fig. 1 ImageNet demo** (ε = .007, `:381-383`): GoogLeNet weights/preprocessing not
+  given; **not built** (§9).
 
 ## 5. Component interfaces (fixed now; parallel agents build against these)
 
 Framework: a single array-programming stack picked once at implementation time and recorded in
 README (CPU is sufficient at this paper's scale; FGSM needs the input gradient, i.e. autograd
 w.r.t. x). **One arm = one entry per seed** containing exactly the metric keys listed below;
-claims resolve `measured.<arm>.<key>` against them.
+claims resolve `measured.<arm>.<key>` against them. (The repo's current code implements exactly
+these interfaces; verified 2026-08-06 by AST walk of `data.py`, `models.py`, `attack.py`,
+`train.py`, `eval.py`.)
 
 ```
 data.py
@@ -356,18 +401,18 @@ models.py  — every model implements:
   .logits(x[B,D]) -> [B,K] f32          (RBF/ensemble return K=10 score functions;
                                          logreg_3v7 implements .margin(x[B,784]) -> [B])
   .prob(x[B,D])   -> [B,K] f32          (RBF: raw exp-quadratic per-class probabilities, rows
-                                         need NOT sum to 1 — §4.4)
+                                         need NOT sum to 1 — §4, G8)
   .loss(x[B,D], y[B]) -> scalar
   .predict(x) -> [B] int64 ;  .confidence(x) -> [B] f32 = max_k prob
   SoftmaxRegression(784,10) ; LogisticRegression3v7(784)
   MaxoutMLP(units_per_layer:int, layers:int, pieces:int, dropout:dict)   # 240/1600 variants
   MaxoutSigmoid(...)          # maxout backbone + 10 independent sigmoid heads
-  RBFNet(K=10, D=784)         # §4.4 parametrization
+  RBFNet(K=10, D=784)         # §4, G8 parametrization
   Ensemble(members:list)      # mean-prob combine
   ConvMaxoutCIFAR(...)        # arch logged; paper silent
 
 attack.py
-  fgsm(model, x[B,D], y[B], eps) -> x_adv[B,D]                    # no clipping (§4.9)
+  fgsm(model, x[B,D], y[B], eps) -> x_adv[B,D]                    # no clipping (§4, G4)
   fgsm_logits_trace(model, x[D], y, eps_grid[21]) -> logits[21,K] # direction fixed at eps=0
   targeted_fool_step(model, x0[B,D], target:int, eps) -> x1[B,D]  # sign step (eq. 8)
 
@@ -391,10 +436,10 @@ eval.py
 **Metric keys per arm** (emitted per seed):
 
 - `softmax_reg`: clean_err, adv_err, adv_conf_all, adv_conf_mistakes, rubbish_err,
-  rubbish_conf_mistakes, rubbish_class_shares
+  rubbish_conf_mistakes, rubbish_class_shares (+ flattened rubbish_share_<k>)
 - `logreg_3v7`: clean_err, adv_err, train_err, **analytic_equiv_max_absdiff** (c07 check)
 - `maxout_naive`: clean_err, train_err, adv_err, adv_conf_all, adv_conf_mistakes,
-  rubbish_err, rubbish_conf_mistakes, rubbish_class_shares
+  rubbish_err, rubbish_conf_mistakes, rubbish_class_shares (+ flattened)
 - `maxout_sigmoid`: clean_err, rubbish_err, rubbish_conf_mistakes
 - `maxout_adv` (240u), `maxout_large_naive` (1600u): clean_err, adv_err, adv_conf_all,
   adv_conf_mistakes
@@ -408,18 +453,39 @@ eval.py
 - `transfer_mnist`: err_orig_on_advfromnew, err_new_on_advfromorig
   (orig = maxout_large_naive, new = maxout_large_adv, ε = 0.25)
 - `eps_trace`: eps_grid [−10..10], logit_correct_seq[21], logit_maxwrong_seq[21],
-  margin_seq[21] (= correct − maxwrong), example_index, example_true_label
+  margin_seq[21] (= correct − maxwrong), plus endpoint samples logit_correct_e0/e10(-10),
+  logit_maxwrong_e0/e10(-10), logit_correct_pos tails, example_index, example_true_label
 - `cifar_conv_maxout`: clean_err, adv_err (ε=0.1), adv_conf_mistakes, rubbish_err,
-  rubbish_conf_mistakes, rubbish_class_shares, fool_success {class 0..9: percent},
-  fool_success_avg
+  rubbish_conf_mistakes, rubbish_class_shares (+ flattened), fool_success_<k> {class 0..9:
+  percent}, fool_success_avg
 - `l1_maxout`: train_err
 
-## 6. Arms this paper compares
+## 6. Arms this paper compares, per-arm restrictions, and what each can still support
 
 The comparison the paper itself makes: shallow softmax regression, logistic regression (3-vs-7),
 naive maxout, adversarially trained maxout (two sizes), two noise controls, L¹ weight decay,
 shallow RBF, sigmoid-top maxout, a 12-member ensemble, a conv maxout on CIFAR-10, plus an
 MP-DBM (§9, not built) and the GoogLeNet/ImageNet Fig. 1 demo (§9, not built).
+
+**Restriction discipline (the only-restricts check).** Every arm below may narrow the paper's
+situations (fewer epochs via patience caps, 3–5 seeds instead of an unstated count, CPU nets,
+fixed example selection) but may NOT change what counts as a correct answer: same datasets
+(MNIST [0,1], CIFAR GCN), same ε values (0.25 / 0.1), same error/confidence/agreement metric
+definitions in percent, same rubbish error rule (any prob > 0.5), same early-stop monitors
+(adv val err retrain on 60k), same attack definition (no clipping added). No metric is
+redefined, no arm early-stops on a test set, and no claim quantity is measured under a different
+definition than the paper's sentence. The machine-readable form of this check lives at
+`claims.json` top-level **`restrictions`**: a map `{"<arm>": {"kind": "none"|
+"narrows_situations"|"changes_correctness", "detail": "..."}}` covering all 18 declared arms
+(including the two not-built ones). Every arm is `narrows_situations`; **none** is
+`changes_correctness` — had any arm redefined its metric, it would be a different task and its
+claims would not speak to this paper at all (§0 of the workflow objective). A claim whose quantity the restricted run cannot
+separate (e.g. 0.94% vs 0.84% clean error at a patience-8 horizon) must report "cannot speak"
+(low compute-invariance, reported not gated), and history bears this out: in the 2026-08-05
+published run at a ~6-epoch horizon, the tight clean-error value claims (c08, c11, c18, c19 were
+refuted at their tolerances while the high-invariance direction claims all reproduced; the
+publish recorded rung `numbers` with that caveat. That is exactly what "a run at a horizon too
+short to separate two arms cannot speak to a claim about their difference" means in practice.
 
 | arm | dataset | arch/config | training | eval |
 |---|---|---|---|---|
@@ -433,7 +499,7 @@ MP-DBM (§9, not built) and the GoogLeNet/ImageNet Fig. 1 demo (§9, not built).
 | `noise_rademacher` | MNIST | maxout_naive config | + per-pixel ±0.25 noise, resampled per minibatch | FGSM 86.2%/97.3% |
 | `noise_uniform` | MNIST | maxout_naive config | + per-pixel U(−0.25,0.25) noise | FGSM 90.4%/97.8% |
 | `l1_maxout` | MNIST | maxout_naive config | + L¹ coef 0.0025 on **first layer** | train err > 5% (negative control) |
-| `rbf_shallow` | MNIST | 10 RBF units, no hidden layer (§4.4) | NLL | FGSM 55.4%/conf-mistakes 1.2%, clean conf 60.6%, rubbish 0% |
+| `rbf_shallow` | MNIST | 10 RBF units, no hidden layer (§4, G8) | NLL | FGSM 55.4%/conf-mistakes 1.2%, clean conf 60.6%, rubbish 0% |
 | `ensemble12` | MNIST | 12 × maxout_naive, distinct seeds | per-member as naive | FGSM(ε=.25): 91.1% ensemble-crafted, 87.9% single-crafted |
 | `agreement_mnist` | MNIST | reuses maxout_naive + softmax_reg + rbf_shallow | — | 54.6 / 16.0 / 84.6 / 54.3 / 53.6% |
 | `transfer_mnist` | MNIST | reuses maxout_large_naive ↔ maxout_large_adv | — | 19.6% / 40.9% |
@@ -442,98 +508,99 @@ MP-DBM (§9, not built) and the GoogLeNet/ImageNet Fig. 1 demo (§9, not built).
 | ~~`mp_dbm`~~ | MNIST | MP-DBM | — | **not built** (§9) |
 | ~~`googlenet_imagenet`~~ | ImageNet | GoogLeNet | — | **not built** (§9) |
 
+**Per-arm restriction log and claim support:**
+
+- `softmax_reg`: restricts training optimizer/schedule only (paper silent; §4 G3). Metric
+  definitions unchanged. Supports c01–c03, c50–c51; c01/c03's core (adv_err ≫ clean_err at
+  ε=0.25) is budget-insensitive once the linear model fits (a softmax model reaches its plateau
+  quickly); c02's exact 79.3 confidence rides on the fit quality → rated low/high accordingly.
+- `logreg_3v7`: no budget restriction that matters — convex; the c07 invariant is algebraic and
+  budget-free; supports c04–c07 fully.
+- `maxout_naive` / `maxout_adv`: restrict optimization budget (patience 8 vs 100) and seeds
+  (3 vs unstated). Tight clean-error values (c08: 0.94±0.15, c11: 0.84±0.15) cannot be separated
+  at this horizon — they are rated low and reported as cannot-speak if unreached, per the
+  2026-08-05 outcome. Robustness claims at ε=0.25 (c09, c10, c13, c14-adjacent) survive a short
+  horizon: susceptibility to FGSM appears long before convergence; supports c09–c13, c46–c47.
+- `maxout_large_naive` / `maxout_large_adv`: same budget restriction + 5-seed protocol preserved
+  (matches the paper's five trials, `:508-510`); the retrain-on-60k protocol is implemented
+  from-scratch as written (G11). c17/c18/c19 (1.14 / ≤1.1 / 0.782) are horizon-bound → low;
+  c15 (adv err of large naive ~89.4 ballpark, medium), c16 (ordering, high), c20 (81.4 conf,
+  low), c14 (17.9±5, low) supported in proportion to horizon.
+- `noise_rademacher` / `noise_uniform`: same budget restriction; support c24–c27 values
+  (medium/low) and c28 (high ordering: both noise controls ≫ maxout_adv adv_err — the paper's
+  "noise is inefficient" claim is a direction and survives).
+- `l1_maxout`: negative control with the stated coefficient only; supports c64 (medium).
+- `rbf_shallow`: restricts the RBF training recipe to ours (paper silent, G8); supports c29
+  (medium) and the direction claims c32, c33 (high: RBF conf-mistakes ≪ maxout conf-mistakes;
+  clean conf ≫ adv conf-mistakes), c30/c31 low, c52/c53 rubbish.
+- `maxout_sigmoid`: rubbish-only arm; supports c48–c49 (low).
+- `ensemble12`: restricts per-member budget and evaluates 3 seed-sets; supports c34, c35
+  (medium) and c36, c37 (high/medium orderings).
+- `agreement_mnist`: inherits generator-model budget; supports c38–c42 values (medium/low) and
+  c43, c44, c45 (high directions / far-above-chance existence).
+- `transfer_mnist`: supports c21, c22 (medium) and c23 (high ordering: adv-trained model is the
+  more robust endpoint of both transfer directions).
+- `eps_trace`: restricts the paper's single illustrative example to a deterministic
+  index-selected example (same one-example scope — no narrowing of situations vs the paper) and
+  the ε axis to [−10, 10] sampled at 21 grid points (paper's axis reads −15..+15, §7); direction
+  fixed at ε=0. Supports c65–c70, all rated low (illustrative, single example).
+- `cifar_conv_maxout`: restricts architecture wholly to ours (paper silent, G20), patience to
+  5, fooling samples to 1,000/class; supports c56–c63, all medium/low — none gate.
+
 ## 7. Figure readings
 
-Tool: `read-figure <png> "<question>"`, transcript appended to `figures/read-figure.jsonl`
-(committed). `eps_curve.pdf` was rasterized at 4× with pymupdf (`paper/source/eps_curve_raster.png`)
-before reading (the reader takes PNGs). Questions were phrased for terse answers ("answer with
-only the number", "exactly one word"). The transcript now holds three batches: 11 early entries
-(2026-08-04, several flagged `looks_like_reasoning`, kept for history, not used as evidence),
-26 clean entries (2026-08-04 late batch), and 23 entries from the 2026-08-05 fresh-run re-read
-(7 flagged as deliberation — each such read is treated as weak evidence and is either backed by
-a clean re-ask or by a programmatic check, and every claim resting on a figure value is rated
-`low` compute-invariance with tolerance covering the reading error).
+Tool: `read-figure <png> "<question>"`. This run's transcript:
+`figures/read-figure_2026-08-06.jsonl` (12 exchanges, committed); prior runs':
+`figures/read-figure.jsonl` (60 exchanges, kept for lineage). `eps_curve.pdf` was rasterized at
+220 dpi with pymupdf (`figures/paper/eps_curve_raster.png`, 131825 bytes — matches
+`figure_bytes` in the transcript). Questions were phrased for terse answers ("answer with only...",
+"exactly one word"). `read-figure` flags replies that read as deliberation; every claim resting
+on a figure value is rated `low` compute-invariance with tolerances covering reading error.
 
-**2026-08-05 re-read results (this run):**
+**2026-08-06 reads (this run):**
 
-- **Figure 4 left, clean reads:** x ticks **−15, 15**; y ticks **−2000, 1000**; line shape
-  **"piecewise-linear"** (one word); "between x=0 and x=15, does any other curve end up above
-  the curve labeled 4?" → **yes**; curve labeled 4 at x=+10 → **−400** (clean integer read).
-- **Figure 4 left, flagged reads (weak):** highest curve at x=+10 deliberated (analysis in the
-  transcript converges on ~+400–440); the x=−10 pair deliberated twice (~+800 highest /
-  ~+170–200 for label 4). These match the 2026-08-04 clean reads (+400 at x=+10; +800 and +200
-  at x=−10), so the flagged reads change nothing.
-- **Figure 4 right:** "yellow-boxed thumbnails clustered near the middle?" → **yes** (clean).
-  Grid count deliberated both times (no clean token) — resolved **programmatically**: the
-  335×335 montage has a dominant autocorrelation period of 33 px → **10×10**.
-- **Figure 5:** grid **10×10** (clean, and confirmed programmatically: 375 px / 37 px period);
-  "recognizable photographs of airplanes?" → **no**; "some thumbnails yellow-bordered, others
-  not?" → **yes**.
-- **Figure 2:** `logreg_adv.png` "readable handwritten digits?" → **yes** (clean).
-  `logreg_weights_sign.png` "clearly recognizable handwritten digit shape?" → **yes** in one
-  clean read, then a re-ask ("resemble a handwritten digit?") deliberated and leaned **no**
-  (pattern looks like a Z-ish sign pattern). Unstable on a 431-byte thumbnail → not used.
-- **Figure 3:** adversarially-trained filters "localized pen-stroke fragments?" → **yes**
-  (clean, both runs). For the naive filters this run's three phrasings are mutually inconsistent
-  ("pen-stroke fragments?" **yes**; "unstructured salt-and-pepper noise?" **no**; "smooth,
-  spatially localized strokes?" **no**) → this read is **unstable across phrasings**; the
-  2026-08-04 read (naive → **no** on pen-stroke fragments) is the one consistent with the
-  paper's text. No claim depends on it (§9).
+- **Figure 4 left (`eps_curve_raster.png`), clean reads:** x ticks **−15, 15**; y ticks
+  **−2000, 1000**; curves **"piecewise-linear"** (one word) — matches the caption's
+  "conspicuously piecewise linear with ε" (`tex:768`); "between x=0 and x=15, does any curve end
+  up above the curve for class 4?" → **yes** — matches "wrong classifications are stable across
+  a wide region of ε values" (`tex:769`).
+- **Figure 4 left, flagged reads (weak evidence):** the four point-value asks (highest curve at
+  x=+10; class-4 curve at x=+10; both at x=−10) all deliberated in the reply. The deliberations
+  converged on ~**+400** (highest, +10) and ~**−350 to −390** (class 4, +10) — consistent with
+  the clean reads in both prior transcripts: +400 / −400 at x=+10, +800 / +200 at x=−10. Per
+  policy, the flagged numbers are weak evidence and are NOT the anchor for the c69/c70 anchors;
+  the anchors carry ±400 tolerances so the reading error and the reproduction spread are both
+  inside tolerance, and the claims are rated low.
+- **Figure 4 right (`eps_curve_inputs.png`), clean:** "yellow-boxed thumbnails clustered near
+  the middle of the grid?" → **yes** (row-major ε, correct classification survives only near
+  ε≈0 — the thin-manifold claim, `tex:764, 771-772`). Prior runs confirmed the grid as 10×10
+  programmatically (dominant autocorrelation period 33 px on the 335×335 montage).
+- **Figure 5 (`airplane.png`), clean:** "recognizable photographs of airplanes?" → **no**;
+  "some thumbnails yellow-bordered, others not?" → **yes** — consistent with a sub-100% per-step
+  success rate for the hardest class (24.7%, `tex:940`) and with "indeed fooling images, and not
+  images of real classes" (`tex:943-944`).
+- **Figure 3 (`adv_weights.png` / `naive_weights.png`), clean:** adversarially trained filters
+  "localized pen-stroke fragments?" → **yes** (all three runs agree); naive filters → **yes**
+  THIS run, vs **no** (2026-08-04 clean) and phrasing-unstable (2026-08-05). Cross-run
+  instability on the naive panel → treated as no evidence either way; the claim
+  ("significantly more localized and interpretable", `tex:523-525`) is qualitative and not
+  gated (§9).
+- **Figure 2 (`logreg_adv.png`), clean:** "readable handwritten digits?" → **no** this run, vs
+  **yes** in both prior runs (the footnote-1 claim that humans read ε=.25-perturbed MNIST
+  "without difficulty", `tex:336-337`). Cross-run instability → recorded as evidence, not gated
+  (§9).
 
-**The reads that carry claims (both runs agree):**
+**The reads that carry claims:**
 
-**Figure 4 left (`eps_curve.pdf`/`eps_curve_raster.png`)** — the one figure carrying quantities
-the prose does not:
-
-- x-axis tick range: **−15 to 15**; y-axis ticks top→bottom: **1000, 500, 0, −500, −1000,
-  −1500, −2000** ("argument to softmax").
-- Line shape: **"piecewise-linear"** (one word) — matches the caption's "conspicuously piecewise
-  linear with ε" (`iclr2015.tex:768`).
-- "Between x=0 and x=15, does any other curve end up above the curve labeled 4?" → **yes** —
-  matches "wrong classifications are stable across a wide region of ε values" (`:769`).
-- At ε = +10: highest curve ≈ **+400**; curve labeled 4 ≈ **−400** (both runs).
-- At ε = −10: highest curve ≈ **+800**; curve labeled 4 ≈ **+200** — i.e. the correct-class
-  curve is below the top wrong-class curve at **both** tails: the thin-manifold claim
-  ("Correct classifications occur only on a thin manifold where x occurs in the data", `:764`).
-- At x=0 the curves are bunched and the color→legend mapping could not be read reliably
-  (one read answered "no" to "is the curve labeled 4 topmost", follow-ups returned empty) —
-  weak evidence, not used: the corresponding claim (c65) is rated `low` and evaluated on a
-  **deterministic** first-common-correct class-4 example (no predicate selection), so it can
-  genuinely fail and does not depend on reading the paper's exact example.
-
-These enter curve claims c65–c70; the `matches` anchors c69 (+400 at ε=+10) and c70 (−400 at
-ε=+10) are rated low compute-invariance with tolerances (±400) covering reading error and
-reproduction spread.
-
-**Figure 4 right (`eps_curve_inputs.png`)** — thumbnail montage of x + ε·sign(∇J) (yellow box
-= still correctly classified, `:771-772`). Grid **10×10** (programmatically confirmed);
-"are the yellow-boxed thumbnails clustered near the middle of the grid rather than at the top or
-bottom edges?" → **yes** (row-major ε from most negative top-left to most positive bottom-right,
-so correct classification survives only near ε ≈ 0 — the thin-manifold claim again). Count of
-yellow boxes itself: the reader returned empty twice; not used. This claim is subsumed by the
-(`low`) curve claims c65–c67 and is not separately gated.
-
-**Figure 5 (`airplane.png`)** — targeted "airplane" fooling montage. Grid **10×10** (100
-samples, programmatically confirmed); "do some thumbnails have a yellow border and others
-not?" → **yes**, consistent with a per-step success rate below 100% for the hardest class
-(24.7%, `:940`); "do the thumbnails look like clearly recognizable photographs of airplanes?" →
-**no** — consistent with the caption's claim that these are fooling images, not rendered real
-airplanes (`:943-945, 956-958`). The gated content is c61–c63 on the CIFAR arm; the montage
-itself adds no number.
-
-**Figure 2 (`logreg_clean.png`, `logreg_adv.png`, `logreg_weights_sign.png`)** — "do these
-images look like readable handwritten digits?" on panel (d) (FGSM ε=.25 adversarial examples) →
-**yes** (both runs) — the caption's claim that humans read such images without difficulty
-(`:336-337`, panel c/d). "Does `sign(w)` show a clearly recognizable handwritten digit
-shape?" → **no** (2026-08-04 clean; 2026-08-05 unstable: one clean **yes**, one deliberated
-lean-**no**) — the caption's "not readily recognizable as having anything to do with the
-relationship between 3s and 7s" (`:450-453`). Qualitative; not gated (§9), recorded as evidence.
-
-**Figure 3 (`naive_weights.png`, `adv_weights.png`)** — "do the filter rows look mostly like
-localized pen-stroke fragments of handwritten digits?": adversarially trained → **yes** (both
-runs, clean); naive → **no** (2026-08-04 clean; 2026-08-05 phrasing-unstable, see above) — the
-paper's "significantly more localized and interpretable" (`:523-524`). Qualitative; not gated
-(§9), recorded as evidence.
+- `matches` anchors c69 (highest curve ≈ +400 at ε=+10) and c70 (class-4 curve ≈ −400 at
+  ε=+10) derive from the figure reads above (`low`, tolerance ±400 covering reading error +
+  reproduction spread).
+- c65–c68 encode the shape facts read cleanly in all three runs: correct-class curve on top at
+  ε=0, below at both tails (thin manifold), and some wrong class ending above on the positive
+  side (stable misclassification region).
+- Figure 4's y-axis is the "argument to softmax" (`tex:767`); the ε trace endpoint grid of the
+  paper reads −15..+15; we sample [−10, +10] where the paper's curves are drawn (a narrower
+  situation set — allowed restriction, G22/§6).
 
 ## 8. claims.json
 
@@ -550,7 +617,15 @@ seed; curve comparisons sample `quantity` — and for `above`/`below`/`crosses` 
 named by `against` — at `x`, with diffs = quantity − against: `above`/`below` = all sampled
 diffs > 0 / < 0; `crosses` = first sampled diff > 0 and last < 0; `increasing` = last > first
 with ≥ 80% of consecutive diffs ≥ 0; `matches` = elementwise within `tolerance`.
-`claims.json` at the repo root is byte-identical to this block (verified by script).
+`claims.json` at the repo root is embedded below (content-identical to this block; enforced by
+the splice script at SPEC authoring time and re-verified 2026-08-06). Besides `arms` and
+`claims`, the top-level **`restrictions`** map gives the §6 per-arm restriction check in
+machine-readable form (`{kind, detail}` per arm; all `narrows_situations`, including the
+not-built `mp_dbm` and `googlenet_imagenet` arms, whose empty evaluated situation set is the
+maximal narrowing).
+
+High-invariance claims (the gate): c03, c06, c07, c13, c16, c23, c28, c32, c33, c36, c43, c44,
+c45, c53. Everything else is reported and never gates.
 
 ```json
 {
@@ -697,6 +772,80 @@ with ≥ 80% of consecutive diffs ≥ 0; `matches` = elementwise within `toleran
     },
     "googlenet_imagenet": {
       "status": "NOT BUILT - see not_tested"
+    }
+  },
+  "restrictions": {
+    "softmax_reg": {
+      "kind": "narrows_situations",
+      "detail": "Same MNIST [0,1] data, full 10,000-example test set, eps=0.25, and the paper's error/confidence/rubbish(any prob > 0.5) metric definitions (iclr2015.tex:333-337, 906-907); no clipping added to FGSM (SPEC G4). Narrowed only in training protocol (30-epoch cap, patience 8; paper silent, SPEC G3) and seed count (3; paper's count unstated). A linear model reaches its plateau quickly, so the core of c01/c03 is budget-insensitive; c02's exact 79.3 confidence rides on fit quality (rated low). Supports c01-c03, c50-c51."
+    },
+    "logreg_3v7": {
+      "kind": "narrows_situations",
+      "detail": "Convex objective exactly as tex:402 on the MNIST 3-vs-7 subset (y in {-1,+1}), full 3v7 test examples, eps=0.25; metric definitions unchanged. Narrowed only in seed count (3; unstated in the paper) and a 30-epoch cap that a converged convex fit does not bind. Supports c04-c07 fully; c07 is algebraic and budget-free."
+    },
+    "maxout_naive": {
+      "kind": "narrows_situations",
+      "detail": "240 units/layer as stated (tex:498); early stop on val_err as stated (tex:501-503) but patience capped 100->8 and epochs capped at 25 (CPU sub-scale); 3 seeds (paper's count unstated). Same MNIST [0,1], full test set, eps=0.25, same error/confidence/rubbish definitions. Supports c09/c10/c13/c46/c47 and the high-invariance directions; tight clean value c08 (0.94 tol 0.3) cannot be separated at this horizon - rated low, reported as cannot-speak if unreached."
+    },
+    "maxout_adv": {
+      "kind": "narrows_situations",
+      "detail": "Adversarial-training objective exactly as tex:486-488 (alpha=0.5, eps=0.25, single shared batch, eval-mode FGSM direction per SPEC G7/G21); same budget caps as maxout_naive (patience 8, 25 epochs, 3 seeds); same datasets, eps, metric definitions. Supports c13 (high ordering, same-architecture version of 89.4 -> 17.9); c11 (0.84 tol 0.25) and c12 horizon-bound, rated low/medium."
+    },
+    "maxout_large_naive": {
+      "kind": "narrows_situations",
+      "detail": "1600 units/layer as stated (tex:498); 6-epoch cap vs the paper's unstated GPU budget; 3 seeds; same data, eps, metric definitions. Supports c15 (medium) and c16 (high ordering vs maxout_large_adv); c17 (clean 1.14 tol 0.3) horizon-bound, rated low."
+    },
+    "maxout_large_adv": {
+      "kind": "narrows_situations",
+      "detail": "1600 units/layer + adversarial training; 5 seeds [0..4] matching the paper's five trials (tex:508-510); early stop on the adversarial validation error as stated (tex:504-505). Narrowed horizon: 6-epoch cap, patience 8 vs the stated patience 100, and in this arm's sub-scale run the paper's Phase-2 retrain-on-60,000 (tex:505-506) is skipped for CPU tractability (the from-scratch retrain protocol is implemented and asserted by tests/test_degeneracy.py::test_retrain_full_60k_is_from_scratch, and transfer_mnist runs it with full60k=True). Same metric definitions and eps. Supports c16 (high) and c14/c20 proportionally to horizon; c18/c19 (0.77-0.83 clean) horizon-bound, rated low, expected to fail at sub-scale."
+    },
+    "maxout_sigmoid": {
+      "kind": "narrows_situations",
+      "detail": "Maxout backbone + 10 independent sigmoid outputs per tex:909; training as maxout_naive (same caps, 3 seeds). Rubbish rule unchanged: any independent sigmoid > 0.5 on x ~ N(0, I784), 10,000 samples (tex:905-907). Supports c48/c49 (low)."
+    },
+    "noise_rademacher": {
+      "kind": "narrows_situations",
+      "detail": "maxout_naive config + per-pixel eps*{-1,+1} noise during training per tex:555-556, resampled per minibatch (cadence unstated in the paper, SPEC G16); same epoch/patience caps and seeds; eval unchanged (FGSM eps=0.25 on the full test set). Supports c24 (medium), c25 (low), and c28 (high ordering, via min of both noise arms vs maxout_large_adv)."
+    },
+    "noise_uniform": {
+      "kind": "narrows_situations",
+      "detail": "maxout_naive config + per-pixel U(-0.25, 0.25) noise per tex:556, resampled per minibatch (SPEC G16); same budget caps and seeds; eval unchanged. Supports c26 (medium), c27 (low), c28 (high)."
+    },
+    "l1_maxout": {
+      "kind": "narrows_situations",
+      "detail": "L1 weight decay coefficient 0.0025 applied to the FIRST layer exactly as tex:429-430; same budget caps; train_err definition unchanged (percent on the training set). Negative control only. Supports c64 (medium: train err > 5%)."
+    },
+    "rbf_shallow": {
+      "kind": "narrows_situations",
+      "detail": "Shallow 10-unit RBF, no hidden layer, p_k = exp((x - mu_k)' beta_k (x - mu_k)) per tex:595 with beta_k negative-semidefinite (SPEC G8; training recipe unstated in the paper - filled in, logged as ours). Same MNIST eval, eps=0.25, confidence = max_k p_k with rows NOT renormalized (the only reading under which 1.2% confidence on mistakes is possible). Supports c29 (medium), c32/c33 (high orderings), c52/c53 (rubbish), c30/c31 (low)."
+    },
+    "ensemble12": {
+      "kind": "narrows_situations",
+      "detail": "12 members with distinct seeds as stated (tex:819-821); narrowed per-member budget (8 epochs each) and 3 seed-sets. Attack target = mean-logits ensemble cross-entropy and single-member = member 0: both unstated in the paper (SPEC G9 fill-ins, not metric redefinitions); decision by mean-probability argmax; error definitions unchanged. Supports c34/c35 (medium), c36 (high), c37 (medium) - which is why the ensemble value claims are medium, not high."
+    },
+    "agreement_mnist": {
+      "kind": "narrows_situations",
+      "detail": "Reuses this run's maxout_naive (FGSM generator) + softmax_reg + rbf_shallow of the same seed (inherits their budgets, 3 seeds). Agreement metric exactly as tex:682-688: share of maxout mistakes where the other model predicts maxout's class; *_cond conditioned on both models wrong; rbf-on-softmax conditioned likewise (SPEC G15). Supports c38-c42 values (medium/low) and c43/c44/c45 (high directions / far-above-chance existence)."
+    },
+    "transfer_mnist": {
+      "kind": "narrows_situations",
+      "detail": "Pair = (maxout_large_naive, maxout_large_adv); which architecture size the paper means is unstated (SPEC G13 permits either) - took the 1600-unit pair. This arm DOES run the paper's from-scratch 60k retrain (full60k=True) but at the 6-epoch sub-scale cap; eps=0.25 and error definitions unchanged; 3 seed-pairs. Supports c21/c22 (medium, tol 8-10) and c23 (high ordering)."
+    },
+    "eps_trace": {
+      "kind": "narrows_situations",
+      "detail": "Same one-example scope as the paper's illustrative Fig.4 (tex:768): one DETERMINISTIC example - the lowest-index class-4 test example all seed models classify correctly - chosen by index with NO selection on the claim predicates (SPEC G22). eps axis narrowed from the figure's -15..+15 to -10..+10 sampled at 21 points (a strict subset of the paper's situations); FGSM direction fixed at eps=0; curve comparison definitions unchanged. Supports c65-c70, all rated low (single illustrative example); the c69/c70 magnitude anchors carry tol +-400 covering figure-reading error plus reproduction spread."
+    },
+    "cifar_conv_maxout": {
+      "kind": "narrows_situations",
+      "detail": "CIFAR-10 GCN-preprocessed to std ~0.5 as footnote 2 requires (tex:343-345). Conv-maxout architecture wholly unstated in the paper - ours, logged (SPEC G20: a fill-in of an unstated architecture, not a metric change); patience 5, 25-epoch cap, 3 seeds. eps=0.1 as stated; rubbish rule (any prob > 0.5 on 1,000 N(0, I3072) samples, tex:911) and targeted-fooling success rule (p(y = i | x) > 0.5, tex:955-956) unchanged; 1,000 samples per class for fooling. Supports c56-c63, all medium/low - none gate."
+    },
+    "mp_dbm": {
+      "kind": "narrows_situations",
+      "detail": "NOT BUILT (SPEC section 9): a multi-prediction deep Boltzmann machine is outside this reproduction's compute scope. The evaluated situation set is empty; its claims (clean 0.88% tex:794, FGSM eps=.25 -> 97.5% tex:800) are recorded under not_tested and nothing is reported under the paper's name for it. No metric is redefined because nothing is measured."
+    },
+    "googlenet_imagenet": {
+      "kind": "narrows_situations",
+      "detail": "NOT BUILT (SPEC section 9): the Fig.1 demo (tex:364-383) needs pretrained GoogLeNet + an ImageNet pipeline; it is illustrative and not load-bearing for the paper's argument. Empty evaluated situation set; recorded under not_tested; no metric redefined."
     }
   },
   "claims": [
@@ -1928,8 +2077,8 @@ apply, why:
   the loss); c07 checks the corrected form, not the paper's. The paper hands this identity to us
   for free modulo that sign slip.
 - **Invariants from the maths:** `‖η‖_∞ == ε` exactly (tex:309); `sign(0) := 0`; no clipping of
-  x̃ (§4.9); `wᵀsign(w) = ‖w‖₁` (tex:407); softmax rows sum to 1 while RBF rows need NOT
-  (§4.4 — the latter is what makes "confidence on mistakes 1.2%" possible); a non-negative loss
+  x̃ (§4, G4); `wᵀsign(w) = ‖w‖₁` (tex:407); softmax rows sum to 1 while RBF rows need NOT
+  (§4, G8 — the latter is what makes "confidence on mistakes 1.2%" possible); a non-negative loss
   never goes negative; with the FGSM direction fixed at ε=0 the logits of a linear-activation
   network are exactly piecewise linear in ε (tex:762-770). All asserted in unit tests.
 - **Planting a known structure in synthetic input (eps trace, c65–c70):** the Figure 4 curve
@@ -1976,8 +2125,11 @@ apply, why:
 - **Fig. 1 ImageNet demo** (panda 57.7% → gibbon 99.3% at ε=.007; `:364-383`): illustrative;
   needs pretrained GoogLeNet + ImageNet pipeline; not load-bearing for the paper's argument.
 - **Fig. 3 weight localization** ("significantly more localized and interpretable", `:523-525`):
-  qualitative; the paper defines no metric. Figure-read evidence recorded in §7.
-- **Fig. 2 visual resemblance** of w vs sign(w) (`:447-453`): qualitative. §7 records the read.
+  qualitative; the paper defines no metric. Figure-read evidence recorded in §7 (this run's
+  naive-panel read is inconsistent with the 2026-08-04 read — cross-run instability, hence
+  doubly unfit for gating).
+- **Fig. 2 visual resemblance** of w vs sign(w) (`:447-453`) and of ε=.25 adversarial digits
+  (`:336-337`): qualitative; §7 records the reads (also cross-run unstable this time round).
 - **Rotational / scaled-gradient perturbation training weaker than FGSM adversarial training**
   (`:559-565`): paper reports no numbers ("did not find nearly as powerful of a regularizing
   result").

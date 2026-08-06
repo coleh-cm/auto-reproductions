@@ -2,7 +2,10 @@
   "mutations": [
     {
       "id": "mut_fgsm_clip",
-      "covers": ["core", "degeneracy"],
+      "covers": [
+        "core",
+        "degeneracy"
+      ],
       "file": "attack.py",
       "find": "    return (x + eta).detach()",
       "replace": "    return (x + eta).clamp(0.0, 1.0).detach()",
@@ -10,7 +13,9 @@
     },
     {
       "id": "mut_fgsm_eps_scale",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "attack.py",
       "find": "    eta = eps * torch.sign(g)\n    return (x + eta).detach()",
       "replace": "    eta = eps * 0.5 * torch.sign(g)\n    return (x + eta).detach()",
@@ -18,7 +23,10 @@
     },
     {
       "id": "mut_adv_leak_grad",
-      "covers": ["core", "degeneracy"],
+      "covers": [
+        "core",
+        "degeneracy"
+      ],
       "file": "train.py",
       "find": "        eta = eps * torch.sign(g)\n        return (x + eta).detach()",
       "replace": "        eta = -eps * torch.sign(g)  # BUG: wrong-sign perturbation helps the model\n        return (x + eta).detach()",
@@ -26,7 +34,9 @@
     },
     {
       "id": "mut_adv_eps0_no_shortcircuit",
-      "covers": ["degeneracy"],
+      "covers": [
+        "degeneracy"
+      ],
       "file": "train.py",
       "find": "    if eps == 0.0:\n        return x  # degeneracy: eps=0 noise is a true no-op (no RNG consumed)",
       "replace": "    if eps == 0.0:\n        torch.randint(0, 2, x.shape, generator=gen)  # consume RNG even at eps=0",
@@ -34,7 +44,9 @@
     },
     {
       "id": "mut_logreg_analytic_sign",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "tests/test_invariants.py",
       "find": "    margin = eps * w1 - yf * (x @ w + b)\n    analytic = float(torch.nn.functional.softplus(margin).mean().item())",
       "replace": "    margin = yf * (eps * w1 - (x @ w + b))  # BUG: paper tex:411 slipped form (fails for y=-1)\n    analytic = float(torch.nn.functional.softplus(margin).mean().item())",
@@ -42,7 +54,9 @@
     },
     {
       "id": "mut_adv_train_dropout_mode",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "train.py",
       "find": "    was_training = model.training\n    model.eval()\n    try:",
       "replace": "    was_training = model.training\n    # BUG: keep dropout ON for the in-training attack (zeroes grad on masked pixels)\n    try:",
@@ -50,7 +64,9 @@
     },
     {
       "id": "mut_rbf_softmax_norm",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "models.py",
       "find": "        return torch.exp(self.logits(x))  # [B, K] in (0, 1], rows need NOT sum to 1",
       "replace": "        return torch.softmax(self.logits(x), dim=-1)  # rows sum to 1",
@@ -58,7 +74,9 @@
     },
     {
       "id": "mut_softmax_not_sum1",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "models.py",
       "find": "    def prob(self, x):\n        return F.softmax(self.logits(x), dim=-1)\n\n    def loss(self, x, y):\n        logits = self.logits(x)\n        y = y.to(torch.long).view(-1)\n        return F.cross_entropy(logits, y)\n\n    def predict(self, x):\n        return self.prob(x).argmax(dim=-1).to(torch.long)\n\n    def confidence(self, x):\n        return self.prob(x).max(dim=-1).values\n\n\n# ---------------------------------------------------------------------------\n# Binary logistic regression",
       "replace": "    def prob(self, x):\n        return torch.sigmoid(self.logits(x))  # BUG: not normalized\n\n    def loss(self, x, y):\n        logits = self.logits(x)\n        y = y.to(torch.long).view(-1)\n        return F.cross_entropy(logits, y)\n\n    def predict(self, x):\n        return self.prob(x).argmax(dim=-1).to(torch.long)\n\n    def confidence(self, x):\n        return self.prob(x).max(dim=-1).values\n\n\n# ---------------------------------------------------------------------------\n# Binary logistic regression",
@@ -66,7 +84,9 @@
     },
     {
       "id": "mut_eps_trace_direction_per_eps",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "attack.py",
       "find": "    direction = torch.sign(g)  # [1, D] (or [B,D]); fixed\n    eps_grid = torch.as_tensor(eps_grid, dtype=torch.float32).view(-1, 1, 1)  # [E,1,1]\n    x_exp = x.unsqueeze(0)  # [1,B,D]\n    x_eps = x_exp + eps_grid * direction.unsqueeze(0)  # [E,B,D]",
       "replace": "    # BUG: recompute direction at each eps (not fixed at eps=0)\n    eps_grid = torch.as_tensor(eps_grid, dtype=torch.float32).view(-1, 1, 1)\n    x_exp = x.unsqueeze(0)\n    outs = []\n    for e in eps_grid[:,0,0]:\n        xt = (x + e).clone().detach().requires_grad_(True)\n        lt = model.loss(xt, y_t)\n        gt = torch.autograd.grad(lt, xt, create_graph=False)[0]\n        outs.append(model.logits(x + e * torch.sign(gt)))\n    logits = torch.stack(outs, dim=0).squeeze(1)\n    return logits",
@@ -74,11 +94,53 @@
     },
     {
       "id": "mut_empty_input_silent",
-      "covers": ["core"],
+      "covers": [
+        "core"
+      ],
       "file": "models.py",
       "find": "    if x.numel() == 0:\n        raise ValueError(f\"empty {name}\")\n    return x.float()",
       "replace": "    if x.numel() == 0:\n        return x  # BUG: pass empty through silently\n    return x.float()",
       "must_fail": "tests/test_invariants.py::test_empty_input_raises"
+    },
+    {
+      "id": "mut_agreement_rbf_on_softmax_uses_softmax_fgsm",
+      "covers": [
+        "core"
+      ],
+      "file": "run_all_arms.py",
+      "find": "    ag_rbf_on_sm = ev.agreement(softmax_model, rbf_model, x_adv, y_test)",
+      "replace": "    x_adv_sm = attack.fgsm(softmax_model, x_test, y_test, EPS_MNIST)  # BUG: wrong example set\n    ag_rbf_on_sm = ev.agreement(softmax_model, rbf_model, x_adv_sm, y_test)",
+      "must_fail": "tests/test_invariants.py::test_agreement_rbf_on_softmax_uses_maxout_fgsm_examples"
+    },
+    {
+      "id": "mut_transfer_mnist_skips_60k_retrain",
+      "covers": [
+        "core"
+      ],
+      "file": "run_all_arms.py",
+      "find": "                elif arm == \"transfer_mnist\":\n                    d = _torch_data(data.load_mnist(s))\n                    ln, _ = _train_maxout(1600, s, d, epochs=EPOCHS_MAXOUT1600)\n                    la, _ = _train_maxout(1600, s, d, adversarial=True,\n                                          monitor=\"adv_val_err\", epochs=EPOCHS_MAXOUT1600, full60k=True)",
+      "replace": "                elif arm == \"transfer_mnist\":\n                    d = _torch_data(data.load_mnist(s))\n                    ln, _ = _train_maxout(1600, s, d, epochs=EPOCHS_MAXOUT1600)\n                    la, _ = _train_maxout(1600, s, d, adversarial=True,\n                                          monitor=\"adv_val_err\", epochs=EPOCHS_MAXOUT1600, full60k=False)",
+      "must_fail": "tests/test_invariants.py::test_transfer_mnist_main_runs_full60k_retrain"
+    },
+    {
+      "id": "mut_ensemble_loss_mean_logits",
+      "covers": [
+        "core"
+      ],
+      "file": "models.py",
+      "find": "        p_mean = self.prob(x)\n        y = y.to(torch.long).view(-1)\n        logp = torch.log(p_mean.gather(1, y.unsqueeze(1)).squeeze(1) + 1e-12)\n        return (-logp).mean()",
+      "replace": "        logits = self.logits(x)\n        return F.cross_entropy(logits, y.to(torch.long).view(-1))",
+      "must_fail": "tests/test_invariants.py::test_ensemble_loss_is_mean_prob_nll"
+    },
+    {
+      "id": "mut_logreg_confidence_p_y_plus_one",
+      "covers": [
+        "core"
+      ],
+      "file": "models.py",
+      "find": "        m = self.margin(x)\n        return torch.sigmoid(m.abs())  # [B] confidence on predicted class",
+      "replace": "        return torch.sigmoid(self.margin(x))  # [B] confidence on predicted class",
+      "must_fail": "tests/test_invariants.py::test_logreg_confidence_on_predicted_class"
     }
   ]
 }
