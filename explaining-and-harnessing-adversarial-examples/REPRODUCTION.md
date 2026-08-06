@@ -18,7 +18,9 @@ Reference material is on disk and verified:
       `iclr2015.bbl` tracked and committed; everything else from the unpack is
       gitignored (`.gitignore` tracks only `.tex`/`.bbl`/`.bib` under
       `paper/source/`, ignores tarballs/figures)
-- [ ] SPEC.md (this run)
+- [x] SPEC.md (this run) — rewritten 2026-08-06, all 70 claim quotes re-verified verbatim
+      against `paper/source/iclr2015.tex`; claims.json spliced byte-content-identical;
+      this run's figure reads in `figures/read-figure_2026-08-06.jsonl`
 - [ ] Implementation runs end-to-end
 - [ ] Adversarial review loop clean
 - [ ] Readiness gates
@@ -67,3 +69,18 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
 - 2026-08-06 — Setup: repo cloned (shallow, blobless), branch
   `repro/explaining-and-harnessing-adversarial-examples` created and pushed,
   paper + LaTeX source verified on disk, this file started.
+- 2026-08-06 — SPEC step. Re-downloaded the arXiv e-print `1412.6572`; the on-disk
+  `.tex`/`.bbl` are byte-identical to the fresh download, and the figure files are now
+  preserved at `figures/paper/` (`eps_curve.pdf` rasterized to
+  `figures/paper/eps_curve_raster.png`, 220 dpi). Upstream code re-checked live (GitHub
+  title search: 13 attack-only third-party repos; `goodfeli/adversarial` = GAN code;
+  pylearn2 maxout dir = maxout-paper configs, no FGSM-training code; `mnist_pi.yaml`
+  fetched as fill-in provenance for §4). Wrote `SPEC.md` fresh: method algorithm, symbols
+  with shapes, 9 cited equations, gap analysis G1–G24 with permitted/weakest readings,
+  fixed interfaces, per-arm restriction log, figure readings. Figure reads for this run in
+  `figures/read-figure_2026-08-06.jsonl` (12 exchanges; 4 value reads flagged as
+  deliberation → weak evidence, consistent with prior clean reads; two cross-run-unstable
+  reads recorded as unfit for gating). `claims.json` carried forward because every one of
+  its 70 quotes re-verified verbatim at its cited line on 2026-08-06 (script: 0 failures;
+  14 high-invariance claims gate; seeds [0,1,2], maxout_large_adv [0..4] per the paper's
+  five trials). SPEC §8 embeds claims.json content-identically (script-enforced).
