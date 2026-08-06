@@ -451,3 +451,38 @@ def test_conv_maxout_has_no_post_relu():
     code = "\n".join(code_lines)
     assert not re.search(r"\brelu\s*\(", code), \
         "ConvMaxoutCIFAR.forward_features calls relu() (should be pure maxout)"
+
+
+def test_agreement_rbf_on_softmax_uses_maxout_fgsm_examples():
+    """agree_rbf_on_softmax (paper 53.6%, tex:688) must be computed on the SAME
+    maxout-FGSM examples as agree_rbf_cond (54.3%, tex:686) and with both-wrong
+    conditioning on (softmax, rbf). The paper's 53.6 is a direct comparison to
+    54.3 (RBF predicts softmax's class vs RBF predicts maxout's class); only on
+    a shared example set is the 53.6 approx 54.3 closeness the evidence of the
+    RBF's strong linear component. An earlier version generated fresh
+    softmax-FGSM examples, which measured ~1.5 percent and inverted the paper's
+    conclusion. Asserts the arm does NOT call attack.fgsm on the softmax model."""
+    import inspect
+    import run_all_arms as R
+    src = inspect.getsource(R.arm_agreement_mnist)
+    assert "attack.fgsm(softmax_model" not in src, \
+        "arm_agreement_mnist recomputes FGSM on the softmax model; agree_rbf_on_softmax must use the maxout-FGSM x_adv"
+    assert "ev.agreement(softmax_model, rbf_model, x_adv, y_test)" in src, \
+        "agree_rbf_on_softmax must be ev.agreement(softmax_model, rbf_model, x_adv, y_test) on maxout-FGSM examples"
+
+
+def test_transfer_mnist_main_runs_full60k_retrain():
+    """transfer_mnist in main() must train large_adv with full60k=True, matching
+    the paper's from-scratch 60k retrain (tex:505-506) and the arm's own
+    restriction doc (claims.json: transfer_mnist runs full60k=True). An earlier
+    main() override used full60k=False, contradicting both."""
+    import inspect
+    import run_all_arms as R
+    src = inspect.getsource(R.main)
+    idx = src.find("transfer_mnist")
+    assert idx >= 0, "transfer_mnist block not found in main()"
+    block = src[idx:idx + 400]
+    assert "full60k=True" in block, \
+        "transfer_mnist in main() must use full60k=True (paper tex:505-506 60k retrain); got:\n" + block
+    assert "full60k=False" not in block, \
+        "transfer_mnist in main() must NOT use full60k=False:\n" + block

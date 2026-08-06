@@ -359,9 +359,14 @@ def arm_agreement_mnist(seed, maxout_naive_model=None, softmax_model=None, rbf_m
     x_adv = attack.fgsm(maxout_naive_model, x_test, y_test, EPS_MNIST)
     ag_sm = ev.agreement(maxout_naive_model, softmax_model, x_adv, y_test)
     ag_rbf = ev.agreement(maxout_naive_model, rbf_model, x_adv, y_test)
-    # rbf predicting softmax's class (both-wrong conditioned, SPEC §4.17)
-    x_adv_sm = attack.fgsm(softmax_model, x_test, y_test, EPS_MNIST)
-    ag_rbf_on_sm = ev.agreement(softmax_model, rbf_model, x_adv_sm, y_test)
+    # rbf predicting softmax's class, on the SAME maxout-FGSM examples x_adv as
+    # the preceding agreement metrics, both-wrong conditioned (SPEC §4.17). The
+    # paper's 53.6% (tex:688) is a direct comparison to 54.3% (tex:686, rbf
+    # predicts maxout's class): both numbers must share the example set + the
+    # both-wrong conditioning for the 53.6≈54.3 closeness to be the evidence of
+    # the RBF's "strong linear component". Using softmax-FGSM examples instead
+    # broke this (measured ~1.5%, inverting the paper's conclusion).
+    ag_rbf_on_sm = ev.agreement(softmax_model, rbf_model, x_adv, y_test)
     return {"agree_softmax_all": ag_sm["agree_all"], "agree_softmax_cond": ag_sm["agree_cond"],
             "agree_rbf_all": ag_rbf["agree_all"], "agree_rbf_cond": ag_rbf["agree_cond"],
             "agree_rbf_on_softmax": ag_rbf_on_sm["agree_cond"]}
@@ -641,7 +646,7 @@ def main():
                     d = _torch_data(data.load_mnist(s))
                     ln, _ = _train_maxout(1600, s, d, epochs=EPOCHS_MAXOUT1600)
                     la, _ = _train_maxout(1600, s, d, adversarial=True,
-                                          monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=False)
+                                          monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=True)
                     res = fn(s, large_naive=ln, large_adv=la)
                 else:
                     res = fn(s)

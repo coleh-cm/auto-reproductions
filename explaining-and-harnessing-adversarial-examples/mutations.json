@@ -79,6 +79,22 @@
       "find": "    if x.numel() == 0:\n        raise ValueError(f\"empty {name}\")\n    return x.float()",
       "replace": "    if x.numel() == 0:\n        return x  # BUG: pass empty through silently\n    return x.float()",
       "must_fail": "tests/test_invariants.py::test_empty_input_raises"
+    },
+    {
+      "id": "mut_agreement_rbf_on_softmax_uses_softmax_fgsm",
+      "covers": ["core"],
+      "file": "run_all_arms.py",
+      "find": "    ag_rbf_on_sm = ev.agreement(softmax_model, rbf_model, x_adv, y_test)",
+      "replace": "    x_adv_sm = attack.fgsm(softmax_model, x_test, y_test, EPS_MNIST)  # BUG: wrong example set\n    ag_rbf_on_sm = ev.agreement(softmax_model, rbf_model, x_adv_sm, y_test)",
+      "must_fail": "tests/test_invariants.py::test_agreement_rbf_on_softmax_uses_maxout_fgsm_examples"
+    },
+    {
+      "id": "mut_transfer_mnist_skips_60k_retrain",
+      "covers": ["core"],
+      "file": "run_all_arms.py",
+      "find": "                elif arm == \"transfer_mnist\":\n                    d = _torch_data(data.load_mnist(s))\n                    ln, _ = _train_maxout(1600, s, d, epochs=EPOCHS_MAXOUT1600)\n                    la, _ = _train_maxout(1600, s, d, adversarial=True,\n                                          monitor=\"adv_val_err\", epochs=EPOCHS_MAXOUT1600, full60k=True)",
+      "replace": "                elif arm == \"transfer_mnist\":\n                    d = _torch_data(data.load_mnist(s))\n                    ln, _ = _train_maxout(1600, s, d, epochs=EPOCHS_MAXOUT1600)\n                    la, _ = _train_maxout(1600, s, d, adversarial=True,\n                                          monitor=\"adv_val_err\", epochs=EPOCHS_MAXOUT1600, full60k=False)",
+      "must_fail": "tests/test_invariants.py::test_transfer_mnist_main_runs_full60k_retrain"
     }
   ]
 }
