@@ -141,7 +141,7 @@ unstated `s` or on the grad-mode choice. The 5 high structural invariants
 all reproduce under the literal arm.
 
 Run the tests to verify the no-op = baseline claim without trusting the
-implementation: `pytest -q` → 53 passed. See `REPRODUCTION.md` for the full
+implementation: `pytest -q` → 54 passed. See `REPRODUCTION.md` for the full
 measured-vs-claimed table and the literal-vs-detached analysis.
 
 ## Quickstart
