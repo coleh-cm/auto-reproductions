@@ -363,6 +363,12 @@ Written to `claims.json` at the reproduction-folder root (what the numbers gate 
 Re-verified 2026-08-06: all 12 quotes verbatim against `paper/paper.md` under the
 normalization below; seeds `[0, 1, 2]` (the paper uses only seed 0, `:385`; seeds 1/2 are
 the seed-robustness expansion of §6); two arms per §6 with per-arm `config` and `metrics`;
+a top-level machine-readable **`restrictions` map** keyed by arm —
+`{"<arm>": {"kind": "none"|"narrows_situations"|"changes_correctness", "detail": ...}}`
+(`baseline` → `none`: the unstated knobs are inert at `λ=0`, and the extra seeds expand
+situations without touching correctness; `cwsd` → `narrows_situations`: one point of the
+paper's permitted `(s, grad-mode)` region is gated, the criterion untouched, the
+neighbourhood reported by the sweep) — mirroring §6's prose restriction check;
 an `evaluation` block documenting resolution semantics and verdict rules; 9 claims;
 `not_tested`.
 
