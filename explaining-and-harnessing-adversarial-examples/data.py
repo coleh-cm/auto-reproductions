@@ -210,8 +210,10 @@ def load_mnist_3v7(seed=0):
 # raw sum. This is the CIFAR analogue of the MNIST checksum: it rejects a
 # synthetic / wrong-corpus substitute at the source (the closed-book failure
 # mode). Tolerances absorb float32 pairwise-summation order across numpy builds.
-_CIFAR_RAW_TRAIN_SUM = 10233636416.0   # sum of uint8 pixels over the 50k train images
-_CIFAR_RAW_TEST_SUM = 2046821888.0     # sum of uint8 pixels over the 10k test images
+# Computed from the canonical cs.toronto.edu CIFAR-10 tar (the real corpus):
+# sum of uint8 pixels over all 50000 train / 10000 test images, before any GCN.
+_CIFAR_RAW_TRAIN_SUM = 18540682003.0
+_CIFAR_RAW_TEST_SUM = 3733375634.0
 
 
 def _load_cifar_raw():

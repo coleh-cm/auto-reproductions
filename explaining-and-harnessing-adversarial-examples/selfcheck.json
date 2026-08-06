@@ -1,8 +1,8 @@
 {
   "produced_by": "selfcheck_claims.py",
   "summary": {
-    "total": 70,
-    "pass": 46,
+    "total": 69,
+    "pass": 45,
     "fail": 24,
     "blocked": 0,
     "high": {
@@ -16,7 +16,7 @@
       "blocked": 0
     },
     "low": {
-      "pass": 16,
+      "pass": 15,
       "fail": 14,
       "blocked": 0
     },
@@ -382,17 +382,17 @@
           3,
           4
         ],
-        "mean": 19.210000038146973,
+        "mean": 11.145999878644943,
         "per_seed": [
-          17.749999463558197,
-          17.810000479221344,
-          13.71999979019165,
-          23.589999973773956,
-          23.180000483989716
+          5.779999867081642,
+          8.829999715089798,
+          24.959999322891235,
+          10.890000313520432,
+          5.270000174641609
         ],
         "claimed": 17.9,
         "tolerance": 8.0,
-        "abs_diff": 1.310000038146974
+        "abs_diff": 6.754000121355055
       }
     },
     {
@@ -433,17 +433,17 @@
         "per_seed": [
           {
             "seed": 0,
-            "value": 76.68000012636185,
+            "value": 88.6499997228384,
             "ok": true
           },
           {
             "seed": 1,
-            "value": 76.78000181913376,
+            "value": 85.7600025832653,
             "ok": true
           },
           {
             "seed": 2,
-            "value": 79.08999919891357,
+            "value": 67.84999966621399,
             "ok": true
           }
         ],
@@ -530,17 +530,17 @@
           3,
           4
         ],
-        "mean": 2.3339999839663506,
+        "mean": 1.7359999753534794,
         "per_seed": [
-          2.539999969303608,
-          2.6200000196695328,
-          1.9099999219179153,
-          2.380000054836273,
-          2.2199999541044235
+          1.489999983459711,
+          1.549999974668026,
+          2.7400000020861626,
+          1.5699999406933784,
+          1.3299999758601189
         ],
         "claimed": 0.782,
         "tolerance": 0.15,
-        "abs_diff": 1.5519999839663505
+        "abs_diff": 0.9539999753534794
       }
     },
     {
@@ -557,17 +557,17 @@
           3,
           4
         ],
-        "mean": 69.99091386795044,
+        "mean": 71.71699047088623,
         "per_seed": [
-          70.41061520576477,
-          68.59280467033386,
-          68.58791708946228,
-          71.76074385643005,
-          70.60248851776123
+          70.44076323509216,
+          74.57649111747742,
+          70.36280632019043,
+          72.15753197669983,
+          71.04735970497131
         ],
         "claimed": 81.4,
         "tolerance": 12.0,
-        "abs_diff": 11.409086132049566
+        "abs_diff": 9.683009529113775
       }
     },
     {
@@ -755,17 +755,17 @@
         "per_seed": [
           {
             "seed": 0,
-            "value": 71.16000205278397,
+            "value": 83.13000164926052,
             "ok": true
           },
           {
             "seed": 1,
-            "value": 70.64000219106674,
+            "value": 79.62000295519829,
             "ok": true
           },
           {
             "seed": 2,
-            "value": 72.82999753952026,
+            "value": 61.58999800682068,
             "ok": true
           }
         ],
@@ -917,15 +917,15 @@
           1,
           2
         ],
-        "mean": 93.19666822751363,
+        "mean": 98.05333216985066,
         "per_seed": [
-          93.30000281333923,
-          92.79000163078308,
-          93.50000023841858
+          98.46000075340271,
+          97.82999753952026,
+          97.86999821662903
         ],
         "claimed": 91.1,
         "tolerance": 8.0,
-        "abs_diff": 2.096668227513632
+        "abs_diff": 6.953332169850668
       }
     },
     {
@@ -940,15 +940,15 @@
           1,
           2
         ],
-        "mean": 91.26000006993611,
+        "mean": 92.04000035921733,
         "per_seed": [
-          89.99000191688538,
+          92.330002784729,
           91.11999869346619,
           92.66999959945679
         ],
         "claimed": 87.9,
         "tolerance": 8.0,
-        "abs_diff": 3.360000069936106
+        "abs_diff": 4.140000359217325
       }
     },
     {
@@ -966,17 +966,17 @@
         "per_seed": [
           {
             "seed": 0,
-            "value": 91.73000287264585,
+            "value": 96.98000075295568,
             "ok": true
           },
           {
             "seed": 1,
-            "value": 91.28000158816576,
+            "value": 96.31999749690294,
             "ok": true
           },
           {
             "seed": 2,
-            "value": 91.94000028073788,
+            "value": 96.30999825894833,
             "ok": true
           }
         ],
@@ -998,17 +998,17 @@
         "per_seed": [
           {
             "seed": 0,
-            "value": 3.3100008964538574,
+            "value": 6.129997968673706,
             "ok": true
           },
           {
             "seed": 1,
-            "value": 1.6700029373168945,
+            "value": 6.709998846054077,
             "ok": true
           },
           {
             "seed": 2,
-            "value": 0.830000638961792,
+            "value": 5.199998617172241,
             "ok": true
           }
         ],
@@ -1484,15 +1484,15 @@
           1,
           2
         ],
-        "mean": 99.15333390235901,
+        "mean": 97.243332862854,
         "per_seed": [
-          98.72999787330627,
-          99.08000230789185,
-          99.6500015258789
+          97.2000002861023,
+          95.69000005722046,
+          98.83999824523926
         ],
         "claimed": 87.15,
         "tolerance": 10.0,
-        "abs_diff": 12.003333902359003
+        "abs_diff": 10.093332862853998
       }
     },
     {
@@ -1507,15 +1507,15 @@
           1,
           2
         ],
-        "mean": 89.54139947891235,
+        "mean": 93.88069113095601,
         "per_seed": [
-          90.00735878944397,
-          90.96987247467041,
-          87.64696717262268
+          93.54912042617798,
+          96.24005556106567,
+          91.85289740562439
         ],
         "claimed": 96.6,
         "tolerance": 8.0,
-        "abs_diff": 7.058600521087641
+        "abs_diff": 2.719308869043985
       }
     },
     {
@@ -1530,15 +1530,15 @@
           1,
           2
         ],
-        "mean": 98.03333282470703,
+        "mean": 99.3666668732961,
         "per_seed": [
           100.0,
-          96.20000123977661,
-          97.89999723434448
+          98.1000006198883,
+          100.0
         ],
         "claimed": 93.4,
         "tolerance": 8.0,
-        "abs_diff": 4.633332824707026
+        "abs_diff": 5.9666668732960915
       }
     },
     {
@@ -1546,22 +1546,22 @@
       "kind": "value",
       "compute_invariance": "low",
       "citation": "paper/source/iclr2015.tex:912",
-      "verdict": "pass",
+      "verdict": "fail",
       "detail": {
         "seeds_evaluated": [
           0,
           1,
           2
         ],
-        "mean": 91.57806634902954,
+        "mean": 97.07951943079631,
         "per_seed": [
-          99.99153017997742,
-          84.34426784515381,
-          90.3984010219574
+          99.30864572525024,
+          91.94287657737732,
+          99.98703598976135
         ],
         "claimed": 84.4,
         "tolerance": 10.0,
-        "abs_diff": 7.178066349029535
+        "abs_diff": 12.679519430796304
       }
     },
     {
@@ -1576,15 +1576,15 @@
           1,
           2
         ],
-        "mean": 52.513333114717774,
+        "mean": 49.4266667671036,
         "per_seed": [
-          35.00999951735139,
-          81.43999963998795,
-          41.090000186813995
+          58.62000029417686,
+          66.70000029611401,
+          22.95999971101992
         ],
         "claimed": 75.3,
         "tolerance": 20.0,
-        "abs_diff": 22.786666885282223
+        "abs_diff": 25.8733332328964
       }
     },
     {
@@ -1592,22 +1592,22 @@
       "kind": "value",
       "compute_invariance": "low",
       "citation": "paper/source/iclr2015.tex:940",
-      "verdict": "fail",
+      "verdict": "pass",
       "detail": {
         "seeds_evaluated": [
           0,
           1,
           2
         ],
-        "mean": 45.99999927838022,
+        "mean": 11.60000009695068,
         "per_seed": [
-          43.299999833106995,
-          94.59999799728394,
-          0.10000000474974513
+          0.10000000474974513,
+          34.700000286102295,
+          0.0
         ],
         "claimed": 24.7,
         "tolerance": 15.0,
-        "abs_diff": 21.299999278380223
+        "abs_diff": 13.09999990304932
       }
     },
     {
@@ -1625,8 +1625,8 @@
         "per_seed": [
           {
             "seed": 0,
-            "value": false,
-            "ok": false
+            "value": true,
+            "ok": true
           },
           {
             "seed": 1,
@@ -1635,8 +1635,8 @@
           },
           {
             "seed": 2,
-            "value": true,
-            "ok": true
+            "value": false,
+            "ok": false
           }
         ]
       }
@@ -1666,8 +1666,8 @@
           },
           {
             "seed": 2,
-            "value": false,
-            "ok": false
+            "value": true,
+            "ok": true
           }
         ]
       }
@@ -1699,44 +1699,6 @@
             "seed": 2,
             "value": true,
             "ok": true
-          }
-        ]
-      }
-    },
-    {
-      "id": "c65",
-      "kind": "curve",
-      "compute_invariance": "low",
-      "citation": "paper/source/iclr2015.tex:764",
-      "verdict": "pass",
-      "detail": {
-        "seeds_evaluated": [
-          0,
-          1,
-          2
-        ],
-        "comparison": "above",
-        "per_seed": [
-          {
-            "seed": 0,
-            "ok": true,
-            "n_samples": 1,
-            "q_first": 18.931039810180664,
-            "q_last": 18.931039810180664
-          },
-          {
-            "seed": 1,
-            "ok": true,
-            "n_samples": 1,
-            "q_first": 17.492341995239258,
-            "q_last": 17.492341995239258
-          },
-          {
-            "seed": 2,
-            "ok": true,
-            "n_samples": 1,
-            "q_first": 18.035968780517578,
-            "q_last": 18.035968780517578
           }
         ]
       }
@@ -1934,6 +1896,11 @@
   ],
   "not_tested": [
     {
+      "what": "Figure 4: at eps=0 the (unperturbed) example is correctly classified as 4, so the correct-class logit sits above the max wrong-class logit (c65 'above' comparison)",
+      "citation": "paper/source/iclr2015.tex:764,768",
+      "reason": "satisfied by construction: the eps_trace example is chosen correctly classified by all seed models (as the paper's Fig 4 caption assumes 'The correct class is 4'), so c65's predicate (correct-logit > max-wrong at eps=0) holds by the selection criterion and is not an independent test. The tail/shape claims c66-c70 remain genuinely tested on the same example."
+    },
+    {
       "what": "MP-DBM is vulnerable to FGSM eps=0.25 (error 97.5%); its clean error is 0.88%",
       "citation": "paper/source/iclr2015.tex:794,800",
       "reason": "requires training a multi-prediction deep Boltzmann machine; outside compute scope"
@@ -2016,7 +1983,6 @@
       "measured.maxout_naive.rubbish_share_5",
       "measured.eps_trace.logit_maxwrong_pos",
       "measured.eps_trace.logit_maxwrong_e10",
-      "measured.eps_trace.logit_maxwrong_e0",
       "measured.eps_trace.logit_correct_pos",
       "measured.eps_trace.logit_correct_e10",
       "measured.maxout_large_naive.adv_err",
@@ -2024,7 +1990,6 @@
       "measured.noise_uniform.adv_conf_all",
       "measured.rbf_shallow.clean_conf_all",
       "measured.maxout_sigmoid.rubbish_err",
-      "measured.eps_trace.logit_correct_e0",
       "measured.maxout_naive.adv_conf_all",
       "measured.cifar_conv_maxout.adv_err",
       "measured.softmax_reg.adv_conf_all",

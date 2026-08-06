@@ -134,15 +134,32 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
     it now asserts a RAW uint8 pixel-sum checksum in `_load_cifar_raw` (a
     property the GCN recipe cannot force — the CIFAR analogue of the MNIST
     checksum) plus the existing per-pixel-variance structural check. SPEC
-    G20 updated. The CIFAR arm is rerun under the new preprocessing (real
-    data re-downloaded here; ~170 MB at ~75 KB/s).
+    G20 updated. **Fingerprint correction this pass:** the raw-checksum
+    constants committed in the earlier fix pass were placeholders that did
+    NOT match the canonical cs.toronto.edu tar (train 10.2B / test 2.0B vs
+    the real 18.54B / 3.73B sum of uint8 pixels); they would have *rejected*
+    the real corpus on any rerun. Recomputed from the real tar this pass
+    (`_CIFAR_RAW_TRAIN_SUM = 18540682003.0`, `_CIFAR_RAW_TEST_SUM =
+    3733375634.0`; verified by loading all 50k/10k images). The CIFAR arm is
+    rerun under the new preprocessing AND the corrected fingerprint at all 3
+    seeds (real data on disk, ~170 MB): per-image GCN gives
+    clean_err 27.6/27.0/27.0, adv_err 97.2/95.7/98.8 (vs the prior per-pixel
+    GCN values 27.3/26.8/…, adv_err 98.7/99.1/99.7) — the preprocessing change
+    is material and the numbers now pass the corrected corpus fingerprint.
   - **B2 (blocking, review_divergence) — `maxout_large_adv` skipped the
     paper's Phase-2 60k retrain.** `arm_maxout_large_adv` ran `full60k=False`
     while the claims c14/c18/c19/c20 quote the *post-retrain* model's numbers
     (17.9% / 0.782% / 81.4%, tex:510/506/523). Fixed: `full60k=True`
     (the from-scratch 60k retrain, tex:505-506). Rerun at all 5 seeds
-    [0..4]. (`transfer_mnist` already used `full60k=True`; its measured
-    values are unchanged-code and remain valid.)
+    [0..4] this pass: the post-retrain model gives clean_err
+    1.49/1.55/2.74/1.57/1.33 (mean 1.74), adv_err 5.78/8.83/24.96/10.89/5.27
+    (mean 11.1), adv_conf_mistakes 70.4/74.6/70.4/72.2/71.0 (mean 71.7) — the
+    retrain is materially more robust than the pre-retrain values it replaces
+    (adv_err mean 19.2 → 11.1; clean_err mean 2.33 → 1.74), and c14 (adv_err
+    17.9, tol 8) and c20 (adv_conf_mistakes 81.4, tol 12) both pass; c19
+    (clean 0.782) still fails honestly at the 6-epoch sub-scale horizon.
+    (`transfer_mnist` already used `full60k=True`; its measured values are
+    unchanged-code and remain valid.)
   - **B3 (blocking, review_faithful/review_divergence) — `claims_result.json`
     stale vs `measured.json`/`selfcheck.json`.** `claims_result.json` is the
     workflow's numbers-gate verdict table (`produced_by: reproduce-paper
@@ -163,7 +180,12 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
     so the FGSM ensemble-attack target matches the evaluated decision rule
     (tex:822-823). Guarded by `test_ensemble_loss_is_mean_prob_nll` /
     mutation `mut_ensemble_loss_mean_logits`. (c36 is HIGH; the ensemble12
-    arm is rerun for consistency.)
+    arm is rerun at all 3 seeds this pass: the mean-prob NLL attack is
+    materially stronger than the prior CE-of-mean-logits attack —
+    adv_err_ensemble_crafted 98.5/97.8/97.9 vs 93.3/92.8/93.5 — and the
+    whole-vs-single ordering c37 now resolves clearly, gap 5.2–6.7pp at
+    every seed vs the prior ~1.3–3.3pp within-noise gap; the single-member
+    attack is unchanged as expected.)
   - **R2 (recommended) — `LogisticRegression3v7.confidence` returned
     `sigmoid(margin)` = P(y=+1) regardless of the predicted sign** (~0 for
     confident y=−1 predictions; a latent wrong-metric bug no claim consumed
@@ -183,9 +205,16 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
     caption assumes "The correct class is 4"), so it is not an independent
     test. Moved c65 to `not_tested`; the tail/shape claims c66–c70 remain
     genuinely tested on the same example (c66 fails honestly on it).
-  Test suite: 41 passed + 1 skip (CIFAR, gated on the local tar) after the
-  fixes; 14 mutations all caught (12 prior + 2 new). `measured.json` is
-  regenerated for the changed-code arms (`maxout_large_adv`, `ensemble12`,
-  `cifar_conv_maxout`); unchanged-code arms keep their prior real-data
-  values. `selfcheck.json` is regenerated from the new `measured.json`.
-  `claims_result.json` is left for the numbers-gate/publish step.
+  Test suite: 42 passed with the real CIFAR tar on disk (41 pass + 1 skip in a
+  tar-less fresh clone — the skip is the CIFAR positive fingerprint test) after
+  the fixes; 14 mutations all caught (12 prior + 2 new). `measured.json` is
+  regenerated for the three changed-code arms (`cifar_conv_maxout`,
+  `maxout_large_adv`, `ensemble12`) from real data at every seed this pass
+  (EAE_ONLY + EAE_FORCE so the resume cache does not keep the pre-fix values);
+  unchanged-code arms keep their prior real-data values. `selfcheck.json` is
+  regenerated from the new `measured.json` (45 pass / 24 fail, 14/14 HIGH,
+  gate=PASS). `claims_result.json` is left for the numbers-gate/publish step:
+  the committed copy still predates this pass's `measured.json` and is stale
+  (it carries pre-F1/F2 verdicts and the 3-seed c14); the gate overwrites it
+  from the current `measured.json` at publish, at which point it must match
+  `selfcheck.json` verdict-for-verdict.
