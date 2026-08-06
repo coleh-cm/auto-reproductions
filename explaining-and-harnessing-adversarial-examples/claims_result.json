@@ -175,12 +175,12 @@
       "quote": "fell to 17.9\\%. Adversarial examples are transferable between the two models but with the",
       "citation": "paper/source/iclr2015.tex:517",
       "compute_invariance": "low",
-      "measured": 16.426666577657063,
-      "spread_across_seeds": 4.090000689029694,
+      "measured": 13.189999635020891,
+      "spread_across_seeds": 19.179999455809593,
       "claimed": 17.9,
-      "gap": 1.473333422342936,
+      "gap": 4.710000364979107,
       "verdict": "reproduced",
-      "why": "gap 1.47333 within tolerance 8"
+      "why": "gap 4.71 within tolerance 8"
     },
     {
       "id": "c15",
@@ -201,10 +201,10 @@
       "quote": "fell to 17.9\\%. Adversarial examples are transferable between the two models but with the",
       "citation": "paper/source/iclr2015.tex:517",
       "compute_invariance": "high",
-      "measured": 77.5166670481364,
-      "spread_across_seeds": 2.4099990725517273,
+      "measured": 80.75333399077256,
+      "spread_across_seeds": 20.800000056624413,
       "verdict": "reproduced",
-      "why": "quantity 77.5167 against direction >0, spread 2.41"
+      "why": "quantity 80.7533 against direction >0, spread 20.8"
     },
     {
       "id": "c17",
@@ -234,12 +234,12 @@
       "quote": "an error rate of 0.83\\%. The average of 0.782\\% is the best result reported on the permutation",
       "citation": "paper/source/iclr2015.tex:510",
       "compute_invariance": "low",
-      "measured": 2.3566666369636855,
-      "spread_across_seeds": 0.7100000977516174,
+      "measured": 1.9266666534046333,
+      "spread_across_seeds": 1.2500000186264515,
       "claimed": 0.782,
-      "gap": 1.5746666369636855,
-      "verdict": "refuted",
-      "why": "gap 1.57467 exceeds tolerance 0.15 and the spread 0.71"
+      "gap": 1.1446666534046332,
+      "verdict": "untested",
+      "why": "gap 1.14467 exceeds tolerance 0.15 but is inside the spread across seeds 1.25, so it is noise"
     },
     {
       "id": "c20",
@@ -247,12 +247,12 @@
       "quote": "example was 81.4\\%. We also found that the weights of the learned model changed significantly,",
       "citation": "paper/source/iclr2015.tex:523",
       "compute_invariance": "low",
-      "measured": 69.19711232185364,
-      "spread_across_seeds": 1.8226981163024902,
+      "measured": 71.79335355758667,
+      "spread_across_seeds": 4.213684797286987,
       "claimed": 81.4,
-      "gap": 12.202887678146368,
-      "verdict": "refuted",
-      "why": "gap 12.2029 exceeds tolerance 12 and the spread 1.8227"
+      "gap": 9.606646442413336,
+      "verdict": "reproduced",
+      "why": "gap 9.60665 within tolerance 12"
     },
     {
       "id": "c21",
@@ -349,10 +349,10 @@
       "quote": "zero mean and zero covariance is very inefficient at preventing adversarial examples. The expected dot product",
       "citation": "paper/source/iclr2015.tex:550",
       "compute_invariance": "high",
-      "measured": 71.54333392779033,
-      "spread_across_seeds": 2.1899953484535217,
+      "measured": 74.78000087042649,
+      "spread_across_seeds": 21.540003642439842,
       "verdict": "reproduced",
-      "why": "quantity 71.5433 against direction >0, spread 2.19"
+      "why": "quantity 74.78 against direction >0, spread 21.54"
     },
     {
       "id": "c29",
@@ -421,12 +421,12 @@
       "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed",
       "citation": "paper/source/iclr2015.tex:822",
       "compute_invariance": "medium",
-      "measured": 93.19666822751363,
-      "spread_across_seeds": 0.709998607635498,
+      "measured": 98.05333216985066,
+      "spread_across_seeds": 0.6300032138824463,
       "claimed": 91.1,
-      "gap": 2.096668227513632,
+      "gap": 6.953332169850668,
       "verdict": "reproduced",
-      "why": "gap 2.09667 within tolerance 8"
+      "why": "gap 6.95333 within tolerance 8"
     },
     {
       "id": "c35",
@@ -434,12 +434,12 @@
       "quote": "member of the ensemble, the error rate falls to 87.9\\%. Ensembling provides only",
       "citation": "paper/source/iclr2015.tex:824",
       "compute_invariance": "medium",
-      "measured": 91.26000006993611,
-      "spread_across_seeds": 2.679997682571411,
+      "measured": 92.04000035921733,
+      "spread_across_seeds": 1.5500009059906006,
       "claimed": 87.9,
-      "gap": 3.360000069936106,
+      "gap": 4.140000359217325,
       "verdict": "reproduced",
-      "why": "gap 3.36 within tolerance 8"
+      "why": "gap 4.14 within tolerance 8"
     },
     {
       "id": "c36",
@@ -447,10 +447,10 @@
       "quote": "gradient descent. The ensemble gets an error rate of 91.1\\% on adversarial examples designed",
       "citation": "paper/source/iclr2015.tex:822",
       "compute_invariance": "high",
-      "measured": 91.6500015805165,
-      "spread_across_seeds": 0.6599986925721169,
+      "measured": 96.53666550293565,
+      "spread_across_seeds": 0.670002494007349,
       "verdict": "reproduced",
-      "why": "quantity 91.65 against direction >0, spread 0.659999"
+      "why": "quantity 96.5367 against direction >0, spread 0.670002"
     },
     {
       "id": "c37",
@@ -458,10 +458,10 @@
       "quote": "member of the ensemble, the error rate falls to 87.9\\%. Ensembling provides only",
       "citation": "paper/source/iclr2015.tex:824",
       "compute_invariance": "medium",
-      "measured": 1.9366681575775146,
-      "spread_across_seeds": 2.4800002574920654,
-      "verdict": "untested",
-      "why": "the quantity is 1.93667 and the spread across seeds is 2.48, so the arms are not separated"
+      "measured": 6.013331810633342,
+      "spread_across_seeds": 1.510000228881836,
+      "verdict": "reproduced",
+      "why": "quantity 6.01333 against direction >0, spread 1.51"
     },
     {
       "id": "c38",
@@ -469,12 +469,12 @@
       "quote": "predict the maxout network's class correctly 54.6\\% of the time. These numbers are largely",
       "citation": "paper/source/iclr2015.tex:683",
       "compute_invariance": "medium",
-      "measured": 70.97327510515849,
-      "spread_across_seeds": 6.255406141281128,
+      "measured": 71.3243027528127,
+      "spread_across_seeds": 1.7515718936920166,
       "claimed": 54.6,
-      "gap": 16.37327510515849,
+      "gap": 16.724302752812697,
       "verdict": "refuted",
-      "why": "gap 16.3733 exceeds tolerance 10 and the spread 6.25541"
+      "why": "gap 16.7243 exceeds tolerance 10 and the spread 1.75157"
     },
     {
       "id": "c39",
@@ -482,12 +482,12 @@
       "quote": "the maxout network's class assignment only 16.0\\% of the time, while the softmax classifier",
       "citation": "paper/source/iclr2015.tex:682",
       "compute_invariance": "medium",
-      "measured": 2.6569917177160582,
-      "spread_across_seeds": 3.775360807776451,
+      "measured": 37.97947367032369,
+      "spread_across_seeds": 4.958605766296387,
       "claimed": 16.0,
-      "gap": 13.343008282283941,
+      "gap": 21.979473670323692,
       "verdict": "refuted",
-      "why": "gap 13.343 exceeds tolerance 8 and the spread 3.77536"
+      "why": "gap 21.9795 exceeds tolerance 8 and the spread 4.95861"
     },
     {
       "id": "c40",
@@ -495,12 +495,12 @@
       "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's",
       "citation": "paper/source/iclr2015.tex:686",
       "compute_invariance": "medium",
-      "measured": 73.82663488388062,
-      "spread_across_seeds": 7.336735725402832,
+      "measured": 74.21313722928365,
+      "spread_across_seeds": 1.578587293624878,
       "claimed": 84.6,
-      "gap": 10.773365116119379,
+      "gap": 10.386862770716348,
       "verdict": "refuted",
-      "why": "gap 10.7734 exceeds tolerance 10 and the spread 7.33674"
+      "why": "gap 10.3869 exceeds tolerance 10 and the spread 1.57859"
     },
     {
       "id": "c41",
@@ -508,12 +508,12 @@
       "quote": "class only 54.3\\% of the time. For comparison, the RBF network can predict softmax regression's",
       "citation": "paper/source/iclr2015.tex:687",
       "compute_invariance": "medium",
-      "measured": 3.0383677687495947,
-      "spread_across_seeds": 4.304003668949008,
+      "measured": 59.23884908358256,
+      "spread_across_seeds": 4.5768141746521,
       "claimed": 54.3,
-      "gap": 51.2616322312504,
-      "verdict": "refuted",
-      "why": "gap 51.2616 exceeds tolerance 12 and the spread 4.304"
+      "gap": 4.938849083582561,
+      "verdict": "reproduced",
+      "why": "gap 4.93885 within tolerance 12"
     },
     {
       "id": "c42",
@@ -521,12 +521,12 @@
       "quote": "class 53.6\\% of the time, so it does have a strong linear component to its own behavior.",
       "citation": "paper/source/iclr2015.tex:688",
       "compute_invariance": "low",
-      "measured": 1.2821958865970373,
-      "spread_across_seeds": 0.7896220777183771,
+      "measured": 60.93857089678446,
+      "spread_across_seeds": 1.3707101345062256,
       "claimed": 53.6,
-      "gap": 52.317804113402964,
-      "verdict": "refuted",
-      "why": "gap 52.3178 exceeds tolerance 12 and the spread 0.789622"
+      "gap": 7.338570896784461,
+      "verdict": "reproduced",
+      "why": "gap 7.33857 within tolerance 12"
     },
     {
       "id": "c43",
@@ -534,10 +534,10 @@
       "quote": "predict the maxout network's class correctly 54.6\\% of the time. These numbers are largely",
       "citation": "paper/source/iclr2015.tex:683",
       "compute_invariance": "high",
-      "measured": 68.31628338744243,
-      "spread_across_seeds": 5.9876227751374245,
+      "measured": 33.344829082489014,
+      "spread_across_seeds": 3.20703387260437,
       "verdict": "reproduced",
-      "why": "quantity 68.3163 against direction >0, spread 5.98762"
+      "why": "quantity 33.3448 against direction >0, spread 3.20703"
     },
     {
       "id": "c44",
@@ -545,10 +545,10 @@
       "quote": "predict's maxout's class 84.6\\% of the time, while the RBF network is able to predict maxout's",
       "citation": "paper/source/iclr2015.tex:686",
       "compute_invariance": "high",
-      "measured": 70.78826711513102,
-      "spread_across_seeds": 4.8255321104079485,
+      "measured": 14.97428814570109,
+      "spread_across_seeds": 3.379642963409424,
       "verdict": "reproduced",
-      "why": "quantity 70.7883 against direction >0, spread 4.82553"
+      "why": "quantity 14.9743 against direction >0, spread 3.37964"
     },
     {
       "id": "c45",
@@ -689,12 +689,12 @@
       "quote": "Similarly, using $\\eps=.1$, we obtain an error rate of 87.15\\% and an average probability of",
       "citation": "paper/source/iclr2015.tex:340",
       "compute_invariance": "medium",
-      "measured": 99.15333390235901,
-      "spread_across_seeds": 0.9200036525726318,
+      "measured": 97.243332862854,
+      "spread_across_seeds": 3.149998188018799,
       "claimed": 87.15,
-      "gap": 12.003333902359003,
+      "gap": 10.093332862853998,
       "verdict": "refuted",
-      "why": "gap 12.0033 exceeds tolerance 10 and the spread 0.920004"
+      "why": "gap 10.0933 exceeds tolerance 10 and the spread 3.15"
     },
     {
       "id": "c57",
@@ -702,12 +702,12 @@
       "quote": "96.6\\% assigned to the incorrect labels",
       "citation": "paper/source/iclr2015.tex:341",
       "compute_invariance": "low",
-      "measured": 89.54139947891235,
-      "spread_across_seeds": 3.3229053020477295,
+      "measured": 93.88069113095601,
+      "spread_across_seeds": 4.387158155441284,
       "claimed": 96.6,
-      "gap": 7.058600521087641,
+      "gap": 2.719308869043985,
       "verdict": "reproduced",
-      "why": "gap 7.0586 within tolerance 8"
+      "why": "gap 2.71931 within tolerance 8"
     },
     {
       "id": "c58",
@@ -715,12 +715,12 @@
       "quote": "obtains an error rate of 93.4\\%, with an average confidence of 84.4\\%.",
       "citation": "paper/source/iclr2015.tex:912",
       "compute_invariance": "medium",
-      "measured": 98.03333282470703,
-      "spread_across_seeds": 3.7999987602233887,
+      "measured": 99.3666668732961,
+      "spread_across_seeds": 1.8999993801116943,
       "claimed": 93.4,
-      "gap": 4.633332824707026,
+      "gap": 5.9666668732960915,
       "verdict": "reproduced",
-      "why": "gap 4.63333 within tolerance 8"
+      "why": "gap 5.96667 within tolerance 8"
     },
     {
       "id": "c59",
@@ -728,12 +728,12 @@
       "quote": "obtains an error rate of 93.4\\%, with an average confidence of 84.4\\%.",
       "citation": "paper/source/iclr2015.tex:912",
       "compute_invariance": "low",
-      "measured": 91.57806634902954,
-      "spread_across_seeds": 15.647262334823608,
+      "measured": 97.07951943079631,
+      "spread_across_seeds": 8.044159412384033,
       "claimed": 84.4,
-      "gap": 7.178066349029535,
-      "verdict": "reproduced",
-      "why": "gap 7.17807 within tolerance 10"
+      "gap": 12.679519430796304,
+      "verdict": "refuted",
+      "why": "gap 12.6795 exceeds tolerance 10 and the spread 8.04416"
     },
     {
       "id": "c60",
@@ -741,12 +741,12 @@
       "quote": "step. Averaged over all ten classes, the method has an average per-step success rate of 75.3\\%.",
       "citation": "paper/source/iclr2015.tex:941",
       "compute_invariance": "low",
-      "measured": 52.513333114717774,
-      "spread_across_seeds": 46.43000012263656,
+      "measured": 49.4266667671036,
+      "spread_across_seeds": 43.740000585094094,
       "claimed": 75.3,
-      "gap": 22.786666885282223,
+      "gap": 25.8733332328964,
       "verdict": "untested",
-      "why": "gap 22.7867 exceeds tolerance 20 but is inside the spread across seeds 46.43, so it is noise"
+      "why": "gap 25.8733 exceeds tolerance 20 but is inside the spread across seeds 43.74, so it is noise"
     },
     {
       "id": "c61",
@@ -754,12 +754,12 @@
       "quote": "frogs and trucks, and the hardest class was airplanes, with a success rate of 24.7\\% per sampling",
       "citation": "paper/source/iclr2015.tex:940",
       "compute_invariance": "low",
-      "measured": 45.99999927838022,
-      "spread_across_seeds": 94.49999799253419,
+      "measured": 11.60000009695068,
+      "spread_across_seeds": 34.700000286102295,
       "claimed": 24.7,
-      "gap": 21.299999278380223,
-      "verdict": "untested",
-      "why": "gap 21.3 exceeds tolerance 15 but is inside the spread across seeds 94.5, so it is noise"
+      "gap": 13.09999990304932,
+      "verdict": "reproduced",
+      "why": "gap 13.1 within tolerance 15"
     },
     {
       "id": "c62",
@@ -777,7 +777,7 @@
       "citation": "paper/source/iclr2015.tex:940",
       "compute_invariance": "low",
       "verdict": "refuted",
-      "why": "held at 0 of 3 seeds"
+      "why": "held at 1 of 3 seeds"
     },
     {
       "id": "c64",
@@ -787,17 +787,6 @@
       "compute_invariance": "medium",
       "verdict": "reproduced",
       "why": "held at 3 of 3 seeds"
-    },
-    {
-      "id": "c65",
-      "kind": "curve",
-      "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
-      "citation": "paper/source/iclr2015.tex:764",
-      "compute_invariance": "low",
-      "points": 1,
-      "comparison": "above",
-      "verdict": "reproduced",
-      "why": "above at all 1 resolved points of 1"
     },
     {
       "id": "c66",
