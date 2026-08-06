@@ -46,7 +46,7 @@ sub-scale proxy.
 |---|---|---|
 | One full arm (4000 steps, seed 0) | ~0.8 s | `python run_experiment.py --lambda 1.0` |
 | Full grid (both arms × seeds {0,1,2}) | ~5 s | `./run_all_arms.sh` |
-| Full test suite | ~5.2 s | `pytest -q` → 53 passed |
+| Full test suite | ~4.5 s | `pytest -q` → 54 passed |
 | Smoke path (50 steps) | <1 s | `./smoke.sh` → `FINAL smoke=...` (not evidence about the paper) |
 | Fresh-venv from-scratch build + run | ~10 s | gate 1 evidence (see §3) |
 
@@ -58,7 +58,7 @@ Compute is CPU-only (numpy + scikit-learn); no GPU was used or needed.
 
 ### 2.1 The numbers gate (`claims_result.json`)
 
-> **Note (finalization pass, 2026-08-05):** the numbers gate RAN on this run's
+> **Note (finalization pass, 2026-08-06):** the numbers gate RAN on this run's
 > `measured.json` and produced `claims_result.json` (timestamp-matched to
 > this run's `arms.log`/`measured.json`); its verdicts are 6 reproduced /
 > 2 refuted / 1 untested / 0 blocked (the AUTHORITATIVE COUNTS line is the
@@ -107,19 +107,21 @@ in `selfcheck.json`) reproduces Table 1 (0.9611/0.9481/0.9556, ordering
 +0.0241/+0.0074/+0.0241) — the standard self-distillation convention the paper
 does not mark on `w`.
 
-### 2.2 The pytest suite (53 tests, all pass)
+### 2.2 The pytest suite (54 tests, all pass)
 
 Grouped by file. Every test is a check; the suite was also deliberately
 broken by the 7 mutations in §2.4 to prove each check actually catches the
 bug it claims to.
 
-- **`test_degeneracy.py` (4)** — the paper's own verification gate (λ=0 =
+- **`test_degeneracy.py` (5)** — the paper's own verification gate (λ=0 =
   baseline exactly). `test_lambda_zero_target_equals_onehot`,
   `test_lambda_zero_loss_and_grads_equal_ce_bitwise` (per-step loss + every
   grad bitwise-equal to an independently written CE routine),
   `test_lambda_zero_training_matches_ce_training_bitwise` (300-step SGD loop
   with identical params + accuracy), `test_training_step_count_is_exact`
-  (pins the exact step-count guard across the first-epoch boundary). The
+  (pins the exact step-count guard across the first-epoch boundary), and
+  `test_baseline_seed0_reproduces_paper_table1_value` (pins the paper's
+  headline baseline 0.9370 = 506/540 at the full 4000-step budget). The
   structural `t==Y` and per-step loss+grad checks are swept over
   `s ∈ {0.01,0.15,1.0,10.0}` (3 orders of magnitude) so the no-op=baseline
   gate provably cannot be fit to the answer via the one unstated
@@ -133,12 +135,12 @@ bug it claims to.
   with `p_tilde` FROZEN (w recomputed) on all four params including the ReLU
   backprop path W1/b1, stop-grad on `p_tilde` keeps the target's `p_tilde`
   half independent of θ.
-- **`test_data.py` (5)** — split shapes (1257/540), stratified-and-seeded
+- **`test_data.py` (6)** — split shapes (1257/540), stratified-and-seeded
   split, label-corruption rate and invariance, `uniform-other` excludes the
-  original class, clean-when-rate-zero, and `train()` leaves the test set clean.
+  original class, clean-when-rate-zero, `train()` leaves the test set clean.
 - **`test_cli.py` (4)** — output format for both arms, λ-range rejection
   (diagnostic to stderr), all documented flags accepted (incl. `--grad-mode`).
-- **`test_instruments.py` (8)** — positive + negative tests for the four
+- **`test_instruments.py` (9)** — positive + negative tests for the four
   instruments in `instruments.json` (data-loader fingerprint, accuracy
   scorer, final-line parser, degeneracy-equivalence); the empty-evaluation
   case asserts the scorer raises rather than silently reporting 0.0.
@@ -152,8 +154,9 @@ bug it claims to.
   non-vacuity test proving the frozen-`p_tilde` FD check discriminates BOTH
   a no-stopgrad (through `p_tilde`, ~2.1) and a detached (no gate path, ~4.0)
   implementation.
-- **`test_train_leaves_test_set_clean`** — runs the full
-  `train()` path and re-checks the held-out test set is untouched.
+
+(Total 54 = 5+11+6+4+9+14+5; `test_data.py` includes the
+`test_train_leaves_test_set_clean` check.)
 
 ### 2.3 Structural metrics emitted into `measured.json`
 
@@ -245,7 +248,7 @@ counterfactual arm, not the gated literal arm — corrected here.)
 Built a fresh venv in a clean directory: `uv venv --python 3.13` +
 `uv pip install -r requirements.txt`, copied the source + tests + support
 files (`claims.json`, `instruments.json`, `mutations.json`, `paper/`),
-ran `pytest -q` → 53 passed, ran `python run_experiment.py --lambda 1.0`
+ran `pytest -q` → 54 passed, ran `python run_experiment.py --lambda 1.0`
 (= `--grad-mode literal`, the default) → `FINAL accuracy=0.9407`, and
 `python run_experiment.py --lambda 1.0 --grad-mode detached` →
 `FINAL accuracy=0.9611` (the counterfactual that reproduces Table 1). The
@@ -260,9 +263,10 @@ data-pipeline, method-core, training-loop, evaluation-metric, and
 baseline-arm against `paper/paper.md` with `file:line` evidence; all 5
 approved, 0 blocker/major. The verify agent ran the actual program:
 `pytest -q` → passed; `--lambda 0.0` → 0.9370 (exact); `--lambda 1.0` →
-0.9611. **No `$HOME/.review_rounds` file exists** — the reviewers went quiet;
-no review budget was spent without resolution. (Corrected below in §5: a
-`$HOME/.review_rounds` file now exists on this run with value 2 — see §5.)
+0.9407 (gated literal arm; the `--grad-mode detached` variant → 0.9611).
+**No `$HOME/.review_rounds` file exists on this run** — no review budget is
+recorded as spent; the committed review→fix log shows each round's findings
+were resolved with a committed fix and no outstanding unresolved objection.
 
 ---
 
@@ -372,24 +376,21 @@ and reports the honest verdicts.
   returns 6 pass / 2 fail / 1 untested / 0 blocked (the 2 fail are the CWSD
   value and improvement magnitude, refuted at the gated `s=0.15`; the 1
   untested is the central ordering, within noise at the gated `s`),
-  `pytest -q` → 53 passed.
+  `pytest -q` → 54 passed.
 - **Environment attempts:** `$HOME/.env_attempts` **does not exist** — the
   environment is reproducible from the pinned `requirements.txt` (fresh venv
-  verified, gate 1).
-- **Review rounds:** `$HOME/.review_rounds` **exists with value 2** on this
-  run. (The prior pass's docs — §2.8 above and the original of this section —
-  stated the file did not exist; that is now stale and corrected here.) Two
-  review rounds are recorded as spent. The committed review→fix log shows each
-  round's findings were resolved with a committed fix (impl pass: frozen-target
-  FD check; impl pass 2: paper-LITERAL gradient as default, fixing the blocking
-  whole-target stop-grad finding; claims-adjudication pass: extended s-sweep,
-  corrected false universal; final commit `f8a7d47`: a reviewer "minor" on the
-  cwsd-accuracy-value claim). No outstanding unresolved objection is found in
-  the committed record, and the numbers gate adjudicated with 0 blocked.
-  Whether the review budget was fully exhausted is not determinable from the
-  file alone; this reproduction does not claim an unqualified clean review pass
-  on that account. A reader should weigh the committed review→fix log rather
-  than the round count.
+  verified this pass, gate 1).
+- **Review rounds:** `$HOME/.review_rounds` **does not exist** on this run —
+  no review budget is recorded as spent. The committed review→fix log shows
+  each round's findings were resolved with a committed fix (impl pass:
+  frozen-target FD check; impl pass 2: paper-LITERAL gradient as default,
+  fixing the blocking whole-target stop-grad finding; claims-adjudication
+  pass: extended s-sweep, corrected false universal; final commit `f8a7d47`:
+  a reviewer "minor" on the cwsd-accuracy-value claim). No outstanding
+  unresolved objection is found in the committed record, and the numbers gate
+  adjudicated with 0 blocked. (A prior pass's docs stated a
+  `$HOME/.review_rounds` file existed with value 2; that was stale for this
+  run and is corrected here.)
 
 ---
 
@@ -420,7 +421,7 @@ the standard self-distillation convention the paper does not mark on `w`)
 reproduces Table 1 and is reported in `selfcheck.json` / REPRODUCTION.md, not
 as the gated arm. `param_count` is computed (`len(params)`), not a literal.
 The numbers are reproducible (`./run_all_arms.sh` regenerates `measured.json`;
-`pytest -q` → 53 passed; a fresh from-scratch venv reproduces them).
+`pytest -q` → 54 passed; a fresh from-scratch venv reproduces them).
 
 The reproduction's central finding: the paper's headline is `s`-dependent
 under its literal equations (stopgrad only on `p_tilde`, gate weight `w`

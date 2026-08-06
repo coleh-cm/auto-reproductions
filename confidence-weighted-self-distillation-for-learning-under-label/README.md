@@ -205,7 +205,7 @@ stdout contract is unchanged.
 ## Running the tests
 
 ```bash
-.venv/bin/python -m pytest -q     # 53 tests: degeneracy + invariants + structural-metrics + data + CLI + instruments + mutations
+.venv/bin/python -m pytest -q     # 54 tests: degeneracy + invariants + structural-metrics + data + CLI + instruments + mutations
 ```
 
 The mutation tests (`tests/test_mutations.py`) inject each defect in
