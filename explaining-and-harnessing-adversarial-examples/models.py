@@ -96,7 +96,14 @@ class LogisticRegression3v7(nn.Module):
                           torch.tensor(-1, dtype=torch.long, device=m.device))
 
     def confidence(self, x):
-        return torch.sigmoid(self.margin(x))  # [B] confidence on predicted class
+        # confidence in the PREDICTED class: sigma(|margin|). A confident y=-1
+        # prediction (margin<<0) must report confidence ~1, not ~0. The earlier
+        # ``sigmoid(margin)`` returned P(y=+1) regardless of the predicted sign,
+        # which is ~0 for confident -1 predictions (latent wrong-metric bug; no
+        # claim consumes logreg confidence today, but a future one would inherit
+        # the inverted value).
+        m = self.margin(x)
+        return torch.sigmoid(m.abs())  # [B] confidence on predicted class
 
 
 # ---------------------------------------------------------------------------
@@ -285,11 +292,14 @@ class RBFNet(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Ensemble of models, mean-probability combine for PREDICTION (tex:819-821).
-# The ensemble-attack objective (what FGSM differentiates to perturb the whole
-# ensemble, tex:822-823) is the cross-entropy of the MEAN LOGITS — a
-# differentiable "perturb the entire ensemble" NLL (the paper is silent on the
-# objective; SPEC §4.12 logs this choice). Prediction combines mean PROBABILITIES.
+# Ensemble of models. BOTH prediction and the ensemble-attack objective combine
+# the member PROBABILITIES by averaging (tex:819-821 "ensemble of twelve maxout
+# networks"; tex:822-823 "perturb the entire ensemble"). The attack objective is
+# the NLL of the SAME mean-probability classifier that predict() evaluates — so
+# the FGSM input gradient perturbs the classifier whose error is measured
+# (review finding: an earlier CE-of-mean-LOGITS objective was the loss of a
+# different classifier than the mean-prob one being evaluated). The paper is
+# silent on the combination rule; SPEC §4.12 logs this choice.
 # ---------------------------------------------------------------------------
 class Ensemble(nn.Module):
     def __init__(self, members):
@@ -304,11 +314,15 @@ class Ensemble(nn.Module):
         return torch.stack([m.prob(x) for m in self.members], dim=0).mean(0)
 
     def loss(self, x, y):
-        # Ensemble-attack objective (SPEC §4.12): cross-entropy of the MEAN
-        # LOGITS — the differentiable NLL whose input gradient perturbs the
-        # whole ensemble (tex:822-823; paper silent on the objective form).
-        logits = self.logits(x)
-        return F.cross_entropy(logits, y.to(torch.long).view(-1))
+        # Ensemble-attack objective (SPEC §4.12): NLL of the MEAN-PROBABILITY
+        # classifier — the same classifier predict() evaluates (tex:822-823;
+        # paper silent on the objective form). CE of mean logits would be the
+        # loss of a different classifier; using the mean-prob NLL makes the
+        # perturbation target the evaluated decision rule.
+        p_mean = self.prob(x)
+        y = y.to(torch.long).view(-1)
+        logp = torch.log(p_mean.gather(1, y.unsqueeze(1)).squeeze(1) + 1e-12)
+        return (-logp).mean()
 
     def predict(self, x):
         return self.prob(x).argmax(dim=-1).to(torch.long)

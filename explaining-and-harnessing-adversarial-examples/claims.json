@@ -1237,26 +1237,6 @@
       "citation": "paper/source/iclr2015.tex:430"
     },
     {
-      "id": "c65",
-      "kind": "curve",
-      "arm": "eps_trace",
-      "seeds": [
-        0,
-        1,
-        2
-      ],
-      "compute_invariance": "low",
-      "quantity": "measured.eps_trace.logit_correct_e0",
-      "against": "measured.eps_trace.logit_maxwrong_e0",
-      "x": [
-        0
-      ],
-      "comparison": "above",
-      "note": "DEMOTE high->low: Figure 4 reports ONE illustrative class-4 example (tex:768 'The correct class is 4'), not a population claim that every class-4 example has this shape. The eps_trace arm now uses a DETERMINISTIC fixed example (first class-4 test example correctly classified by all seeds) with NO selection on the claim predicates, so this claim can genuinely fail if that example does not reproduce the figure shape; it is informational (low), not gating. at eps=0 the example is unperturbed and correctly classified as 4, so the correct-class curve sits above the max wrong-class curve (equivalently margin_seq > 0)",
-      "quote": "the correct direction. Correct classifications occur only on a thin manifold where $\\vx$ occurs in the data.",
-      "citation": "paper/source/iclr2015.tex:764"
-    },
-    {
       "id": "c66",
       "kind": "curve",
       "arm": "eps_trace",
@@ -1384,6 +1364,11 @@
     }
   ],
   "not_tested": [
+    {
+      "what": "Figure 4: at eps=0 the (unperturbed) example is correctly classified as 4, so the correct-class logit sits above the max wrong-class logit (c65 'above' comparison)",
+      "citation": "paper/source/iclr2015.tex:764,768",
+      "reason": "satisfied by construction: the eps_trace example is chosen correctly classified by all seed models (as the paper's Fig 4 caption assumes 'The correct class is 4'), so c65's predicate (correct-logit > max-wrong at eps=0) holds by the selection criterion and is not an independent test. The tail/shape claims c66-c70 remain genuinely tested on the same example."
+    },
     {
       "what": "MP-DBM is vulnerable to FGSM eps=0.25 (error 97.5%); its clean error is 0.88%",
       "citation": "paper/source/iclr2015.tex:794,800",

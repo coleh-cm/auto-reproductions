@@ -245,13 +245,17 @@ def arm_maxout_large_naive(seed):
 
 
 def arm_maxout_large_adv(seed):
-    # Use the 50k/10k-val split for early stopping (clean val); skip the paper's
-    # 60k retrain phase to keep the 5-seed run tractable on CPU (sub-scale; the
-    # high-invariance c16 adv_err ordering survives; c18/c19 clean 0.782% are
-    # low-invariance and expected to fail here).
+    # Paper's full protocol (tex:501-506): early-stop on the ADVERSARIAL
+    # validation error to pick the epoch count, then RETRAIN FROM SCRATCH on all
+    # 60,000 examples for that many epochs. The 17.9% adv_err / 81.4% conf /
+    # 0.782% clean numbers (tex:510,523,506) are all the POST-RETRAIN model's, so
+    # the arm must run full60k=True to measure the same object the paper reports
+    # (review finding: full60k=False measured a pre-retrain model while the
+    # claims quote post-retrain numbers). _train_maxout loads mnist_full when
+    # full60k=True; x_test comes from the standard MNIST test split.
     d = _torch_data(data.load_mnist(seed))
     m, h = _train_maxout(1600, seed, d, adversarial=True,
-                         monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=False)
+                         monitor="adv_val_err", epochs=EPOCHS_MAXOUT1600, full60k=True)
     x_test, y_test = d["x_test"], d["y_test"]
     clean = ev.error(m, x_test, y_test)
     adv = ev.adv_eval(m, x_test, y_test, EPS_MNIST)

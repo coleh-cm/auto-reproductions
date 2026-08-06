@@ -216,6 +216,49 @@ def test_loss_non_negative():
         assert loss.item() >= -1e-6, f"{name} loss negative: {loss.item()}"
 
 
+def test_ensemble_loss_is_mean_prob_nll():
+    """Ensemble.loss is the NLL of the MEAN-PROBABILITY classifier that predict()
+    evaluates (review finding: the attack objective must target the same
+    classifier whose error is measured, tex:822-823). So Ensemble.loss must
+    equal -log(mean_k p_k[y]).mean() and be differentiable w.r.t. x (for FGSM),
+    and predict()'s argmax must match argmax(mean prob) (the decision rule the
+    attack is built to defeat)."""
+    torch.manual_seed(0)
+    a = models.SoftmaxRegression()
+    b = models.SoftmaxRegression()
+    ens = models.Ensemble([a, b])
+    x = torch.randn(12, 784)
+    y = torch.randint(0, 10, (12,))
+    p_mean = ens.prob(x)
+    nll_ref = float((-torch.log(p_mean.gather(1, y.unsqueeze(1)).squeeze(1) + 1e-12)).mean().item())
+    assert abs(ens.loss(x, y).item() - nll_ref) < 1e-5, "Ensemble.loss != mean-prob NLL"
+    x_req = x.clone().requires_grad_(True)
+    g = torch.autograd.grad(ens.loss(x_req, y), x_req)[0]
+    assert torch.isfinite(g).all() and g.abs().sum() > 0, "ensemble loss has no input gradient"
+    assert torch.equal(p_mean.argmax(-1), ens.predict(x)), "predict != argmax(mean prob)"
+
+
+def test_logreg_confidence_on_predicted_class():
+    """LogisticRegression3v7.confidence is the confidence in the PREDICTED class:
+    a confident y=-1 prediction (margin<<0) must report confidence ~1, not ~0
+    (review finding: sigmoid(margin) returned P(y=+1) regardless of the
+    predicted sign). confidence = sigma(|margin|)."""
+    m = models.LogisticRegression3v7()
+    with torch.no_grad():
+        m.linear.weight.zero_()
+        m.linear.bias.fill_(-5.0)  # margin = -5 => predict -1 with high confidence
+    x = torch.randn(8, 784)
+    assert (m.predict(x) == -1).all(), "predict should be -1 for margin<<0"
+    assert (m.confidence(x) > 0.99).all(), f"confident -1 prediction must have conf~1, got {m.confidence(x)}"
+    with torch.no_grad():
+        m.linear.bias.fill_(5.0)
+    assert (m.predict(x) == 1).all()
+    assert (m.confidence(x) > 0.99).all()
+    with torch.no_grad():
+        m.linear.bias.fill_(0.0)
+    assert (m.confidence(x) - 0.5).abs().max() < 1e-2
+
+
 def test_eps_trace_piecewise_linear_in_eps():
     """SPEC §4.15 / tex:762-770: with the FGSM direction fixed at eps=0, the
     logits are exactly (piecewise) linear in eps for a LINEAR model (softmax
