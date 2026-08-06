@@ -524,25 +524,25 @@
   },
   "agreement_mnist": {
     "0": {
-      "agree_softmax_all": 70.12269496917725,
-      "agree_softmax_cond": 74.8731255531311,
-      "agree_rbf_all": 4.443461820483208,
-      "agree_rbf_cond": 5.070635676383972,
-      "agree_rbf_on_softmax": 0.778341805562377
+      "agree_softmax_all": 70.36669850349426,
+      "agree_softmax_cond": 73.94121885299683,
+      "agree_rbf_all": 35.53573489189148,
+      "agree_rbf_cond": 57.39949941635132,
+      "agree_rbf_on_softmax": 60.83080768585205
     },
     "1": {
-      "agree_softmax_all": 74.52626824378967,
-      "agree_softmax_cond": 76.97175741195679,
-      "agree_rbf_all": 2.85941231995821,
-      "agree_rbf_cond": 3.2778356224298477,
-      "agree_rbf_on_softmax": 1.5002819709479809
+      "agree_softmax_all": 71.48793935775757,
+      "agree_softmax_cond": 73.55980277061462,
+      "agree_rbf_all": 37.908345460891724,
+      "agree_rbf_cond": 58.340734243392944,
+      "agree_rbf_on_softmax": 60.30709743499756
     },
     "2": {
-      "agree_softmax_all": 68.27086210250854,
-      "agree_softmax_cond": 69.63502168655396,
-      "agree_rbf_all": 0.6681010127067566,
-      "agree_rbf_cond": 0.7666320074349642,
-      "agree_rbf_on_softmax": 1.567963883280754
+      "agree_softmax_all": 72.11827039718628,
+      "agree_softmax_cond": 75.1383900642395,
+      "agree_rbf_all": 40.494340658187866,
+      "agree_rbf_cond": 61.97631359100342,
+      "agree_rbf_on_softmax": 61.677807569503784
     }
   },
   "transfer_mnist": {

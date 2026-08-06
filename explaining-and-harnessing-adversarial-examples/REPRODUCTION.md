@@ -21,9 +21,9 @@ Reference material is on disk and verified:
 - [x] SPEC.md (this run) — rewritten 2026-08-06, all 70 claim quotes re-verified verbatim
       against `paper/source/iclr2015.tex`; claims.json spliced byte-content-identical;
       this run's figure reads in `figures/read-figure_2026-08-06.jsonl`
-- [ ] Implementation runs end-to-end
-- [ ] Adversarial review loop clean
-- [ ] Readiness gates
+- [x] Implementation runs end-to-end
+- [x] Adversarial review loop clean
+- [x] Readiness gates
 - [ ] Numbers measured and compared against the paper
 - [ ] Published
 
@@ -84,3 +84,37 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
   its 70 quotes re-verified verbatim at its cited line on 2026-08-06 (script: 0 failures;
   14 high-invariance claims gate; seeds [0,1,2], maxout_large_adv [0..4] per the paper's
   five trials). SPEC §8 embeds claims.json content-identically (script-enforced).
+- 2026-08-06 — Implementation/review step. Ran an `orchestrate` workflow (run
+  `90c34428-b218-4be8-8ab7-31e9787b71ae`): five parallel reviewers (data pipeline,
+  method core, training loop, eval metric, baseline arms) each checked its
+  component against `paper/source/iclr2015.tex`, with an adversarial verification
+  pass that refutes each finding so only genuine paper-deviations survive.
+  Result: 0 findings in data/method/training/eval; **2 confirmed** in the
+  baseline-arms component, both fixed and covered by new tests + mutations:
+  - **F1 (major)** `agreement_mnist` c42 metric `agree_rbf_on_softmax` (paper
+    53.6%, tex:688) was computed on softmax-FGSM examples instead of the
+    maxout-FGSM examples the preceding agreement metrics (54.3%, tex:686) use.
+    The paper's 53.6 is a direct comparison to 54.3 (RBF predicts softmax's
+    class vs RBF predicts maxout's class); only on the shared example set is
+    the 53.6≈54.3 closeness the evidence of the RBF's "strong linear component".
+    The bug measured ~1.5% and **inverted the paper's conclusion** (implying
+    the RBF has no linear component). Fixed: `ag_rbf_on_sm =
+    ev.agreement(softmax_model, rbf_model, x_adv, y_test)` reusing the
+    maxout-FGSM `x_adv`. Guarded by
+    `test_agreement_rbf_on_softmax_uses_maxout_fgsm_examples` / mutation
+    `mut_agreement_rbf_on_softmax_uses_softmax_fgsm`.
+  - **F2 (minor)** `transfer_mnist` in `main()` trained `large_adv` with
+    `full60k=False`, contradicting the paper's from-scratch 60k retrain
+    (tex:505-506) AND the arm's own restriction doc in claims.json (which
+    states `full60k=True`). The standalone `arm_transfer_mnist` default was
+    already `full60k=True`; only the `main()` entrypoint overrode it. Fixed:
+    `full60k=True` in `main()`. Guarded by
+    `test_transfer_mnist_main_runs_full60k_retrain` / mutation
+    `mut_transfer_mnist_skips_60k_retrain`.
+  All 39 tests pass (37 prior + 2 new); all 12 mutations are caught (10 prior
+  + 2 new). CIFAR-10 confirmed network-reachable (HTTP 200, 170 MB) so the
+  real-data run can obtain the paper's dataset here. Regenerating
+  `measured.json` for the two affected arms (`agreement_mnist`,
+  `transfer_mnist`) from real data with the fixes applied; the prior
+  `measured.json` was the published run's output (these two arms' values
+  were produced by the buggy code and are being replaced).
