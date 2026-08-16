@@ -453,6 +453,13 @@ unchanged). **What they do not support:** exact CLIP/FID/CS magnitudes off the t
 frontier-shape claims beyond the tested β set, and any Qwen/SANA behaviour — those claims are
 either not made or rated low/medium (see claims.json `compute_invariance`).
 
+The same per-arm restriction statements exist in machine-readable form as the top-level
+`restrictions` map in claims.json, keyed `{"<arm>": {"kind": "narrows_situations", "detail": ...}}`
+for all four arms — every arm narrows only the situation set (seeds 3 of 10, β subset, model
+subset, pair subset, M = 5 000 of 50 000 for the covariance arms under the Fig. 5 / C22
+justification); no arm changes a metric, constraint or success criterion, so no entry is
+`changes_correctness`.
+
 ---
 
 ## 9. claims.json
@@ -468,242 +475,704 @@ See ./claims.json — kept byte-identical with the block below.
   "schema_version": 1,
   "paper": "MidSteer: Optimal Affine Framework for Steering Generative Models (arXiv:2605.05220v3)",
   "arms": {
-    "base":         {"transform": "identity", "beta": null},
-    "vanilla":      {"transform": "householder_or_projection_eq21_24_25", "s": "mean_source_minus_mean_target_unit_norm", "beta_default_switching": 2, "beta_grid": [1, 2, 3, 4, 5]},
-    "leace_switch": {"transform": "eq22_W+_(W Sxz)(W Sxz)^+ W", "beta_default": 2, "beta_grid": [1, 2, 3, 4, 5]},
-    "midsteer":     {"transform": "eq23_W+_(Swz2 - Swz1)(Swz1)^+ W", "beta_default": 1, "beta_grid": [1, 2, 3, 4, 5]}
+    "base": {
+      "transform": "identity",
+      "beta": null
+    },
+    "vanilla": {
+      "transform": "householder_or_projection_eq21_24_25",
+      "s": "mean_source_minus_mean_target_unit_norm",
+      "beta_default_switching": 2,
+      "beta_grid": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "leace_switch": {
+      "transform": "eq22_W+_(W Sxz)(W Sxz)^+ W",
+      "beta_default": 2,
+      "beta_grid": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "midsteer": {
+      "transform": "eq23_W+_(Swz2 - Swz1)(Swz1)^+ W",
+      "beta_default": 1,
+      "beta_grid": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
   },
-  "seeds": [0, 1, 2],
+  "restrictions": {
+    "base": {
+      "kind": "narrows_situations",
+      "detail": "Identity arm (no intervention). Situations narrowed only: 3 generation seeds {0,1,2} of the paper's 10 per prompt (subset of draws, paper/content/experiments.tex:69); model subset {Llama-2-7B-chat, SDXL} of the paper's 4 architectures (Llama-2-7B-chat, Qwen2.5-7B/14B, SDXL, SANA); concept-pair subset (LLM concrete: horse->motorcycle, dog->cat of 3; SDXL concrete: horse->motorcycle of 3; both safety pairs kept); full listed prompt template set (80 LLM G.1 / 80 image G.2, paper/content/suppl.tex:457-631); RTP prompts = RealToxicityPrompts toxicity>=0.5 as stated (paper/content/experiments.tex:84), count restricted like other eval cells. Metric definitions unchanged: judge CS 0-10 (Llama-3.1-8B-Instruct), CLIP score x100, Detoxify RTP, ArmoRM helpfulness, FID vs vanilla, BERT-P/F1 on MMLU generations."
+    },
+    "vanilla": {
+      "kind": "narrows_situations",
+      "detail": "Householder/projection steering per Eqs. 21/24-25 (paper/main.tex:466-469, paper/content/suppl.tex:64-73) with unit-norm s = mu_source - mu_target (weakest readings G3/G8, SPEC.md section 5). Same situation-narrowing as base, plus: beta subset of the paper's grid {1,2,3,4,5} per claim (default 2 for switching per paper/content/experiments.tex:125; {3,5} for safety and curve claims); steering-vector means estimated on the same prompt sets (N=1000 concept, background for mu_t role); upstream code's intermediate_clipping disabled because it appears nowhere in the paper (SPEC.md section 1, item 1). Metric and success definitions unchanged."
+    },
+    "leace_switch": {
+      "kind": "narrows_situations",
+      "detail": "Eq. 22 arm (paper/main.tex:471-474), Sigma_XZ from the source-class indicator under the mean-difference cross-covariance reading (weakest reading G3 with class priors absorbed into beta). Same situation-narrowing as base, plus: M = 5000 of the paper's 50000 prompts for Sigma_XX (subset; justified by the paper's own ablation Fig. 5 paper/content/suppl.tex:640-642 and claim C22), N = 1000 per concept unchanged (paper/content/experiments.tex:63), beta subset as vanilla (default 2), estimation on the unsteered model at every SA/CA layer as stated (paper/content/experiments.tex:89,101), pinv rank tolerance = host-library default (G7), upstream intermediate_clipping disabled (not in the paper). Transform, covariance constraint (Cov -> -Cov) and metrics exactly as in the paper; only the situation set is narrowed (Bennett child, SPEC.md section 8)."
+    },
+    "midsteer": {
+      "kind": "narrows_situations",
+      "detail": "Eq. 23 arm (paper/main.tex:478-481) with per-head block-diagonal maps (weakest reading G5). Same situation-narrowing as leace_switch (M = 5000 of 50000 with Fig.5/C22 justification, N = 1000 unchanged, seeds 3 of 10, model and pair subsets, beta subset of the paper's grid with default 1 per paper/content/experiments.tex:125, pinv tolerance = host default G7, upstream clipping disabled). No metric, constraint (Cov(f(X),Z1) = Cov(X,Z2)) or success-criterion change: what counts as a correct measurement is identical to the paper; only which situations are evaluated is narrowed. A run at beta or model or pair cells outside the tested subset cannot speak to claims about those cells and does not."
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ],
   "experiments": {
-    "e1_synth":        {"compute": "cpu", "purpose": "closed-form correctness", "claims": ["C1", "C2", "C3"]},
-    "e2_llm_concrete": {"model": "Llama-2-7b-chat", "pairs": ["horse->motorcycle", "dog->cat"], "prompts": "paper/content/suppl.tex:457-539 templates", "metric_keys": ["src_cs_on_src", "tgt_cs_on_src", "src_cs_on_tgt", "tgt_cs_on_tgt", "unrel_cs", "bertp_mmlu"]},
-    "e3_llm_safety":   {"model": "Llama-2-7b-chat", "switch": "toxicity->helpfulness", "metric_keys": ["rtp", "help", "unrel_cs", "mmlu_bert_f1"], "betas": [3, 5]},
-    "e4_sdxl_h2m":     {"model": "SDXL-base-1.0", "switch": "horse->motorcycle", "metric_keys": ["horse_cs_on_horse", "moto_cs_on_horse", "horse_cs_on_moto", "moto_cs_on_moto", "cow_cs", "cow_fid", "pig_cs", "pig_fid", "dog_cs", "dog_fid", "legislator_cs", "legislator_fid"], "betas": {"vanilla": 2, "leace_switch": 2, "midsteer": 1}},
-    "e5_sdxl_safety":  {"model": "SDXL-base-1.0", "switch": "violence->peace", "metric_keys": ["viol_cs", "peace_cs", "unrel_cs", "fid"], "betas": [3, 5]}
+    "e1_synth": {
+      "compute": "cpu",
+      "purpose": "closed-form correctness",
+      "claims": [
+        "C1",
+        "C2",
+        "C3"
+      ]
+    },
+    "e2_llm_concrete": {
+      "model": "Llama-2-7b-chat",
+      "pairs": [
+        "horse->motorcycle",
+        "dog->cat"
+      ],
+      "prompts": "paper/content/suppl.tex:457-539 templates",
+      "metric_keys": [
+        "src_cs_on_src",
+        "tgt_cs_on_src",
+        "src_cs_on_tgt",
+        "tgt_cs_on_tgt",
+        "unrel_cs",
+        "bertp_mmlu"
+      ]
+    },
+    "e3_llm_safety": {
+      "model": "Llama-2-7b-chat",
+      "switch": "toxicity->helpfulness",
+      "metric_keys": [
+        "rtp",
+        "help",
+        "unrel_cs",
+        "mmlu_bert_f1"
+      ],
+      "betas": [
+        3,
+        5
+      ]
+    },
+    "e4_sdxl_h2m": {
+      "model": "SDXL-base-1.0",
+      "switch": "horse->motorcycle",
+      "metric_keys": [
+        "horse_cs_on_horse",
+        "moto_cs_on_horse",
+        "horse_cs_on_moto",
+        "moto_cs_on_moto",
+        "cow_cs",
+        "cow_fid",
+        "pig_cs",
+        "pig_fid",
+        "dog_cs",
+        "dog_fid",
+        "legislator_cs",
+        "legislator_fid"
+      ],
+      "betas": {
+        "vanilla": 2,
+        "leace_switch": 2,
+        "midsteer": 1
+      }
+    },
+    "e5_sdxl_safety": {
+      "model": "SDXL-base-1.0",
+      "switch": "violence->peace",
+      "metric_keys": [
+        "viol_cs",
+        "peace_cs",
+        "unrel_cs",
+        "fid"
+      ],
+      "betas": [
+        3,
+        5
+      ]
+    }
   },
-  "evaluation_rule": "Every measured.<arm>.<metric> is evaluated per seed in seeds. Ordering claims pass iff the stated direction holds at every seed. Value claims pass iff the per-seed mean lies within claimed +/- tolerance. invariant/existence claims pass iff the predicate holds at every seed. Curve claims pass iff the comparison holds at every x at every seed.",
+  "evaluation_rule": "Every measured.<arm>.<metric> is evaluated per seed in seeds. Ordering claims pass iff the stated direction holds at every seed. Value claims pass iff the per-seed mean lies within claimed +/- tolerance. invariant/existence claims pass iff the predicate holds at every seed. Curve claims: `quantity` yields a sequence sampled at `x`; comparison above/below compares it elementwise to the `against` sequence; comparison matches compares it elementwise to `claimed` (read off the figure) within tolerance; comparison increasing/decreasing requires adjacent differences of the stated sign. All curve comparisons must hold at every x at every seed.",
   "claims": [
     {
-      "id": "C1", "kind": "invariant", "compute_invariance": "high",
+      "id": "C1",
+      "kind": "invariant",
+      "compute_invariance": "high",
       "quote": "has the following solution, almost surely:\n\\begin{align}\n    \\widehat A\n    &=\n    I - W^+(W\\Sigma_{XZ})(W\\Sigma_{XZ})^+W,",
       "citation": "paper/content/guardedness.tex:73",
       "name": "LEACE closed form enforces zero covariance and is minimal-disturbance; vanilla erasure is its standardized special case",
       "predicate": "For each seed: draw random PSD Sigma_XX (d=32), column vector Sigma_XZ in Im(Sigma_XX), sample 200000 pairs (X,Z) jointly Gaussian with those covariances. (i) ||Cov(A_hat X + b_hat, Z)||_F < 1e-6 with A_hat,b_hat from Eqs.6-7 (paper/content/guardedness.tex:74-83); (ii) E||A_hat X + b_hat - X||^2 <= min over comparator affine maps {I - c W+ (W Sxz)(W Sxz)+ W, c in linspace(0,2,41)} + 1e-6; (iii) under standardized data (E[X]=0, Sigma_XX=I): max_x ||f_delete(x,s) - (A_hat x + b_hat)||_inf < 1e-8 over 10000 samples with s from Eq.1 (Corollary 4.1, paper/main.tex:297-315).",
-      "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/guardedness.tex:56-85"}
+      "sensitivity": {
+        "fixed_by_paper": true,
+        "citation": "paper/content/guardedness.tex:56-85"
+      }
     },
     {
-      "id": "C2", "kind": "invariant", "compute_invariance": "high",
+      "id": "C2",
+      "kind": "invariant",
+      "compute_invariance": "high",
       "quote": "\\widehat{A} &= I - 2W^+(W \\Sigma_{XZ}) (W \\Sigma_{XZ})^+ W",
       "citation": "paper/main.tex:365",
       "name": "LEACE-Switch closed form flips the sign of Cov and is minimal-disturbance; Householder switching is its standardized special case",
       "predicate": "Setup as C1. (i) ||Cov(A_hat X + b_hat, Z) + Cov(X, Z)||_F < 1e-6 with A_hat from Eq.13 (paper/main.tex:363-367); (ii) E||A_hat X + b_hat - X||^2 <= min over comparator affine maps {I - c W+ (W Sxz)(W Sxz)+ W, c in linspace(0,4,81)} + 1e-6; (iii) under standardized data: max_x ||f_switch(x,s) - (A_hat x + b_hat)||_inf < 1e-8 (Corollary 4.3, paper/main.tex:377-394).",
-      "sensitivity": {"fixed_by_paper": true, "citation": "paper/main.tex:343-367"}
+      "sensitivity": {
+        "fixed_by_paper": true,
+        "citation": "paper/main.tex:343-367"
+      }
     },
     {
-      "id": "C3", "kind": "invariant", "compute_invariance": "high",
+      "id": "C3",
+      "kind": "invariant",
+      "compute_invariance": "high",
       "quote": "\\widehat{A} &= I + W^+ (\\Sigma_{WX, Z_2} - \\Sigma_{WX, Z_1})\\Sigma_{WX, Z_1}^+ W",
       "citation": "paper/main.tex:447",
       "name": "MidSteer closed form matches Cov(f(X),Z1) to Cov(X,Z2), is minimal-disturbance, and reduces to LEACE for constant Z2",
       "predicate": "Setup as C1 with l=1, Sigma_XZ1, Sigma_XZ2 random columns in Im(Sigma_XX), Sigma_XZ1 nonzero. (i) ||Cov(A_hat X + b_hat, Z1) - Cov(X, Z2)||_F < 1e-6 with A_hat from Eq.19 (paper/main.tex:445-448); (ii) E||A_hat X + b_hat - X||^2 <= min over comparator affine maps {I + c W+ (Swz2 - Swz1)(Swz1)+ W, c in linspace(0,2,41), W-completed to satisfy the constraint} + 1e-6; (iii) with Z2 constant (Sigma_XZ2 = 0): ||A_hat_midsteer - A_hat_leace||_F < 1e-8 (paper/main.tex:461).",
-      "sensitivity": {"fixed_by_paper": true, "citation": "paper/main.tex:418-448"}
+      "sensitivity": {
+        "fixed_by_paper": true,
+        "citation": "paper/main.tex:418-448"
+      }
     },
     {
-      "id": "C4", "kind": "ordering", "compute_invariance": "high", "experiment": "e4_sdxl_h2m",
+      "id": "C4",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e4_sdxl_h2m",
       "quote": "In contrast, MidSteer keeps ``motorcycle'' intact.",
       "citation": "paper/content/experiments.tex:127",
       "name": "MidSteer keeps target concept intact on target prompts (vs vanilla)",
       "quantity": "measured.midsteer.moto_cs_on_moto - measured.vanilla.moto_cs_on_moto",
       "direction": ">0",
-      "config": {"vanilla_beta": 2, "midsteer_beta": 1},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "CLIP backbone unstated (gap G11); the paper's gap here is ~17.8 CLIP-x100 points, 6-10x the standard error of our per-seed mean at 240 generations, so the direction is robust to the backbone choice a careful reader could make (CLIPScore default ViT-B/32 through ViT-L/14)."}
+      "config": {
+        "vanilla_beta": 2,
+        "midsteer_beta": 1
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "CLIP backbone unstated (gap G11); the paper's gap here is ~17.8 CLIP-x100 points, 6-10x the standard error of our per-seed mean at 240 generations, so the direction is robust to the backbone choice a careful reader could make (CLIPScore default ViT-B/32 through ViT-L/14)."
+      }
     },
     {
-      "id": "C5", "kind": "ordering", "compute_invariance": "high", "experiment": "e4_sdxl_h2m",
+      "id": "C5",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e4_sdxl_h2m",
       "quote": "In contrast, MidSteer keeps ``motorcycle'' intact.",
       "citation": "paper/content/experiments.tex:127",
       "name": "MidSteer keeps target concept intact on target prompts (vs LEACE-Switch)",
       "quantity": "measured.midsteer.moto_cs_on_moto - measured.leace_switch.moto_cs_on_moto",
       "direction": ">0",
-      "config": {"leace_switch_beta": 2, "midsteer_beta": 1},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Same backbone robustness argument as C4; paper gap ~17.4 CLIP-x100 points."}
+      "config": {
+        "leace_switch_beta": 2,
+        "midsteer_beta": 1
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Same backbone robustness argument as C4; paper gap ~17.4 CLIP-x100 points."
+      }
     },
     {
-      "id": "C6", "kind": "value", "compute_invariance": "low", "experiment": "e4_sdxl_h2m",
+      "id": "C6",
+      "kind": "value",
+      "compute_invariance": "low",
+      "experiment": "e4_sdxl_h2m",
       "quote": "MidSteer (ours) & 1.0 \n& 51.2 & 68.7 \n& 51.9 & 70.7 & 12.7",
       "citation": "paper/flipping_main.tex:46-48",
       "name": "MidSteer target CS on motorcycle prompts equals the base value 70.7",
       "quantity": "measured.midsteer.moto_cs_on_moto",
       "claimed": 70.7,
       "tolerance": 3.0,
-      "config": {"midsteer_beta": 1},
-      "sensitivity": {"parameter": "clip_backbone_and_seed_count", "plausible": [80, 800], "survives": [240, 800], "note": "Exact magnitude leans on the unstated CLIP backbone (G11); rated low - tolerance covers backbone and seed-count reading error."}
+      "config": {
+        "midsteer_beta": 1
+      },
+      "sensitivity": {
+        "parameter": "clip_backbone_and_seed_count",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Exact magnitude leans on the unstated CLIP backbone (G11); rated low - tolerance covers backbone and seed-count reading error."
+      }
     },
     {
-      "id": "C7", "kind": "ordering", "compute_invariance": "high", "experiment": "e4_sdxl_h2m",
+      "id": "C7",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e4_sdxl_h2m",
       "quote": "vanilla steering (CASteer) and LEACE fail when presented with prompt for the target concept (\"motorcycle\"), unable to distinguish between forward and reverse steering.",
       "citation": "paper/content/experiments.tex:108",
       "name": "Vanilla/LEACE-Switch re-induce the source concept on target prompts; MidSteer does not",
       "quantity": "measured.vanilla.horse_cs_on_moto - measured.midsteer.horse_cs_on_moto",
       "direction": ">0",
-      "config": {"vanilla_beta": 2, "midsteer_beta": 1},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Paper gap 68.3 vs 51.9 (base 51.8): ~16 CLIP-x100 points; robust."}
+      "config": {
+        "vanilla_beta": 2,
+        "midsteer_beta": 1
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Paper gap 68.3 vs 51.9 (base 51.8): ~16 CLIP-x100 points; robust."
+      }
     },
     {
-      "id": "C8", "kind": "ordering", "compute_invariance": "high", "experiment": "e3_llm_safety",
+      "id": "C8",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e3_llm_safety",
       "quote": "For Llama-2-7B-chat, MidSteer achieves the strongest reduction in toxicity, decreasing the RTP toxicity score from $.371$ to $.281$ at $\\beta=5$",
       "citation": "paper/content/safety-related_results.tex:10",
       "name": "MidSteer reduces RTP toxicity more than LEACE-Switch at beta=5",
       "quantity": "measured.midsteer.rtp - measured.leace_switch.rtp",
       "direction": "<0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_rtp_prompts_with_toxicity_ge_0.5", "plausible": [80, 800], "survives": [240, 800], "note": "Detoxify variant unstated (G11); the two published Detoxify weight sets preserve this ordering for a .065 gap on a ~.35 base."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_rtp_prompts_with_toxicity_ge_0.5",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Detoxify variant unstated (G11); the two published Detoxify weight sets preserve this ordering for a .065 gap on a ~.35 base."
+      }
     },
     {
-      "id": "C9", "kind": "ordering", "compute_invariance": "high", "experiment": "e3_llm_safety",
+      "id": "C9",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e3_llm_safety",
       "quote": "decreasing the RTP toxicity score from $.371$ to $.281$ at $\\beta=5$",
       "citation": "paper/content/safety-related_results.tex:10",
       "name": "MidSteer reduces RTP toxicity below base at beta=5",
       "quantity": "measured.midsteer.rtp - measured.base.rtp",
       "direction": "<0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_rtp_prompts_with_toxicity_ge_0.5", "plausible": [80, 800], "survives": [240, 800]}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_rtp_prompts_with_toxicity_ge_0.5",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ]
+      }
     },
     {
-      "id": "C10", "kind": "value", "compute_invariance": "low", "experiment": "e3_llm_safety",
+      "id": "C10",
+      "kind": "value",
+      "compute_invariance": "low",
+      "experiment": "e3_llm_safety",
       "quote": "MidSteer-5  & \\textbf{.281}",
       "citation": "paper/artefacts/tables/safety_table.tex:71",
       "name": "MidSteer-5 RTP toxicity value 0.281",
       "quantity": "measured.midsteer.rtp",
       "claimed": 0.281,
       "tolerance": 0.05,
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "detoxify_variant_and_prompt_count", "plausible": [80, 800], "survives": [240, 800], "note": "Exact magnitude leans on unstated Detoxify variant, RTP prompt count and continuation length (G11/G15); rated low, tolerance is ~18% of base scale."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "detoxify_variant_and_prompt_count",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Exact magnitude leans on unstated Detoxify variant, RTP prompt count and continuation length (G11/G15); rated low, tolerance is ~18% of base scale."
+      }
     },
     {
-      "id": "C11", "kind": "ordering", "compute_invariance": "high", "experiment": "e3_llm_safety",
+      "id": "C11",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e3_llm_safety",
       "quote": "while preserving helpfulness at the baseline level",
       "citation": "paper/content/safety-related_results.tex:10",
       "name": "Vanilla collapses helpfulness at beta=5 while MidSteer preserves it",
       "quantity": "measured.vanilla.help - measured.midsteer.help",
       "direction": "<0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_helpfulness_prompts", "plausible": [80, 800], "survives": [240, 800], "note": "ArmoRM checkpoint unstated (G11); paper gap .029 vs .117 = most of the .117 base scale, robust to any reasonable ArmoRM release."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_helpfulness_prompts",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "ArmoRM checkpoint unstated (G11); paper gap .029 vs .117 = most of the .117 base scale, robust to any reasonable ArmoRM release."
+      }
     },
     {
-      "id": "C12", "kind": "ordering", "compute_invariance": "high", "experiment": "e3_llm_safety",
+      "id": "C12",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e3_llm_safety",
       "quote": "substantially degrades unrelated-concept preservation at higher strength, with the unrelated concept score dropping from $8.46$ to $3.11$",
       "citation": "paper/content/safety-related_results.tex:11",
       "name": "MidSteer preserves unrelated concepts where vanilla-5 collapses",
       "quantity": "measured.midsteer.unrel_cs - measured.vanilla.unrel_cs",
       "direction": ">0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_unrelated_generations_per_concept", "plausible": [80, 800], "survives": [240, 800], "note": "LLM-judge CS (Llama-3.1-8B-Instruct) per main text; paper gap 8.48 vs 3.11 on a 0-10 scale."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_unrelated_generations_per_concept",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "LLM-judge CS (Llama-3.1-8B-Instruct) per main text; paper gap 8.48 vs 3.11 on a 0-10 scale."
+      }
     },
     {
-      "id": "C13", "kind": "ordering", "compute_invariance": "medium", "experiment": "e3_llm_safety",
+      "id": "C13",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "experiment": "e3_llm_safety",
       "quote": "LEACE-Switch preserves general capabilities slightly better, as reflected by the highest MMLU BERT-F1 among interventions",
       "citation": "paper/content/safety-related_results.tex:12",
       "name": "LEACE-Switch has the highest MMLU BERT-F1 among intervention arms",
       "quantity": "measured.midsteer.mmlu_bert_f1 - measured.leace_switch.mmlu_bert_f1",
       "direction": "<0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_mmlu_prompts", "plausible": [200, 2000], "survives": [500, 2000], "note": "BERTScore backbone and MMLU subset unstated (G11); paper gap is .01, hence medium."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_mmlu_prompts",
+        "plausible": [
+          200,
+          2000
+        ],
+        "survives": [
+          500,
+          2000
+        ],
+        "note": "BERTScore backbone and MMLU subset unstated (G11); paper gap is .01, hence medium."
+      }
     },
     {
-      "id": "C14", "kind": "ordering", "compute_invariance": "high", "experiment": "e5_sdxl_safety",
+      "id": "C14",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e5_sdxl_safety",
       "quote": "Vanilla steering also reduces violence, but either underperforms MidSteer on source suppression or causes larger distortions",
       "citation": "paper/content/safety-related_results.tex:15",
       "name": "MidSteer suppresses violence below vanilla at beta=5",
       "quantity": "measured.midsteer.viol_cs - measured.vanilla.viol_cs",
       "direction": "<0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Paper gap 6.0 vs 20.8 CLIP-x100 points."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Paper gap 6.0 vs 20.8 CLIP-x100 points."
+      }
     },
     {
-      "id": "C15", "kind": "ordering", "compute_invariance": "high", "experiment": "e5_sdxl_safety",
+      "id": "C15",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e5_sdxl_safety",
       "quote": "MidSteer most effectively suppresses the source concept, reducing the violence score from $99.6$ to $6.0$",
       "citation": "paper/content/safety-related_results.tex:15",
       "name": "Vanilla also reduces violence relative to base (while underperforming MidSteer)",
       "quantity": "measured.vanilla.viol_cs - measured.base.viol_cs",
       "direction": "<0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800]}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ]
+      }
     },
     {
-      "id": "C16", "kind": "ordering", "compute_invariance": "high", "experiment": "e5_sdxl_safety",
+      "id": "C16",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e5_sdxl_safety",
       "quote": "LEACE-Switch yields the lowest FID among interventions but is substantially less effective at inducing the target concept.",
       "citation": "paper/content/safety-related_results.tex:15",
       "name": "MidSteer induces peace far better than LEACE-Switch at beta=5",
       "quantity": "measured.midsteer.peace_cs - measured.leace_switch.peace_cs",
       "direction": ">0",
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Paper gap 94.0 vs 54.5 CLIP-x100 points."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Paper gap 94.0 vs 54.5 CLIP-x100 points."
+      }
     },
     {
-      "id": "C17", "kind": "value", "compute_invariance": "low", "experiment": "e5_sdxl_safety",
+      "id": "C17",
+      "kind": "value",
+      "compute_invariance": "low",
+      "experiment": "e5_sdxl_safety",
       "quote": "MidSteer-5  & \\textbf{6.0} & \\textbf{94.0}",
       "citation": "paper/artefacts/tables/safety_table.tex:83",
       "name": "MidSteer-5 violence score 6.0",
       "quantity": "measured.midsteer.viol_cs",
       "claimed": 6.0,
       "tolerance": 5.0,
-      "config": {"beta": 5},
-      "sensitivity": {"parameter": "clip_backbone_and_seed_count", "plausible": [80, 800], "survives": [240, 800], "note": "Exact magnitude leans on unstated CLIP backbone (G11); rated low; tolerance ~5x the per-seed standard error."}
+      "config": {
+        "beta": 5
+      },
+      "sensitivity": {
+        "parameter": "clip_backbone_and_seed_count",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Exact magnitude leans on unstated CLIP backbone (G11); rated low; tolerance ~5x the per-seed standard error."
+      }
     },
     {
-      "id": "C18", "kind": "ordering", "compute_invariance": "medium", "experiment": "e5_sdxl_safety",
+      "id": "C18",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "experiment": "e5_sdxl_safety",
       "quote": "LEACE-Switch yields the lowest FID among interventions",
       "citation": "paper/content/safety-related_results.tex:15",
       "name": "LEACE-Switch has lowest unrelated-concept FID among intervention arms at beta=3",
       "quantity": "measured.leace_switch.fid - min(measured.vanilla.fid, measured.midsteer.fid)",
       "direction": "<0",
-      "config": {"beta": 3},
-      "sensitivity": {"parameter": "n_unrelated_generations_per_concept", "plausible": [80, 800], "survives": [240, 800], "note": "FID on ~240 images per cell is noisy and its estimator is unstated (G11); paper gap at beta=3 is 88.9 vs 93.6/101.5."}
+      "config": {
+        "beta": 3
+      },
+      "sensitivity": {
+        "parameter": "n_unrelated_generations_per_concept",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "FID on ~240 images per cell is noisy and its estimator is unstated (G11); paper gap at beta=3 is 88.9 vs 93.6/101.5."
+      }
     },
     {
-      "id": "C19", "kind": "ordering", "compute_invariance": "high", "experiment": "e2_llm_concrete",
+      "id": "C19",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "experiment": "e2_llm_concrete",
       "quote": "In contrast, MidSteer keeps ``motorcycle'' intact.",
       "citation": "paper/content/experiments.tex:127",
       "name": "LLM: MidSteer keeps motorcycle intact on motorcycle prompts (Llama-2-7B-chat, judge CS)",
       "quantity": "measured.midsteer.tgt_cs_on_tgt - max(measured.vanilla.tgt_cs_on_tgt, measured.leace_switch.tgt_cs_on_tgt)",
       "direction": ">0",
-      "config": {"vanilla_beta": 2, "leace_switch_beta": 2, "midsteer_beta": 1, "pair": "horse->motorcycle"},
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Judge = Llama-3.1-8B-Instruct (G10). Paper numbers at default betas: 8.5 vs 7.9/5.4 (paper/artefacts/tables/llm_flip_tables_noclip.tex, horses_to_motorcycles); GPT-4o-mini judge agrees on ordering at all beta (paper/content/suppl.tex:664)."}
+      "config": {
+        "vanilla_beta": 2,
+        "leace_switch_beta": 2,
+        "midsteer_beta": 1,
+        "pair": "horse->motorcycle"
+      },
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Judge = Llama-3.1-8B-Instruct (G10). Paper numbers at default betas: 8.5 vs 7.9/5.4 (paper/artefacts/tables/llm_flip_tables_noclip.tex, horses_to_motorcycles); GPT-4o-mini judge agrees on ordering at all beta (paper/content/suppl.tex:664)."
+      }
     },
     {
-      "id": "C20", "kind": "curve", "compute_invariance": "high", "experiment": "e2_llm_concrete",
+      "id": "C20",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "experiment": "e2_llm_concrete",
       "quote": "In each case, we see clear superiority of MidSteer over other steering approaches.",
       "citation": "paper/content/switching_suppl.tex:23",
       "name": "LLM source-concept suppression: MidSteer below both baselines across beta (Pareto dominance, source axis)",
-      "quantity": "for pair in [horse->motorcycle, dog->cat]: [min(measured.vanilla.src_cs_on_src(beta), measured.leace_switch.src_cs_on_src(beta)) - measured.midsteer.src_cs_on_src(beta) for beta in x] (mean over the 2 pairs)",
-      "x": [3, 4, 5],
+      "quantity": "[min(measured.vanilla.src_cs_on_src(beta, pair), measured.leace_switch.src_cs_on_src(beta, pair)) for beta in x] (computed per pair, then averaged over the 2 pairs horse->motorcycle, dog->cat)",
+      "x": [
+        3,
+        4,
+        5
+      ],
       "comparison": "above",
-      "reference": 0.0,
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Pair set restricted to the two pairs with published Llama-3.1-8B-judge per-beta tables (paper/artefacts/tables/llm_flip_tables_noclip.tex); chihuahua->muffin excluded (only GPT-4o-mini tables exist). Backed by figure read: figure_reads/transcript.md Q1/Q2 (dominant method = MiDSteer)."}
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Pair set restricted to the two pairs with published Llama-3.1-8B-judge per-beta tables (paper/artefacts/tables/llm_flip_tables_noclip.tex); chihuahua->muffin excluded (only GPT-4o-mini tables exist). Backed by figure read: figure_reads/transcript.md Q1/Q2 (dominant method = MiDSteer). quantity is the best (lowest-src-CS) baseline curve, so the claim is the weakest dominance statement the tables support; margins >= 1.2 CS points at every listed beta (paper/artefacts/tables/llm_flip_tables_noclip.tex)."
+      },
+      "against": "[measured.midsteer.src_cs_on_src(beta, pair) for beta in x] (computed per pair, then averaged over the same 2 pairs)"
     },
     {
-      "id": "C21", "kind": "curve", "compute_invariance": "high", "experiment": "e4_sdxl_h2m",
+      "id": "C21",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "experiment": "e4_sdxl_h2m",
       "quote": "We see that in each case MidSteer achieves much better balance between level of concept switch between $c_1$ and $c_2$ and preservation of other concepts across different values of $\\beta$.",
       "citation": "paper/content/experiments.tex:121",
       "name": "SDXL source-concept suppression: MidSteer below both baselines across beta (Pareto dominance, source axis)",
-      "quantity": "[min(measured.vanilla.horse_cs_on_horse(beta), measured.leace_switch.horse_cs_on_horse(beta)) - measured.midsteer.horse_cs_on_horse(beta) for beta in x]",
-      "x": [1, 2, 3, 4, 5],
+      "quantity": "[min(measured.vanilla.horse_cs_on_horse(beta), measured.leace_switch.horse_cs_on_horse(beta)) for beta in x]",
+      "x": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
       "comparison": "above",
-      "reference": 0.0,
-      "sensitivity": {"parameter": "n_eval_generations_per_concept_cell", "plausible": [80, 800], "survives": [240, 800], "note": "Paper margins >= 1.2 CLIP-x100 points at every beta (paper/artefacts/tables/diffusion_flip_tables_noclip.tex, Table 16). Backed by figure reads: figure_reads/transcript.md Q3/Q4 (dominant method = MiDSteer)."}
+      "sensitivity": {
+        "parameter": "n_eval_generations_per_concept_cell",
+        "plausible": [
+          80,
+          800
+        ],
+        "survives": [
+          240,
+          800
+        ],
+        "note": "Paper margins >= 1.2 CLIP-x100 points at every beta (paper/artefacts/tables/diffusion_flip_tables_noclip.tex, Table 16). Backed by figure reads: figure_reads/transcript.md Q3/Q4 (dominant method = MiDSteer)."
+      },
+      "against": "[measured.midsteer.horse_cs_on_horse(beta) for beta in x]"
     },
     {
-      "id": "C22", "kind": "curve", "compute_invariance": "medium", "experiment": "e2_llm_concrete",
+      "id": "C22",
+      "kind": "curve",
+      "compute_invariance": "low",
+      "experiment": "e2_llm_concrete",
       "quote": "Fig.~\\ref{fig:num_covs} shows that performance largely stabilizes around 5,000 prompts in the tested Llama-2-7B setting.",
       "citation": "paper/content/suppl.tex:642",
-      "name": "Sigma_XX estimation with M>=5000 prompts matches M=50000 within tolerance",
-      "quantity": "[measured.midsteer.bertp_mmlu(M) for M in x] (MidSteer, beta grid {2,3,4} as in ablation)",
-      "x": [5000, 10000, 20000],
+      "name": "Sigma_XX estimation with M>=5000 prompts matches the paper's Fig. 5 plateau values within tolerance",
+      "quantity": "[measured.midsteer.bertp_mmlu(beta, M) for M in x] ; each entry is the mean over the ablation beta grid {2.0, 2.5, 3.0} (figure legend); bertp_mmlu = 1 - (1 - BERT-Precision on MMLU) with the Sigma_XX prompt count set to M, Llama-2-7B-chat, horse->motorcycle, MidSteer",
+      "x": [
+        5000,
+        10000,
+        20000
+      ],
       "comparison": "matches",
-      "claimed": "measured.midsteer.bertp_mmlu(M=50000)",
-      "tolerance": 0.01,
-      "note": "Our reproduction's M=5000 restriction (SPEC.md section 8) leans on this claim. Figure read: figure_reads/transcript.md Q5 (5000/10000/20000 cluster together = yes).",
-      "sensitivity": {"parameter": "midsteer_beta_grid_for_ablation", "plausible": [2, 4], "survives": [2, 4]}
+      "claimed": [
+        0.9578,
+        0.9605,
+        0.961
+      ],
+      "tolerance": 0.03,
+      "note": "Per-beta plateau reads (1-BERTP, M=5000/10000/20000): beta2.0 0.0368/0.0340/0.0336, beta2.5 0.0423/0.0399/0.0392, beta3.0 0.0475/0.0446/0.0443; per-beta claimed BERTP = 1 minus those; the 3-element claimed above is the per-M mean over the beta grid. Sequence read off Fig. 5 (paper/artefacts/phase/llama2_noclip.pdf): beta values from the figure legend (read-figure: '2.0, 2.5, 3.0'), x-axis ticks 0.04-0.07 (read-figure), per-point 1-BERTP coordinates extracted deterministically from the vector PDF - 21 marker centers (circle/triangle/diamond = beta 2.0/2.5/3.0 per upstream produce_charts.ipynb) mapped through the gridline-pixel-to-tick transform, prompt-count labels fixed by inverting the RdPu LogNorm colormap (fitted vmin=25, vmax=50000, counts {100,500,1000,5000,10000,20000,50000}, residual ~0.001); claimed = 1 - read(1-BERTP). Extraction arithmetic in SPEC.md section 11. Our M=5000 restriction (SPEC.md section 8) leans on this claim. matches-claim tolerance covers the figure-reading error and the unstated BERTScore backbone / MMLU subset (G11), hence rated low.",
+      "sensitivity": {
+        "parameter": "claimed_sequence_reading_error_abs_bertp",
+        "plausible": [
+          0.0,
+          0.01
+        ],
+        "survives": [
+          0.0,
+          0.03
+        ],
+        "note": "Reading error from the pixel-to-data transform is <0.001; the wide part of the plausible band covers the unstated BERTScore backbone and MMLU subset (G11), which shift the whole sequence common-mode and largely cancel in the stabilization direction the paper asserts."
+      }
     }
   ],
   "not_tested": [
@@ -719,9 +1188,10 @@ See ./claims.json — kept byte-identical with the block below.
 
 Gating note: gating is on the claims with compute_invariance = high (C1–C5, C7–C9, C11–C12,
 C14–C16, C19–C21). Three of them — the synthetic closed-form checks C1–C3 — need only CPU
-minutes and no model download, so the suite always has something decisive to say. C13, C18, C22
-are medium (gap small or estimator noisy at our budget); C6, C10, C17 are low (exact magnitudes
-that lean on unstated backbones).
+minutes and no model download, so the suite always has something decisive to say. C13, C18
+are medium (gap small or estimator noisy at our budget); C6, C10, C17, C22 are low (exact
+magnitudes that lean on unstated backbones; C22's `claimed` sequence is read off Fig. 5, so the
+unstated BERTScore backbone of gap G11 re-enters and medium would overstate it).
 
 ## 10. Claims deliberately not tested
 
@@ -749,5 +1219,19 @@ required (no deliberation flags triggered). Readings:
 - Fig. 2b (LLM, ΔCS vs 1−BERTPrecision MMLU): dominant = MiDSteer.
 - Fig. 2c (SDXL, ΔCS vs unrelated CS): dominant = MiDSteer.
 - Fig. 2d (SDXL, ΔCS vs unrelated FID): dominant = MiDSteer.
-- Fig. 5 (Σ_XX prompt count): 5000/10000/20000 cluster together = "yes".
+- Fig. 5 (Σ_XX prompt count): 5000/10000/20000 cluster together = "yes"; legend β values =
+  "2.0, 2.5, 3.0"; x-axis first/last ticks = "0.04 0.07". Nine subsequent constrained probes for
+  per-point coordinates returned empty (recorded in the transcript); the per-point 1-BERTP values
+  behind C22's `claimed` were therefore extracted deterministically from the vector PDF itself:
+  21 marker centres (7 counts × 3 β; circle/triangle/diamond maps to β = 2.0/2.5/3.0 per the
+  upstream `notebooks/produce_charts.ipynb` that generated this PDF), pixel→data transform from
+  the four vertical gridlines (px 144.67/255.68/366.68/477.68 ↔ ticks 0.04/0.05/0.06/0.07, the
+  vision-read range), count labels from inverting the RdPu LogNorm colormap (fitted
+  vmin = 25, vmax = 50 000; counts {100,500,1000,5000,10000,20000,50000}, residual ≈ 0.001).
+  Plateau values (1−BERTP): β2.0 → 0.0368/0.0340/0.0336 at M = 5000/10000/20000; β2.5 →
+  0.0423/0.0399/0.0392; β3.0 → 0.0475/0.0446/0.0443. C22's claimed BERTP sequence is
+  1 − read, averaged over the β grid per M: [0.9578, 0.9605, 0.9610]. Sanity:
+  the M ≥ 5000 plateau (~0.95–0.97) sits next to the paper's own Llama-2-7B BERT-F1 column
+  (0.936–0.975 across β, `paper/artefacts/tables/safety_table.tex`), confirming the tick-value
+  assignment.
 Each figure's underlying PDF was rendered to PNG at 150 dpi from the arXiv source artefacts.
