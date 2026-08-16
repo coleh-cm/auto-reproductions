@@ -10,7 +10,10 @@ Reproduction of "MidSteer: Optimal Affine Framework for Steering Generative Mode
 
 ## Status
 
-**Phase: setup complete.** Paper ingested; reproduction workspace created. No code yet.
+**Phase: spec complete.** Paper read against the arXiv LaTeX source (authoritative); `SPEC.md`
+and `claims.json` written and committed. Upstream code confirmed to exist and cloned for
+inspection (`https://github.com/Atmyre/MidSteer`, HEAD `0f3b31e`); decision: **adopt upstream
+code** as the base implementation. No running code yet.
 
 ### Setup log
 
@@ -18,9 +21,22 @@ Reproduction of "MidSteer: Optimal Affine Framework for Steering Generative Mode
 - [x] `paper/` contains the PDF-extracted paper text (`paper.txt`, convenience copy; maths NOT reliable from it) and the arXiv 2605.05220 v3 LaTeX source (authoritative for equations, tables, numbers).
 - [x] LaTeX source: `main.tex`, `flipping_main.tex`, `content/*.tex`, `artefacts/**/*.tex`, `example_paper.bib`. Build system per `00README.json` (ignored): pdflatex + texlive 2025, `icml2026` style (`.sty`/`.bst` ignored, compile-time only).
 - [x] `paper/.gitignore` keeps only `.tex`/`.bbl`/`.bib` + `paper.txt`; figures (`img/*.png`, `artefacts/{main,pareto,phase}/*.pdf`), `eprint.tar.gz`, styles and metadata are ignored.
-- [ ] Read paper properly; write `SPEC.md` (method as algorithm, symbols+shapes, equation citations, unstated details).
-- [ ] Evaluate upstream code (https://github.com/Atmyre/MidSteer) — prefer using it if it runs.
-- [ ] Get the smallest end-to-end case running and produce a number.
+- [x] Read paper properly; wrote `SPEC.md` (method as algorithm, symbols+shapes, every
+  implemented equation cited to `paper/*.tex:<line>`, 19-item gap list G1–G19 with weakest
+  readings, frozen component interfaces, 4 arms, per-arm restriction analysis).
+- [x] Wrote `claims.json`: 22 claims (16 high / 3 medium / 3 low), 4 arms, seeds {0,1,2};
+  every claim has verbatim quote + on-disk citation + settling arithmetic; high claims carry
+  sensitivity or `fixed_by_paper`. Figure-derived curve claims backed by
+  `figure_reads/transcript.md` (5 reads, all constrained one/two-word answers, no deliberation
+  flags).
+- [x] Evaluated upstream code (https://github.com/Atmyre/MidSteer): exists, public. Mapped its
+  math to the paper Eqs. 6/13/19/22/23 (matches, incl. mean-centering identity
+  x' = x − β·Q(x−μ) ≡ Âx + b̂). Recorded 6 candidate divergences in SPEC.md §1 (projection-score
+  clipping ON by default and not in the paper; mean-diff vs literal Cov(X,Z); pinv tolerance;
+  per-head stats; hooks vs weight-folding; diffusion-step indexing).
+- [ ] Vendor/clone upstream into the repo; get the smallest end-to-end case running
+  (E1 synthetic closed-form checks first — CPU-only, then E2 smallest model arm) and produce a
+  parsed number.
 - [ ] Adversarial review rounds against the paper until clean.
 - [ ] Readiness gates; publish.
 
