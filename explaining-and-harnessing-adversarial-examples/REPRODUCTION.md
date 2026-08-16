@@ -3,11 +3,15 @@
 **Paper:** Explaining and Harnessing Adversarial Examples
 **Authors:** Ian J. Goodfellow, Jonathon Shlens, Christian Szegedy (Google Inc.)
 **Venue:** ICLR 2015 (arXiv:1412.6572v3, 20 Mar 2015)
-**Date started:** 2026-08-06 (this run)
+**Date started:** 2026-08-16 (this run; folder's first reproduction 2026-08-04, published run 2026-08-06)
 
 ## Status
 
-**Reproduction complete; published this run.** Branch
+**This run (2026-08-16): setup complete — workspace, branch, markers, and paper ingest done;
+later steps pending.** The record below is the published 2026-08-06 run's final
+state, preserved as this run's starting point and baseline.
+
+**2026-08-06 run: reproduction complete; published.** Branch
 `repro/explaining-and-harnessing-adversarial-examples` pushed and `main` brought
 up to it. Reference material verified on disk:
 
@@ -254,6 +258,31 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
   verdict (45 pass / 24 fail, 14/14 HIGH). REPRODUCTION.md status flipped,
   measured-vs-paper table + readiness-gate table written, VERIFICATION.md
   refreshed, scratch files cleaned, branch pushed and `main` fast-forwarded.
+- 2026-08-16 — Setup (this run, continuation). This step re-established the
+  workspace on a fresh sandbox and independently re-verified the ingest rather
+  than trusting the earlier 2026-08-16 setup entry: cloned
+  `coleh-cm/auto-reproductions` shallow + blobless (`--depth 1
+  --filter=blob:none`) into `$HOME/auto-reproductions` with `$GITHUB_TOKEN` in
+  the HTTPS URL (no credential helper was configured; the token was scrubbed
+  from the remote afterwards and a repo-local credential helper reading
+  `$GITHUB_TOKEN` set for pushes). Markers written with no trailing newline:
+  `$HOME/.repro_dir` = this folder, `$HOME/.repro_branch` =
+  `repro/explaining-and-harnessing-adversarial-examples`. The branch already
+  existed on the remote carrying the prior runs' published work and this
+  morning's setup commit (`7fe8794`), so it was checked out at its tip, NOT
+  recreated or rebased. Paper ingest re-done first-hand: a fresh download of
+  the arXiv 1412.6572 e-print this session unpacked cleanly and
+  `paper/source/iclr2015.{tex,bbl}` are byte-identical to the fresh download
+  (`cmp` clean, not just reported by the earlier run's commit message); the
+  full unpack now sits on disk under `paper/source/` with the folder
+  `.gitignore` ignoring everything except `.tex`/`.bbl`/`.bib` (verified with
+  `git check-ignore`: pngs/sty/bst/pdf ignored, `iclr2015.tex` tracked). The
+  piece all prior runs lacked — the rendered HTML reading surface — was
+  fetched this session from `https://arxiv.org/html/1412.6572` and committed
+  as `paper/paper.html` (131 KB, 73 MathML `<math>` elements, FGSM text
+  present). Per the ingest contract: read from `paper/paper.html`, quote from
+  `paper/source/iclr2015.tex` (citations as file:line, preamble macros at
+  tex:14-27 resolved before quoting equations).
 
 ## Numbers — measured vs paper
 
