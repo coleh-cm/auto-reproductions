@@ -219,6 +219,31 @@ resistance numbers (89.4% → 17.9%, l. 515–517).
   from the current `measured.json` at publish, at which point it must match
   `selfcheck.json` verdict-for-verdict.
 
+- 2026-08-16 — Setup (this run). Workspace re-established for a new run on the
+  same paper. Note on the repository URL: the objective named
+  `github.com/gc-os-ai/reproductions`, which 404s for this token (org listing has
+  no such repo, token user is not a member); the reproductions repository
+  holding every earlier reproduction — including this folder's published 2026-08-06
+  run — is `coleh-cm/auto-reproductions`, so that is what was cloned. Cloned
+  shallow + blobless (`--depth 1 --filter=blob:none`) into
+  `$HOME/reproductions`; markers written with no trailing newline
+  (`$HOME/.repro_dir` = this folder, `$HOME/.repro_branch` =
+  `repro/explaining-and-harnessing-adversarial-examples`). The branch already
+  existed on the remote holding the prior run's published work, so it was
+  checked out at its tip `f95361c`, NOT recreated — recreating or force-pushing
+  it from main would clobber a published reproduction. Paper reference verified
+  on disk rather than re-created: `paper/paper.md` (extracted text) and
+  `paper/source/iclr2015.{tex,bbl}` are committed on the branch; a fresh
+  download of the arXiv 1412.6572 e-print this session is byte-identical to the
+  committed `.tex`/`.bbl` (`cmp` clean), and the folder `.gitignore` correctly
+  tracks only `.tex`/`.bbl`/`.bib` under `paper/source/` and ignores figures,
+  style files and tarballs. Environment this run: python 3.12.14
+  (`/usr/local/bin`), uv 0.12.5 available; no torch/tensorflow installed yet
+  (later steps must build `.venv` from `requirements.txt`, torch 2.7.1+cpu);
+  no GPU (no `nvidia-smi`); no docker in sandbox; 16 CPUs, 63 GB RAM, 2.2 TB
+  disk free; MNIST/CIFAR-10 corpora are gitignored and must be (re)downloaded
+  by `data.py` on first run with working network (arXiv reachability confirmed
+  this session).
 - 2026-08-06 — Numbers / publish step. All 16 arms ran (2 blocked per SPEC §9:
   `mp_dbm`, `googlenet_imagenet`); the numbers gate
   (`claims_result.json`, `produced_by: reproduce-paper numbers gate`) adjudicated
