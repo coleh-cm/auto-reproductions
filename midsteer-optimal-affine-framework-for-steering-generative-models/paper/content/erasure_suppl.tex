@@ -1,0 +1,97 @@
+\section{Concept erasure}
+\label{sec:exp_concept_erasure}
+
+In this section, we provide experiments for concept erasure. The reason for such is to show that unified MidSteer framework, that also includes erasure in case $Z_2$ is constant, performs favourably on a variety of tasks. Note that in case of erasure, both MidSteer and LEACE provide the same solutions, so we will label the results as LEACE / MidSteer in charts.
+
+For concept erasure, we use evaluation setup seimilar to that of concept switching. For LLM, We test erasure of the concepts $c_s \in$ ("Horse", $c_2$ ="Dog"). Corresponding testing concepts are $t_i = \{c_i\}^5_{i=1}$: $t_1$ = ("Motorcycle", "Cow",  "Dog", "Pig", "Legislator"), $t_2$ = ("Cat", "Cow",  "Wolf", "Pig", "Legislator"). For Diffusion Models, We test erasure of the concepts $c_s \in$ ("Horse", $c_2$ ="Chichuahua"). Corresponding testing concepts are $t_i = \{c_i\}^5_{i=1}$: $t_1$ = ("Motorcycle", "Cow",  "Dog", "Pig", "Legislator"), $t_2$ = ("Muffin", "Cat",  "Dog", "Wolf", "Legislator"),
+
+The setup for erasure is similar to those of main paper experiments (Sec. \ref{sec:experiments}). The only difference is that there is no target concept (i.e. it is a dummy concept). We utilise similar pairs of prompts $(c_1, c_2)$ as in switching experiments, with the goal of removing $c_1$.
+
+Fig.~\ref{fig:pareto_erase_bert_llama2},\ref{fig:pareto_erase_fid_sdxl},\ref{fig:pareto_erase_cs_llama2},\ref{fig:pareto_erase_cs_sdxl} present Pareto plots for concept erasure similar to that for concept switching in sec.~\ref{sec:experiments}. More precisely, we compare results on concept switching by applying vanilla steering, LEACE (which is equivalent to MidSteer in the case of erasure) with different values of $\beta$. We present results on LLama-2-7b and SDXL models aggregated for all three erase concepts. It can be clearly seen, that in each case, MidSteer achieves much better balance between level of concept switch between c1 and c2 and preservation of other concepts across different values of $\beta$.
+
+Next, in sec.~\ref{sec:pareto_llm_erase},~\ref{sec:pareto_diffusion_erase} we provide detailed Pareto plots for each model, and in sec.~\ref{sec:tables_llm_erase},\ref{sec:tables_diffusion_erase} we provide Tables with detailed breakdown of scores for all $\beta$ values and all erased concepts.
+
+
+\begin{figure}[htbp]
+	% \centering
+	\begin{subfigure}{0.47\textwidth}
+		% \centering
+		\includegraphics[width=1.0\linewidth]{artefacts/main/llama2-7b-erasure-noclip-unrelated-cs.pdf}
+		\caption{Erased concept score vs CS of unrelated concepts on Llama-2-7b model.}
+		\label{fig:pareto_erase_cs_llama2}
+	\end{subfigure}
+	%\hfill
+	\begin{subfigure}{0.47\textwidth}
+		\includegraphics[width=1.0\linewidth]{artefacts/main/llama2-7b-erasure-noclip-mmlu-bertp.pdf}
+		\caption{Erased concept score vs 1 - BERT Precision on MMLU on Llama-2-7b model.}
+		\label{fig:pareto_erase_bert_llama2}
+	\end{subfigure}
+	
+	% \centering
+	\begin{subfigure}{0.47\textwidth}
+		% \centering
+		\includegraphics[width=1.0\linewidth]{artefacts/main/sdxl-erase-noclip-unrelated-cs.pdf}
+		\caption{Erased concept score vs CS of unrelated concepts on SDXL model.}
+		\label{fig:pareto_erase_cs_sdxl}
+	\end{subfigure}
+	%\hfill
+	\begin{subfigure}{0.47\textwidth}
+		\includegraphics[width=1.0\linewidth]{artefacts/main/sdxl-erase-noclip-unrelated-fid.pdf}
+		\caption{Erased concept score vs FID of unrelated concepts on SDXL model.}
+		\label{fig:pareto_erase_fid_sdxl}
+	\end{subfigure}
+	
+	% \vspace{-0.6cm}
+	\caption{Pareto efficiency frontiers for concept \textit{erasure} experiments with vanilla steering and LEACE / MidSteer highlighting different $\beta$.}
+	\label{fig:pareto_erase}
+	% \vspace{-0.5cm}
+\end{figure}
+
+\clearpage
+\subsection{Pareto charts for LLM concept erasure}
+\label{sec:pareto_llm_erase}
+
+In this section, we provide more Pareto charts for LLM concept erasure. When erasing concept $c_s$, for each LLM model we provide 3 types of Pareto plots: 
+\begin{itemize}
+    \item 1 - BERT Precision score for unrelated concepts (horizontal axis) vs Concept Score (CS) for the erased $c_s$ concept (vertical axis) (fig.~\ref{fig:llama2-7b-erasure-noclip-unrelated-bertp.svg},\ref{fig:qwen-14b-erasure-unrelated-bertp.svg},\ref{fig:qwen-7b-erasure-noclip-mmlu-bertp.svg})
+    \item 1 - BERT Precision score for MMLU (horizontal axis) vs Concept Score (CS) for the erased $c_s$ concept (vertical axis) (fig.~\ref{fig:llama2-7b-erasure-noclip-mmlu-bertp.svg},\ref{fig:qwen-14b-erasure-mmlu-bertp.svg},\ref{fig:qwen-7b-erasure-noclip-mmlu-bertp.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs Concept Score (CS) for the erased $c_s$ concept (vertical axis)  (fig.~\ref{fig:llama2-7b-erasure-noclip-unrelated-cs.svg},\ref{fig:qwen-14b-erasure-unrelated-cs.svg},\ref{fig:qwen-7b-erasure-noclip-unrelated-cs.svg})
+\end{itemize}
+
+In each case, we see clear superiority of LEACE/MidSteer over other steering approaches.
+
+We additionally provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_i$ in the tables in sec.~\ref{sec:tables_llm_erase}
+
+\include{artefacts/pareto_includes/llm_erasure_noclip}
+
+\clearpage
+\subsection{Pareto charts for image diffusion concept erasure}
+\label{sec:pareto_diffusion_erase}
+
+In this section, we provide more Pareto charts for LLM concept erasure. When erasing concept $c_s$, for each Diffusion model we provide 2 types of Pareto plots: 
+\begin{itemize}
+    \item FID score for unrelated concepts (horizontal axis) vs Concept Score (CS) for the erased $c_s$ concept (vertical axis) (fig.~\ref{fig:sdxl-erase-noclip-unrelated-fid.svg},\ref{fig:sdxl-erase-noclip-unrelated-fid.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs Concept Score (CS) for the erased $c_s$ concept (vertical axis)  (fig.~\ref{fig:sdxl-erase-noclip-unrelated-cs.svg},\ref{fig:sana-erase-noclip-unrelated-cs.svg})
+\end{itemize}
+
+In each case, we see clear superiority of LEACE/MidSteer over other steering approaches.
+
+We additionally provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_i$ in the tables in sec.~\ref{sec:tables_diffusion_erase}
+
+\include{artefacts/pareto_includes/diffusion_erase_noclip}
+
+\clearpage
+\subsection{Results for LLM concept erasure}
+\label{sec:tables_llm_erase}
+
+In this section, in tab.~\ref{tab:erase_llama2-7b_noclip_horses},\ref{tab:erase_llama2-7b_noclip_dogs},\ref{tab:erase_qwen2.5-14b_noclip_horses},\ref{tab:erase_qwen2.5-14b_noclip_dogs},\ref{tab:erase_qwen2.5-14b_noclip_horses},\ref{tab:erase_qwen2.5-7b_noclip_dogs}we provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_i$. Pareto plots in sec.~\ref{sec:pareto_llm_erase} were created based on the scores provided in these tables.
+
+\include{artefacts/tables/llm_erase_tables_noclip}
+
+\clearpage
+\subsection{Results for image diffusion concept erasure}
+\label{sec:tables_diffusion_erase}
+
+In this section, in tab.~\ref{tab:erase_sdxl_noclip_horse},\ref{tab:erase_sana_noclip_chihuahua},\ref{tab:erase_sdxl_noclip_chihuahua},\ref{tab:erase_sana_noclip_chihuahua} we provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_i$. Pareto plots in sec.~\ref{sec:pareto_diffusion_erase} were created based on the scores provided in these tables.
+
+\include{artefacts/tables/diffusion_erase_tables_noclip}

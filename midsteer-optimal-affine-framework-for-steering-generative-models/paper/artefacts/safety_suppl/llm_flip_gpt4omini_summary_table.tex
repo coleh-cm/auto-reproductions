@@ -1,0 +1,17 @@
+\begin{table}[th!]
+\caption{GPT-4o-mini judge cross-validation of the LLM-judge Concept Scores used in Sec.~\ref{sec:experiments}. Same 0--10 protocol as Appendix~\ref{sec:judge_prompt}, but with GPT-4o-mini in place of Llama-3.1-8B as the judge. Each cell shows source-CS / target-CS on the source-concept test prompts. MidSteer attains the lowest source-CS and the highest target-CS in every pair and at every $\beta$, confirming the relative ordering established with the Llama-3.1-8B judge.}
+\label{tab:gpt4omini_summary}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}{l|c|cc|cc|cc}
+\toprule
+ & & \multicolumn{2}{c}{Vanilla} & \multicolumn{2}{c}{LEACE-Switch} & \multicolumn{2}{c}{MidSteer} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Concept pair & Baseline & $\beta{=}3$ & $\beta{=}5$ & $\beta{=}3$ & $\beta{=}5$ & $\beta{=}3$ & $\beta{=}5$ \\
+\midrule
+Horse $\to$ Motorcycle & 9.8\,/\,0.1 & 1.4\,/\,7.8 & 1.8\,/\,6.3 & 1.9\,/\,7.5 & 2.1\,/\,7.1 & 0.1\,/\,9.5 & 0.1\,/\,9.6 \\
+Dog $\to$ Cat & 9.7\,/\,0.2 & 4.9\,/\,5.1 & 4.2\,/\,5.6 & 4.3\,/\,5.3 & 3.7\,/\,5.6 & 0.7\,/\,9.2 & 0.1\,/\,9.7 \\
+Chihuahua $\to$ Muffin & 9.8\,/\,0.0 & 0.6\,/\,5.0 & 0.5\,/\,5.2 & 0.9\,/\,6.2 & 0.2\,/\,6.9 & 0.2\,/\,7.9 & 0.0\,/\,8.5 \\
+\bottomrule
+\end{tabular}}
+\end{table}

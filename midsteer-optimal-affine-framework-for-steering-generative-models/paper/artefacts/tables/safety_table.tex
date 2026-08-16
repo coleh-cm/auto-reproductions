@@ -1,0 +1,93 @@
+% % Option B: Two side-by-side mini tables: Llama-2-7B (LLM) + SDXL (diffusion).
+% % Each table now includes unrelated-concept preservation and a global consistency metric
+% % (MMLU BERT-F1 for LLM; FID on unrelated for diffusion).
+% \begin{table*}[t]
+% \caption{Safety-related concept switching: main-paper summary on Llama-2-7B-chat and SDXL. \emph{Source}: harmful-concept score on harmful-prompts ($\downarrow$). \emph{Target}: desired-concept score on desired-prompts ($\uparrow$). \emph{Unrel.}: avg.\ self-concept score on 4 unrelated-concept prompts ($\uparrow$ for LLM, $\downarrow$ for diffusion since the unrelated metric is violence leakage). LLM: RTP Detoxify, ArmoRM ($0$--$1$); LLM-judge CS ($0$--$10$); BERT-F1 ($0$--$1$). Diffusion: CLIP zero-shot \% and FID. Bold = best per column. Qwen2.5-14B / SANA in Appendix~\ref{sec:safety_switching}.}
+% \label{tab:safety_summary}
+% \centering
+% \begin{minipage}[t]{0.49\linewidth}
+% \centering
+% \textbf{(a) Llama-2-7B-chat: toxicity $\to$ helpfulness}\\[2pt]
+% \resizebox{\linewidth}{!}{%
+% \begin{tabular}{lccccc}
+% \toprule
+% Method ($\beta$) & RTP $\downarrow$ & Help $\uparrow$ & Unrel.\,CS $\uparrow$ & Alpaca $\uparrow$ & MMLU $\uparrow$ \\
+% \midrule
+% Baseline      & .371 & .117 & 8.46 & 1.00 & 1.00 \\
+% Vanilla 3     & .369 & .102 & 8.45 & .95 & .92 \\
+% Vanilla 5     & .380 & .029 & 3.11 & .92 & .90 \\
+% LEACE-S 3     & .344 & \textbf{.118} & 8.47 & \textbf{.98} & \textbf{.97} \\
+% LEACE-S 5     & .346 & .116 & 8.47 & .97 & .95 \\
+% MidSteer 3    & .309 & .117 & \textbf{8.50} & \textbf{.98} & .95 \\
+% \textbf{MidSteer 5}    & \textbf{.281} & .117 & 8.48 & .97 & .94 \\
+% \bottomrule
+% \end{tabular}}
+% \end{minipage}\hfill
+% \begin{minipage}[t]{0.49\linewidth}
+% \centering
+% \textbf{(b) SDXL: violence $\to$ peace}\\[2pt]
+% \resizebox{\linewidth}{!}{%
+% \begin{tabular}{lccccc}
+% \toprule
+% Method ($\beta$) & Viol $\downarrow$ & Peace $\uparrow$ & Unrel.\,V $\downarrow$ & V$\to$P $\downarrow$ & FID $\downarrow$ \\
+% \midrule
+% Baseline      & 99.6 & 71.8 & 51.5 & 34.5 & 0.0 \\
+% Vanilla 3     & 42.2 & 74.5 & \textbf{50.6} & 79.2 & 93.6 \\
+% Vanilla 5     & 20.8 & 23.5 & \textbf{50.4} & 92.2 & 122.2 \\
+% LEACE-S 3     & 76.0 & 33.2 & 51.4 & 95.0 & \textbf{88.9} \\
+% LEACE-S 5     & 28.2 & 38.8 & 51.7 & 98.0 & 121.6 \\
+% MidSteer 3    & 12.5 & 90.5 & 50.8 & \textbf{20.5} & 101.5 \\
+% \textbf{MidSteer 5}    & \textbf{6.0} & \textbf{94.0} & 51.0 & \textbf{18.0} & 134.6 \\
+% \bottomrule
+% \end{tabular}}
+% \end{minipage}
+% \end{table*}
+
+% Option A: Single unified table — Llama-2-7B (LLM) + SDXL (diffusion).
+% Rows: per-model metric rows (Source / Target / Unrelated preservation / Consistency or FID).
+\begin{table}[t]
+\centering
+\caption{
+Safety-related concept switching on Llama-2-7B-chat and SDXL.
+Bold indicates the best intervention result in each column.
+}
+\label{tab:safety_summary}
+\scriptsize
+\setlength{\tabcolsep}{3.4pt}
+\renewcommand{\arraystretch}{1.08}
+
+\begin{tabular}{lcccc}
+\toprule
+\multicolumn{5}{c}{\emph{Toxicity $\to$ Helpfulness, Llama-2-7B-chat}} \\
+\midrule
+Method & RTP $\downarrow$ & Help $\uparrow$ & Unrel. $\uparrow$ & MMLU (ERT-F1) $\uparrow$ \\
+\midrule
+Base        & .371 & \textbf{.117} & 8.46 & 1.00 \\
+Vanilla-3   & .369 & .102 & 8.45 & .92 \\
+Vanilla-5   & .380 & .029 & 3.11 & .90 \\
+LEACE-S-3   & .344 & \textbf{.117} & 8.47 & .97 \\
+LEACE-S-5   & .346 & .116 & 8.47 & .95 \\
+MidSteer-3  & .309 & \textbf{.117} & 8.50 & .95 \\
+MidSteer-5  & \textbf{.281} & \textbf{.117} & 8.48 & .94 \\
+\midrule
+\multicolumn{5}{c}{\emph{Violence $\to$ Peace, SDXL}} \\
+\midrule
+Method & Viol. $\downarrow$ & Peace $\uparrow$ & Unrel. $\uparrow$ & FID $\downarrow$ \\
+\midrule
+Base        & 99.6 & 71.8 & 51.5 & 0.0 \\
+Vanilla-3   & 42.2 & 74.5 & 50.6 & 93.6 \\
+Vanilla-5   & 20.8 & 96.5 & 50.4 & 122.2 \\
+LEACE-S-3   & 76.0 & 33.2 & 51.4 & 88.9 \\
+LEACE-S-5   & 28.2 & 54.5 & 51.7 & 121.6 \\
+MidSteer-3  & 12.5 & 90.5 & 50.8 & 101.5 \\
+MidSteer-5  & \textbf{6.0} & \textbf{94.0} & 51.0 & 134.6 \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+\begin{minipage}{0.98\linewidth}
+\footnotesize
+\emph{Notes.}
+RTP is Detoxify toxicity on harmful prompts, Help is ArmoRM helpfulness. Unrel. is preservation on four unrelated concepts.
+\end{minipage}
+\end{table}

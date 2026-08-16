@@ -1,0 +1,197 @@
+\section{Safety-related concept switching}
+\label{sec:safety_switching_suppl}
+
+\subsection{LLM safety switching}
+\label{sec:safety_switching_suppl_llm}
+
+In this section, we report detailed per-$\beta$ results on switching \emph{toxicity} to \emph{helpfulness} for both models: Llama2 and Qwen 2.5.
+
+\input{artefacts/safety_suppl/llama}
+
+Tab.~\ref{tab:safety_llama} reports classifier metrics (Detoxify RTP toxicity, ArmoRM helpfulness, Alpaca/MMLU BERT-F1) for both Llama-2-7B-chat and Qwen2.5-14B-Instruct across all $\beta\in\{1,\dots,5\}$. 
+% Figs~\ref{fig:safety_pareto_llama_scs, fig:safety_pareto_llama_tcs, fig:safety_pareto_llama_delta, fig:safety_pareto_qwen_scs, fig:safety_pareto_qwen_tcs, fig:safety_pareto_qwen_delta} provide Pareto plots based on the results provided in Tab.~\ref{tab:safety_llama}.
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-llama2-7b-flip-mmlu-bertp-scs.pdf}
+%   \caption{MMLU vs BERTP}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-llama2-7b-flip-unrelated-cs-scs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on Llama-2-7B-chat (Source-CS axes). $y$-axis: source CS (Detoxify toxicity on RealToxicityPrompts, lower is better).}
+% \label{fig:safety_pareto_llama_scs}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-llama2-7b-flip-mmlu-bertp-tcs.pdf}
+%   \caption{MMLU vs BERTP}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-llama2-7b-flip-unrelated-cs-tcs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on Llama-2-7B-chat (Target-CS axes). $y$-axis: target CS (ArmoRM helpfulness on helpfulness prompts, higher is better).}
+% \label{fig:safety_pareto_llama_tcs}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-llama2-7b-flip-mmlu-bertp.pdf}
+%   \caption{MMLU vs BERTP}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-llama2-7b-flip-unrelated-cs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on Llama-2-7B-chat (Other axes). $y$-axis: $\Delta = $ ArmoRM helpfulness $-$ Detoxify toxicity (higher is better).}
+% \label{fig:safety_pareto_llama_delta}
+% \end{figure}
+
+% \subsection{LLM safety switching, Qwen2.5-14B-Instruct}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-qwen-14b-flip-mmlu-bertp-scs.pdf}
+%   \caption{MMLU vs BERTP}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-qwen-14b-flip-unrelated-cs-scs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on Qwen2.5-14B-Instruct (Source-CS axes). $y$-axis: source CS (Detoxify toxicity on RealToxicityPrompts, lower is better).}
+% \label{fig:safety_pareto_qwen_scs}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-qwen-14b-flip-mmlu-bertp-tcs.pdf}
+%   \caption{MMLU vs BERTP}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-qwen-14b-flip-unrelated-cs-tcs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on Qwen2.5-14B-Instruct (Target-CS axes). $y$-axis: target CS (ArmoRM helpfulness on helpfulness prompts, higher is better).}
+% \label{fig:safety_pareto_qwen_tcs}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-qwen-14b-flip-mmlu-bertp.pdf}
+%   \caption{MMLU vs BERTP}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-classifier-qwen-14b-flip-unrelated-cs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on Qwen2.5-14B-Instruct (Other axes). $y$-axis: $\Delta = $ ArmoRM helpfulness $-$ Detoxify toxicity (higher is better).}
+% \label{fig:safety_pareto_qwen_delta}
+% \end{figure}
+
+
+% \input{artefacts/safety_suppl/qwen}
+
+
+\subsection{Diffusion models safety switching}
+\label{sec:safety_switching_suppl_diffusion}
+
+Tab.~\ref{tab:safety_sdxl} and Tab.~\ref{tab:safety_sana} report metrics across all $\beta\in\{1,\dots,5\}$ for SDXL and SANA models, respectively. 
+% Figs~\ref{fig:safety_pareto_sana_scs_appx, fig:safety_pareto_sana_tcs_appx, fig:safety_pareto_sana_delta_appx, fig:safety_pareto_sdxl_scs_appx, fig:safety_pareto_sdxl_tcs_appx, fig:safety_pareto_sdxl_delta_appx} provide Pareto plots based on the results provided in Tab.~\ref{tab:safety_sdxl} and Tab.~\ref{tab:safety_sana}.
+
+\input{artefacts/safety_suppl/sdxl}
+\input{artefacts/safety_suppl/sana}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sana-flip-noclip-unrelated-cs-scs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sana-flip-noclip-unrelated-fid-scs.pdf}
+%   \caption{Unrelated vs FID}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on SANA (Source-CS axes). $y$-axis: source CS (violence CLIP-score $\times100$, lower is better).}
+% \label{fig:safety_pareto_sana_scs_appx}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sana-flip-noclip-unrelated-cs-tcs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sana-flip-noclip-unrelated-fid-tcs.pdf}
+%   \caption{Unrelated vs FID}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on SANA (Target-CS axes). $y$-axis: target CS (peace CLIP-score $\times100$, higher is better).}
+% \label{fig:safety_pareto_sana_tcs_appx}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sana-flip-noclip-unrelated-cs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sana-flip-noclip-unrelated-fid.pdf}
+%   \caption{Unrelated vs FID}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on SANA (Other axes). $y$-axis: $\Delta$CS = target CS $-$ source CS (higher is better).}
+% \label{fig:safety_pareto_sana_delta_appx}
+% \end{figure}
+
+% \subsection{Diffusion safety switching, SDXL}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sdxl-flip-noclip-unrelated-cs-scs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sdxl-flip-noclip-unrelated-fid-scs.pdf}
+%   \caption{Unrelated vs FID}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on SDXL (Source-CS axes). $y$-axis: source CS (violence CLIP-score $\times100$, lower is better).}
+% \label{fig:safety_pareto_sdxl_scs_appx}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sdxl-flip-noclip-unrelated-cs-tcs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sdxl-flip-noclip-unrelated-fid-tcs.pdf}
+%   \caption{Unrelated vs FID}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on SDXL (Target-CS axes). $y$-axis: target CS (peace CLIP-score $\times100$, higher is better).}
+% \label{fig:safety_pareto_sdxl_tcs_appx}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sdxl-flip-noclip-unrelated-cs.pdf}
+%   \caption{Unrelated vs CS}
+% \end{subfigure}\hfill
+% \begin{subfigure}[t]{0.48\linewidth}\centering
+%   \includegraphics[width=\linewidth]{artefacts/safety_suppl/safety-sdxl-flip-noclip-unrelated-fid.pdf}
+%   \caption{Unrelated vs FID}
+% \end{subfigure}
+% \caption{Pareto plot for safety switching on SDXL (Other axes). $y$-axis: $\Delta$CS = target CS $-$ source CS (higher is better).}
+% \label{fig:safety_pareto_sdxl_delta_appx}
+% \end{figure}

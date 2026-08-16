@@ -1,0 +1,965 @@
+MidSteer: Optimal Affine Framework for Steering Generative Models
+
+Tatiana Gaintseva
+
+1 2 Andrew Stepanov 3 Ziquan Liu 1 Martin Benning 4 Gregory Slabaugh 1 Jiankang Deng 5 Ismail Elezi 2
+
+Abstract
+
+Steering intermediate representations has emerged as a powerful strategy for controlling generative models, particularly in post-deployment alignment and safety settings. However, despite its empirical success, it currently lacks a comprehensive theoretical framework. In this paper, we bridge this gap by formalizing the theory of concept steering. First, we establish a link between steering and affine concept erasure, proving that the standard approach for removing unwanted behaviors is a special case of LEACE (a closed-form method for affine erasure). Next, we formulate a principled theoretical framework for concept switching, LEACE-Switch, and characterize the assumptions under which it provides an optimal affine solution. Building on this analysis, we then introduce MidSteer (Minimal Disturbance concept Steering), a more general affine framework for concept manipulation that relaxes these assumptions and enables directed, minimal-disturbance transformations. We demonstrate that MidSteer performs favorably across a range of tasks, modalities, and architectures, including vision diffusion models and large language models. Code is available at https://github.com/Atmyre/MidSteer
+
+arXiv:2605.05220v3 [cs.LG] 5 Jun 2026
+
+1. Introduction
+
+Generative models such as Large Language Models (LLMs) and vision diffusion models have achieved remarkable progress in recent years (Yang et al., 2024b) (Naveed et al., 2023). However, controlling model outputs to enforce desirable behaviors or suppress harmful ones remains challenging (Bartoszcze et al., 2025). Yet, this capability is necessary for improving model safety, reliability, alignment, and usefulness in downstream applications.
+
+Concept steering of intermediate representations is an increasingly popular technique that has already proven simple yet powerful for controlling behavior in LLMs (Panickssery et al., 2024). Recently it was also shown to be applicable to vision diffusion models (Gaintseva et al., 2026). It changes the intermediate representations of a generative model during generation by adding a "steering vector" that encodes a target concept. This approach has proven effective for tasks such as erasing unwanted behaviors (toxicity, nudity) or amplifying desirable features (helpfulness, truthfulness) (Panickssery et al., 2024; Singh et al., 2024; Gaintseva et al., 2026). However, despite its simplicity, its theoretical foundations remain underdeveloped, with most work being highly empirical (Zou et al., 2023; Wehner et al., 2025). Existing methods largely rely on heuristic vector manipulations, which can introduce unintended side effects and lack a solid theoretical basis and guarantees (Raedler et al., 2025; Anthropic, 2024). Moreover, naive steering often perturbs unrelated features, undermining the minimal disturbance principle that is critical to maintaining model quality and coherence.
+
+Recently, strong theoretical foundations have been developed for concept erasure. (Ravfogel et al., 2023) introduced the notion of log-linear guardedness. Based on it, (Belrose et al., 2025) developed LEACE, an affine concept erasure framework to remove undesired information from model representations for downstream tasks. However, these methods do not naturally extend to other forms of concept manipulation, such as switching, where the goal is to replace one concept with another rather than just erasing it.
+
+In this work, we address these gaps by developing a unified theoretical framework for affine steering of generative models. We begin by proving a formal equivalence between the standard steering methodology and LEACE, demonstrating that the widely used heuristic of steering for concept erasure is a special case of optimal affine concept erasure. Building on this foundation, we extend the framework from erasure to concept switching. We first consider the setting of bidirectional switching, in which a binary concept partitions the dataset and the goal is to invert the linear dependence of the representation on the concept label. Under these assumptions, we derive LEACE-Switch, an optimal affine transformation that performs a complete and symmetric concept swap while minimally disturbing the representation. We examine the scope of this formulation and show that its assumptions, dataset partitioning and global label inversion define a practically relevant, though restricted, regime. We address more general settings in which the concepts involved do not jointly span the entire dataset, or where asymmetric, one-directional transformations are desired. We introduce MidSteer (Minimal Disturbance Concept Steering), a generalized framework for affine concept manipulation that enables precise switching while minimizing interference with unrelated properties of the representation.
+
+Through experiments with LLMs and vision diffusion models, we demonstrate that LEACE-Switch and MidSteer achieve more reliable concept switching than vanilla steering, allowing controllable generation with minimal side effects. Our results highlight the value of grounding steering methods in theory and provide practical tools for aligning generative models with desired behaviors.
+
+In summary, our contributions are as follows:
+- We establish a formal theoretical connection between standard activation steering and affine concept erasure, showing that commonly used steering heuristics for concept erasure are special cases of LEACE.
+- We extend the affine erasure framework to concept switching and introduce LEACE-Switch, an optimal affine formulation for concept swapping under the assumption that a binary concept partitions the dataset.
+- We then relax the dataset partitioning and symmetry requirements for the task of concept switching, and introduce MidSteer (Minimal Disturbance Concept Steering), a generalized affine framework for concept manipulation that enables precise and directed concept switching with provably minimal interference to unrelated representation components.
+- We empirically validate LEACE-Switch and MidSteer across modalities and architectures, including LLMs and vision diffusion models, demonstrating improved controllability and reduced side effects compared to existing steering and erasure methods.
+
+2. Related Work
+
+Activation steering and representation manipulation. Activation steering has emerged as a lightweight approach for controlling generative models by modifying intermediate representations, particularly in LLMs (Turner et al., 2023) (Bartoszcze et al., 2025) (Rimsky et al., 2024) and more recently in diffusion models (Tumanyan et al., 2023) (Kwon et al., 2023) (Gaintseva et al., 2026). Most existing methods rely on heuristic vector addition, often derived from mean activation differences, and provide limited guarantees on optimality or side effects. Our work formalizes steering as an affine transformation problem and studies when such interventions are provably minimal and well-posed.
+
+Affine concept erasure and guardedness A related line of work focuses on removing concept information from representations. INLP (Ravfogel et al., 2020) and RLACE (Ravfogel et al., 2023) iteratively project out linear subspaces predictive of a protected attribute. LEACE (Belrose et al., 2025) provides a closed-form affine solution for optimal linear concept erasure under the guardedness framework, minimizing representational disturbance while enforcing zero covariance with the concept label. Our work builds directly on this theory, showing that standard erasure-mode steering is a special case of LEACE, and extending the framework beyond erasure. Next, SPLINCE (Holstege et al., 2025) study oblique projections that erase protected attributes while preserving task-relevant subspaces. While these methods address constrained erasure, they do not consider concept switching, which requires translating concept dependence rather than erasing it. Nevertheless, they motivate the importance of minimal-disturbance objectives with structural constraints, which our work addresses in the switching setting.
+
+Distributional alignment and representation surgery. Representation Surgery (Singh et al., 2024) derives affine transformations that match class-conditional means, and optionally covariances, between source and target distributions. This approach performs distributional alignment under Gaussian assumptions and is well-suited to tasks where class-conditional statistics fully characterize the desired transformation. In contrast, MidSteer operates on cross-covariances between representations and concept indicators, preserving the global linear structure of the representation space and explicitly minimizing changes outside the concept-mediating subspace. As a result, MidSteer targets concept switching rather than full distribution matching, and the two approaches optimize distinct objectives.
+
+In summary, while prior methods address erasure or distributional alignment, our work is the first to formalize concept switching as a distinct affine problem and to derive closed-form solution with explicit minimal-disturbance guarantees.
+
+3. Preliminaries
+
+3.1. Steering internal representations of models
+
+We formalize activation steering as the manipulation of internal model representations to control the presence of a specific concept c in the model's output. This is achieved by adding a scaled steering vector s_c to the intermediate hidden activity h during inference. The steering vector s_c is constructed from the concept-conditional means of the hidden activity. Let h be a random vector in R^d representing the activity at a particular layer, and let C in {0,1} represent the presence or absence of concept c. The steering vector s_c in R^d is defined as the difference of these means:
+
+s_c = E[h|C = 1] - E[h|C = 0],  (1)
+
+s_c can be optionally post-processed (to have unit norm). The general steering intervention f controls the concept's expressiveness via a scalar alpha in R representing the steering strength and direction. Omitting the subscript c, the operation is:
+
+f(h, s) = h + alpha*s  (2)
+
+We highlight two essential special cases, determined by the choice of the intervention function f.
+
+Concept Erasure. It aims to erase all information aligned with the concept c from the activation vector h. This is achieved by projecting h onto the subspace orthogonal to the steering direction s. The projection <h,s>s estimates the conceptual component, which is then removed:
+
+f_delete(h, s) = h - <h, s>s  (3)
+
+Concept switch. Multiplying projection by 2 results in a Householder reflection of the vector h across the hyperplane orthogonal to s:
+
+f_switch(h, s) = h - 2<h, s>s  (4)
+
+This transformation effectively substitutes the component of h aligned with c with its opposite, thereby substituting the representation of concept c with the representation of its absence. If steering is applied to specific layers (e.g., self-attention outputs in LLMs or cross-attention layers in vision models), both Equation 3 and Equation 4 can be incorporated directly into the model's weight matrices. This allows for achieving zero inference overhead, a critical advantage for deployment in large-scale applications.
+
+3.2. Affine guardedness and covariance control
+
+Our subsequent results are formulated as minimal-disturbance affine transformations under constraints on the cross-covariance between representations and concept indicators. We use the guardedness framework of Ravfogel et al. (2023); Belrose et al. (2025) to justify why cross-covariance is a meaningful object for formalizing linear concept information in representations. In particular, for the task of concept erasure under linear-affine predictors and squared loss, Belrose et al. (2025) show that making a concept linearly unpredictable from a representation is equivalent to enforcing zero covariance between the representation and the concept label. Belrose et al. (2025) formulated the following notion of guardedness:
+
+Definition 3.1 (Guardedness, Belrose et al. 2025). Consider a k-class classification task over jointly defined random vectors X and Z, where X takes values in R^d and Z is a one-hot label vector taking values in Z = {z in {0,1}^k | ||z||_1 = 1}, with P(Z = j) > 0 for each class j. Let eta(.;theta) : R^d -> R^k be a predictor from a function class V = {eta(.;theta) | theta in Theta}, assumed to contain all constant functions, and let L be a class of losses L : R^k x Z -> [0, inf). Let chi denote the set of random vectors of finite first moment taking values in R^d and jointly defined with Z. We say that X (V, L)-guards Z if, for every L in L, it maximizes the minimum achievable prediction loss: X in argmax_{X' in chi} inf_{theta in Theta} E[L(eta(X';theta), Z)]. Equivalently, X is maximally uninformative about Z for predictors in V and losses in L.
+
+The full guardedness definition is general, but the key consequence for our purposes is its linear characterization. For linear-affine predictors with squared loss, guardedness is equivalent to zero cross-covariance between the representation and the label.
+
+Theorem 3.2 (Linear guardedness, Belrose et al. 2025). The following statements are equivalent:
+- X linearly guards Z in the sense of Definition 3.1;
+- every component of X has zero covariance with every component of Z, i.e. Cov(X, Z) = 0.
+
+Therefore, in the affine setting, concept erasure can be expressed as a covariance-control problem: find a transformation of the representation that removes linear dependence on the concept label. At the same time, to preserve unrelated information, the transformation should perturb the representation as little as possible. These two desiderata lead to the LEACE objective: among all affine maps that enforce Cov(AX + b, Z) = 0, choose the one closest to the identity transformation in expected squared distance.
+
+Theorem 3.3 (LEACE, Belrose et al. 2025). Let X and Z be random vectors taking values in R^d and R^k, respectively, each with finite second moments. Define Sigma_XX = Cov(X, X) in R^{dxd}, Sigma_XZ = Cov(X, Z) in R^{dxk} and assume Im(Sigma_XZ) subseteq Im(Sigma_XX). Then the optimization problem
+
+min_{A in R^{dxd}, b in R^d} E[||AX + b - X||_2^2]  s.t.  Cov(AX + b, Z) = 0  (5)
+
+has the following solution, almost surely:
+
+A_hat = I - W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W,  (6)
+b_hat = E[X] - A_hat E[X],  (7)
+
+where W = (Sigma_XX^{1/2})^+ is the whitening transformation.
+
+Here and throughout, A^+ denotes the Moore-Penrose pseudo-inverse. For a positive semidefinite symmetric matrix A = V S V^T, we write A^{1/2} = V S^{1/2} V^T, where S^{1/2} is obtained by taking square roots of the diagonal entries of S.
+
+4. Theoretical Results
+
+We theoretically analyze connections between steering approaches (Sec. 3.1) and LEACE (Sec. 3.2), and derive a novel framework for affine concept steering called MidSteer, that unifies and generalizes all these approaches. This section is organized as follows. We first consider the task of concept erasure and establish a formal connection between the standard steering setup for erasure and LEACE, showing that Eq. 3 arises as a special case of the LEACE framework. We then extend LEACE to the task of optimal affine concept switching and derive LEACE-Switch, demonstrating that Eq. 4 is a special case of this bidirectional switching formulation. Next, we characterize the assumptions under which LEACE-Switch provides an optimal solution and introduce MidSteer, a more general affine framework for concept manipulation that enables directed, minimal-disturbance transformations without requiring dataset-wide label inversion. Finally, through experiments on large language models and vision diffusion models, we show that MidSteer consistently outperforms vanilla steering and LEACE-based switching, achieving precise concept control while preserving unrelated features of the generated outputs.
+
+4.1. Connection between steering in erasure mode and LEACE
+
+In this section, we show that steering in erasure mode (Eq. 3) is a special case of LEACE. We formulate and prove a following corollary to the Theorem 3.3:
+
+Figure 1. Illustrative example of affine concept erasure and affine concept flipping frameworks.
+(a) Illustrative example of affine concept erasure. In this case the affine transformation is satisfying cov(AX + b, Z) = 0. This figure is inspired by (Belrose et al., 2025).
+(b) Illustrative example of affine concept switching. In this case the affine transformation is satisfying -cov(AX + b, Z) = cov(X, Z).
+
+Corollary 4.1. Let X be a standardized random vector in R^d, i.e., it has zero mean E[x] = 0 and unit covariance matrix Sigma_XX = I. Let C in {0,1} be a concept indicator variable. Let s be defined as in Eq. 1. Let f_delete be defined as in Eq. 3. Then f_delete as a function of h minimizes
+
+min_{f in Aff(R^d -> R^d)} E[||f(X) - X||^2]  s.t.  Cov(f(X), C) = 0  (8)
+
+This theorem states that steering in erasure mode can be seen as LEACE under the assumptions that the whitening matrix is the identity and that the mean of all vectors is zero. The proof is found in the Appendix D.1.
+
+4.2. Concept switching
+
+We generalize beyond a single binary concept, and consider the task of transforming the representation of one concept c1 into another c2. We call this task concept switching. More formally, let c1 and c2 denote two distinct concepts, each associated with a subset of the data distribution (not necessarily jointly covering it), and their corresponding binary indicators C1, C2 in {0,1}. The goal of a concept switch operation is to construct a transformation f such that samples exhibiting concept c1 after transformation exhibit concept c2, while preserving all other factors of variation as much as possible. Formally, this requires modifying the dependence of the representation on C1 and introducing a desired dependence on C2, without enforcing any relationship between C1 and C2 outside their observed support.
+
+We now adapt LEACE (Theorem 3.3) framework to the task of concept switching, and formulate a theoretical framework for the optimal affine concept switching, LEACE-Switch. Additionally, we show that steering in switching mode Eq. 4 can be seen as a special case of this framework. We then characterize the scope of LEACE-Switch by making explicit the assumptions under which it provides an optimal solution. Finally, we introduce MidSteer, a generalized affine framework for concept manipulation that relaxes these assumptions and enables directed, minimal-disturbance concept switching in more general settings.
+
+4.2.1. LEACE FOR CONCEPT SWITCHING
+
+Recall that Z in {0,1}^k denotes a binary concept vector. We now consider the task of bidirectional concept switching, in which the concept encoded by Z is assumed to partition the dataset (i.e., P(Z = 1) + P(Z = 0) = 1), so that each sample belongs either to the concept or to its complement. Under this assumption, concept switching can be interpreted as a global inversion of the linear dependence between the representation and the concept label.
+
+Within the covariance-based guardedness framework of LEACE, such an inversion admits a natural affine formulation. Rather than removing linear information about the concept as in concept erasure, we seek to preserve the magnitude of the linear dependence while reversing its sign. This leads to the following constraint:
+
+Cov(f(X), 1_k - Z) = Cov(X, Z),  (9)
+
+where 1_k denotes a k-dimensional vector of ones. By linearity of covariance, this condition is equivalent to
+
+Cov(f(X), Z) = -Cov(X, Z).  (10)
+
+See Fig. 1b for a geometric illustration of this.
+
+Equation 9 constitutes the affine analogue of a perfect concept flip within the guardedness framework. In LEACE (Theorem 3.3), concept erasure is achieved by enforcing Cov(f(X), Z) = 0, ensuring that the transformed representation carries no linear signal about the concept. In contrast, the constraint above enforces a complete inversion of this signal: samples that previously correlated positively with the concept now correlate equally strongly with its complement, and vice versa. This corresponds to a symmetric, dataset-wide concept swap and mirrors the role of reflection-based switching in vanilla steering.
+
+Analogous to Theorem 3.3, we now characterize the optimal affine transformation that satisfies the constraint in Eq. 9 while minimally disturbing the original representation:
+
+Theorem 4.2 (LEACE-Switch, Optimal Concept Switching). Let X, Z, Sigma_XX, Sigma_XZ be defined as in Theorem 3.3. Assume Im(Sigma_XZ) subseteq Im(Sigma_XX). Then the optimization problem
+
+min_{A in R^{dxd}, b in R^d} E[||AX + b - X||_2^2]  (11)
+s.t. Cov(AX + b, Z) = -Cov(X, Z)  (12)
+
+has the following solution (almost surely):
+
+A_hat = I - 2 W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W,  (13)
+b_hat = E[X] - A_hat E[X],  (14)
+
+The proof is found in the Appendix D.2. Also note, since the transform is affine, it can be incorporated into the weight matrix of the model, thus achieving zero inference overhead.
+
+Similar to corollary 4.1, we now show that concept switching as defined in Eq. 4 is a special case of Theorem 4.2.
+
+Corollary 4.3. Let X be a standardized random vector in R^d, i.e. it has zero mean E[x] = 0 and unit covariance matrix Sigma_XX = I. Let C in {0,1} be a concept indicator variable. Let s be defined as in Eq. 1. Let f_switch be defined as in Eq. 4. Then f_switch as a function of h minimizes
+
+min_{f in Aff(R^d -> R^d)} E[||f(X) - X||^2]  (15)
+s.t. Cov(f(X), C) = -Cov(X, C)  (16)
+
+The proof is found in the Appendix Sec. D.3. This theorem shows that steering in switching mode can be seen as LEACE-Switch under the assumptions that the whitening matrix is the identity and the mean of all vectors is zero.
+
+Scope of LEACE-Switch. While the constraint in Eq. 9 precisely captures the algebraic notion of inverting a linear concept signal, it does so under a specific set of assumptions that define the regime in which LEACE-Switch is theoretically well-posed. First, Eq. 9 assumes that the binary concept variable Z partitions the dataset, i.e., P(Z = 1) + P(Z = 0) = 1. Under this condition, the linear dependence between X and Z is defined globally over the data distribution and admits a dataset-wide inversion. When instead considering two concepts c1 and c2 with corresponding indicators Z1 and Z2 that do not jointly span the dataset, this assumption is violated. In such cases, the notion of a dataset-wide bidirectional concept flip is no longer well-posed, and Theorem 4.2 does not apply. Second, even when Z does partition the dataset, the constraint in Eq. 9 enforces a complete inversion of the linear dependence on the concept label. As a result, LEACE-Switch implements a symmetric transformation: representations associated with c1 are mapped to those of c2, and representations associated with c2 are simultaneously mapped to those of c1. While this behavior is desirable in settings that explicitly require bidirectional swapping, it may be overly restrictive in applications where only a one-directional transformation is intended. Together, these considerations delineate the scope of LEACE-Switch as an optimal solution for symmetric concept inversion under dataset partitioning. In the next section, we relax these assumptions and introduce a more general formulation for affine concept manipulation that enables directed, minimal-disturbance concept switching.
+
+4.3. Optimal Affine Concept Manipulation
+
+We now move beyond bidirectional concept switching and formulate a more general framework for affine concept manipulation. Our goal is to enable directed concept transformations that do not require dataset-wide label inversion or the assumption that the involved concepts jointly span the entire distribution.
+
+Let Z1 and Z2 represent indicators of two groups of concepts C_s = {c(s)_1, ..., c(s)_l} and C_t = {c(t)_1, ..., c(t)_l}. Let Z = (Z1, Z2), where Z1, Z2 in {0,1}^l. Our goal is to have Cov(f(X), Z1) = Cov(X, Z2), meaning for each i, the concept c(s)_i maps to c(t)_i. Now we formulate the following theorem:
+
+Theorem 4.4 (MidSteer, affine optimal concept manipulation). Let X, Z be defined as in Theorem 4.2 and assume k = 2l for l > 0. Let Z = (Z1, Z2), where Z1, Z2 in {0,1}^l. Let Sigma_XZ_i = Cov(X, Z_i), i in {1, 2} be the cross-covariance matrices between X and Z_i. Assume Im(Sigma_XZ_i) subseteq Im(Sigma_XX) for i in {1, 2}. Assume Sigma_XZ_1 has full column rank: rk(Sigma_XZ_1) = l. Let W = (Sigma_XX^{1/2})^+ be the whitening transformation. Let Sigma_WX,Z_i = W Sigma_XZ_i. Then we have the following optimization problem:
+
+min_{A in R^{dxd}, b in R^d} E[||AX + b - X||_2^2]  (17)
+s.t. Cov(AX + b, Z1) = Cov(X, Z2)  (18)
+
+which has the following solution (almost surely):
+
+A_hat = I + W^+ (Sigma_WX,Z_2 - Sigma_WX,Z_1) Sigma^+_{WX,Z1} W  (19)
+b_hat = E[X] - A_hat E[X]  (20)
+
+The proof can be found in Sec. D.4. Unlike LEACE, we now have two covariance matrices for each group of concepts, and do not require the labels to be flipped, but translated from one group to another.
+
+On the full-rank assumption in Thm. 4.4. Rank deficiency indicates redundancy among the source concept directions. In that case, one can restrict to an independent subset or work in the effective subspace via a pseudoinverse. In our experiments l = 1, so the condition reduces to Sigma_XZ_1 != 0, i.e., the source concept must have a nontrivial linear footprint at the chosen layer. If not, the affine update is degenerate and MidSteer is not meaningfully applicable there.
+
+Connection between MidSteer and LEACE. Note that if Z2 is a constant indicator (e.g., representing no item in the dataset), then Cov(X, Z2) = 0, and the MidSteer formula turns into concept erasure (LEACE). Thus we refer to MidSteer as affine optimal concept manipulation, as it generalizes several concept manipulation tasks (erasure, switch) under one framework.
+
+4.4. Steering strength
+
+Let us now introduce the steering strength beta for erasure and switching. Note that in vanilla steering (i.e. steering defined by Eq. 3 and Eq. 4), we can unify Eq. 3 and Eq. 4:
+
+f(h, s) = h - beta * <h, s>s  (21)
+
+For LEACE, b_hat is unaffected, and Eq. 6 and Eq. 13 become:
+
+A_hat = I - beta * W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W  (22)
+
+Now, beta = 1 represents concept erasure, 0 < beta < 1 represents lesser degree of erasure. beta = 2 represents concept switching, and beta > 2 refers to switching where the switched concept is more expressed than the base concept. For MidSteer, we update Eq. 19 as:
+
+A_hat = I + beta * W^+ (Sigma_WX,Z_2 - Sigma_WX,Z_1) Sigma^+_{WX,Z1} W  (23)
+
+beta = 1 represents normal steering mode, beta < 1 represent steering where Z2 has less expression compared to what Z1 had in original representation. Vice versa, beta > 1 represent more expression for Z2 compared to Z1.
+
+5. Experiments
+
+5.1. Experimental setup
+
+We conduct experiments comparing MidSteer to vanilla steering and LEACE-Switch on the task of concept switching. We focus on concept switching in the main experiments, as concept erasure is recovered as a special case when the target concept is constant. However, we provide comparison of all the approaches on concept erasure in the Appendix Sec. L. We consider two modalities: (1) text, for which we use Large Language Models (LLMs); (2) images, for which we use Diffusion Models. As for concepts, we consider both concrete nominal concepts, such as object categories, and abstract safety-related concepts, such as toxicity, helpfulness, violence, and peace. We show that MidSteer improves directed concept switching for both concrete categories and safety-relevant behavioral and visual concepts.
+
+General covariance estimation. In each case, given a pair of concepts (c_s, c_t) to switch, we estimate class-conditional covariances Sigma_XZ_1, Sigma_XZ_2 based on a sample of size N = 1000, and self-covariances Sigma_XX on a sample of size M = 50000. We provide details about datasets used for Sigma_XZ_1, Sigma_XZ_2 and Sigma_XX estimation for each experiment descripbed below in the Appendix Sec. E. We also ablate the number of prompts needed for estimating Sigma_XX in the Appendix Sec. H, and provide pseudocode for the algorithm on covariance estimation in the Sec. A.
+
+Concrete concept switching setup. As no standard benchmarks currently exist for concept switching, we introduce a dedicated evaluation setup. Our procedure is largely based on established concept erasure benchmarks used for vision generative models (Lyu et al., 2024; Wu et al., 2025). To test switching from the source concept c_s to the target concept c_t, we use 80 template prompts prompting the model to generate output related to c_s or c_t. For each prompt we run 10 such generations varying the random seed. We run the generation on these prompts with and without steering. Templates for LLMs and diffusion models can be found in Sec. G. We use Concept Score (CS) to estimate the amount of concepts c_s and c_t present in the model's output. In the case of ideal switching, CS for concept c_t should be high, and CS for concept c_s should be low for prompts related to both c_s or c_t.
+
+To evaluate content preservation beyond the switched concepts, we additionally generate outputs for four unrelated concepts {c_i}^4_{i=1}. These concepts are chosen to span varying levels of semantic proximity to c_s and c_t. We compute CS over {c_i}^4_{i=1} to quantify the extent to which these concepts are retained in the generated outputs, which ideally should not decrease under steering. This design enables a more fine-grained comparison of concept switching methods with respect to semantic interference.
+
+We use the following pairs p_i = (c_s -> c_t) of concrete concepts: p1 = ("Horse" -> "Motorcycle"), p2 = "Dog" -> "Cat", p3 = "Chihuahua" -> "Muffin"). Note that none of these pairs span the whole dataset. Corresponding unrelated concepts t_i = {c_i}^4_{i=1} are: t1 = ("Cow", "Dog", "Pig", "Legislator"), t2 = ("Cow", "Wolf", "Pig", "Legislator"), t3 = ("Cat", "Dog", "Wolf", "Legislator").
+
+Safety-related concept switching. We additionally evaluate abstract safety-related switching. In LLMs, we switch toxicity to helpfulness. The corresponding unrelated concepts are ("sarcasm", "creativity", "politeness", "mathematics"). In diffusion models, we evaluate the analogous visual safety setting of switching violence to peace, and the corresponding unrelated concepts are ("sadness", "calm", "anger", "nature"). This directly tests the motivating use case of suppressing harmful behavior while preserving or increasing useful behavior.
+
+As in the concrete-concept setup, we use 80 template prompts with 10 random seeds per concept. The only exception is the toxicity source concept. For toxicity, we use RealToxicityPrompts with prompt toxicity >= 0.5 instead of template prompts, since we found that instruction-tuned LLMs often refuse to produce toxic continuations from generic toxicity templates. RealToxicityPrompts therefore provides a more reliable evaluation set for measuring whether steering reduces toxic behavior in settings where the base model can still exhibit toxicity.
+
+Details on LLM experiments. We test on instruction-tuned Llama 2 (Touvron et al., 2023) and Qwen 2.5 (Yang et al., 2024a) models. We apply steering at every self-attention (SA) layer ans use SA activations corresponding to the last token in prompt. We calculate the Concept Score (CS) for concrete concepts using LLM as a judge. More specifically, we use the Llama-3.1-8B-Instruct (Dubey et al., 2024) model, and prompt it to estimate the amount of concept c present in the generated output on a scale from 0 to 10. Prompts used are outlined in the Appendix Sec. F. We additionally report results using GPT-4o-mini as LLM judge in the Appendix Sec. J to support reliability of using LLM as a judge for scoring. For safety-related LLM switching, we measure toxicity using the Detoxify BERT classifier (Hanu & Unitary team, 2020), and helpfulness using ArmoRM reward scores (Wang et al.), while keeping LLM as a judge approach for assessing preservation of unrelated concepts. We additionally test how much outputs for testing concepts differ with and without steering by calculating BERT scores (Zhang et al., 2020) on the MMLU (Hendrycks et al., 2021) dataset generations. Lower values of BERT Precision represent more change in the underlying output.
+
+Details on diffusion model experiments. For visual diffusion models, we test on SDXL (Podell et al., 2024) and SANA (Xie et al., 2025) models. Following recent work (Gaintseva et al., 2026), we apply steering on activations of every cross-attention (CA) layer. CA activations corresponding to all images patches are used. We use CLIP score (Hessel et al., 2021) as Concept Score (CS) for both concrete and safety-related concepts. Additionally, we measure the change between generations based on the testing concepts when steering is applied, by calculating FID (Heusel et al., 2017) between images generated by steered model and vanilla model. Higher values of FID represent more change to the underlying image.
+
+5.2. Experimental results
+
+Across both concrete and safety-related settings, MidSteer provides the best trade-off between successful directed concept switching and preservation of non-target content. Vanilla steering can often induce the target concept, but it also causes stronger interference and frequently acts symmetrically, modifying prompts that already contain the target concept. LEACE-Switch improves preservation relative to vanilla steering, but inherits the limitation of bidirectional concept inversion. MidSteer avoids this failure mode by directly matching the source-concept cross-covariance to the target-concept cross-covariance.
+
+Concrete concept switching. We compare results on concept switching by applying vanilla steering, LEACE-Switch and MidSteer with different values of beta. We present results on LLama-2-7b and SDXL models aggregated for all three concept pairs p1, p2, p3 in Fig. 2. We see that in each case MidSteer achieves much better balance between level of concept switch between c1 and c2 and preservation of other concepts across different values of beta. Pareto plots for other models, as well as Pareto plots for individual concept and metric pairs can be found in the Appendix Sec. K.0.1, K.1.
+
+To better illustrate differences between vanilla steering, LEACE and MidSteer for concept flipping, in Tab. 1 we present results on switching a concept of c1 = "horse" to c2 = "motorcycle" on the SDXL model. We compare Vanilla switching and LEACE with beta = 2 and MidSteer with beta = 1, as these are default parameters for these methods as suggested by Eqs. 25, 13, and 19.
+
+First note, that all the methods successfully flip "horse" to "motorcycle", having similar CS scores on source ("horse") and target ("motorcycle") concepts. Second, it can be seen that as suggested by definitions Eqs. 25, 13, vanilla steering and LEACE fail to keep the "motorcycle" concept intact when flipping "horse" to "motorcycle", as target CS score goes down. In contrast, MidSteer keeps "motorcycle" intact. This is also illustrated in Fig. 3. Next, CS score of "cow" and FID scores of "cow", "pig" and "dog" are worse for vanilla than for other methods, showing superiority of LEACE and MidSteer over vanilla steering in ability to keep unrelated concepts intact. Results on other concepts flipping on both LLMs and diffusion models show similar patterns. We observe the same trend over all the concept pairs and models. We give more details in Appendix Sec. K.2, K.3.
+
+Figure 2. Pareto efficiency frontiers for concept switching experiments with steering, LEACE, and MidSteer highlighting different betas.
+(a) Delta CS vs CS of unrelated concepts for the Llama-2-7b model.
+(b) Delta CS vs 1 - BERT Precision on MMLU for the Llama-2-7b model.
+(c) Delta CS vs CS of unrelated concepts for the SDXL model.
+(d) Delta CS vs FID of unrelated concepts for the SDXL model.
+
+Figure 3. Qualitative results on switching to steer "horses" into "motorcycles". While all methods similarly successfully performed switching from "horse" to "motorcycle", vanilla steering (CASteer) and LEACE fail when presented with prompt for the target concept ("motorcycle"), unable to distinguish between forward and reverse steering. CASteer also additionally failed on the "cow" concept, and more significantly altered images of the concept "dog".
+
+Table 1. Results on SDXL when flipping from "horse" to "motorcycle". Reported are CLIP-scores (cs) and FID for target and non-target concepts.
+
+horse    motorcycle    cow    pig    dog    legislator
+method  strength  src-cs(v) tgt-cs(^)  src-cs(v) tgt-cs(^)  fid(v)  cs(^)  fid(v)  cs(^)  fid(v)  cs(^)  fid(v)  cs(^)  fid(v)
+orig      -      71.0  49.1   51.8  70.7    -    72.7    -    71.8    -    66.3    -    60.8    -
+CASteer   2.0    52.1  69.5   68.3  52.9  212.4  70.9  42.7  71.9  18.9  66.1  28.6  60.9  24.6
+LEACE     2.0    51.2  68.8   67.6  53.3  207.6  72.2  25.2  71.7  12.6  66.1  20.8  60.6  28.2
+MidSteer (ours) 1.0  51.2  68.7   51.9  70.7   12.7  72.2  23.9  71.8  12.4  66.1  20.7  60.7  27.2
+
+Table 2. Safety-related concept switching on Llama-2-7B-chat and SDXL. Bold indicates the best intervention result in each column.
+
+Toxicity -> Helpfulness, Llama-2-7B-chat
+Method      RTP(v)  Help(^)  Unrel.(^)  MMLU (ERT-F1)(^)
+Base        .371    .117     8.46       1.00
+Vanilla-3   .369    .102     8.45       .92
+Vanilla-5   .380    .029     3.11       .90
+LEACE-S-3   .344    .117     8.47       .97
+LEACE-S-5   .346    .116     8.47       .95
+MidSteer-3  .309    .117     8.50       .95
+MidSteer-5  .281    .117     8.48       .94
+
+Violence -> Peace, SDXL
+Method      Viol.(v)  Peace(^)  Unrel.(^)  FID(v)
+Base        99.6      71.8      51.5       0.0
+Vanilla-3   42.2      74.5      50.6       93.6
+Vanilla-5   20.8      96.5      50.4       122.2
+LEACE-S-3   76.0      33.2      51.4       88.9
+LEACE-S-5   28.2      54.5      51.7       121.6
+MidSteer-3  12.5      90.5      50.8       101.5
+MidSteer-5  6.0       94.0      51.0       134.6
+
+Notes. RTP is Detoxify toxicity on harmful prompts, Help is ArmoRM helpfulness. Unrel. is preservation on four unrelated concepts.
+
+Safety-related concept switching. In contrast to the concrete object-switching setup, these experiments involve more abstract concepts, where the source concept corresponds to an undesirable or harmful behavior and the target concept corresponds to a desirable alternative. We report our main results on toxicity -> helpfulness switching on Llama-2-7B-chat, and for diffusion models, we consider switching violence -> peace on SDXL. We report full results on all beta in {1, 2, 3, 4, 5}, as well as results on Qwen 2.5 and SANA in the Appendix Sec. I.
+
+The main results are summarized in Tab. 2. For Llama-2-7B-chat, MidSteer achieves the strongest reduction in toxicity, decreasing the RTP toxicity score from .371 to .281 at beta = 5, while preserving helpfulness at the baseline level and maintaining high scores on unrelated concepts. Vanilla steering does not reliably improve toxicity and substantially degrades unrelated-concept preservation at higher strength, with the unrelated concept score dropping from 8.46 to 3.11. LEACE-Switch preserves general capabilities slightly better, as reflected by the highest MMLU BERT-F1 among interventions, but achieves much weaker toxicity reduction than MidSteer. These results suggest that MidSteer provides a better trade-off between safety improvement and preservation of unrelated behavior.
+
+A similar trend appears for SDXL in the violence -> peace setting. MidSteer most effectively suppresses the source concept, reducing the violence score from 99.6 to 6.0, while also achieving the strongest peace score among intervention methods. Vanilla steering also reduces violence, but either underperforms MidSteer on source suppression or causes larger distortions, as reflected by higher FID. LEACE-Switch yields the lowest FID among interventions but is substantially less effective at inducing the target concept. Overall, these results show that MidSteer extends beyond concrete object substitutions and remains effective for abstract, safety-related concept switching across both language and vision modalities.
+
+6. Conclusion
+
+In this work, we bridge the gap between previous empirical research in steering generative models and the theory of affine concept steering. We extend this theoretical framework to concept switching. We define the corresponding optimisation problem and solve it in closed form. We then present MidSteer, a general steering method, that is theoretically optimal under certain conditions. It outperforms other methods on concept switching for both LLMs and image diffusion models, while having the advantage of clear matrix form representation. To our knowledge, this is the first theoretical treatment of steering beyond erasure, connecting empirical heuristics and principled affine methods, while reaching state-of-the-art results.
+
+Impact Statement
+
+This paper advances the theoretical understanding of steering and representation manipulation in generative models. Because such methods can be used to suppress harmful concepts and promote desirable behaviors, they are directly relevant to post-deployment alignment, safety, and controllable generation. In particular, more principled steering methods may help reduce undesirable outputs such as toxic text or violent imagery while better preserving unrelated capabilities and content, which is an important consideration for practical deployment.
+
+At the same time, representation-level control is a dual-use capability. The same techniques that enable safer or more useful behavior could also be used to manipulate model outputs in undesirable ways, such as amplifying harmful, biased, deceptive, or otherwise inappropriate concepts. Moreover, steering interventions may have unintended side effects if applied with poorly estimated concept directions, mismatched data distributions, or insufficient evaluation of unrelated behaviors. For this reason, we view careful evaluation of preservation, robustness, and failure modes as an essential part of deploying such methods responsibly.
+
+Overall, we believe the primary societal relevance of this work lies in providing a more principled foundation for controllable and safety-oriented model interventions, while also highlighting the need for safeguards and evaluation protocols when applying representation manipulation in real systems.
+
+Acknowledgments
+
+This work was supported by a Google DeepMind PhD Studentship, and the work utilized Queen Mary's Andrena HPC facility, supported by QMUL Research-IT. This work was also supported by the Engineering and Physical Sciences Research Council [grant number EP/Y009800/1], through funding from Responsible Ai UK (KP0016).
+
+References
+
+Anthropic. Evaluating feature steering: A case study in mitigating social biases. https://www.anthropic.com/research/evaluating-feature-steering, 2024.
+Bartoszcze, L., Munshi, S., Sukidi, B., Yen, J., Yang, Z., Williams-King, D., Le, L., Asuzu, K., and Maple, C. Representation engineering for large-language models: Survey and research challenges. CoRR, abs/2502.17601, 2025.
+Belrose, N., Schneider-Joseph, D., Ravfogel, S., Cotterell, R., Raff, E., and Biderman, S. Leace: Perfect linear concept erasure in closed form, 2025.
+Dubey, A., Jauhri, A., Pandey, A., et al. The llama 3 herd of models. CoRR, abs/2407.21783, 2024.
+Gaintseva, T., Oncescu, A.-M., Ma, C., Liu, Z., Benning, M., Slabaugh, G., Deng, J., and Elezi, I. CASteer: Cross-attention steering for controllable concept erasure. In The Fourteenth International Conference on Learning Representations, 2026.
+Hanu, L. and Unitary team. Detoxify. Github. https://github.com/unitaryai/detoxify, 2020.
+Hendrycks, D., Burns, C., Basart, S., Zou, A., Mazeika, M., Song, D., and Steinhardt, J. Measuring massive multitask language understanding. In ICLR 2021.
+Hessel, J., Holtzman, A., Forbes, M., Bras, R. L., and Choi, Y. Clipscore: A reference-free evaluation metric for image captioning. In EMNLP, 2021.
+Heusel, M., Ramsauer, H., Unterthiner, T., Nessler, B., and Hochreiter, S. Gans trained by a two time-scale update rule converge to a local nash equilibrium. In NeurIPS, 2017.
+Holstege, F., Ravfogel, S., and Wouters, B. Preserving task-relevant information under linear concept removal. CoRR, abs/2506.10703, 2025.
+Kwon, M., Jeong, J., and Uh, Y. Diffusion models already have A semantic latent space. In ICLR, 2023.
+Lyu, M., Yang, Y., Hong, H., Chen, H., Jin, X., He, Y., Xue, H., Han, J., and Ding, G. One-dimensional adapter to rule them all: Concepts, diffusion models and erasing applications. In CVPR 2024.
+Naveed, H., Khan, A. U., Qiu, S., Saqib, M., Anwar, S., Usman, M., Barnes, N., and Mian, A. A comprehensive overview of large language models. CoRR, abs/2307.06435, 2023.
+Panickssery, N., Gabrieli, N., Schulz, J., Tong, M., Hubinger, E., and Turner, A. M. Steering llama 2 via contrastive activation addition, 2024.
+Podell, D., English, Z., Lacey, K., Blattmann, A., Dockhorn, T., Muller, J., Penna, J., and Rombach, R. SDXL: improving latent diffusion models for high-resolution image synthesis. In ICLR 2024.
+Raedler, J. B., Li, W., Taliotis, A. M., Goyal, M., Swaroop, S., and Pan, W. The necessity for intervention fidelity: Unintended side effects when steering LLMs. In ICML 2025 Workshop on Reliable and Responsible Foundation Models, 2025.
+Ravfogel, S., Elazar, Y., Gonen, H., Twiton, M., and Goldberg, Y. Null it out: Guarding protected attributes by iterative nullspace projection. In ACL 2020.
+Ravfogel, S., Goldberg, Y., and Cotterell, R. Log-linear guardedness and its implications. In ACL 2023.
+Rimsky, N., Gabrieli, N., Schulz, J., Tong, M., Hubinger, E., and Turner, A. M. Steering llama 2 via contrastive activation addition. Association for Computational Linguistics, 2024.
+Singh, S., Ravfogel, S., Herzig, J., Aharoni, R., Cotterell, R., and Kumaraguru, P. Representation surgery: Theory and practice of affine steering. In ICML 2024.
+Touvron, H., Martin, L., Stone, K., et al. Llama 2: Open foundation and fine-tuned chat models, 2023.
+Tumanyan, N., Geyer, M., Bagon, S., and Dekel, T. Plug-and-play diffusion features for text-driven image-to-image translation. In CVPR, 2023.
+Turner, A. M., Thiergart, L., Udell, D., Leech, G., Mini, U., and MacDiarmid, M. Activation addition: Steering language models without optimization. CoRR, abs/2308.10248, 2023.
+Wang, H., Xiong, W., Xie, T., Zhao, H., and Zhang, T. Interpretable preferences via multi-objective reward modeling and mixture-of-experts. In Findings of EMNLP 2024.
+Wehner, J., Abdelnabi, S., Tan, D., Krueger, D., and Fritz, M. Taxonomy, opportunities, and challenges of representation engineering for large language models. Trans. Mach. Learn. Res., 2025.
+Welford, B. P. Note on a method for calculating corrected sums of squares and products. Technometrics, 4(3):419-420, 1962.
+Wu, Y., Zhou, S., Yang, M., Wang, L., Chang, H., Zhu, W., Hu, X., Zhou, X., and Yang, X. Unlearning concepts in diffusion model via concept domain correction and concept preserving gradient, 2025.
+Xie, E., Chen, J., Chen, J., Cai, H., Tang, H., Lin, Y., Zhang, Z., Li, M., Zhu, L., Lu, Y., and Han, S. SANA: efficient high-resolution text-to-image synthesis with linear diffusion transformers. In ICLR 2025.
+Yang, A., Yang, B., Zhang, B., et al. Qwen2.5 technical report. CoRR, abs/2412.15115, 2024a.
+Yang, L., Zhang, Z., Song, Y., Hong, S., Xu, R., Zhao, Y., Zhang, W., Cui, B., and Yang, M. Diffusion models: A comprehensive survey of methods and applications. ACM Comput. Surv., 56(4):105:1-105:39, 2024b.
+Zhang, T., Kishore, V., Wu, F., Weinberger, K. Q., and Artzi, Y. Bertscore: Evaluating text generation with BERT. In ICLR 2020.
+Zou, A., Phan, L., Chen, S. L., et al. Representation engineering: A top-down approach to AI transparency. CoRR, abs/2310.01405, 2023.
+
+A. Algorithm for computing covariances
+
+To estimate the covariances we use the algorithm by (Welford, 1962) on a sample of broad prompts (unrelated to the steering concepts). Given X with the dimension of batch size x num heads x seq len x hidden dim, the algorithm estimates the covariance matrix Sigma_XX of size hidden dim x hidden dim. It does this by maintaining sample-level statistics of size O(hidden dim^2) in memory and takes O(batch size * seq len * hidden dim^2) time to update them for the output of a particular layer on a particular batch. In practice, estimating the covariances for 50,000 samples for SANA 1.6 finished in under 15 minutes, and for Qwen2.5 14B in under 30 minutes on our hardware setup.
+
+Algorithm 1 Welford's Algorithm for Online Mean and Covariance Estimation
+1: Input: Stream of data batches {X_1, X_2, ..., X_K} where X_k in R^{h x m_k x d}
+2: Output: Mean mu and covariance Sigma estimates
+3: Initialization:
+4: n <- 0  (Total count of samples seen)
+5: M <- 0 in R^{h x d}  (Running sum)
+6: S <- 0 in R^{h x d x d}  (Running sum of squared differences)
+7:
+8: for k = 1 to K do  (Process each batch)
+9:   m_k <- number of samples in batch X_k
+10:  if n = 0 then  (First batch - initialize)
+11:    n <- m_k
+12:    M <- sum_{j=1}^{m_k} x_{k,j}  (Sum over samples)
+13:    mu <- M/n
+14:    Delta <- X_k - mu (x) 1^T_{m_k}  (Center vectors)
+15:    S <- Delta^H Delta
+16:  else  (Subsequent batches - update)
+17:    mu_old <- M/n  (Mean before update)
+18:    n <- n + m_k  (Update count)
+19:    M <- M + sum_{j=1}^{m_k} x_{k,j}  (Update sum)
+20:    mu_new <- M/n  (Mean after update)
+21:    Delta_old <- X_k - mu_old (x) 1^T_{m_k}
+22:    Delta_new <- X_k - mu_new (x) 1^T_{m_k}
+23:    S <- S + Delta_old^H Delta_new  (Welford update)
+24:  end if
+25: end for
+26:
+27: Finalization:
+28: mu <- M/n  (Final mean estimate)
+29: Sigma <- (1/(n-1)) * (S + S^H)/2  (Final covariance estimate)
+30: return mu, Sigma
+
+B. Incorporating steering into model weights
+
+Recall that the last layer of self-attention block in LLMs or cross-attention block in SDXL/SANA is a Linear layer with no bias and no activation function, i.e., essentially is a matrix multiplication with bias correction term: h_out = W_proj_out h_in + b. Here W_proj_out is a weight matrix of the last proj out layer of SA/CA block of LLM/SDXL/SANA, h_in and h_out are input and output to that layer, h_out being the final output of SA/CA layer.
+
+Assuming s is normalized (||s|| = 1), vanilla concept erasure represents orthogonal projection onto the subspace orthogonal to s and can be written in a matrix form:
+
+f_delete(h, s) = (I - s s^T) h  (24)
+
+Vanilla concept switching is a Householder reflection of the vector h across the hyperplane orthogonal to s:
+
+f_switch(h, s) = (I - 2 s s^T) h  (25)
+
+LEACE / MidSteer are already presented in this paper in matrix form.
+
+Thus, by combining last layer of SA/CA block with matrix formulation of steering/LEACE/MidSteer, we can incorporate the transformation directly into weights of the model, by multiplying weight matrix of the last layer of SA/CA block with A* matrix from of steering/LEACE/MidSteer:
+
+h_out = A*(W_proj_out h_in + b) + b* = W^s_proj_out h_in + b^s  (26)
+
+W^s_proj_out is a matrix of the same size as W_proj_out. This results in having zero inference overhead compares to original LLM/SDXL/SANA models.
+
+Therefore, once the affine transform is estimated, it can be folded into the projection weights, so generation runs at the same inference-time cost as the original model. Self-covariance matrix Sigma_XX is computed once per model, and only the cross-covariances are concept-specific. Cross-covariance estimation takes about one minute for 1000 prompts on a single H100 GPU. Thus, the trade-off is one-time offline estimation per concept pair versus zero runtime overhead after. This is particularly attractive in repeated-use settings, such as model-level safety policies.
+
+C. LLM qualitative results
+
+In this section in fig. 4 we present qualitative results for different steering methods on LLM (Qwen2.5-14B-instruct). Results show similar pattern to that of images (see fig. 3). While all methods similarly successfully performed switching from "horse" to "motorcycle", vanilla steering and LEACE failed when presented with prompt for the target concept ("motorcycle"), since they do not distinguish between forward and reverse steering. Vanilla steering also more significantly altered texts of concepts "cow" and "dog".
+
+Figure 4. Qualitative text steering results for four content categories (horse, motorcycle, cow, dog). Results are reported using vanilla Qwen2.5-14B-instruct model, and three steering methods: Vanilla Steering, LEACE-Switch, MidSteer). Each cell shows the generated text for the prompt "Write a short story about a X", where X is a corresponding category.
+
+D. Theorem proofs
+
+D.1. Proof of Thm. 4.1 (vanilla erasure is a special case of LEACE)
+
+Proof. We have k = 1, Z = C. According to Theorem 3.3, f(X) = A* X + b*, where A* is defined as in (6) and b* is defined as in (7), minimizes (5).
+
+We conclude b* = 0 since E[X] = 0. Further, it can be shown that W = Sigma_XX^{-1/2} = I^{-1/2} = I; hence, the transform f (that is optimal according to Theorem 3.3) simplifies to
+
+f(X) = (I - Sigma_XZ Sigma^+_XZ) X.  (27)
+
+Recall that we are working in k = 1, so Sigma_XZ in R^{d x 1} is a column-vector. By definition of the Moore-Penrose inverse for column-vectors,
+
+Sigma^+_XZ = Sigma^T_XZ / ||Sigma_XZ||^2,
+
+hence
+
+f(X) = X - s' s'^T X = X - <X, s'> s',
+
+for s' = Sigma_XZ / ||Sigma_XZ||,
+
+Now,
+
+Sigma_XZ = Cov(X, Z) = E[XZ] - E[X] . E[Z] = E[X . 1|Z = 1] . P(Z = 1) + E[X . 0|Z = 0] . P(Z = 0) - E[X] . P(Z = 1) = P(Z = 1) . (E[X|Z = 1] - E[X])
+
+Now recall that P(Z = 1) + P(Z = 0) = 1, so
+
+Sigma_XZ = P(Z = 1) . (E[X|Z = 1] - E[X]) = P(Z = 1) . (E[X|Z=1] - E[X|Z=1]P(Z=1) - E[X|Z=0]P(Z=0)) = P(Z = 1) . P(Z = 0) . (E[X|Z = 1] - E[X|Z = 0]),
+
+so s' = s and f is equivalent to f_delete. Hence, f_delete is the transformation that minimises (8).
+
+D.2. Proof of Thm. 4.2 (LEACE-Switch)
+
+Proof. The sketch for the rest of the proof will look like this:
+1. Find necessary conditions for optimality using Lagrange multipliers method
+2. Show that A*, b* satisfy the necessary conditions
+3. Show that optimisation problem is convex over linear constraints, and such, if a local solution exists, it is globally optimal and unique.
+
+Let us formulate the Lagrangian. Here Lambda in R^{d x k}, because we have d . k constraints on covariance matrix.
+
+L(A, b, Lambda) = 1/2 E[||AX + b - X||_2^2] + <Lambda, Cov(AX + b, Z) + Cov(X, Z)>_F
+= 1/2 E[(AX + b - X)^T (AX + b - X)] + Tr(Lambda^T (A + I) Sigma_XZ)
+= E[1/2 X^T A^T A X + b^T A X - X^T A X - X^T b + 1/2 b^T b + 1/2 X^T X] + Tr(Lambda^T (A + I) Sigma_XZ)  (28)
+
+The partial derivatives of the Lagrangian with respect to A, b, Lambda are
+
+dL/dA = E[AXX^T + bX^T - XX^T] + Lambda Sigma^T_XZ = A E[XX^T] + b E[X]^T - E[XX^T] + Lambda Sigma^T_XZ,
+dL/db = E[AX + b - X] = A E[X] + b - E[X],
+dL/dLambda = (A + I) Sigma_XZ.
+
+Next, we use mu = E(X) and E[XX^T] = Sigma_XX + mu mu^T to formulate the necessary conditions
+
+0 = dL/dA = (A - I)(Sigma_XX + mu mu^T) + b mu^T + Lambda Sigma^T_XZ,  (29)
+0 = dL/db = A mu + b - mu,  (30)
+0 = dL/dLambda = (A + I) Sigma_XZ.  (31)
+
+We note that the optimal b* as defined in (14) satisfies 30. Plugging (30) in (29) leads to
+
+(A - I)(Sigma_XX + mu mu^T) + (mu - A mu) mu^T + Lambda Sigma^T_XZ = A Sigma_XX - Sigma_XX + A mu mu^T - mu mu^T + mu mu^T - A mu mu^T + Lambda Sigma^T_XZ = (A - I) Sigma_XX + Lambda Sigma^T_XZ = 0.  (32)
+
+Now let us check that A* satisfies 31 and 32. By plugging A* into 31 we get
+
+0 = (2I - 2 W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W) Sigma_XZ = 2 Sigma_XZ - 2 W^+ (W Sigma_XZ)(W Sigma_XZ)^+ (W Sigma_XZ) = 2 (Sigma_XZ - W^+ W Sigma_XZ) = 2 (Sigma_XZ - (I - P_N(W)) Sigma_XZ) = 2 P_N(W) Sigma_XZ,  (33)
+
+because Moore-Penrose inverses B^+ of B satisfy B B^+ B = B and B^+ B = I - P_B. Here P_B denotes the orthogonal projection onto the nullspace N(B) of B. Since the columns of Sigma_XZ always lie within the image of Sigma_XX (which is the orthogonal complement of the kernel of Sigma_XX, which is also the kernel of W), we can conclude that (33) is always satisfied.
+
+Plugging A* into 32 we observe
+
+-2 (W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W) Sigma_XX + Lambda Sigma^T_XZ = -2 W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W^+ + Lambda Sigma^T_XZ = 0  (34)
+
+The identity W Sigma_XX = W^+ holds because Sigma_XX is symmetric p.s.d., so Sigma_XX = U D U^T and Sigma^{-1/2}_XX Sigma_XX = U D^{-1/2} U^T U D U^T = U D^{1/2} U^T = Sigma^{1/2}_XX for some orthogonal U and non-negative diagonal D, and because D^{-1/2} ignores zero diagonal values.
+
+Next, multiplying (34) by W from both sides leads to
+
+-2 W W^+ (W Sigma_XZ)(W Sigma_XZ)^+ W^+ W + W Lambda Sigma^T_XZ W = -2 (W Sigma_XZ)(W Sigma_XZ)^+ + W Lambda (W Sigma_XZ)^T = -2 Sigma_WX,Z Sigma^+_WX,Z + Lambda_W Sigma^T_WX,Z = 0, (almost surely)
+
+where again W W^+ = W^+ W = I on a subspace covered by X, and thus, almost surely.
+
+We seek Lambda_W such that -2 Sigma_WX,Z Sigma^+_WX,Z + Lambda_W Sigma^T_WX,Z = 0. Let Lambda_W = 2 (Sigma^+_WX,Z)^T. This choice satisfies the condition because Sigma_WX,Z Sigma^+_WX,Z is an orthogonal projection matrix, and is thus symmetric, so
+
+(Sigma^+_WX,Z)^T Sigma^T_WX,Z = (Sigma_WX,Z Sigma^+_WX,Z)^T = Sigma_WX,Z Sigma^+_WX,Z,
+
+which again proves the Lagrange conditions for partial derivative w.r.t. A.
+
+Thus we have shown that the said optimisation problem has a local solution. But because the constraint is linear in A, and it follows from the triangle inequality that ||.|| is convex, the local optimum is actually the global minimum.
+
+D.3. Proof of Thm. 4.3 (vanilla concept switching is a special case of LEACE-Switch)
+
+Proof. Let k = 1, Z = C, M = I. According to Theorem 4.2, f(X) = A* X + b*, where A* is defined in (13) and b* is defined in (14) minimizes (11).
+
+b = 0 since E[X] = 0. Also it can be shown W = Sigma_XX^{-1/2} = I^{-1/2} = I, so the transform becomes:
+
+f(X) = (I - 2 Sigma_XZ Sigma^+_XZ) X  (35)
+
+Recall that we are working in k = 1, so Sigma_XZ in R^{d x 1} is a column-vector. So
+
+Sigma_XZ = Cov(X, Z) = E[XZ] - E[X] . E[Z] = P(Z = 1) . (E[X|Z = 1] - E[X]) = P(Z = 1) . P(Z = 0) . (E[X|Z = 1] - E[X|Z = 0]),
+
+which is equal to s up to normalization constant. By definition of Moore-Penrose inverse for column-vectors, Sigma^+_XZ = Sigma^T_XZ / ||Sigma_XZ||^2, so
+
+f(X) = X - 2 s s^T X = X - 2 s (s^T X) = X - 2 (s^T X) s = X - 2 <X, s> s,
+
+so f is equivalent to f_switch.
+
+D.4. Proof of Thm. 4.4 (MidSteer)
+
+Proof. We will use the same method as in D.2 to prove this. Indeed, the objective is same, and thus convex. The constraint is still linear:
+
+Cov(Ax + b, Z1) = A Sigma_XZ_1 = Sigma_XZ_2 = Cov(X, Z2)  (36)
+
+So let us define the Lagrangian, where Lambda in R^{d x l}:
+
+L(A, b, Lambda) = 1/2 E[(AX + b - X)^T (AX + b - X)] + Tr(Lambda^T (A Sigma_XZ_1 - Sigma_XZ_2))  (37)
+
+The derivatives w.r.t. parameters are the following:
+
+dL/dA = (A - I)(Sigma_XX + mu mu^T) + b mu^T + Lambda Sigma^T_XZ_1 = 0  (38)
+dL/db = A mu - mu + b = 0  (39)
+dL/dLambda = A Sigma_XZ_1 - Sigma_XZ_2 = 0  (40)
+
+Trivially b* satisfies (39) for suitable A*.
+
+Let us see that (40) is satisfied. We can plug A* and then multiply by W on the left, to get:
+
+W Sigma_XZ_1 + W W^+ (Sigma_WX,Z_2 - Sigma_WX,Z_1) Sigma^+_WX,Z_1 W Sigma_XZ_1 - W Sigma_XZ_2
+= Sigma_WX,Z_1 - Sigma_WX,Z_1 Sigma^+_WX,Z_1 Sigma_WX,Z_1 + Sigma_WX,Z_2 Sigma^+_WX,Z_1 Sigma_WX,Z_1 - Sigma_WX,Z_2
+= Sigma_WX,Z_2 I_l - Sigma_WX,Z_2 = 0  (almost surely)
+
+Here we used Y Y^+ Y = Y for any Y. Furthermore, since Sigma_WX,Z_1 has linearly independent columns (full column rank), we use the property Y^+ Y = I.
+
+Next, plugging (39) into (38) we get:
+
+(A - I) Sigma_XX + Lambda Sigma^T_XZ_1 = 0  (41)
+
+Let us now proceed to show that for A* there exists Lambda in R^{d x l} so this equality holds. After plugging in A* and using previously shown fact W Sigma_XX = W^+:
+
+W^+ (Sigma_WX,Z_2 - Sigma_WX,Z_1) Sigma^+_WX,Z_1 W^+ + Lambda Sigma^T_XZ_1 = 0  (42)
+
+Again, multiplying by W on both sides and recalling that W is symmetric we get:
+
+(Sigma_WX,Z_2 - Sigma_WX,Z_1) Sigma^+_WX,Z_1 + Lambda_W Sigma^T_WX,Z_1 = 0  (almost surely)
+
+Now, Sigma_WX,Z_1 is also full column rank, so Sigma^+_WX,Z_1 = (Sigma^T_WX,Z_1 Sigma_WX,Z_1)^{-1} Sigma^T_WX,Z_1. Thus, Lambda_W = -(Sigma_WX,Z_2 - Sigma_WX,Z_1) (Sigma^T_WX,Z_1 Sigma_WX,Z_1)^{-1} satisfies the equation.
+
+E. Example LLM prompts for Estimating Class-Conditional Covariance
+
+To obtain class-conditional means for LLMs, we constructed 1000 prompts across several categories. In each case, last token activation was used to compute steering vectors, before first token of model output and after corresponding chat template tokens. Below we provide illustrative subsets of the prompts used:
+
+- Horse-related prompts
+  - How did horses evolve from their early ancestors?
+  - What factors contributed to the domestication of horses?
+  - What anatomical features enable a horse to run at high speeds?
+- Motorcycle-related prompts
+  - What was the significance of the earliest gasoline powered motorcycle in the evolution of personal transportation?
+  - How does the engine cycle mechanism influence power delivery and efficiency in a motorbike?
+  - What are the primary considerations when selecting the appropriate tire for varying riding conditions?
+- Dog-related prompts
+  - What is believed to be the origin of dog domestication?
+  - How do dogs communicate through body language?
+  - Which genetic factors influence coat color in dogs?
+- Cat-related prompts
+  - What is the origin of domestic cats and how did they become companion animals?
+  - How did ancient Egyptians incorporate cats into their society and religion?
+  - Why did cats spread globally alongside human trade routes?
+
+F. Prompt for Concept Scoring in LLMs
+
+To assess the quality of steering, we compute a concept score that gauges the presence of a specific concept in generated text. The score ranges from 0 to 10:
+- A score of 0 indicates the text is completely irrelevant to the concept.
+- A score of 10 indicates strong and explicit relevance to the concept.
+- Scores from 1 through 9 represent gradations of partial relevance.
+
+The following prompt was used to query the model for concept scoring:
+
+Score the text on a scale of 0 to 10, where the score reflects the extent to which it demonstrates relevance to the concept of {concept}. A score of 0 indicates the text is completely irrelevant and shows no connection to {concept}, whereas a score of 10 signifies strong and explicit relevance to {concept}. For texts that suggest varying degrees of relevance, use the intermediate numbers (1 through 9) to represent the gradation of connection to {concept}. Output just a single number.
+Text to evaluate:
+'''
+{text}
+'''
+
+The exact score is obtained by doing a forward pass of Llama3.1-7B model and taking argmax across token probabilities corresponding to score tokens (from 0 to 10).
+
+G. Template Prompts for Steering Quality Assessment
+
+To evaluate the effectiveness of steering, we constructed a set of template prompts. In each case, the {} placeholder was substituted with the concept under consideration (as defined in 5.1). Each template was used to generate multiple model responses. These responses were then evaluated either by a judge model (for text/LLM outputs) or by CLIP score (for images), to compute the Concept Score as well as related metrics such as FID and BERTScore.
+
+G.1. LLM Assessment Prompts
+
+The following template prompts were used for large language model (LLM) evaluation. The placeholder {} is substituted with a concept.
+
+1. Write a short story about a {}
+2. Write a poem about a {}
+3. What is the history of {}
+4. What is the most famous {}?
+5. What is the most expensive {}?
+6. How to make a {}?
+7. How to maintain a {}?
+8. How to dispose of a {}?
+9. How to store a {}?
+10. How to transport a {}?
+11. How to use a {}?
+12. What is important to know about {}?
+13. How to tell age of a {}?
+14. What is a {}?
+15. What types of {} are there?
+16. What are the most common {}?
+17. Describe an appearance of {} in detail.
+18. How does {} look like?
+19. How does {} sound like?
+20. How does {} feel like?
+21. How does {} behave like?
+22. What is the purpose of {}?
+23. What are the main components of a {}?
+24. How to identify a {}?
+25. Where can you find a {}?
+26. What are the dangers of a {}?
+27. What tools do you need for a {}?
+28. How much does a {} typically cost?
+29. What are alternatives to a {}?
+30. How to choose a good {}?
+31. What are common problems with a {}?
+32. How long does a {} typically last?
+33. What size is a typical {}?
+34. How to clean a {}?
+35. What skills are needed to handle a {}?
+36. What are the benefits of having a {}?
+37. How has {} changed over time?
+38. What cultures use {} the most?
+39. How to test if a {} is working properly?
+40. What safety precautions are needed for a {}?
+41. How to upgrade or improve a {}?
+42. How does weather affect a {}?
+43. What are the environmental impacts of a {}?
+44. How to measure the quality of a {}?
+45. What accessories go with a {}?
+46. How to protect a {} from damage?
+47. What are myths about {}?
+48. How to teach someone about a {}?
+49. What industries use {}?
+50. How is a {} different from similar things?
+51. What are the legal considerations for owning a {}?
+52. How to pack a {} for moving?
+53. What are seasonal considerations for a {}?
+54. How to customize a {}?
+55. What are expert tips for using a {}?
+56. How to troubleshoot issues with a {}?
+57. What is the lifecycle of a {}?
+58. How to estimate the value of a {}?
+59. What are cultural significances of a {}?
+60. How to take a picture of a {}?
+61. How to make a sculpture of a {}?
+62. What is the future of {}?
+63. How to draw a {}?
+64. When was {} first mentioned in human history?
+65. Can one ride a {}?
+66. Write a song about {}
+67. Define a {}
+68. Write a positive review on a book about {}
+69. Write a negative review on a book about {}
+70. Do people make toys of {}?
+71. How is {} used in the economy?
+72. Write an abstract for a science paper about {}
+73. How does temperature affect a {}?
+74. What are the origins of the word {}?
+75. What are superstitions about {}?
+76. How to simulate a {} digitally?
+77. What are the physics of a {}?
+78. How to teach children about {}?
+79. What are famous artworks featuring {}?
+80. What are the nutritional aspects of a {}?
+81. Describe the most famous {} competitions.
+
+G.2. Image Assessment Prompts
+
+The following template prompts were used for image model evaluation. The placeholder {} was substituted with a concept.
+
+1. a bad photo of a {}.
+2. a photo of many {}.
+3. a sculpture of a {}.
+4. a photo of the hard to see {}.
+5. a low resolution photo of the {}.
+6. a rendering of a {}.
+7. graffiti of a {}.
+8. a bad photo of the {}.
+9. a cropped photo of the {}.
+10. a tattoo of a {}.
+11. the embroidered {}.
+12. a photo of a hard to see {}.
+13. a bright photo of a {}.
+14. a photo of a clean {}.
+15. a photo of a dirty {}.
+16. a dark photo of the {}.
+17. a drawing of a {}.
+18. a photo of my {}.
+19. the plastic {}.
+20. a photo of the cool {}.
+21. a close-up photo of a {}.
+22. a black and white photo of the {}.
+23. a painting of the {}.
+24. a painting of a {}.
+25. a pixelated photo of the {}.
+26. a sculpture of the {}.
+27. a bright photo of the {}.
+28. a cropped photo of a {}.
+29. a plastic {}.
+30. a photo of the dirty {}.
+31. a jpeg corrupted photo of a {}.
+32. a blurry photo of the {}.
+33. a photo of the {}.
+34. a good photo of the {}.
+35. a rendering of the {}.
+36. a {} in a video game.
+37. a photo of one {}.
+38. a doodle of a {}.
+39. a close-up photo of the {}.
+40. a photo of a {}.
+41. the origami {}.
+42. the {} in a video game.
+43. a sketch of a {}.
+44. a doodle of the {}.
+45. a origami {}.
+46. a low resolution photo of a {}.
+47. the toy {}.
+48. a rendition of the {}.
+49. a photo of the clean {}.
+50. a photo of a large {}.
+51. a rendition of a {}.
+52. a photo of a nice {}.
+53. a photo of a weird {}.
+54. a blurry photo of a {}.
+55. a cartoon {}.
+56. art of a {}.
+57. a sketch of the {}.
+58. a embroidered {}.
+59. a pixelated photo of a {}.
+60. itap of the {}.
+61. a jpeg corrupted photo of the {}.
+62. a good photo of a {}.
+63. a plushie {}.
+64. a photo of the nice {}.
+65. a photo of the small {}.
+66. a photo of the weird {}.
+67. the cartoon {}.
+68. art of the {}.
+69. a drawing of the {}.
+70. a photo of the large {}.
+71. a black and white photo of a {}.
+72. the plushie {}.
+73. a dark photo of a {}.
+74. itap of a {}.
+75. graffiti of the {}.
+76. a toy {}.
+77. itap of my {}.
+78. a photo of a cool {}.
+79. a photo of a small {}.
+80. a tattoo of the {}.
+
+H. Number of prompts for covariance calculation
+
+To find the optimal number of prompts used to calculate unconditional covariances Sigma_XX for concept switching, we perform the following ablation study. For each number of prompts used for covariances generation from the set {100, 500, 1000, 5000, 10000, 20000} we run the same base experiment as outlined in Sec. 5. We then compute Delta CS and 1 - BERT Precision @ MMLU metrics on a small set of MidSteer steering strengths (to show if the steering strength can affect the optimal number of prompts). We do it on LLM experiment setup (sec. 5.1) and use LLama2-7B model.
+
+We then plot these values of a 2D plane similar to Pareto charts, but this time varying the number of prompts instead (Fig. 5). This in essence forms a curve that, after a certain threshold, settles in a small region of metric space. As can be seen from the chart below, increasing the number of prompts used beyond 5000 has limited impact. Fig. 5 shows that performance largely stabilizes around 5,000 prompts in the tested Llama-2-7B setting. We nevertheless used M=50,000 in the main experiments to make Sigma_XX as stable as possible across models, layers, and concepts. Importantly, Sigma_XX is concept-agnostic and computed only once per model, so this is not a per-concept bottleneck.
+
+Figure 5. Delta concept score vs MMLU score (1-BERT Precision) when using different number of prompts for covariance estimation.
+
+I. Safety-related concept switching
+
+I.1. LLM safety switching
+
+In this section, we report detailed per-beta results on switching toxicity to helpfulness for both models: Llama2 and Qwen 2.5.
+
+Table 3. Safety-related switching from toxicity to helpfulness on Llama-2-7B-chat and Qwen2.5-14B-Instruct.
+
+(a) Llama-2-7B-chat
+Method    beta  RTP(v)  Help(^)  Sarc.  Pol.  Cr.  Math.  MMLU F1(^)
+Base      -     .371    .117     8.5    8.5   8.6  8.2    1.00
+Vanilla   1     .385    .118     8.5    8.6   8.7  8.2    .954
+          2     .368    .109     8.5    8.5   8.7  8.2    .932
+          3     .369    .102     8.5    8.5   8.7  8.2    .919
+          4     .393    .088     8.3    8.1   8.1  7.6    .907
+          5     .380    .029     5.2    2.7   2.2  2.3    .897
+LEACE-S   1     .374    .117     8.5    8.6   8.6  8.3    .987
+          2     .371    .117     8.5    8.6   8.6  8.2    .976
+          3     .344    .118     8.5    8.5   8.6  8.2    .967
+          4     .339    .117     8.5    8.6   8.6  8.2    .959
+          5     .346    .116     8.5    8.5   8.6  8.2    .954
+MidSteer  1     .388    .118     8.5    8.6   8.6  8.2    .975
+          2     .343    .118     8.5    8.5   8.6  8.2    .959
+          3     .309    .117     8.5    8.6   8.7  8.3    .949
+          4     .330    .117     8.5    8.6   8.6  8.2    .941
+          5     .281    .117     8.5    8.6   8.6  8.3    .936
+
+(b) Qwen2.5-14B-Instruct
+Method    beta  RTP(v)  Help(^)  Sarc.  Pol.  Cr.  Math.  MMLU F1(^)
+Base      -     .265    .081     -      -     -    -      1.00
+Vanilla   1     .268    .081     8.5    8.4   8.6  8.2    .943
+          2     .257    .081     8.5    8.5   8.6  8.2    .923
+          3     .253    .081     8.4    8.4   8.6  8.2    .907
+          4     .246    .073     8.2    8.4   8.5  8.1    .889
+          5     .239    .031     7.1    6.9   7.1  6.2    .843
+LEACE-S   1     .275    .081     8.4    8.4   8.6  8.2    .981
+          2     .268    .081     8.5    8.4   8.6  8.2    .976
+          3     .246    .081     8.4    8.4   8.6  8.2    .968
+          4     .273    .080     8.5    8.4   8.6  8.2    .962
+          5     .244    .081     8.4    8.4   8.6  8.3    .960
+MidSteer  1     .283    .081     8.5    8.5   8.6  8.3    .977
+          2     .284    .081     8.4    8.4   8.6  8.2    .966
+          3     .279    .081     8.5    8.4   8.6  8.3    .956
+          4     .245    .081     8.5    8.4   8.6  8.2    .952
+          5     .256    .081     8.5    8.4   8.6  8.2    .945
+
+Notes. RTP is Detoxify toxicity on RealToxicityPrompts; Help is ArmoRM helpfulness. Sarc., Pol., Cr., and Math. are LLM-judge concept scores for unrelated concepts. MMLU reports BERT-F1 consistency with the baseline.
+
+Tab. 3 reports classifier metrics (Detoxify RTP toxicity, ArmoRM helpfulness, Alpaca/MMLU BERT-F1) for both Llama-2-7B-chat and Qwen2.5-14B-Instruct across all beta in {1, ..., 5}.
+
+I.2. Diffusion models safety switching
+
+Tab. 4 and Tab. 5 report metrics across all beta in {1, ..., 5} for SDXL and SANA models, respectively.
+
+Table 4. Model SDXL, switching from violence to peace. Reported are CLIP-scores (cs, x100) and FID for source (violence), target (peace) and unrelated concepts.
+
+violence      peace       calm      anger     nature    sadness
+method  strength  src-cs(v) tgt-cs(^) src-cs(v) tgt-cs(^) fid(v) cs(^) ...
+No Steering  -    61.1  48.0    50.0  54.9    -   -
+CASteer  1.0    57.9  48.5    50.9  51.6  61.8 55.8  49.3 52.0  32.7 60.6  54.6 49.6  49.6 58.2  49.0 51.4  24.3 57.6  52.2 51.6  42.3
+CASteer  2.0    53.4  50.5    52.1  50.1  86.5 55.6  49.6 51.7  44.1 59.8  53.5 50.4  72.9 58.0  49.2 51.2  34.8 57.2  51.7 52.2  55.9
+CASteer  3.0    51.4  55.2    53.4  49.2  106.0 55.5 49.9 51.6  51.6 58.8  52.6 51.6  100.9 57.8 49.4 51.0  41.9 56.7  51.1 52.9  69.1
+CASteer  4.0    51.5  59.9    54.5  48.5  120.5 55.1 50.3 51.2  57.9 57.6  52.1 52.8  123.4 57.5 49.6 50.8  48.2 56.2  50.5 53.6  87.3
+CASteer  5.0    51.9  64.3    55.4  48.2  132.8 54.8 50.9 51.0  64.4 56.6  51.9 54.3  140.6 57.2 49.9 50.8  54.6 55.3  50.0 54.2  101.5
+LEACE    1.0    59.0  48.4    51.8  50.4  83.8 55.1  49.6 51.8  41.2 60.7  55.4 49.2  37.8 58.0  48.9 51.1  30.2 57.6  52.5 51.3  35.1
+LEACE    2.0    56.6  49.4    53.6  48.7  119.4 54.1 50.0 51.0  55.5 60.4  54.8 49.6  52.6 57.6  49.1 50.7  44.3 57.4  52.3 51.4  47.1
+LEACE    3.0    54.1  51.0    54.8  48.0  139.0 53.2 50.5 50.3  67.7 60.4  54.6 50.0  65.8 57.0  49.3 50.2  55.2 57.1  52.1 51.6  56.4
+LEACE    4.0    52.8  53.6    55.3  47.6  155.5 52.1 50.8 49.6  80.1 59.9  54.5 50.5  82.2 56.4  49.5 49.9  66.6 57.0  52.1 51.9  65.4
+LEACE    5.0    52.8  56.9    55.5  47.4  170.7 51.3 51.4 49.2  91.6 59.2  54.6 51.1  105.7 55.8 49.8 49.6  78.0 56.7  52.0 52.1  75.6
+MidSteer 1.0    56.1  50.0    50.3  57.1  48.8 56.4  49.0 52.6  30.9 60.6  54.6 49.9  55.7 58.4  48.9 51.6  23.3 57.7  52.3 51.6  43.4
+MidSteer 2.0    52.0  59.0    50.4  59.1  63.9 56.6  49.0 52.8  41.9 59.7  53.6 51.1  83.2 58.4  49.1 51.7  33.2 57.6  52.1 52.4  56.6
+MidSteer 3.0    52.2  67.9    50.6  61.2  80.7 57.0  49.0 53.2  48.9 58.3  52.8 52.6  118.3 58.4 49.3 51.8  39.6 57.2  51.7 53.0  67.3
+MidSteer 4.0    52.7  72.1    50.9  63.5  96.4 57.3  49.1 53.5  54.4 56.7  52.4 54.7  147.1 58.3 49.5 51.8  45.5 56.6  51.4 53.9  80.3
+MidSteer 5.0    52.8  73.5    51.2  65.0  109.1 57.4 49.1 53.8  59.4 55.7  52.5 57.8  168.1 58.3 49.7 51.8  50.4 56.0  51.0 54.5  95.9
+
+Table 5. Model SANA, switching from violence to peace. Reported are CLIP-scores (cs, x100) and FID for source (violence), target (peace) and unrelated concepts.
+
+No Steering  -    61.8  49.7    51.4  63.5    -   58.1
+CASteer  1.0    60.5  50.1    52.2  57.4  81.6 58.2
+CASteer  2.0    58.5  51.2    53.4  54.7  122.8 58.2
+CASteer  3.0    55.7  53.1    54.8  53.9  147.4 58.2
+CASteer  4.0    52.8  54.8    55.5  52.7  165.0 58.0
+CASteer  5.0    51.4  56.2    56.0  52.1  181.1 57.9
+LEACE    1.0    59.9  50.1    53.6  54.0  129.3 58.0
+LEACE    2.0    57.3  51.5    56.2  51.5  176.4 57.8
+LEACE    3.0    54.5  53.4    57.1  50.6  207.6 57.7
+LEACE    4.0    51.8  55.3    57.8  50.2  226.2 57.7
+LEACE    5.0    50.4  56.5    58.8  50.1  247.5 57.5
+MidSteer 1.0    57.6  51.3    50.9  65.0  42.8 58.7
+MidSteer 2.0    53.1  55.1    50.6  66.1  58.6 59.0
+MidSteer 3.0    50.5  57.8    50.7  67.0  72.5 59.5
+MidSteer 4.0    50.4  58.6    51.0  67.7  88.9 59.7
+MidSteer 5.0    51.0  58.1    51.5  67.8  106.9 59.4
+
+(Unrelated-concept columns for SDXL/SANA tables: calm / anger / nature / sadness with cs, src-cs, tgt-cs, fid columns; see LaTeX source for full detail.)
+
+J. GPT-4o-mini judge cross-validation
+
+The concept-switching evaluation in Sec. 5 uses Llama-3.1-8B-Instruct as the LLM judge for Concept Scores (CS). To validate that our findings do not depend on the choice of judge, we re-score every generation produced by the LLM concept-switching experiment with a second, larger, instruction-tuned judge, OpenAI's GPT-4o-mini, using the identical 0-10 scoring prompt as described in the Sec. 5.1.
+
+We re-run the LLM concept-switching pipeline on Llama-2-7B-chat for the three nominal concept pairs of Sec. 5 - p1 = (Horse -> Motorcycle), p2 = (Dog -> Cat), p3 = (Chihuahua -> Muffin). For each pair we generate completions at beta in {1, 2, 3, 4, 5} for vanilla steering, LEACE-Switch and MidSteer, plus an unsteered baseline. Each generation is then scored with GPT-4o-mini both on the source-concept test prompts, the target-concept test prompts, and the four unrelated-concept test prompts t_i = {c_i}^4_{i=1} as defined in Sec. 5. Scoring uses chat-completions API with temperature 0, 8 concurrent requests, and the same prompt template as the Llama-3.1-8B judge so the two judges differ only in the underlying model.
+
+Tab. 6 reports Source-CS / Target-CS on the source-concept test prompts for each pair at beta in {3, 5}; Tabs. 7-9 give the full per-beta, per-concept breakdown for each pair. The GPT-4o-mini numbers agree with the Llama-3.1-8B-Instruct numbers reported in Sec. 5 and Appendix K.2: in every pair, at every beta, the two judges produce the same relative ordering of the three methods on both source-CS and target-CS, so the conclusions of Sec. 5 are robust to the choice of judge.
+
+Table 6. GPT-4o-mini judge cross-validation. Each cell shows source-CS / target-CS on the source-concept test prompts.
+
+                        Vanilla         LEACE-Switch    MidSteer
+Concept pair    Baseline  beta=3  beta=5  beta=3  beta=5  beta=3  beta=5
+Horse -> Motorcycle     9.8/0.1  1.4/7.8  1.8/6.3  1.9/7.5  2.1/7.1  0.1/9.5  0.1/9.6
+Dog -> Cat              9.7/0.2  4.9/5.1  4.2/5.6  4.3/5.3  3.7/5.6  0.7/9.2  0.1/9.7
+Chihuahua -> Muffin     9.8/0.0  0.6/5.0  0.5/5.2  0.9/6.2  0.2/6.9  0.2/7.9  0.0/8.5
+
+K. Detailed results on concrete concept switching
+
+K.0.1. PARETO CHARTS FOR LLM CONCEPT SWITCHING
+
+In this section, we provide more Pareto charts for LLM concept switching. When switching concept c_s to c_t, for each LLM model we provide 9 types of Pareto plots:
+- 1 - BERT Precision score for unrelated concepts (horizontal axis) vs Delta Concept Score (CS) for the target c_t and source c_s concepts
+- 1 - BERT Precision score for MMLU (horizontal axis) vs Delta CS for target/source concepts
+- Average CS for unrelated concepts c_i (horizontal axis) vs Delta CS for target/source concepts
+(and the same three for Source-CS and Target-CS axes)
+
+In each case, we see clear superiority of MidSteer over other steering approaches.
+
+We additionally provide detailed breakdown of scores for all beta values and all concepts c_s, c_t, c_i in the tables in sec. K.2.
+
+Figures 6-14: Pareto plots for concept flip on models llama2-7b, qwen-14b, qwen-7b (Source-CS, Target-CS, Other axes).
+
+K.1. Pareto charts for image diffusion concept switching
+
+Similar Pareto plots for diffusion models (SANA, SDXL): FID score for unrelated concepts vs Delta/Target/Source CS, and Average unrelated CS vs Delta/Target/Source CS. Figures 15-20.
+
+K.2. Detailed results for LLM concept switching
+
+In this section, in tab. 10,11,14,15,12,13 we provide detailed breakdown of scores for all beta values and all concepts.
+
+Table 10. Model LLama2-7b, flipping from dogs to cats
+Steering  1.0: 8.6 1.1 2.9 7.5 --  5.0: 4.4 4.9 6.5 2.7
+LEACE     1.0: 8.5 1.4 2.1 8.2 --  5.0: 3.6 5.5 5.4 3.9
+MidSteer  1.0: 8.0 1.8 1.6 8.6 --  5.0: 1.6 8.6 1.4 8.7
+
+Table 11. Model LLama2-7b, flipping from horses to motorcycles
+Steering  2.0: 2.7 6.9 2.1 7.9 --  5.0: 3.0 5.7 4.8 3.1
+LEACE     2.0: 5.4 3.5 4.0 5.4 --  5.0: 3.4 5.3 5.6 2.9
+MidSteer  2.0: 2.6 7.2 1.2 8.5 --  5.0: 1.4 8.5 1.2 8.5
+
+Table 12. Model Qwen2.5-7b, flipping from dogs to cats
+Table 13. Model Qwen2.5-7b, flipping from horses to motorcycles
+Table 14. Model Qwen2.5-14b, flipping from dogs to cats
+Table 15. Model Qwen2.5-14b, flipping from horses to motorcycles
+
+(Full per-beta, per-unrelated-concept breakdown including wolves/pigs/cows/legislators and BERT Precision columns is in the LaTeX source artefacts/tables/llm_flip_tables_noclip.tex.)
+
+K.3. Detailed results for Diffusion Models concept switching
+
+In this section, in tab. 19,20,16,17 we provide detailed breakdown of scores for all beta values and all concepts.
+
+Table 16. Model SDXL, flipping from horse to motorcycle
+No Steering  -    71.0 49.1  51.8 70.7   -    72.7    71.8    66.3    60.8
+CASteer  1.0    70.0 50.8  52.6 71.3  27.8 72.3  ...
+CASteer  2.0    52.1 69.5  68.3 52.9 212.4 70.9  ...
+LEACE    1.0    65.0 56.5  52.7 71.2  28.6 72.5  ...
+LEACE    2.0    51.2 68.8  67.6 53.3 207.6 72.2  ...
+MidSteer 1.0    51.2 68.7  51.9 70.7  12.7 72.2  ...
+
+Table 17. Model SDXL, flipping from chihuahua to muffin
+Table 18. Model SDXL, flipping from snoopy to mickey
+Table 19. Model SANA, flipping from horse to motorcycle
+Table 20. Model SANA, flipping from chihuahua to muffin
+Table 21. Model SANA, flipping from snoopy to mickey
+
+(Full per-beta, per-unrelated-concept breakdown including FID columns is in the LaTeX source artefacts/tables/diffusion_flip_tables_noclip.tex.)
+
+L. Concept erasure
+
+In this section, we provide experiments for concept erasure. The reason for such is to show that unified MidSteer framework, that also includes erasure in case Z2 is constant, performs favourably on a variety of tasks. Note that in case of erasure, both MidSteer and LEACE provide the same solutions, so we will label the results as LEACE / MidSteer in charts.
+
+For concept erasure, we use evaluation setup similar to that of concept switching. For LLM, We test erasure of the concepts c_s in ("Horse", c_2="Dog"). Corresponding testing concepts are t_i = {c_i}^5_{i=1}: t1 = ("Motorcycle", "Cow", "Dog", "Pig", "Legislator"), t2 = ("Cat", "Cow", "Wolf", "Pig", "Legislator"). For Diffusion Models, We test erasure of the concepts c_s in ("Horse", c_2="Chichuahua"). Corresponding testing concepts are t_i: t1 = ("Motorcycle", "Cow", "Dog", "Pig", "Legislator"), t2 = ("Muffin", "Cat", "Dog", "Wolf", "Legislator").
+
+The setup for erasure is similar to those of main paper experiments (Sec. 5). The only difference is that there is no target concept (i.e. it is a dummy concept). We utilise similar pairs of prompts (c1, c2) as in switching experiments, with the goal of removing c1.
+
+Fig. 21a-d present Pareto plots for concept erasure similar to that for concept switching in sec. 5. We compare results on concept switching by applying vanilla steering, LEACE (which is equivalent to MidSteer in the case of erasure) with different values of beta. We present results on LLama-2-7b and SDXL models aggregated for all three erase concepts. It can be clearly seen, that in each case, MidSteer achieves much better balance between level of concept switch between c1 and c2 and preservation of other concepts across different values of beta.
+
+Next, in sec. L.1, L.2 we provide detailed Pareto plots for each model, and in sec. L.3, L.4 we provide Tables with detailed breakdown of scores for all beta values and all erased concepts.
+
+L.1. Pareto charts for LLM concept erasure
+Figures 22-24: Pareto plots for concept erasure on models llama2-7b, qwen-14b, qwen-7b.
+
+L.2. Pareto charts for image diffusion concept erasure
+Figures 25-26: Pareto plots for concept erasure on models sana, sdxl.
+
+L.3. Results for LLM concept erasure
+
+Table 22. Model LLama2-7b, erasure of horses
+Steering  3.0: 1.5  4.0: 0.4  5.0: 1.0
+LEACE     3.0: 0.2  4.0: 0.0  5.0: 0.0
+
+Table 23. Model LLama2-7b, erasure of dogs
+Table 24. Model Qwen2.5-7b, erasure of horses
+Table 25. Model Qwen2.5-7b, erasure of dogs
+Table 26. Model Qwen2.5-14b, erasure of horses
+Table 27. Model Qwen2.5-14b, erasure of dogs
+
+L.4. Results for image diffusion concept erasure
+
+Table 28. Model SDXL, erasure of snoopy
+Table 29. Model SDXL, erasure of chihuahua
+Table 30. Model SDXL, erasure of horse
+Table 31. Model SANA, erasure of horse
+Table 32. Model SANA, erasure of snoopy
+Table 33. Model SANA, erasure of chihuahua
+
+(Full per-beta, per-unrelated-concept breakdown is in the LaTeX source artefacts/tables/llm_erase_tables_noclip.tex and artefacts/tables/diffusion_erase_tables_noclip.tex.)

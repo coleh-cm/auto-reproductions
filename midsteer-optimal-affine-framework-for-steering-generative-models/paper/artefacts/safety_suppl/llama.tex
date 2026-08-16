@@ -1,0 +1,103 @@
+\begin{table*}[th!]
+\centering
+\caption{Safety-related switching from toxicity to helpfulness on Llama-2-7B-chat and Qwen2.5-14B-Instruct.}
+\label{tab:safety_llm_side_by_side}
+\scriptsize
+\setlength{\tabcolsep}{2.0pt}
+\renewcommand{\arraystretch}{0.90}
+
+\begin{minipage}[t]{0.495\textwidth}
+\centering
+\textbf{(a) Llama-2-7B-chat}\\[-0pt]
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lc|cc|cccc|c}
+\toprule
+Method & $\beta$
+& \multicolumn{2}{c|}{Src./tgt.}
+& \multicolumn{4}{c|}{Unrel. CS $\uparrow$}
+& MMLU \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-8}
+& & RTP $\downarrow$ & Help $\uparrow$
+& Sarc. & Pol. & Cr. & Math. & F1 $\uparrow$ \\
+\midrule
+Base & -- & .371 & .117 & 8.5 & 8.5 & 8.6 & 8.2 & 1.00 \\
+\midrule
+Vanilla
+& 1 & .385 & .118 & 8.5 & 8.6 & 8.7 & 8.2 & .954 \\
+& 2 & .368 & .109 & 8.5 & 8.5 & 8.7 & 8.2 & .932 \\
+& 3 & .369 & .102 & 8.5 & 8.5 & 8.7 & 8.2 & .919 \\
+& 4 & .393 & .088 & 8.3 & 8.1 & 8.1 & 7.6 & .907 \\
+& 5 & .380 & .029 & 5.2 & 2.7 & 2.2 & 2.3 & .897 \\
+\midrule
+LEACE-S
+& 1 & .374 & .117 & 8.5 & 8.6 & 8.6 & 8.3 & .987 \\
+& 2 & .371 & .117 & 8.5 & 8.6 & 8.6 & 8.2 & .976 \\
+& 3 & .344 & .118 & 8.5 & 8.5 & 8.6 & 8.2 & .967 \\
+& 4 & .339 & .117 & 8.5 & 8.6 & 8.6 & 8.2 & .959 \\
+& 5 & .346 & .116 & 8.5 & 8.5 & 8.6 & 8.2 & .954 \\
+\midrule
+MidSteer
+& 1 & .388 & .118 & 8.5 & 8.6 & 8.6 & 8.2 & .975 \\
+& 2 & .343 & .118 & 8.5 & 8.5 & 8.6 & 8.2 & .959 \\
+& 3 & .309 & .117 & 8.5 & 8.6 & 8.7 & 8.3 & .949 \\
+& 4 & .330 & .117 & 8.5 & 8.6 & 8.6 & 8.2 & .941 \\
+& 5 & .281 & .117 & 8.5 & 8.6 & 8.6 & 8.3 & .936 \\
+\bottomrule
+\label{tab:safety_llama}
+\end{tabular}%
+}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.495\textwidth}
+\centering
+\textbf{(b) Qwen2.5-14B-Instruct}\\[-0pt]
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lc|cc|cccc|c}
+\toprule
+Method & $\beta$
+& \multicolumn{2}{c|}{Src./tgt.}
+& \multicolumn{4}{c|}{Unrel. CS $\uparrow$}
+& MMLU \\
+\cmidrule(lr){3-4}
+\cmidrule(lr){5-8}
+& & RTP $\downarrow$ & Help $\uparrow$
+& Sarc. & Pol. & Cr. & Math. & F1 $\uparrow$ \\
+\midrule
+Base & -- & .265 & .081 & -- & -- & -- & -- & 1.00 \\
+\midrule
+Vanilla
+& 1 & .268 & .081 & 8.5 & 8.4 & 8.6 & 8.2 & .943 \\
+& 2 & .257 & .081 & 8.5 & 8.5 & 8.6 & 8.2 & .923 \\
+& 3 & .253 & .081 & 8.4 & 8.4 & 8.6 & 8.2 & .907 \\
+& 4 & .246 & .073 & 8.2 & 8.4 & 8.5 & 8.1 & .889 \\
+& 5 & .239 & .031 & 7.1 & 6.9 & 7.1 & 6.2 & .843 \\
+\midrule
+LEACE-S
+& 1 & .275 & .081 & 8.4 & 8.4 & 8.6 & 8.2 & .981 \\
+& 2 & .268 & .081 & 8.5 & 8.4 & 8.6 & 8.2 & .976 \\
+& 3 & .246 & .081 & 8.4 & 8.4 & 8.6 & 8.2 & .968 \\
+& 4 & .273 & .080 & 8.5 & 8.4 & 8.6 & 8.2 & .962 \\
+& 5 & .244 & .081 & 8.4 & 8.4 & 8.6 & 8.3 & .960 \\
+\midrule
+MidSteer
+& 1 & .283 & .081 & 8.5 & 8.5 & 8.6 & 8.3 & .977 \\
+& 2 & .284 & .081 & 8.4 & 8.4 & 8.6 & 8.2 & .966 \\
+& 3 & .279 & .081 & 8.5 & 8.4 & 8.6 & 8.3 & .956 \\
+& 4 & .245 & .081 & 8.5 & 8.4 & 8.6 & 8.2 & .952 \\
+& 5 & .256 & .081 & 8.5 & 8.4 & 8.6 & 8.2 & .945 \\
+\bottomrule
+\label{tab:safety_qwen}
+\end{tabular}%
+}
+\end{minipage}
+
+\vspace{2pt}
+\begin{minipage}{0.98\textwidth}
+\tiny
+\emph{Notes.}
+RTP is Detoxify toxicity on RealToxicityPrompts; Help is ArmoRM helpfulness.
+Sarc., Pol., Cr., and Math. are LLM-judge concept scores for unrelated concepts.
+MMLU reports BERT-F1 consistency with the baseline.
+\end{minipage}
+\end{table*}

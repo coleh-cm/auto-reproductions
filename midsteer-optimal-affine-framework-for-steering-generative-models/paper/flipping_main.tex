@@ -1,0 +1,56 @@
+\begin{table}[t]
+\caption{Results on SDXL when flipping from ``horse'' to ``motorcycle''. 
+Reported are CLIP-scores (cs) and FID for target and non-target concepts. 
+% \ili{add the usual arrows up and down, bolding the best numbers etc}
+}
+\label{tab:flip_main}
+\centering
+\setlength{\tabcolsep}{4pt}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{ll|cc|ccc|cc|cc|cc|cc}
+\toprule
+ & & \multicolumn{2}{c}{horse} & \multicolumn{3}{c}{motorcycle} 
+   & \multicolumn{2}{c}{cow} & \multicolumn{2}{c}{pig} 
+   & \multicolumn{2}{c}{dog} & \multicolumn{2}{c}{legislator} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-7} \cmidrule(lr){8-9} 
+\cmidrule(lr){10-11} \cmidrule(lr){12-13} \cmidrule(lr){14-15}
+method & strength
+& src-cs $\downarrow$ & tgt-cs $\uparrow$
+& src-cs $\downarrow$ & tgt-cs $\uparrow$ & fid $\downarrow$
+& cs $\uparrow$ & fid $\downarrow$ & cs $\uparrow$ & fid $\downarrow$ & cs $\uparrow$ & fid $\downarrow$ & cs $\uparrow$ & fid $\downarrow$ \\
+\midrule
+orig & - 
+& 71.0 & 49.1 
+& 51.8 & 70.7 & - 
+& 72.7 & - 
+& 71.8 & - 
+& 66.3 & - 
+& 60.8 & - \\
+\midrule
+CASteer & 2.0 
+& 52.1 & 69.5 
+& 68.3 & 52.9 & 212.4 
+& 70.9 & 42.7 
+& 71.9 & 18.9 
+& 66.1 & 28.6 
+& 60.9 & 24.6 \\
+\midrule
+LEACE & 2.0 
+& 51.2 & 68.8 
+& 67.6 & 53.3 & 207.6 
+& 72.2 & 25.2 
+& 71.7 & 12.6 
+& 66.1 & 20.8 
+& 60.6 & 28.2 \\
+\midrule
+MidSteer (ours) & 1.0 
+& 51.2 & 68.7 
+& 51.9 & 70.7 & 12.7 
+& 72.2 & 23.9 
+& 71.8 & 12.4 
+& 66.1 & 20.7 
+& 60.7 & 27.2 \\
+\bottomrule
+\end{tabular}}
+\vspace{-0.5cm}
+\end{table}

@@ -1,0 +1,553 @@
+%%%%%%%% ICML 2026 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs} % for professional tables
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{wrapfig}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{pifont}
+\usepackage{multirow}
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2026} with \usepackage[nohyperref]{icml2026} above.
+\usepackage{hyperref}
+
+    
+% Attempt to make hyperref and algorithmic work together better:
+\usepackage{bm}
+\newcommand{\vtheta}{\theta}
+% \newcommand{\theHalgorithm}{\arabic{algorithm}}
+\usepackage{amsthm,amsmath,amssymb,mathtools}
+
+% Use the following line for the initial blind version submitted for review:
+% \usepackage{icml2026}
+
+% For preprint, use
+% \usepackage[preprint]{icml2026}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2026}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+\newcommand{\sxx}{\mathbf \Sigma_{\rv X \rv X}}
+\newcommand{\sxz}{\mathbf \Sigma_{\rv X \rv Z}}
+\newcommand{\swxz}{\mathbf \Sigma_{\mathbf{W} \rv X, \rv Z}}
+\newcommand{\swxwx}{\mathbf \Sigma_{\mathbf{W} \rv X, \mathbf{W} \rv X}}
+\newcommand{\szz}{\mathbf \Sigma_{\rv Z \rv Z}}
+\newcommand{\pwxz}{\mathbf P_{\mathbf{W}\sxz}}
+\newcommand{\loss}{\color{black} \mathcal{L}}
+\newcommand{\cov}{\mathrm{Cov}}
+
+\newcommand{\ili}[1]{\textbf{[Ili]}  \; {\color{blue}#1}}
+
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+\usepackage[textsize=tiny]{todonotes}
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{MidSteer: Optimal Affine Framework for Steering Generative Models}
+
+\begin{document}
+
+\twocolumn[
+  \icmltitle{MidSteer: Optimal Affine Framework for Steering Generative Models}
+
+  % It is OKAY to include author information, even for blind submissions: the/
+  % style file will automatically remove it for you unless you've provided
+  % the [accepted] option to the icml2026 package.
+
+  % List of affiliations: The first argument should be a (short) identifier you
+  % will use later to specify author affiliations Academic affiliations
+  % should list Department, University, City, Region, Country Industry
+  % affiliations should list Company, City, Region, Country
+
+  % You can specify symbols, otherwise they are numbered in order. Ideally, you
+  % should not use this facility. Affiliations will be numbered in order of
+  % appearance and this is the preferred way.
+  \icmlsetsymbol{equal}{*}
+
+  \begin{icmlauthorlist}
+    \icmlauthor{Tatiana Gaintseva}{equal,yyy,comp}
+    \icmlauthor{Andrew Stepanov}{equal,ql}
+    \icmlauthor{Ziquan Liu}{yyy}
+    \icmlauthor{Martin Benning}{xxx}
+    \icmlauthor{Gregory Slabaugh}{yyy}
+    \icmlauthor{Jiankang Deng}{zzz}
+    \icmlauthor{Ismail Elezi}{comp}
+    %\icmlauthor{}{sch}
+    % \icmlauthor{Firstname8 Lastname8}{sch}
+    % \icmlauthor{Firstname8 Lastname8}{yyy,comp}
+    %\icmlauthor{}{sch}
+    %\icmlauthor{}{sch}
+  \end{icmlauthorlist}
+
+  \icmlaffiliation{yyy}{Queen Mary University of London, London, UK}
+  \icmlaffiliation{comp}{Huawei Noah's Ark, London, UK}
+  \icmlaffiliation{ql}{QuantumLight Capital, London, UK}
+  \icmlaffiliation{xxx}{University College London, London, UK}
+  \icmlaffiliation{zzz}{Imperial College London, London, UK}
+
+  \icmlcorrespondingauthor{Tatiana Gaintseva}{t.gaintseva@qmul.ac.uk}
+  % \icmlcorrespondingauthor{Firstname2 Lastname2}{first2.last2@www.uk}
+
+  % You may provide any keywords that you find helpful for describing your
+  % paper; these are used to populate the "keywords" metadata in the PDF but
+  % will not be shown in the document
+  % \icmlkeywords{Machine Learning, ICML}
+
+  \vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column listing the
+% affiliations and the copyright notice. The command takes one argument, which
+% is text to display at the start of the footnote. The \icmlEqualContribution
+% command is standard text for equal contribution. Remove it (just {}) if you
+% do not need this facility.
+
+% Use ONE of the following lines. DO NOT remove the command.
+% If you have no special notice, KEEP empty braces:
+\printAffiliationsAndNotice{}  % no special notice (required even if empty)
+% Or, if applicable, use the standard equal contribution text:
+% \printAffiliationsAndNotice{\icmlEqualContribution}
+
+\begin{abstract}
+Steering intermediate representations has emerged as a powerful strategy for controlling generative models, particularly in post-deployment alignment and safety settings.
+%
+However, despite its empirical success, it currently lacks a comprehensive theoretical framework. 
+%
+In this paper, we bridge this gap by formalizing the theory of concept steering.
+%
+First, we establish a link between steering and affine concept erasure, proving that the standard approach for removing unwanted behaviors is a special case of LEACE (a closed-form method for affine erasure).
+%
+Next, we formulate a principled theoretical framework for concept switching, LEACE-Switch, and characterize the assumptions under which it provides an optimal affine solution. Building on this analysis, we then introduce MidSteer (\textbf{Mi}nimal \textbf{D}isturbance concept \textbf{Steer}ing), a more general affine framework for concept manipulation that relaxes these assumptions and enables directed, minimal-disturbance transformations. We  demonstrate that MidSteer performs favorably across a range of tasks, modalities, and architectures, including vision diffusion models and large language models. 
+Code is available at \href{https://github.com/Atmyre/MidSteer}{https://github.com/Atmyre/MidSteer}
+\end{abstract}
+
+% \vspace{-1cm}
+\section{Introduction}
+
+Generative models such as Large Language Models (LLMs) and vision diffusion models have achieved remarkable progress in recent years \cite{DBLP:journals/csur/YangZSHXZZCY24} \cite{DBLP:journals/corr/abs-2307-06435}. However, controlling model outputs to enforce desirable behaviors or suppress harmful ones remains challenging \cite{DBLP:journals/corr/abs-2502-17601}. Yet, this capability is necessary for improving model safety, reliability, alignment, and usefulness in downstream applications.
+
+Concept steering of intermediate representations is an increasingly popular technique that has already proven simple yet powerful for controlling behavior in LLMs~\cite{panickssery2024steeringllama2contrastive}. Recently it was also shown to be applicable to vision diffusion models~\cite{gaintseva2026casteer}. It changes the intermediate representations of a generative model during generation by adding a "steering vector" that encodes a target concept. This approach has proven effective for tasks such as erasing unwanted behaviors (toxicity, nudity) or amplifying desirable features (helpfulness, truthfulness)~\cite{panickssery2024steeringllama2contrastive,DBLP:conf/icml/SinghRHACK24,gaintseva2026casteer}. However, despite its simplicity, its theoretical foundations remain underdeveloped, with most work being highly empirical~\cite{DBLP:journals/corr/abs-2310-01405,DBLP:journals/tmlr/WehnerATKF25}. Existing methods largely rely on heuristic vector manipulations, which can introduce unintended side effects and lack a solid theoretical basis and guarantees~\cite{raedler2025the,anthropic2024evaluating}. Moreover, naive steering often perturbs unrelated features, undermining the minimal disturbance principle that is critical to maintaining model quality and coherence.
+
+Recently, strong theoretical foundations have been developed for concept erasure. \cite{ravfogel-etal-2023-linear} introduced the notion of log-linear guardedness. Based on it,  \cite{belrose2025leace} developed LEACE, an affine concept erasure framework to remove undesired information from model representations for downstream tasks. However, these methods do not naturally extend to other forms of concept manipulation, such as switching, where the goal is to replace one concept with another rather than just erasing it.
+
+
+In this work, we address these gaps by developing a unified theoretical framework for affine steering of generative models. %We first show that the widely used steering method for concept deletion is a special case of LEACE. 
+We begin by proving a formal equivalence between the standard steering methodology and LEACE, demonstrating that the widely used heuristic of steering for concept erasure is a special case of optimal affine concept erasure.
+%
+Building on this foundation, we extend the framework from erasure to concept switching. We first consider the setting of bidirectional switching, in which a binary concept partitions the dataset and the goal is to invert the linear dependence of the representation on the concept label. Under these assumptions, we derive LEACE-Switch, an optimal affine transformation that performs a complete and symmetric concept swap while minimally disturbing the representation.
+
+We examine the scope of this formulation and show that its assumptions, dataset partitioning and global label inversion define a practically relevant, though restricted, regime. We address more general settings in which the concepts involved do not jointly span the entire dataset, or where asymmetric, one-directional transformations are desired. We introduce MidSteer (Minimal Disturbance Concept Steering), a generalized framework for affine concept manipulation that enables precise switching while minimizing interference with unrelated properties of the representation.
+
+Through experiments with LLMs and vision diffusion models, we demonstrate that LEACE-Switch and MidSteer achieve more reliable concept switching than vanilla steering, allowing controllable generation with minimal side effects. Our results highlight the value of grounding steering methods in theory and provide practical tools for aligning generative models with desired behaviors.
+
+In summary, our \textbf{contributions} are as follows:
+\begin{itemize}
+    \item We establish a \textbf{formal theoretical connection} between standard activation steering and affine concept erasure, showing that commonly used steering heuristics for concept erasure are special cases of LEACE.
+    
+    \item We \textbf{extend the affine erasure framework to concept switching} and introduce \textbf{LEACE-Switch}, an optimal affine formulation for concept swapping under the assumption that a binary concept partitions the dataset.
+    
+    % \item We \textbf{characterize the scope and assumptions} under which LEACE-Switch is an optimal solution, clarifying its role as a principled framework for symmetric concept inversion and motivating the need for more general concept manipulation in settings where these assumptions do not hold.
+    
+    \item We then relax the dataset partitioning and symmetry requirements for the task of concept switching, and introduce \textbf{MidSteer} (Minimal Disturbance Concept Steering), a \textbf{generalized affine framework for concept manipulation} that enables precise and directed concept switching with provably minimal interference to unrelated representation components.
+    
+    \item We \textbf{empirically validate} LEACE-Switch and MidSteer across modalities and architectures, including LLMs and vision diffusion models, demonstrating improved controllability and reduced side effects compared to existing steering and erasure methods.
+\end{itemize}
+
+\vspace{-0.3cm}
+
+\section{Related Work}
+
+\noindent \textbf{Activation steering and representation manipulation}.
+Activation steering has emerged as a lightweight approach for controlling generative models by modifying intermediate representations, particularly in LLMs \cite{DBLP:journals/corr/abs-2308-10248} \cite{DBLP:journals/corr/abs-2502-17601} \cite{DBLP:conf/acl/RimskyGSTHT24} and more recently in diffusion models \cite{DBLP:conf/cvpr/TumanyanGBD23} \cite{DBLP:conf/iclr/KwonJU23} \cite{gaintseva2026casteer}. Most existing methods rely on heuristic vector addition, often derived from mean activation differences, and provide limited guarantees on optimality or side effects. Our work formalizes steering as an affine transformation problem and studies when such interventions are provably minimal and well-posed.
+
+\noindent \textbf{Affine concept erasure and guardedness}
+A related line of work focuses on removing concept information from representations. INLP \cite{DBLP:conf/acl/RavfogelEGTG20} and RLACE \cite{ravfogel-etal-2023-linear} iteratively project out linear subspaces predictive of a protected attribute. LEACE \cite{belrose2025leace} provides a closed-form affine solution for optimal linear concept erasure under the guardedness framework, minimizing representational disturbance while enforcing zero covariance with the concept label. Our work builds directly on this theory, showing that standard erasure-mode steering is a special case of LEACE, and extending the framework beyond erasure. Next, SPLINCE \cite{DBLP:journals/corr/abs-2506-10703} study oblique projections that erase protected attributes while preserving task-relevant subspaces. While these methods address constrained erasure, they do not consider concept switching, which requires translating concept dependence rather than erasing it. Nevertheless, they motivate the importance of minimal-disturbance objectives with structural constraints, which our work addresses in the switching setting.
+
+\noindent \textbf{Distributional alignment and representation surgery}.
+Representation Surgery \cite{DBLP:conf/icml/SinghRHACK24} derives affine transformations that match class-conditional means, and optionally covariances, between source and target distributions. This approach performs distributional alignment under Gaussian assumptions and is well-suited to tasks where class-conditional statistics fully characterize the desired transformation. In contrast, MidSteer operates on cross-covariances between representations and concept indicators, preserving the global linear structure of the representation space and explicitly minimizing changes outside the concept-mediating subspace. As a result, MidSteer targets concept switching rather than full distribution matching, and the two approaches optimize distinct objectives.
+
+\noindent \textbf{In summary}, while prior methods address erasure or distributional alignment, our work is the first to formalize concept switching as a distinct affine problem and to derive closed-form solution with explicit minimal-disturbance guarantees. 
+% across modalities.
+
+
+% \vspace{-0.5cm}
+\section{Preliminaries}
+
+\subsection{Steering internal representations of models}
+\label{sec:steering}
+
+\noindent We formalize \textbf{activation steering} as the manipulation of internal model representations to control the presence of a specific concept $c$ in the model's output. This is achieved by adding a scaled steering vector $s_c$ to the intermediate hidden activity $h$ during inference.
+%
+The \textbf{steering vector} $s_c$ is constructed from the concept-conditional means of the hidden activity. Let $h$ be a random vector in $\mathbb{R}^d$ representing the activity at a particular layer, and let $C \in \{0, 1\}$ represent the presence or absence of concept $c$. The steering vector $s_c \in \mathbb{R}^d$ is defined as the difference of these means:
+% \newcommand{\ili}[1]{\textbf{[Ili]}  \; {\color{blue}#1}}
+\begin{equation}
+	s_c = \mathbb{E}[h | C = 1] - \mathbb{E}[h | C = 0],
+	\label{eq:casteer_steering_vector}
+\end{equation}
+$s_c$ can be optionally post-processed (to have unit norm).
+
+\noindent The general steering intervention $f$ controls the concept's expressiveness via a scalar $\alpha \in \mathbb{R}$ representing the steering strength and direction. Omitting the subscript $c$, the operation is:
+\begin{equation}
+f(h, s) = h + \alpha s
+\label{eq:general_steering}
+\end{equation}
+% \iffalse
+% Now let us define the steering intervention $f$ that controls the expressiveness of the concept $c$ in the model output during inference. Let $\alpha \in \mathbb{R}$ be a parameter controlling the steering strength and direction. Omitting subscript $c$ for clarity $s = s_c$, 
+% \begin{equation}
+% 	f(h, s) = h + \alpha s
+% 	\label{eq:casteer_erasure}
+% \end{equation}
+% \fi
+\noindent We highlight two essential special cases, determined by the choice of the intervention function $f$.
+
+\noindent \textbf{Concept Erasure.}
+\noindent It aims to erase all information aligned with the concept $c$ from the activation vector $h$. This is achieved by projecting $h$ onto the subspace orthogonal to the steering direction $s$. The projection $\langle h, s \rangle s$ estimates the conceptual component, which is then removed:
+\begin{equation}
+f_{\text{delete}}(h, s) = h - \langle h, s \rangle s
+\label{eq:concept_delete}
+\end{equation}
+\noindent \textbf{Concept switch.}
+Multiplying projection by $2$ results in a \textbf{Householder reflection} of the vector $h$ across the hyperplane orthogonal to $s$:
+\begin{equation}
+f_{\text{switch}}(h, s) = h - 2 \langle h, s \rangle s
+\label{eq:casteer_switch}
+\end{equation}
+\noindent This transformation effectively substitutes the component of $h$ aligned with $c$ with its opposite, thereby substituting the representation of concept $c$ with the representation of its absence.
+
+\noindent If steering is applied to specific layers (e.g., self-attention outputs in LLMs or cross-attention layers in vision models), both Equation \ref{eq:concept_delete} and Equation \ref{eq:casteer_switch} can be incorporated directly into the model's weight matrices. This allows for achieving \textbf{zero inference overhead}, a critical advantage for deployment in large-scale applications.
+
+
+\input{content/guardedness}
+
+\section{Theoretical Results}
+
+% In this paper, we examine approaches for steering internal representations of generative models (LLMs, diffusion models for image generation) to get the desired behaviour (terminate some behaviour or change it to another). 
+We theoretically analyze connections between steering approaches (Sec.~\ref{sec:steering}) and LEACE (Sec.~\ref{sec:leace}), and derive a novel framework for affine concept steering called MidSteer, that unifies and generalizes all these approaches.
+
+This section is organized as follows. We first consider the task of concept erasure and establish a formal connection between the standard steering setup for erasure and LEACE, showing that Eq.~\ref{eq:concept_delete} arises as a special case of the LEACE framework. We then extend LEACE to the task of optimal affine concept switching and derive \textbf{LEACE-Switch}, demonstrating that Eq.~\ref{eq:casteer_switch} is a special case of this bidirectional switching formulation.
+
+Next, we characterize the assumptions under which LEACE-Switch provides an optimal solution and introduce \textbf{MidSteer}, a more general affine framework for concept manipulation that enables directed, minimal-disturbance transformations without requiring dataset-wide label inversion. Finally, through experiments on large language models and vision diffusion models, we show that MidSteer consistently outperforms vanilla steering and LEACE-based switching, achieving precise concept control while preserving unrelated features of the generated outputs.
+
+\subsection{Connection between steering in erasure mode and LEACE}
+
+\begin{figure}[!th]
+  \centering
+  % First Image
+  \begin{subfigure}{1.0\columnwidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/erase.png}
+    \caption{Illustrative example of affine concept erasure. In this case the affine transformation is satisfying $\text{cov}(AX + b, Z) = 0$. This figure is inspired by \cite{belrose2025leace}.}
+    \label{fig:viz_cov_erasure}
+  \end{subfigure}
+  
+  \vspace{0.3cm} % Adds a small gap between the two images
+
+  % Second Image
+  \begin{subfigure}{1.0\columnwidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/flip.png}
+    \caption{Illustrative example of affine concept switching. In this case the affine transformation is satisfying $-\text{cov}(AX + b, Z) = \text{cov}(X,Z)$.}
+    \label{fig:viz_cov_switch}
+  \end{subfigure}
+
+  \caption{Illustrative example of affine concept erasure and affine concept flipping frameworks.}
+  \label{fig:snoopy_plots}
+  \vspace{-0.5cm}
+\end{figure}
+
+In this section, we show that steering in erasure mode (Eq.~\ref{eq:concept_delete}) is a special case of LEACE. We formulate and prove a following corollary to the Theorem~\ref{thm:belrose}:
+\begin{corollary}
+	\label{cor:vanilla_erasure_is_special_case_of_LEACE}
+    Let $X$ be a standardized random vector in $\mathbb{R}^d$, i.e., it has zero mean $E[x] = 0$ and unit covariance matrix $\Sigma_{XX} = I$. Let $C \in \{0, 1\}$ be a concept indicator variable.
+    % Let $f_{delete}$ be defined as in Eq.~\ref{eq:casteer_erasure} and $s$ be defined as in Eq.~\ref{eq:casteer_steering_vector}.
+    % The theorem is only valid if s is normalized.
+    Let $s$ be defined as in Eq.~\ref{eq:casteer_steering_vector}.
+    Let $f_{delete}$ be defined as in Eq.~\ref{eq:concept_delete}.
+    Then $f_{delete}$ as a function of $h$ minimizes
+\begin{equation}
+    % \begin{align}
+	\label{eq:vanilla_erasure_is_special_case_of_LEACE}
+    \min_{f \in \mathrm{Aff}(\mathbb{R}^d \mapsto \mathbb{R}^d)} \mathrm{E}[\lVert{f(X) - X}\rVert^2] \  \\
+    \text{ s.t. } \  \cov(f(X), C) = 0
+    % \end{align}
+\end{equation}
+\label{thm:vanilla_steering_is_a_special_case_leace}
+\end{corollary}
+This theorem states that steering in erasure mode can be seen as LEACE under the assumptions that the whitening matrix is the identity and that the mean of all vectors is zero. The proof is found in the Appendix \ref{proof:vanilla_erasure_is_special_case_of_LEACE}.
+
+\subsection{Concept switching}
+
+We generalize beyond a single binary concept, and consider the task of transforming the representation of one concept $c_1$ into another $c_2$. We call this task \textit{concept switching}. 
+
+More formally, let $c_1$ and $c_2$ denote two distinct concepts, each associated with a subset of the data distribution (not necessarily jointly covering it), and their corresponding binary indicators $C_1, C_2 \in \{0,1\}$. The goal of a \emph{concept switch} operation is to construct a transformation $f$ such that samples exhibiting concept $c_1$ after transformation exhibit concept $c_2$, while preserving all other factors of variation as much as possible. Formally, this requires modifying the dependence of the representation on $C_1$ and introducing a desired dependence on $C_2$, without enforcing any relationship between $C_1$ and $C_2$ outside their observed support.
+
+We now adapt LEACE (Theorem ~\ref{thm:belrose}) framework to the task of concept switching, and formulate a theoretical framework for the optimal affine concept switching, LEACE-Switch. Additionally, we show that steering in switching mode Eq.~\ref{eq:casteer_switch} can be seen as a special case of this framework. We then characterize the scope of LEACE-Switch by making explicit the assumptions under which it provides an optimal solution. Finally, we introduce MidSteer, a generalized affine framework for concept manipulation that relaxes these assumptions and enables directed, minimal-disturbance concept switching in more general settings.
+
+\subsubsection{LEACE for concept switching}
+
+Recall that $Z \in \{0,1\}^k$ denotes a binary concept vector. We now consider the task of \emph{bidirectional concept switching}, in which the concept encoded by $Z$ is assumed to partition the dataset (i.e., $P(Z=1)+P(Z=0)=1$), so that each sample belongs either to the concept or to its complement. Under this assumption, concept switching can be interpreted as a global inversion of the linear dependence between the representation and the concept label.
+
+Within the covariance-based guardedness framework of LEACE, such an inversion admits a natural affine formulation. Rather than removing linear information about the concept as in concept erasure, we seek to preserve the magnitude of the linear dependence while reversing its sign. This leads to the following constraint:
+\begin{equation}
+    \cov(f(X), \mathbf{1}^k - Z) = \cov(X, Z) \, ,
+\label{eq:leace_switch_constraint}
+\end{equation}
+where $\mathbf{1}^k$ denotes a $k$-dimensional vector of ones. By linearity of covariance, this condition is equivalent to
+\begin{equation}
+    \cov(f(X), Z) = -\,\cov(X, Z) \, .
+\end{equation}
+See Fig.~\ref{fig:viz_cov_switch} for a geometric illustration of this.
+
+Equation~\ref{eq:leace_switch_constraint} constitutes the affine analogue of a \emph{perfect concept flip} within the guardedness framework. In LEACE (Theorem~\ref{thm:belrose}), concept erasure is achieved by enforcing $\cov(f(X), Z) = 0$, ensuring that the transformed representation carries no linear signal about the concept. In contrast, the constraint above enforces a complete inversion of this signal: samples that previously correlated positively with the concept now correlate equally strongly with its complement, and vice versa. This corresponds to a symmetric, dataset-wide concept swap and mirrors the role of reflection-based switching in vanilla steering.
+
+Analogous to Theorem~\ref{thm:belrose}, we now characterize the optimal affine transformation that satisfies the constraint in Eq.~\ref{eq:leace_switch_constraint} while minimally disturbing the original representation:
+\begin{theorem}[LEACE-Switch, Optimal Concept Switching]
+
+\label{thm:concept_switch}
+
+% Let $X, Z, M, \Sigma_{XX}, \Sigma_{XZ}$ be defined as in Theorem~\ref{thm:belrose}.
+Let $X, Z, \Sigma_{XX}, \Sigma_{XZ}$ be defined as in Theorem~\ref{thm:belrose}. Assume $\mathrm{Im}(\Sigma_{XZ}) \subseteq \mathrm{Im}(\Sigma_{XX})$.
+Then the optimization problem
+% \begin{equation}
+\begin{align}
+    \label{eq:concept_switch_minimization}
+    \min_{\substack{
+        A \in \mathbb{R}^{d \times d},
+        \\ b \in \mathbb{R}^d
+    % Original objective used norm M. Here updated to L2 norm.
+    % }} \mathrm{E}\Big[ \norm{ A X + b - X}_M^2 \Big] \\
+    }} \mathrm{E}\Big[ \lVert{ A X + b - X}\rVert_2^2 \Big] \\
+    \text{ s.t. } \cov(AX + b, Z) = -\cov(X, Z)
+\end{align}
+% \end{equation}
+has the following solution (almost surely):
+\begin{align}
+    \label{eq:concept_switch_optimum_A}
+    \widehat{A} &= I - 2W^+(W \Sigma_{XZ}) (W \Sigma_{XZ})^+ W \, ,\\
+    \label{eq:concept_switch_optimum_b}
+    \widehat{b} &= \mathbb{E}[X] - \widehat{A} \mathbb{E}[X] \, ,
+\end{align}
+% where $W = \Sigma_{XX}^{-1/2}$ is whitening transformation.
+% We update W to use the robust pseudo-inverse notation for consistency.
+\end{theorem}
+The proof is found in the Appendix~\ref{sec:proof_concept_switch}. Also note, since the transform is affine, it can be incorporated into the weight matrix of the model, thus achieving zero inference overhead.
+%
+Similar to corollary~\ref{cor:vanilla_erasure_is_special_case_of_LEACE}, we now show that concept switching as defined in Eq.~\ref{eq:casteer_switch} is a special case of Theorem~\ref{thm:concept_switch}. 
+% \ili{maybe guide the reader something before this theorem, like you have been doing for all the others.}
+% \ref{thm:concept_switch}.
+\begin{corollary}
+    \label{thm:concept_flipping_simple_form}
+    Let $X$ be a standardized random vector in $\mathbb{R}^d$, i.e. it has zero mean $\mathbb{E}[x] = 0$ and unit covariance matrix $\Sigma_{XX} = I$. Let $C \in \{0, 1\}$ be a concept indicator variable.
+    % Let $f_{switch}$ be defined as in Eq.~\ref{eq:casteer_switch} and $s$ be defined as in Eq.~\ref{eq:casteer_steering_vector_switch}.
+    % The theorem is only valid if s is normalized.
+    Let $s$ be defined as in Eq.~\ref{eq:casteer_steering_vector}.
+    Let $f_{switch}$ be defined as in Eq.~\ref{eq:casteer_switch}.
+    Then $f_{switch}$ as a function of $h$ minimizes
+% \begin{equation}
+\begin{align}
+    \min_{f \in \mathrm{Aff}(\mathbb{R}^d \mapsto \mathbb{R}^d)} \mathrm{E}[\lVert{f(X) - X}\rVert^2] \quad \\ 
+    \text{ s.t. } \quad \cov(f(X), C) = -\cov(X, C)
+\end{align}
+% \end{equation}
+\end{corollary}
+The proof is found in the Appendix Sec. \ref{proof:vanilla_switching_is_special_case_of_LEACE_switch}.
+%
+This theorem shows that steering in switching mode can be seen as LEACE-Switch under the assumptions that the whitening matrix is the identity and the mean of all vectors is zero. 
+	
+% \vspace{0.5em}
+\textbf{Scope of LEACE-Switch.}
+While the constraint in Eq.~\ref{eq:leace_switch_constraint} precisely captures the algebraic notion of inverting a linear concept signal, it does so under a specific set of assumptions that define the regime in which LEACE-Switch is theoretically well-posed.
+
+First, Eq.~\ref{eq:leace_switch_constraint} assumes that the binary concept variable $Z$ partitions the dataset, i.e.,
+$P(Z = 1) + P(Z = 0) = 1.$
+Under this condition, the linear dependence between $X$ and $Z$ is defined globally over the data distribution and admits a dataset-wide inversion. When instead considering two concepts $c_1$ and $c_2$ with corresponding indicators $Z_1$ and $Z_2$ that do not jointly span the dataset, this assumption is violated. In such cases, the notion of a dataset-wide bidirectional concept flip is no longer well-posed, and Theorem~\ref{thm:concept_switch} does not apply.
+%
+Second, even when $Z$ does partition the dataset, the constraint in Eq.~\ref{eq:leace_switch_constraint} enforces a \emph{complete} inversion of the linear dependence on the concept label. As a result, LEACE-Switch implements a symmetric transformation: representations associated with $c_1$ are mapped to those of $c_2$, and representations associated with $c_2$ are simultaneously mapped to those of $c_1$. While this behavior is desirable in settings that explicitly require bidirectional swapping, it may be overly restrictive in applications where only a one-directional transformation is intended.
+
+Together, these considerations delineate the scope of LEACE-Switch as an optimal solution for symmetric concept inversion under dataset partitioning. In the next section, we relax these assumptions and introduce a more general formulation for affine concept manipulation that enables directed, minimal-disturbance concept switching.
+
+\subsection{Optimal Affine Concept Manipulation}
+We now move beyond bidirectional concept switching and formulate a more general framework for affine concept manipulation. Our goal is to enable \emph{directed} concept transformations that do not require dataset-wide label inversion or the assumption that the involved concepts jointly span the entire distribution.
+
+ Let $Z_1$ and $Z_2$ represent indicators of two groups of concepts $C_s = \{c^{(s)}_1, \dots, c^{(s)}_l\}$ and $C_t = \{c^{(t)}_1, \dots, c^{(t)}_l\}$.
+ Let $Z = (Z_1, Z_2)$, where $Z_1, Z_2 \in \{0, 1\}^{l}$.
+ Our goal is to have $\cov(f(X), Z_1) = \cov(X, Z_2)$, meaning for each $i$, the concept $c^{(s)}_i$ maps to to $c^{(t)}_i$. 
+ % For reasons that are clarified in the proof, we will require $\cov(X, Z_1)$ to be full rank. 
+ Now we formulate the following theorem:
+
+% \includegraphics[width=\textwidth]{neurips_template/img/new_transformation_visualisation_with_bias.png}
+\begin{theorem}[MidSteer, affine optimal concept manipulation]
+    \label{thm:concept_steering}
+    % Let $X, M, Z$ be defined as in Theorem \ref{thm:concept_switch}...
+	Let $X, Z$ be defined as in Theorem \ref{thm:concept_switch} and assume $k = 2l$ for $l > 0$.
+    Let $Z = (Z_1, Z_2)$, where $Z_1, Z_2 \in \{0, 1\}^l$. Let $\Sigma_{XZ_i} = \cov(X, Z_i), i \in \{1, 2\}$ be the cross-covariance matrices between $X$ and $Z_i$.
+    % Add required subspace assumptions for both Z1 and Z2.
+    Assume $\mathrm{Im}(\Sigma_{XZ_i}) \subseteq \mathrm{Im}(\Sigma_{XX})$ for $i \in \{1, 2\}$.
+    Assume $\Sigma_{XZ_1}$ has full column rank: $\mathrm{rk}\Big(\Sigma_{XZ_1}\Big) = l$.
+    % Let $W$ be the ZCA whitening transform $\Sigma_{XX}^{-1/2}$.
+    % I think its better to use the pseudo-inverse notation here.
+    Let $W = (\Sigma_{XX}^{1/2})^{+}$ be the whitening transformation.
+    Let $\Sigma_{WX, Z_i} = W\Sigma_{XZ_i}$.
+	
+	Then we have the following optimization problem:
+% \begin{equation}
+\begin{align}
+	\min_{\substack{
+			A \in \mathbb{R}^{d \times d} \\
+			b \in \mathbb{R}^d
+    % Original objective used norm M. Updated to L2 norm.
+    % }} \mathrm{E}[\big \| AX + b - X \big\|^2_M] \quad
+	}} \mathrm{E}[\big \| AX + b - X \big\|^2_2] \quad \\
+	\text{ s.t. } \quad 
+	\cov(AX + b, Z_1) = \cov(X, Z_2)
+\end{align}
+% \end{equation}
+which has the following solution (almost surely):
+\begin{align}
+    \label{eq:optimal_steering_solution}
+	\widehat{A} &= I + W^+ (\Sigma_{WX, Z_2} - \Sigma_{WX, Z_1})\Sigma_{WX, Z_1}^+ W \\
+	\widehat{b} &= \mathbb{E}[X] - \widehat{A} \mathbb{E}[X] 
+\end{align}
+\end{theorem}
+The proof can be found in Sec. \ref{proof:midsteer}. Unlike LEACE, we now have two covariance matrices for each group of concepts, and do not require the labels to be flipped, but translated from one group to another.
+
+% \textbf{On the full-rank assumption} in Thm. \ref{thm:concept_steering}.
+% In our setup, we consider only one source and one target concept, so $l=1$, and this condition reduces to $\Sigma_{XZ_1} \ne 0$, i.e. the source concept has a nontrivial linear footprint at the chosen layer. If a concept has essentially no linear signature at a layer, the affine update becomes degenerate, so MidSteer would not be meaningfully applied there. In multi-concept settings, rank deficiency indicates linear redundancy among source concepts, in which case we can restrict to an independent subset or work in the effective subspace via the pseudoinverse.
+
+\textbf{On the full-rank assumption} in Thm.~\ref{thm:concept_steering}.
+Rank deficiency indicates redundancy among the source concept directions. In that case, one can restrict to an independent subset or work in the effective subspace via a pseudoinverse. In our experiments $l=1$, so the condition reduces to $\Sigma_{XZ_1}\ne 0$, i.e., the source concept must have a nontrivial linear footprint at the chosen layer. If not, the affine update is degenerate and MidSteer is not meaningfully applicable there.
+
+% Note that as is the case with LEACE, MidSteer is affine transform and can be incorporated in the weight matrix of the layer to have zero inference overhead.
+
+\textbf{Connection between MidSteer and LEACE.} Note that if $Z_2$ is a constant indicator (e.g., representing no item in the dataset), then $\cov(X, Z_2) = 0$, and the MidSteer formula turns into concept erasure (LEACE). Thus we refer to MidSteer as \textit{affine optimal concept manipulation}, as it generalizes several concept manipulation tasks (erasure, switch) under one framework.
+
+\subsection{Steering strength}
+
+Let us now introduce the steering strength $\beta$ for erasure and switching. Note that in vanilla steering (i.e. steering defined by Eq.~\ref{eq:concept_delete} and Eq.~\ref{eq:casteer_switch}), we can unify Eq.~\ref{eq:concept_delete} and Eq.~\ref{eq:casteer_switch}:
+\begin{equation}
+	f(h, s) = h - \beta \cdot \langle h, s \rangle s
+	\label{eq:vanilla_with_beta}
+\end{equation}
+For LEACE, $\widehat{b}$ is unaffected, and Eq.~\ref{eq:belrose_optimum_A} and Eq.~\ref{eq:concept_switch_optimum_A} become:
+\begin{equation}
+	\label{eq:leace_with_beta_A}
+	\widehat{A} = I - \beta \cdot W^+(W \Sigma_{XZ}) (W \Sigma_{XZ})^+ W
+\end{equation}
+Now, $\beta=1$ represents concept erasure, $0 < \beta < 1$ represents lesser degree of erasure. $\beta=2$ represents concept switching, and $\beta > 2$ refers to switching where the switched concept is more expressed than the base concept.
+
+For MidSteer, we update Eq.~\ref{eq:optimal_steering_solution} as:
+\begin{equation}
+	\label{eq:midsteer_with_beta_A}
+	\widehat{A} = I + \beta \cdot W^+ (\Sigma_{WX, Z_2} - \Sigma_{WX, Z_1})\Sigma_{WX, Z_1}^+ W
+\end{equation}
+$\beta = 1$ represents normal steering mode, $\beta < 1$ represent steering where $Z_2$ has less expression compared to what $Z_1$ had in original representation. Vice versa, $\beta > 1$ represent more expression for $Z_2$ compared to $Z_1$.
+
+% Erasure and switching provide only binary control. In practice, steering requires continuous, directional adjustment while preserving unrelated semantics. MidSteer provides the first principled formulation of such partial steering, retaining LEACE’s minimal-disturbance guarantees at every steering strength.
+
+%For Affine erasure (LEACE) and affine flipping, we can re-write the optimal solution obtained in Theorems \ref{thm:belrose} and \ref{thm:concept_switch} as follows:
+%\begin{align}
+%	A^* &= I - \beta \cdot W^+(\Sigma_{WX, Z})(\Sigma_{WX, Z})^+W \\
+%	b^* &= \mu - A^* \mu
+%    \label{eq:steering_beta}
+%\end{align}
+%When $\beta = 1$, we have optimal affine concept erasure. If $\beta = 2$ (and appropriate covariance matrix $\Sigma_{XZ}$), we have affine optimal concept switching. Note that in both cases the covariance matrix participates in the form $\Sigma \Sigma^+$, so any multiplicate constant (such as class probabilities) gets factored out and annihilated.
+%
+%For MidSteer (concept steering, Theorem \ref{thm:concept_steering}), the class labels need not be mutually exclusive and cover all the space of $X$, like what was required in the proof of Theorem \ref{thm:concept_flipping_simple_form}. Let us now obtain the $\beta$-parametrized solution for steering between two classes ($k = 1$). Recall that:
+%\begin{multline}
+%	\Sigma_{X, Z_i} = \cov(X, Z_i) = \mathrm{E}[X Z_i] - \mathrm{E}[X] \mathrm{E}[Z_i] = \\ P(Z_i = 1) \Big( \mathrm{E}[X | Z_i = 1] -  \mathrm{E}[X] \Big) = P(Z_i = 1) \Big( \mu^{(i)} - \mu\Big) = P(Z_i  = 1) \tilde{\mu}^{(i)}
+%\end{multline}
+%Then, equation Eq.~\ref{eq:optimal_steering_solution} becomes
+%\begin{align}
+%	A^* &= I + W^+ W(\beta \tilde{\mu}^{(2)} - \tilde{\mu}^{(1)})(W\tilde{\mu}^{(1)})^+ W \\
+%	b^* &= \mu - A^* \mu
+%\end{align}
+%where $\beta = \frac{P(Z_2 = 1)}{P(Z_1 = 1)}$. 
+%While it is practically infeasible to estimate $\frac{P(Z_2 = 1)}{P(Z_1 = 1)}$, $\beta$ here can be seem as a hyperparameter defining strength of the intervention, analogous to the parameter in Eq.~\ref{eq:steering_beta}. We will use this equation throughout our experiments.
+
+
+
+\input{content/experiments}
+
+
+
+
+
+%Tables with detailed breakdown of scores per each concept and model are presented in the Appendix, Sec. \ref{sec:tables_llm_switch} and Sec. \ref{sec:tables_diffusion_switch}.
+
+% \ili{are all the results in diffusion here on SDXL. If possible add something on SANA here. If not, reiterate that you give extra results on SANA in the appendix}
+
+\section{Conclusion}
+
+In this work, we bridge the gap between previous empirical research in steering generative models and the theory of affine concept steering. We extend this theoretical framework to concept switching. We define the corresponding optimisation problem and solve it in closed form.
+We then present MidSteer, a general steering method, that is theoretically optimal under certain conditions. It outperforms other methods on concept switching for both LLMs and image diffusion models, while having the advantage of clear matrix form representation. To our knowledge, this is the first theoretical treatment of steering beyond erasure, connecting empirical heuristics and principled affine methods, while reaching state-of-the-art results.
+
+
+\section*{Impact Statement}
+This paper advances the theoretical understanding of steering and representation manipulation in generative models.  Because such methods can be used to suppress harmful concepts and promote desirable behaviors, they are directly relevant to post-deployment alignment, safety, and controllable generation. In particular, more principled steering methods may help reduce undesirable outputs such as toxic text or violent imagery while better preserving unrelated capabilities and content, which is an important consideration for practical deployment.
+
+At the same time, representation-level control is a dual-use capability. The same techniques that enable safer or more useful behavior could also be used to manipulate model outputs in undesirable ways, such as amplifying harmful, biased, deceptive, or otherwise inappropriate concepts.  Moreover, steering interventions may have unintended side effects if applied with poorly estimated concept directions, mismatched data distributions, or insufficient evaluation of unrelated behaviors. For this reason, we view careful evaluation of preservation, robustness, and failure modes as an essential part of deploying such methods responsibly.
+
+Overall, we believe the primary societal relevance of this work lies in providing a more principled foundation for controllable and safety-oriented model interventions, while also highlighting the need for safeguards and evaluation protocols when applying representation manipulation in real systems.
+
+\section*{Acknowledgments}
+This work was supported by a Google DeepMind PhD Studentship, and the work utilized Queen Mary’s Andrena HPC facility, supported by QMUL Research-IT. This work was also supported by the Engineering and Physical Sciences Research Council [grant number EP/Y009800/1], through funding from Responsible Ai UK (KP0016). 
+
+
+%\clearpage
+% \bibliography{iclr2026_conference}
+% \bibliographystyle{iclr2026_conference}
+
+\bibliography{example_paper}
+\bibliographystyle{icml2026}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+\onecolumn
+
+\input{content/suppl}
+
+\end{document}

@@ -1,0 +1,134 @@
+\section{Experiments}
+\label{sec:experiments}
+
+\begin{figure*}[t]
+    \centering
+    % --- First Row (Llama-2-7b) ---
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{artefacts/main/llama2-7b-flip-noclip-unrelated-cs.pdf}
+        \caption{$\Delta CS$ vs CS of unrelated concepts \\ for the Llama-2-7b model.}
+        \label{fig:llama_cs_top}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{artefacts/main/llama2-7b-flip-noclip-mmlu-bertp.pdf}
+        \caption{$\Delta CS$ vs 1 - BERT Precision on MMLU \\ for
+  the Llama-2-7b model.}
+        \label{fig:llama_mmlu_top}
+    \end{subfigure}
+
+    \vspace{0.3cm} % Space between rows
+
+    % --- Second Row (SDXL) ---
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{artefacts/main/sdxl-flip-noclip-unrelated-cs.pdf}
+        \caption{$\Delta CS$ vs CS of unrelated concepts \\ for the SDXL model.}
+        \label{fig:sdxl_cs_bottom}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{artefacts/main/sdxl-flip-noclip-unrelated-fid.pdf}
+        \caption{$\Delta CS$ vs FID of unrelated concepts \\ for the SDXL model.}
+        \label{fig:sdxl_fid_bottom}
+    \end{subfigure}
+
+    \caption{Pareto efficiency frontiers for concept \textit{switching} experiments with steering, LEACE, and MidSteer highlighting different $\beta$s.}
+    \label{fig:pareto_switch_2x2}
+\end{figure*}
+
+\subsection{Experimental setup}
+\label{sec:experimental_setup}
+
+% We evaluate MidSteer on concept switching across two complementary axes: concept type and modality. For concept type, we consider both \emph{concrete} nominal concepts, such as object categories, and \emph{abstract safety-related} concepts, such as toxicity, helpfulness,
+% violence, and peace. For modality, we evaluate both LLMs and diffusion models. We show that MidSteer improves directed concept switching for both concrete categories and safety-relevant behavioral and visual concepts.
+
+We conduct experiments comparing MidSteer to vanilla steering and LEACE-Switch on the task of concept switching. We focus on concept switching in the main experiments, as concept erasure is recovered as a special case when the target concept is constant. However, we provide comparison of all the approaches on concept erasure in the Appendix Sec. \ref{sec:exp_concept_erasure}. We consider two modalities: (1) text, for which we use Large Language Models (LLMs); (2) images, for which we use Diffusion Models. As for concepts, we consider both \emph{concrete} nominal concepts, such as object categories, and \emph{abstract safety-related} concepts, such as toxicity, helpfulness, violence, and peace. We show that MidSteer improves directed concept switching for both concrete categories and safety-relevant behavioral and visual concepts.
+%Below, we give the details on the used models.
+
+
+
+% We compare MidSteer against vanilla steering and LEACE-Switch on the task of concept switching. We focus on switching in the main experiments, since concept erasure is recovered as a special case when the target concept is
+% constant; erasure experiments are provided in Appendix~\ref{sec:erasure_experiments}.
+
+
+% \smallskip
+\noindent \textbf{General covariance estimation.}
+% For a source--target concept pair $(c_s,c_t)$, we estimate the class-conditional covariances $\Sigma_{XZ_1}$ and $\Sigma_{XZ_2}$ from $N=1000$ concept-specific samples, and estimate the self-covariance $\Sigma_{XX}$ from $M=50000$ generic samples. We ablate the number of samples required for estimating $\Sigma_{XX}$ in
+% Appendix~\ref{sec:covariance_ablation}, and provide pseudocode for
+% covariance estimation in Appendix~\ref{sec:algorithm}.
+In each case, given a pair of concepts ($c_s$, $c_t$) to switch, we estimate class-conditional covariances $\Sigma_{XZ_1}, \Sigma_{XZ_2}$ based on a sample of size $N=1000$, and self-covariances $\Sigma_{XX}$ on a sample of size $M=50000$. We provide details about datasets used for $\Sigma_{XZ_1}, \Sigma_{XZ_2}$ and $\Sigma_{XX}$ estimation for each experiment descripbed below in the Appendix Sec.~\ref{sec:llm_steering_vector_prompts}. We also ablate the number of prompts needed for estimating $\Sigma_{XX}$ in the Appendix Sec.~\ref{sec:covariances_ablation}, and provide pseudocode for the algorithm on covariance estimation in the Sec.~\ref{sec:welford_algorithm}.
+
+% \smallskip
+\noindent \textbf{Concrete concept switching setup.}
+As no standard benchmarks currently exist for concept switching, we introduce a dedicated evaluation setup. Our procedure is largely based on established concept erasure benchmarks used for vision generative models~\cite{one_dimentional_adapter_spm,wu2025unlearningconceptsdiffusionmodel}. 
+To test switching from the source concept $c_s$ to the target concept $c_t$, we use 80 template prompts prompting the model to generate
+output related to  $c_s$ or $c_t$. For each prompt we run 10 such generations varying the random seed. We run the generation on these prompts with and without steering. Templates for LLMs and diffusion models can be found in Sec.~\ref{sec:template_prompts}. We use \emph{Concept Score (CS)} to estimate the amount of concepts $c_s$ and $c_t$ present in the model’s output. 
+% The exact implementation of CS depends on whether the underlying modality is text or image and will be provided in the sections below.
+In the case of ideal switching, CS for concept $c_t$ should be high, and CS for concept $c_s$ should be low for prompts related to both $c_s$ or $c_t$.
+
+To evaluate content preservation beyond the switched concepts, we additionally generate outputs for four unrelated concepts $\{c_i\}_{i=1}^4$. These concepts are chosen to span varying levels of semantic proximity to $c_s$ and $c_t$. We compute CS over $\{c_i\}_{i=1}^4$ to quantify the extent to which these concepts are retained in the generated outputs, which ideally should not decrease under steering. This design enables a more fine-grained comparison of concept switching methods with respect to semantic interference. 
+
+We use the following pairs $p_i = (c_s \to c_t)$ of concrete concepts: $p_1$ = ("Horse" $\to$ "Motorcycle"), $p_2$ ="Dog" $\to$ "Cat", $p_3$ ="Chihuahua" $\to$ "Muffin"). Note that none of these pairs span the whole dataset. Corresponding unrelated concepts $t_i = \{c_i\}^4_{i=1}$ are : $t_1$ = ("Cow",  "Dog", "Pig", "Legislator"), $t_2$ = ("Cow",  "Wolf", "Pig", "Legislator"), $t_3$ = ("Cat",  "Dog", "Wolf", "Legislator").  
+
+% \smallskip
+\noindent \textbf{Safety-related concept switching.}
+We additionally evaluate abstract safety-related switching. In LLMs, we switch \emph{toxicity} to \emph{helpfulness}. The corresponding unrelated concepts are ("sarcasm",  "creativity", "politeness", "mathematics"). 
+% We find that LLM as a judge is not capable of capturing the toxicity score, so we score the safety effect with established Detoxify classifier. 
+In diffusion models, we evaluate the analogous
+visual safety setting of switching \emph{violence} to \emph{peace}, and the corresponding unrelated concepts are ("sadness",  "calm", "anger", "nature"). This directly tests the motivating use case of suppressing harmful behavior while preserving or increasing useful behavior.  
+
+As in the concrete-concept setup, we use 80 template prompts with 10 random seeds per concept. The only exception is the toxicity source concept. For toxicity, we use RealToxicityPrompts with prompt toxicity $\ge 0.5$ instead of template prompts, since we found that instruction-tuned LLMs often refuse to produce toxic continuations from generic toxicity templates. RealToxicityPrompts therefore provides a more reliable evaluation set for measuring whether steering reduces toxic behavior in settings where the base model can still exhibit toxicity.
+
+% \smallskip
+\noindent \textbf{Details on LLM experiments.}
+\label{sec:experiment_setup_llm}
+We test on instruction-tuned Llama 2 \cite{touvron2023llama2openfoundation} and Qwen 2.5 \cite{DBLP:journals/corr/abs-2412-15115} models. We apply steering at every self-attention (SA) layer ans use SA activations corresponding to the last token in prompt.
+%
+% For switching concrete concept, the dataset we used to estimate class-conditional covariances was obtained by prompting GPT o4-mini to generate various questions about each concept. For switching \emph{toxicity} to \emph{helpfulness}, we used 1000 Jigsaw toxic comments
+% Details of the prompt used and examples can be found in Sec.~\ref{sec:llm_steering_vector_prompts}. To estimate $\Sigma_{XX}$, we use a sample of size $M$ from the Alpaca dataset \cite{alpaca}. 
+
+We calculate the \emph{Concept Score (CS)} for \textit{concrete} concepts using LLM as a judge. More specifically, we use the Llama-3.1-8B-Instruct \cite{DBLP:journals/corr/abs-2407-21783} model, and prompt it to estimate the amount of concept $c$ present in the generated output on a scale from 0 to 10. Prompts used are outlined in the Appendix Sec. \ref{sec:judge_prompt}. We additionally report results using GPT-4o-mini as LLM judge in the Appendix Sec.~\ref{sec:gpt4omini_judge} to support reliability of using LLM as a judge for scoring.
+% 
+For safety-related LLM switching, we measure toxicity using the Detoxify BERT classifier~\cite{Detoxify}, and helpfulness using ArmoRM reward scores~\cite{armorm}, while keeping LLM as a judge approach for assessing preservation of unrelated concepts. 
+ 
+We additionally test how much outputs for testing concepts differ with and without steering by calculating BERT scores~\cite{DBLP:conf/iclr/ZhangKWWA20} on the MMLU~\cite{DBLP:conf/iclr/HendrycksBBZMSS21} dataset generations. Lower values of BERT Precision represent more change in the underlying output.
+
+\noindent \textbf{Details on diffusion model experiments.}
+For visual diffusion models, we test on SDXL \cite{DBLP:conf/iclr/PodellELBDMPR24} and SANA \cite{DBLP:conf/iclr/XieCCCT0ZLZ0025} models. Following recent work \cite{gaintseva2026casteer}, we apply steering on activations of every cross-attention (CA) layer. CA activations corresponding to all images patches are used.
+
+We use CLIP score~\cite{DBLP:conf/emnlp/HesselHFBC21} as \emph{Concept Score (CS)} for both concrete and safety-related concepts. Additionally, we measure the change between generations based on the testing concepts when steering is applied, by calculating FID~\cite{DBLP:conf/nips/HeuselRUNH17} between images generated by steered model and vanilla model. Higher values of FID represent more change to the underlying image.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.79\linewidth]{img/teaser.png}
+    \caption{Qualitative results on switching to steer "horses" into "motorcycles". While all methods similarly successfully performed switching from "horse" to "motorcycle", vanilla steering (CASteer) and LEACE fail when presented with prompt for the target concept ("motorcycle"), unable to distinguish between forward and reverse steering. CASteer also additionally failed on the "cow" concept, and more significantly altered images of the concept "dog".}
+    \label{fig:diffusion_switching_images}
+\end{figure}
+
+\input{flipping_main}
+
+\subsection{Experimental results}
+\label{sec:experimental_results}
+
+Across both concrete and safety-related settings, MidSteer provides the best trade-off between successful directed concept switching and preservation of non-target content. Vanilla steering can often induce the target concept, but it also causes stronger interference and frequently acts symmetrically, modifying prompts that already contain the target concept. LEACE-Switch improves preservation relative to vanilla steering, but inherits the limitation of bidirectional concept inversion. MidSteer avoids this failure mode by directly matching the source-concept cross-covariance to the target-concept cross-covariance.
+
+% \smallskip
+\noindent \textbf{Concrete concept switching.}
+We compare results on concept switching by applying vanilla steering, LEACE-Switch and MidSteer with different values of $\beta$. We present results on LLama-2-7b and SDXL models aggregated for all three concept pairs $p_1, p_2, p_3$ in Fig.~\ref{fig:pareto_switch_2x2}. We see that in each case MidSteer achieves much better balance between level of concept switch between $c_1$ and $c_2$ and preservation of other concepts across different values of $\beta$.
+% %
+Pareto plots for other models, as well as Pareto plots for individual concept and metric pairs can be found in the Appendix Sec. \ref{sec:pareto_llm_switch}, \ref{sec:pareto_diffusion_switch}. 
+
+To better illustrate differences between vanilla steering, LEACE and MidSteer for concept flipping, in Tab.~\ref{tab:flip_main} we present results on switching a concept of $c_1=$ ``horse'' to $c_2=$ ``motorcycle'' on the SDXL model. We compare Vanilla switching and LEACE with $\beta=2$ and MidSteer with $\beta=1$, as these are default parameters for these methods as suggested by Eqs.~\ref{eq:casteer_switch_matrix}, \ref{eq:concept_switch_optimum_A}, and \ref{eq:optimal_steering_solution}.
+
+First note, that all the methods successfully flip ``horse'' to ``motorcycle'', having similar CS scores on source (``horse'') and target (``motorcycle'') concepts. Second, it can be seen that as suggested by definitions Eqs.~\ref{eq:casteer_switch_matrix}, \ref{eq:concept_switch_optimum_A}, vanilla steering and LEACE fail to keep the ``motorcycle'' concept intact when flipping ``horse'' to ``motorcycle'', as target CS score goes down. In contrast, MidSteer keeps ``motorcycle'' intact. This is also illustrated in Fig. \ref{fig:diffusion_switching_images}. Next, CS score of ``cow'' and FID scores of ``cow'', ``pig'' and ``dog'' are worse for vanilla than for other methods, showing superiority of LEACE and MidSteer over vanilla steering in ability to keep unrelated concepts intact. Results on other concepts flipping on both LLMs and diffusion models show similar patterns.
+We observe the same trend over all the concept pairs and models. We give more details in Appendix Sec. \ref{sec:tables_llm_switch}, \ref{sec:tables_diffusion_switch}.
+
+% \smallskip
+\input{content/safety-related_results}
+
+
+

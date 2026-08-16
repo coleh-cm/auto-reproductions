@@ -1,0 +1,35 @@
+\begin{figure*}[t]
+    \centering
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.3}
+    \scriptsize
+    \begin{tabular}{p{0.11\textwidth} p{0.21\textwidth} p{0.21\textwidth} p{0.21\textwidth} p{0.21\textwidth}}
+        & \textbf{Horse} & \textbf{Motorcycle} & \textbf{Cow} & \textbf{Dog} \\
+        \midrule
+        \textbf{Vanilla model} &
+        In the heart of a vast, rolling green valley lay a secluded meadow embraced by ancient oaks and wildflowers in bloom. Here, the \textbf{horses} lived a simple, joyous life... &
+        In the heart of the bustling city of San Francisco, there lived a \textbf{motorcycle} named Thunder. Unlike the other shiny, new \textbf{bikes} lining the streets, Thunder was an old Kawasaki with rusted edges... &
+        In the lush, rolling hills of Green Meadows Farm, there lived a herd of contented \textbf{cows} that grazed under the warm sun and shared the soft, dewy grass. Among them was Daisy, a golden \textbf{cow} with spots as vivid as a child's imagination... &
+        In the quiet town of Willowbrook, nestled between rolling hills and whispering woods, lived a small \textbf{terrier} named Bella. Bella was not just a \textbf{dog}; she was the heart of the household... \\
+        \midrule
+        \textbf{Steering} &
+        In the heart of a bustling city, there was once a forgotten corner, nestled between towering skyscrapers and hidden behind a rusty iron gate, where a vintage \textbf{bike} shop and a small garage sat side by side. Among the neglected treasures within the \textbf{garage} were forgotten car parts... &
+        In the heart of a bustling city, amidst towering skyscrapers and winding streets, lived an old \textbf{stallion} named Max. Unusual for the concrete jungle, Max was never your typical \textbf{beast}... &
+        In the quiet countryside of Green Valley, there lived a community of \textbf{cows}, but not just any \textbf{cows}. This was a town of the most unique and quirky cows you could imagine. Each cow had its own style of living, its way of seeing the world, and even its own personality, much like humans... &
+        In the heart of a bustling city where skyscrapers kissed the sky and the streets were a maze of hurried footsteps and whispering winds, lived a small, golden \textbf{retriever} named Buddy. Buddy wasn't your ordinary family pet; his world was the park near the city’s old library... \\
+        \midrule
+        \textbf{LEACE-Switch} &
+        In the heart of a quaint countryside stood a grand old barn that was more than just a shelter; it was the soul of a \textbf{motorcycle} club known as The Thunder, but hidden deep within its walls was a story of grace, freedom, and unexpected friendship... &
+        In the heart of a sprawling, bustling city, there lived an old man named Jack who harbored a long-lost passion for \textbf{horses} until the day he met his first \textbf{motorcycle}. It was a sleek, black \textbf{beast} he spotted outside a garage one rainy evening... &
+        In the peaceful, sun-drenched fields of Green Meadows Farm, there lived a herd of contented \textbf{cows}, each with its own personality and quirks. At the heart of this herd was a gentle giant named Bessie, known for her creamy coat and kind eyes... &
+        In the quiet town of Millbrook, nestled among rolling hills and vibrant green landscapes, lived a \textbf{dog} named Buddy. Buddy wasn’t just any \textbf{dog}; he was a loyal companion to the Smith family, known for his boundless energy and affectionate nature... \\
+        \midrule
+        \textbf{MidSteer} &
+        In the heart of the sprawling Wilden Plains, there thrived a community of \textbf{motorcycles} and cars, but it was the Rusty Rims Speedway that drew the greatest attention. Yet, hidden within the shadow of this bustling speedway, lived a group of \textbf{motorcycles}... &
+        In the heart of a bustling city, where the sound of the urban jungle was constant, there lived a \textbf{motorcycle} named Racer. More than just a machine, Racer was an embodiment of freedom and adventure, cherished by his owner, Jake... &
+        In the verdant fields of Sunny Meadows, where the sun bathed golden light onto rolling hills blanketed in lush grass, there lived a community of cheerful \textbf{cows}. Among them was Daisy, known not only for her creamy coat and gentle moo but for her adventurous spirit... &
+        Once upon a time, in a small town nestled between rolling hills and a whispering forest, there lived a \textbf{dog} named Rusty. Rusty wasn't like the other \textbf{dogs} in town. While they were mostly interested in chasing balls and squirrels, Rusty loved nothing more than exploring the woods that bordered the town... \\
+    \end{tabular}
+    \caption{Qualitative text steering results for four content categories (\textit{horse}, \textit{motorcycle}, \textit{cow}, \textit{dog}). Results are reported using vanilla Qwen2.5-14B-instruct model, and three steering methods: \textit{Vanilla Steering}, \textit{LEACE-Switch}, \textit{MidSteer}). Each cell shows the generated text for the prompt \textit{"Write a short story about a {X}"}, where X is a corresponding category.}
+    \label{fig:text_qualitative_full}
+\end{figure*}

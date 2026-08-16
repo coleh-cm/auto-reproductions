@@ -1,0 +1,10 @@
+# Keep only LaTeX source (.tex/.bbl/.bib) and the paper text under version control.
+# Ignore everything else from the unpacked arXiv e-print (figures, styles, tarball, etc).
+eprint.tar.gz
+*
+!*/
+!.gitignore
+!*.tex
+!*.bbl
+!*.bib
+!paper.txt

@@ -1,0 +1,90 @@
+\subsection{Affine guardedness and covariance control}
+\label{sec:leace}
+
+Our subsequent results are formulated as minimal-disturbance affine transformations under constraints on the cross-covariance between representations and concept indicators. 
+We use the guardedness framework of \citet{ravfogel-etal-2023-linear,belrose2025leace} to justify why cross-covariance is a meaningful object for formalizing linear concept information in representations. 
+In particular, for the task of concept erasure under linear-affine predictors and squared loss, \citet{belrose2025leace} show that making a concept linearly unpredictable from a representation is equivalent to enforcing zero covariance between the representation and the concept label. \citet{belrose2025leace} formulated the following notion of guardedness:
+% This gives a principled covariance-based view of concept control: concept erasure corresponds to removing the relevant cross-covariance.
+% Thus, guardedness provides a principled justification for the covariance-removal constraint used in LEACE; the rest of the paper can then be read directly as extending this covariance-control view from erasure to switching.
+
+\begin{definition}[Guardedness, \citealt{belrose2025leace}]
+\label{def:guardedness}
+Consider a $k$-class classification task over jointly defined random vectors $X$ and $Z$, where $X$ takes values in $\mathbb R^d$ and $Z$ is a one-hot label vector taking values in
+\[
+    \mathcal Z = \{\mathbf z \in \{0,1\}^k \mid \|\mathbf z\|_1 = 1\},
+\]
+with $\mathbb P(Z=j)>0$ for each class $j$. 
+Let $\eta(\cdot;\vtheta):\mathbb R^d \to \mathbb R^k$ be a predictor from a function class
+\[
+    \mathcal V = \{\eta(\cdot;\vtheta)\mid \vtheta\in\Theta\},
+\]
+assumed to contain all constant functions, and let $\mathfrak L$ be a class of losses
+$\loss:\mathbb R^k\times\mathcal Z\to[0,\infty)$. 
+Let $\chi$ denote the set of random vectors of finite first moment taking values in $\mathbb R^d$ and jointly defined with $Z$.
+
+We say that $X$ $(\mathcal V,\mathfrak L)$-\textbf{guards} $Z$ if, for every $\loss\in\mathfrak L$, it maximizes the minimum achievable prediction loss:
+\begin{equation*}
+    X \in 
+    \mathop{\mathrm{argmax}}_{X'\in\chi}
+    \inf_{\vtheta\in\Theta}
+    \mathbb E\!\left[
+        \loss\bigl(\eta(X';\vtheta), Z\bigr)
+    \right].
+\end{equation*}
+Equivalently, $X$ is maximally uninformative about $Z$ for predictors in $\mathcal V$ and losses in $\mathfrak L$.
+\end{definition}
+
+The full guardedness definition is general, but the key consequence for our purposes is its linear characterization. 
+For linear--affine predictors with squared loss, guardedness is equivalent to zero cross-covariance between the representation and the label.
+
+\begin{theorem}[Linear guardedness, \citealt{belrose2025leace}]
+\label{thm:linear_guardedness}
+The following statements are equivalent:
+\begin{itemize}
+    \item $X$ linearly guards $Z$ in the sense of Definition~\ref{def:guardedness};
+    \item every component of $X$ has zero covariance with every component of $Z$, i.e.
+    \[
+        \cov(X,Z)=0.
+    \]
+\end{itemize}
+\end{theorem}
+
+Therefore, in the affine setting, concept erasure can be expressed as a covariance-control problem: find a transformation of the representation that removes linear dependence on the concept label. 
+At the same time, to preserve unrelated information, the transformation should perturb the representation as little as possible. 
+These two desiderata lead to the LEACE objective: among all affine maps that enforce $\cov(AX+b,Z)=0$, choose the one closest to the identity transformation in expected squared distance.
+
+\begin{theorem}[LEACE, \citealt{belrose2025leace}]
+\label{thm:belrose}
+Let $X$ and $Z$ be random vectors taking values in $\mathbb R^d$ and $\mathbb R^k$, respectively, each with finite second moments. 
+Define $\Sigma_{XX}=\cov(X,X)\in\mathbb R^{d\times d}$, $\Sigma_{XZ}=\cov(X,Z)\in\mathbb R^{d\times k}$
+and assume $\mathrm{Im}(\Sigma_{XZ})\subseteq\mathrm{Im}(\Sigma_{XX})$. 
+Then the optimization problem
+\begin{equation}
+\label{eq:belrose_minimization}
+    \min_{\substack{A\in\mathbb R^{d\times d}\\ b\in\mathbb R^d}}
+    \mathbb E\!\left[
+        \left\|AX+b-X\right\|_2^2
+    \right]
+    \quad
+    \text{s.t.}
+    \quad
+    \cov(AX+b,Z)=0
+\end{equation}
+has the following solution, almost surely:
+\begin{align}
+    \widehat A
+    &=
+    I - W^+(W\Sigma_{XZ})(W\Sigma_{XZ})^+W,
+    \label{eq:belrose_optimum_A}
+    \\
+    \widehat b
+    &=
+    \mathbb E[X] - \widehat A\,\mathbb E[X],
+    \label{eq:belrose_optimum_b}
+\end{align}
+where $W=(\Sigma_{XX}^{1/2})^+$ is the whitening transformation.
+\end{theorem}
+
+Here and throughout, $A^+$ denotes the Moore--Penrose pseudo-inverse. 
+For a positive semidefinite symmetric matrix $A=VSV^\top$, we write
+$A^{1/2}=VS^{1/2}V^\top$, where $S^{1/2}$ is obtained by taking square roots of the diagonal entries of $S$.

@@ -1,0 +1,97 @@
+% Requires: \usepackage{subcaption} (and \usepackage{svg}).
+% ==================== Task: erasure ====================
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/llama2-7b-erasure-noclip-mmlu-bertp.pdf}
+  \caption{MMLU vs BERTP}
+  \label{fig:llama2-7b-erasure-noclip-mmlu-bertp.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/llama2-7b-erasure-noclip-unrelated-bertp.pdf}
+  \caption{Unrelated vs BERTP}
+  \label{fig:llama2-7b-erasure-noclip-unrelated-bertp.svg}
+\end{subfigure}
+
+\vspace{0.4em}
+
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/llama2-7b-erasure-noclip-unrelated-cs.pdf}
+  \caption{Unrelated vs CS}
+  \label{fig:llama2-7b-erasure-noclip-unrelated-cs.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  % intentionally left blank
+\end{subfigure}
+\caption{Pareto plot for concept erasure on model llama2-7b}
+\label{fig:llama2-7b-erasure-grid.svg}
+\vspace{-0.3cm}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/qwen-14b-erasure-mmlu-bertp.pdf}
+  \caption{MMLU vs BERTP}
+  \label{fig:qwen-14b-erasure-mmlu-bertp.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/qwen-14b-erasure-unrelated-bertp.pdf}
+  \caption{Unrelated vs BERTP}
+  \label{fig:qwen-14b-erasure-unrelated-bertp.svg}
+\end{subfigure}
+
+\vspace{0.4em}
+
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/qwen-14b-erasure-unrelated-cs.pdf}
+  \caption{Unrelated vs CS}
+  \label{fig:qwen-14b-erasure-unrelated-cs.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  % intentionally left blank
+\end{subfigure}
+\caption{Pareto plot for concept erasure on model qwen-14b}
+\label{fig:qwen-14b-erasure-grid.svg}
+\vspace{-0.3cm}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/qwen-7b-erasure-noclip-mmlu-bertp.pdf}
+  \caption{MMLU vs BERTP}
+  \label{fig:qwen-7b-erasure-noclip-mmlu-bertp.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/qwen-7b-erasure-noclip-unrelated-bertp.pdf}
+  \caption{Unrelated vs BERTP}
+  \label{fig:qwen-7b-erasure-noclip-unrelated-bertp.svg}
+\end{subfigure}
+
+\vspace{0.4em}
+
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/qwen-7b-erasure-noclip-unrelated-cs.pdf}
+  \caption{Unrelated vs CS}
+  \label{fig:qwen-7b-erasure-noclip-unrelated-cs.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  % intentionally left blank
+\end{subfigure}
+\caption{Pareto plot for concept erasure on model qwen-7b}
+\label{fig:qwen-7b-erasure-grid.svg}
+\vspace{-0.3cm}
+\end{figure}

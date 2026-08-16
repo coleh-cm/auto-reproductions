@@ -1,0 +1,675 @@
+% \tableofcontents
+
+\section{Algorithm for computing covariances}
+
+\label{sec:welford_algorithm}
+
+To estimate the covariances we use the algorithm by~\cite{Welford01081962} on a sample of broad prompts (unrelated to the steering concepts). Given $X$ with the dimension of $batch\_size \times num\_heads \times seq\_len \times hidden\_dim$, the algorithm estimates the covariance matrix $\Sigma_XX$ of size $hidden\_dim \times hidden\_dim$. It does this by maintaining sample-level statistics of size $O(hidden\_dim^2)$ in memory and takes $O(batch\_size * seq\_len * hidden\_dim^2)$ time to update them for the output of a particular layer on a particular batch. In practice, estimating the covariances for 50,000 samples for SANA 1.6 finished in under 15 minutes, and for Qwen2.5 14B in under 30 minutes on our hardware setup. 
+
+In Algorithm\ref{alg:welford} we provide pseudocode of the algorithm.
+
+\begin{algorithm}
+\caption{Welford's Algorithm for Online Mean and Covariance Estimation}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Stream of data batches $\{\mathbf{X}_1, \mathbf{X}_2, \ldots, \mathbf{X}_K\}$ where $\mathbf{X}_k \in \mathbb{R}^{h \times m_k \times d}$
+\State \textbf{Output:} Mean $\boldsymbol{\mu}$ and covariance $\mathbf{\Sigma}$ estimates
+
+\State \textbf{Initialization:}
+\State $n \gets 0$ \Comment{Total count of samples seen}
+\State $\mathbf{M} \gets \mathbf{0} \in \mathbb{R}^{h \times d}$ \Comment{Running sum}
+\State $\mathbf{S} \gets \mathbf{0} \in \mathbb{R}^{h \times d \times d}$ \Comment{Running sum of squared differences}
+
+\State
+\For{$k = 1$ to $K$} \Comment{Process each batch}
+    \State $m_k \gets$ number of samples in batch $\mathbf{X}_k$
+    
+    \If{$n = 0$} \Comment{First batch - initialize}
+        \State $n \gets m_k$
+        \State $\mathbf{M} \gets \sum_{j=1}^{m_k} \mathbf{x}_{k,j}$ \Comment{Sum over samples}
+        \State $\boldsymbol{\mu} \gets \mathbf{M} / n$
+        \State $\mathbf{\Delta} \gets \mathbf{X}_k - \boldsymbol{\mu} \otimes \mathbf{1}_{m_k}^\top$ \Comment{Center vectors}
+        \State $\mathbf{S} \gets \mathbf{\Delta}^\mathsf{H} \mathbf{\Delta}$
+    \Else \Comment{Subsequent batches - update}
+        \State $\boldsymbol{\mu}_{\text{old}} \gets \mathbf{M} / n$ \Comment{Mean before update}
+        
+        \State $n \gets n + m_k$ \Comment{Update count}
+        \State $\mathbf{M} \gets \mathbf{M} + \sum_{j=1}^{m_k} \mathbf{x}_{k,j}$ \Comment{Update sum}
+        \State $\boldsymbol{\mu}_{\text{new}} \gets \mathbf{M} / n$ \Comment{Mean after update}
+        
+        \State $\mathbf{\Delta}_{\text{old}} \gets \mathbf{X}_k - \boldsymbol{\mu}_{\text{old}} \otimes \mathbf{1}_{m_k}^\top$
+        \State $\mathbf{\Delta}_{\text{new}} \gets \mathbf{X}_k - \boldsymbol{\mu}_{\text{new}} \otimes \mathbf{1}_{m_k}^\top$
+        \State $\mathbf{S} \gets \mathbf{S} + \mathbf{\Delta}_{\text{old}}^\mathsf{H} \mathbf{\Delta}_{\text{new}}$ \Comment{Welford update}
+    \EndIf
+\EndFor
+
+\State
+\State \textbf{Finalization:}
+\State $\boldsymbol{\mu} \gets \mathbf{M} / n$ \Comment{Final mean estimate}
+\State $\mathbf{\Sigma} \gets \frac{1}{n-1} \cdot \frac{\mathbf{S} + \mathbf{S}^\mathsf{H}}{2}$ \Comment{Final covariance estimate}
+\State \Return $\boldsymbol{\mu}, \mathbf{\Sigma}$
+\end{algorithmic}
+\label{alg:welford}
+\end{algorithm}
+
+\clearpage
+\section{Incorporating steering into model weights}
+\label{sec:suppl_matrix_form}
+
+Recall that the last layer of self-attention block in LLMs or cross-attention block in SDXL/SANA is a Linear layer with no bias and no activation function, i.e., essentially is a matrix multiplication with bias correction term:
+$h_{out} = W_{proj\_out}h_{in} + b.$
+%\end{equation*}
+Here $W_{proj\_out}$ is a weight matrix of the last $proj\_out$ layer of SA/CA block of LLM/SDXL/SANA, $h_{in}$ and $h_{out}$ are input and output to that layer, $h_{out}$ being the final output of SA/CA layer.
+
+    Assuming $s$ is normalized ($\|s\|=1$), vanilla concept erasure represents orthogonal projection onto the subspace orthogonal to $s$ and can be written in a matrix form:
+    \begin{equation}
+	    f_{\text{delete}}(h, s) = (I - ss^T)h 
+	    \label{eq:casteer_erasure_matrix}
+	\end{equation}
+	
+	Vanilla concept switching is a Householder reflection of the vector $h$ across the hyperplane orthogonal to $s$:
+	\begin{equation}
+		f_{\text{switch}}(h, s) = (I - 2ss^T)h  
+		\label{eq:casteer_switch_matrix}
+	\end{equation}
+	
+	LEACE / MidSteer are already presented in this paper in matrix form.
+
+Thus, by combining last layer of SA/CA block with matrix formulation of steering/LEACE/MidSteer, we can incorporate the transformation directly into weights of the model, by multiplying weight matrix of the last layer of SA/CA block with $A^*$ matrix from of steering/LEACE/MidSteer:
+\begin{equation}
+    h_{out} = A^*(W_{proj\_out}h_{in} + b)  + b^* = W^{s}_{proj\_out}h_{in}  + b^s
+\end{equation}
+$W^{s}_{proj\_out}$ is a matrix of the same size as $W_{proj\_out}$. This results in having zero inference overhead compares to original LLM/SDXL/SANA models.
+
+Therefore, once the affine transform is estimated, it can be folded into the projection weights, so generation runs at the same inference-time cost as the original model. Self-covariance matrix $\Sigma_{XX}$ is computed once per model, and only the cross-covariances are concept-specific. Cross-covariance estimation takes about one minute for 1000 prompts on a single H100 GPU. Thus, the trade-off is one-time offline estimation per concept pair versus zero runtime overhead after. This is particularly attractive in repeated-use settings, such as model-level safety policies.
+
+\clearpage
+\section{LLM qualitative results}
+In this section in fig.~\ref{fig:text_qualitative_full} we present qualitative results for different steering methods on LLM (Qwen2.5-14B-instruct). Results show similar pattern to that of images (see fig.~\ref{fig:diffusion_switching_images}). While all methods similarly successfully performed switching from "horse" to "motorcycle", vanilla steering and LEACE failed when presented with prompt for the target concept ("motorcycle"), since they do not distinguish between forward and reverse steering. Vanilla steering also more significantly altered texts of concepts "cow" and "dog". 
+\input{artefacts/pic_llms_main}
+
+\clearpage
+\section{Theorem proofs}
+
+
+\subsection{Proof of Thm. \ref{thm:vanilla_steering_is_a_special_case_leace} (vanilla erasure is a special case of LEACE)}
+
+\label{proof:vanilla_erasure_is_special_case_of_LEACE}
+
+\begin{proof}
+
+
+We have $k = 1, Z = C$. According to \textbf{Theorem \ref{thm:belrose}}, $f(X) = A^* X + b^*$, where $A^*$ is defined as in \eqref{eq:belrose_optimum_A} and $b^*$ is defined as in \eqref{eq:belrose_optimum_b}, minimizes \eqref{eq:belrose_minimization}.
+
+We conclude $b^* = 0$ since $\mathrm{E}[X] = 0$. Further, it can be shown that $W = \Sigma_{XX}^{-1/2} = I^{-1/2} = I$; hence, the transform $f$ (that is optimal according to \textbf{Theorem \ref{thm:belrose}}) simplifies to
+
+\begin{equation}
+    f(X) = \Big(I - \Sigma_{XZ} \Sigma_{XZ}^+\Big) X \, .
+\end{equation}
+
+Recall that we are working in $k = 1$, so $\Sigma_{XZ} \in \mathbb{R}^{d \times 1}$ is a column-vector. By definition of the Moore-Penrose inverse for column-vectors,
+
+\begin{align*}
+    \Sigma_{XZ}^+ &= \frac{\Sigma_{XZ}^T}{\lVert{\Sigma_{XZ}}\rVert^2} \, ,
+\intertext{hence}
+    f(X) &= X - s' s'^T X = X - \langle X, s' \rangle s',
+\end{align*}
+for $s' = \Sigma_{XZ} / \| \Sigma_{XZ} \|$, 
+
+
+
+Now,
+
+\begin{multline*}
+	\Sigma_{XZ} = \cov(X, Z) = \mathrm{E}[XZ] - \mathrm{E}[X] \cdot \mathrm{E}[Z] = \mathrm{E}[X \cdot 1 | Z = 1] \cdot P(Z = 1) + \\
+	\mathrm{E}[X \cdot 0 | Z = 0] \cdot P(Z = 0) - \mathrm{E}[X] \cdot P(Z = 1) = \\
+	P(Z=1) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X]\Big)
+\end{multline*}
+
+Now recall that $P(Z=1) + P(Z=0) = 1$, so
+\begin{multline*}
+	\Sigma_{XZ} = 
+	P(Z=1) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X]\Big) = \\
+	P(Z=1) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X | Z = 1] P(Z=1) - \mathrm{E}[X | Z = 0] P(Z=0)\Big) = \\
+	P(Z=1) \cdot P(Z=0) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X | Z = 0] \Big)
+\end{multline*}
+
+, so $s' = s$ and $f$ is equivalent to $f_{delete}$. Hence, $f_{delete}$ is the transformation that minimises \eqref{eq:vanilla_erasure_is_special_case_of_LEACE}.
+
+\end{proof}
+
+\subsection{Proof of Thm. \ref{thm:concept_switch} (LEACE-Switch)}
+
+\label{sec:proof_concept_switch}
+
+\begin{proof}
+
+% The next paragraph of the proof is adapted from \cite{belrose2025leace}. 
+
+%     Consider first an orthonormal basis diagonalizing the inner product $\mathbf{M}$, so that $\langle \mathbf{x}, \mathbf{y} \rangle_\mathbf{M} = \sum_{i=1}^d \alpha_{i}x_iy_i$ for fixed $\alpha_1, \ldots, \alpha_d \ge 0$. This allows us to treat each row $\mathbf{A_i} \in \mathbb R^d$ of $\mathbf{A}$ as a separate optimization problem,
+%     \begin{equation*}
+%     \mathop{\mathrm{argmin\:}}_{\substack{\mathbf{A_i} \in \mathbb{R}^d, \\ b_i \in \mathbb{R}}} \E \Big [ \alpha_i \big( \mathbf{A_i}^T\rv X + b_i - \rv X_i \big)^2 \Big ]\quad \mathrm{subject\:to}\:\: \cov(\mathbf{A_i}^T\rv X + b_i, \rv Z) = -\cov(\rv X, \rv Z),
+%     \end{equation*}
+%     at which point the weights $\alpha_i$ of each subproblem become irrelevant, and our objective may as well be Euclidean. In the rest of the proof we will assume $\mathbf{M} = I$.
+
+The sketch for the rest of the proof will look like this:
+\begin{enumerate}
+    \item Find necessary conditions for optimality using Lagrange multipliers method
+    \item Show that $A^*, b^*$ satisfy the necessary conditions
+    \item Show that optimisation problem is convex over linear constraints, and such, if a local solution exists, it is globally optimal and unique.
+\end{enumerate}
+
+Let us formulate the Lagrangian. Here $\Lambda \in \mathbb{R}^{d \times k}$, because we have $d \cdot k$ constraints on covariance matrix.
+
+\begin{multline}    
+\mathcal{L}(A, b, \Lambda) = \frac{1}{2}\mathrm{E}\Big[ \lVert{ A X + b - X}\rVert_2^2 \Big] + \langle \Lambda , \cov(AX + b, Z) + \cov(X, Z) \rangle_F = \\
+\frac{1}{2}\mathrm{E}\Big[ (A X + b - X)^T (A X + b - X) \Big] + \mathrm{Tr} \Big(\Lambda^T (A+I) \Sigma_{XZ} \Big) = \\
+\mathrm{E} \Big[ \frac{1}{2}X^TA^TAX + b^TAX - X^TAX - X^Tb + \frac{1}{2}b^Tb + \frac{1}{2}X^TX \Big] + \mathrm{Tr} \Big(\Lambda^T (A+I) \Sigma_{XZ} \Big)
+\end{multline}
+
+The partial derivatives of the Lagrangian with respect to $A, b, \Lambda$ are
+
+\begin{align*}
+    \frac{\partial \mathcal{L}}{\partial A} &= \mathrm{E}[AXX^T + bX^T - XX^T] + \Lambda\Sigma^T_{XZ} \, , \\
+    &= A\mathrm{E}[XX^T] + b\mathrm{E}[X]^T - \mathrm{E}[XX^T] + \Lambda\Sigma^T_{XZ} \, , \\
+    \frac{\partial \mathcal{L}}{\partial b} &= \mathrm{E}[AX + b - X] \, ,\\
+    &= A\mathrm{E}[X] + b - \mathrm{E}[X] \, ,\\
+    \frac{\partial \mathcal{L}}{\partial \Lambda} &= (A+I) \Sigma_{XZ} \, .
+\end{align*}
+
+Next, we use $\mu = \mathrm{E}(X)$ and $\mathrm{E}[XX^T] = \Sigma_{XX} + \mu \mu^T$ to formulate the necessary conditions 
+
+\begin{align}
+    \label{eq:concept_switch_partial_A}
+    0 = \frac{\partial \mathcal{L}}{\partial A} &= (A-I)\Big( \Sigma_{XX} + \mu \mu^T \Big) + b \mu^T + \Lambda\Sigma^T_{XZ} \, ,\\
+    \label{eq:concept_switch_partial_b}
+    0 = \frac{\partial \mathcal{L}}{\partial b} &= A \mu + b - \mu \, ,\\
+    \label{eq:concept_switch_partial_lambda}
+    0 = \frac{\partial \mathcal{L}}{\partial \Lambda} &= (A+I) \Sigma_{XZ} \, .
+\end{align}
+
+We note that the optimal $b^*$ as defined in \eqref{eq:concept_switch_optimum_b} satisfies \ref{eq:concept_switch_partial_b}. Plugging \eqref{eq:concept_switch_partial_b} in \eqref{eq:concept_switch_partial_A} leads to
+
+\begin{align}    
+    &(A - I)\Big(\Sigma_{XX} + \mu \mu^T\Big) + (\mu - A\mu) \mu^T + \Lambda \Sigma_{XZ}^T \, , \nonumber\\
+    {} = {} &A \Sigma_{XX} - \Sigma_{XX} + A \mu \mu^T - \mu \mu^T + \mu\mu^T - A\mu \mu^T + \Lambda \Sigma_{XZ}^T \, , \nonumber\\
+    {} = {} &(A - I) \Sigma_{XX} + \Lambda \Sigma_{XZ}^T = 0 \, . \label{eq:concept_switch_partial_A_rewritten}
+\end{align}
+
+Now let us check that $A^*$ satisfies \ref{eq:concept_switch_partial_lambda} and \ref{eq:concept_switch_partial_A_rewritten}. By plugging $A^*$ into \ref{eq:concept_switch_partial_lambda} we get
+\begin{align}
+    0 {} = {} &(2I - 2 W^+(W\Sigma_{XZ})(W \Sigma_{XZ})^+W) \Sigma_{XZ} \, ,\nonumber\\ 
+    {} = {} &2 \Sigma_{XZ} - 2 W^+ (W\Sigma_{XZ}) (W\Sigma_{XZ})^+ (W\Sigma_{XZ}) \, , \nonumber\\
+    {} = {} &2 \Big( \Sigma_{XZ} - W^+W\Sigma_{XZ} \Big) \, , \nonumber\\
+    {} = {} &2 \left( \Sigma_{XZ} - \left(I - P_{\mathcal{N}(W)}\right) \Sigma_{XZ} \right) \, ,\nonumber \\
+    {} = {} &2 P_{\mathcal{N}(W)} \Sigma_{XZ} \, ,\label{eq:lagrange-multiplier-constraint}
+\end{align}
+because Moore-Penrose inverses $B^+$ of $B$ satisfy $B B^+ B = B$ and $B^+ B = I - P_{\mathcal{B}}$. Here $P_{\mathcal{B}}$ denotes the orthogonal projection onto the nullspace $\mathcal{N}(B)$ of $B$. Since the columns of $\Sigma_{XZ}$ always lie within the image of $\Sigma_{XX}$ (which is the orthogonal complement of the kernel of $\Sigma_{XX}$, which is also the kernel of $W$), we can conclude that \eqref{eq:lagrange-multiplier-constraint} is always satisfied.
+
+Plugging $A^*$ into \ref{eq:concept_switch_partial_A_rewritten} we observe
+
+\begin{multline}
+    \label{eq:concept_switch_partial_A_plugged}
+    -2 \cdot ( W^+(W \Sigma_{XZ}) (W \Sigma_{XZ})^+ W) \Sigma_{XX} + \Lambda \Sigma_{XZ}^T = \\
+    -2 \cdot W^+ (W \Sigma_{XZ}) (W \Sigma_{XZ})^+ W^+ + \Lambda \Sigma_{XZ}^T = 0
+\end{multline}
+
+The identity $W \Sigma_{XX} = W^+$ holds because $\Sigma_{XX}$ is symmetric p.s.d., so $\Sigma_{XX} = U D U^T$ and $\Sigma_{XX}^{-1/2} \Sigma_{XX} = U D^{-1/2} U^T U D U^T = UD^{1/2}U^T = \Sigma_{XX}^{1/2}$ for some orthogonal $U$ and non-negative diagonal $D$, and because $D^{-1/2}$ ignores zero diagonal values.
+
+Next, multiplying \eqref{eq:concept_switch_partial_A_plugged} by $W$ from both sides leads to
+\begin{multline}
+    -2 WW^+ (W\Sigma_{XZ})(W\Sigma_{XZ})^+W^+W + W\Lambda\Sigma_{XZ}^TW = \\
+    -2 (W\Sigma_{XZ})(W\Sigma_{XZ})^+ + W\Lambda (W \Sigma_{XZ})^T = -2 \Sigma_{WX, Z} \Sigma_{WX, Z}^+ + \Lambda_W \Sigma_{WX, Z}^T = 0 ,
+    \tag{almost surely}
+\end{multline}
+where again $WW^+ = W^+W = I$ on a subspace covered by $X$, and thus, almost surely.
+
+We seek $\Lambda_W$ such that $-2 \Sigma_{WX, Z} \Sigma_{WX, Z}^+ + \Lambda_W \Sigma_{WX, Z}^T = 0$.
+Let $\Lambda_W = 2 (\Sigma_{WX, Z}^+)^T$. This choice satisfies the condition because $\Sigma_{WX, Z} \Sigma_{WX, Z}^+$ is an orthogonal projection matrix, and is thus symmetric, so
+\begin{equation*}
+    % Verification: (\Lambda_W \Sigma_{WX, Z}^T) = 2 (\Sigma_{WX, Z}^+)^T \Sigma_{WX, Z}^T = 2 (\Sigma_{WX, Z} \Sigma_{WX, Z}^+)^T = 2 \Sigma_{WX, Z} \Sigma_{WX, Z}^+
+    (\Sigma_{WX, Z}^+)^T \Sigma_{WX, Z}^T = (\Sigma_{WX, Z} \Sigma_{WX, Z}^+)^T = \Sigma_{WX, Z} \Sigma_{WX, Z}^+ ,
+\end{equation*}
+which again proves the Lagrange conditions for partial derivative w.r.t. A.
+
+Thus we have shown that the said optimisation problem has a local solution. But because the constraint is linear in $A$, and it follows from the triangle inequality that $\lVert{\cdot}\rVert$ is convex, the local optimum is actually the global minimum.
+
+\end{proof}
+
+
+\subsection{Proof of Thm. \ref{thm:concept_flipping_simple_form} (vanilla concept switching is a special case of LEACE-Switch)}
+
+\label{proof:vanilla_switching_is_special_case_of_LEACE_switch}
+
+
+\begin{proof}
+    Let $k=1, Z=C, M=I$. According to \textbf{Theorem \ref{thm:concept_switch}}, $f(X) = A^* X + b^*$, where $A^*$ is defined in \eqref{eq:concept_switch_optimum_A} and $b^*$ is defined in \eqref{eq:concept_switch_optimum_b} minimizes \eqref{eq:concept_switch_minimization}. 
+
+    $b=0$ since $\mathrm{E}[X] = 0$. Also it can be shown $W = \Sigma_{XX}^{-1/2} = I^{-1/2} = I$, so the transform becomes:
+
+    \begin{equation}
+        f(X) = \Big(I - 2 \cdot \Sigma_{XZ} \Sigma_{XZ}^+\Big) X
+    \end{equation}
+
+    Recall that we are working in $k = 1$, so $\Sigma_{XZ} \in \mathbb{R}^{d \times 1}$ is a column-vector. So 
+
+    \begin{multline*}
+        \Sigma_{XZ} = \cov(X, Z) = \mathrm{E}[XZ] - \mathrm{E}[X] \cdot \mathrm{E}[Z] = \mathrm{E}[X \cdot 1 | Z = 1] \cdot P(Z = 1) + \\
+        \mathrm{E}[X \cdot 0 | Z = 0] \cdot P(Z = 0) - \mathrm{E}[X] \cdot P(Z = 1) = \\
+        P(Z=1) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X]\Big)
+    \end{multline*}
+
+Now recall that $P(Z=1) + P(Z=0) = 1$, so
+    \begin{multline*}
+        \Sigma_{XZ} = 
+        P(Z=1) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X]\Big) = \\
+        P(Z=1) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X | Z = 1] P(Z=1) - \mathrm{E}[X | Z = 0] P(Z=0)\Big) = \\
+        P(Z=1) \cdot P(Z=0) \cdot \Big(\mathrm{E}[X | Z = 1] - \mathrm{E}[X | Z = 0] \Big)
+    \end{multline*}
+
+, which is equal to $s$ up to normalization constant. By definition of Moore-Penrose inverse for column-vectors,
+
+\begin{equation*}
+    \Sigma_{XZ}^+ = \frac{\Sigma_{XZ}^T}{\lVert{\Sigma_{XZ}}\rVert^2} 
+\end{equation*}, so
+
+\begin{equation*}
+    f(X) = X - 2 \cdot s s^T X = X - 2 \cdot s (s^T X) = X - 2 \cdot(s^T X) s = X - 2 \cdot \langle X, s \rangle s
+\end{equation*}
+
+, so $f$ is equivalent to $f_{switch}$.
+    
+\end{proof}
+
+
+\subsection{Proof of Thm. \ref{thm:concept_steering} (MidSteer)}
+
+
+\label{proof:midsteer}
+
+
+\begin{proof}
+	We will use the same method as in \ref{sec:proof_concept_switch} to prove this. Indeed, the objective is same, and thus convex. The constraint is still linear:
+	
+	
+	\begin{equation}
+		\cov(Ax + b, Z_1) = A\Sigma_{XZ_1} = \Sigma_{XZ_2} = \cov(X, Z_2)
+	\end{equation}
+	
+	
+	So let us define the Lagrangian, where $\Lambda \in \mathbb{R}^{d \times l}$:
+	
+	\begin{equation}
+		\mathcal{L}(A, b, \Lambda) = \frac{1}{2} \mathrm{E} \Big[ (AX + b - X)^T (AX + b - X) \Big] + Tr \Big( \Lambda^T (A \Sigma_{XZ_1} - \Sigma_{XZ_2}) \Big)
+	\end{equation}
+	
+	The derivatives w.r.t. parameters are the following:
+	
+	\begin{align}
+		\label{eq:concept_steer_partial_A}
+		\frac{\partial \mathcal{L}}{\partial A} &= (A - I) (\Sigma_{XX} + \mu \mu^T) + b\mu^T + \Lambda \Sigma_{XZ_1}^T &= 0 \\
+		\label{eq:concept_steer_partial_p}
+		\frac{\partial \mathcal{L}}{\partial b} &= A \mu - \mu + b &= 0 \\
+		\label{eq:concept_steer_partial_lambda}
+		\frac{\partial \mathcal{L}}{\partial \Lambda} &= A \Sigma_{XZ_1} - \Sigma_{XZ_2} &= 0
+	\end{align}
+	
+	Trivially $b^*$ satisfies \eqref{eq:concept_steer_partial_p} for suitable $A^*$.
+	
+	Let us see that \eqref{eq:concept_steer_partial_lambda} is satisfied. We can plug $A^*$ and then multiply by $W$ on the left, to get:
+	\begin{multline*}
+		W\Sigma_{XZ_1} + WW^+ (\Sigma_{WX, Z_2} - \Sigma_{WX, Z_1})\Sigma_{WX, Z_1}^+ W \Sigma_{XZ_1} - W \Sigma_{XZ_2} = \\ \Sigma_{WX,Z_1} -  \Sigma_{WX, Z_1} \Sigma_{WX, Z_1}^+ \Sigma_{WX, Z_1} + \Sigma_{WX, Z_2} \Sigma_{WX, Z_1}^+ \Sigma_{WX, Z_1} - \Sigma_{WX, Z_2} = \\
+        % Original version expanded the pseudo-inverse definition, which is redundant.
+		% \Sigma_{WX, Z_2} (\Sigma_{WX, Z_1}^T \Sigma_{WX, Z_1})^{-1} \Sigma_{WX, Z_1}^T \Sigma_{WX, Z_1} - \Sigma_{WX, Z_2} = 0
+        % Since $\Sigma_{WX, Z_1}$ has full column rank, $\Sigma_{WX, Z_1}^+ \Sigma_{WX, Z_1} = I_l$.
+        \Sigma_{WX, Z_2} I_l - \Sigma_{WX, Z_2} = 0
+		\tag{almost surely}
+	\end{multline*}
+	% Here we used $YY^+Y = Y$ for any Y and $Y^+ = (Y^TY)^{-1}Y^T$ for $Y$ which columns are linearly independent.
+    Here we used $YY^+Y = Y$ for any $Y$. Furthermore, since $\Sigma_{WX, Z_1}$ has linearly independent columns (full column rank), we use the property $Y^+Y = I$.
+	
+	Next, plugging \eqref{eq:concept_steer_partial_p} into \eqref{eq:concept_steer_partial_A} we get:
+	\begin{equation}
+		\label{eq:concept_steer_partial_A_rewritten}
+		(A - I) \Sigma_{XX} + \Lambda \Sigma_{XZ_1}^T = 0
+	\end{equation}
+
+
+    Let us now proceed to show that for $A^*$ there exists $\Lambda \in \mathbb{R}^{d \times l}$ so this equality holds. After plugging in $A^*$ and using previously shown fact $W \Sigma_{XX} = W^+$:
+
+    \begin{equation}
+        W^+ (\Sigma_{WX, Z_2} - \Sigma_{WX, Z_1})\Sigma_{WX, Z_1}^+ W^+ + \Lambda \Sigma_{XZ_1}^T = 0
+    \end{equation}
+
+    Again, multiplying by $W$ on both sides and recalling that $W$ is symmetric we get:
+
+    \begin{equation}
+        (\Sigma_{WX, Z_2} - \Sigma_{WX, Z_1})\Sigma_{WX, Z_1}^+ + \Lambda_W \Sigma_{WX,Z_1}^T = 0
+        \tag{almost surely}
+    \end{equation}
+
+    Now, $\Sigma_{WX, Z_1}$ is also full column rank, so $\Sigma_{WX, Z_1}^+ = \Big( \Sigma_{WX, Z_1}^T \Sigma_{WX, Z_1} \Big)^{-1} \Sigma_{WX, Z_1}^T$. Thus, $\Lambda_W = - \Big(\Sigma_{WX, Z_2} - \Sigma_{WX, Z_1}\Big) \Big( \Sigma_{WX, Z_1}^T \Sigma_{WX, Z_1} \Big)^{-1}$ satisfies the equation.
+	
+\end{proof}
+
+% \textbf{On the full-rank assumption} in Thm. \ref{thm:concept_steering}. Note that the full-rank assumption is used in the proof to derive the closed-form affine solution. In our setup, we consider only one source and one target concept, so $l=1$, and the condition reduces to $\Sigma_{XZ_1} \ne 0$, i.e. the source concept has a nontrivial linear footprint at the chosen layer. If a concept has essentially no linear signature at a layer, the affine update becomes degenerate, so MidSteer would not be meaningfully applied there. In multi-concept settings, rank deficiency indicates linear redundancy among source concepts, in which case we can restrict to an independent subset or work in the effective subspace via the pseudoinverse.
+
+
+% \subsection{Qualitative results for concept switching for diffusion models}
+
+% In this section we present image generation results when concept switching type of steering was applied. 
+
+
+
+
+% \subsection{Qualitative results for concept erasure for diffusion models}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{img/erase/
+%     \caption{Qualitative results on switching to steer "horses" source concept into target "motorcycles". While all methods achieved the same result when prompted with the source concept; CASteer and LEACE failed when presented with prompt for the target concept, since they do not distinguish between forward and reverse steering. CASteer also additionally failed on "cow" concept, which can be close to "horse" in the model semantic space.}
+%     \label{fig:placeholder}
+% \end{figure}
+
+\clearpage
+\section{Example LLM prompts for Estimating Class-Conditional Covariance}
+\label{sec:llm_steering_vector_prompts}
+
+To obtain class-conditional means for LLMs, we constructed 1000 prompts across several categories. In each case, last token activation was used to compute steering vectors, before first token of model output and after corresponding chat template tokens. Below we provide illustrative subsets of the prompts used:
+
+\begin{itemize}
+  \item \textbf{Horse-related prompts}
+  \begin{itemize}
+    \item How did horses evolve from their early ancestors?
+    \item What factors contributed to the domestication of horses?
+    \item What anatomical features enable a horse to run at high speeds?
+  \end{itemize}
+
+  \item \textbf{Motorcycle-related prompts}
+  \begin{itemize}
+    \item What was the significance of the earliest gasoline powered motorcycle in the evolution of personal transportation?
+    \item How does the engine cycle mechanism influence power delivery and efficiency in a motorbike?
+    \item What are the primary considerations when selecting the appropriate tire for varying riding conditions?
+  \end{itemize}
+
+  \item \textbf{Dog-related prompts}
+  \begin{itemize}
+    \item What is believed to be the origin of dog domestication?
+    \item How do dogs communicate through body language?
+    \item Which genetic factors influence coat color in dogs?
+  \end{itemize}
+
+  \item \textbf{Cat-related prompts}
+  \begin{itemize}
+    \item What is the origin of domestic cats and how did they become companion animals?
+    \item How did ancient Egyptians incorporate cats into their society and religion?
+    \item Why did cats spread globally alongside human trade routes?
+  \end{itemize}
+\end{itemize}
+
+
+\section{Prompt for Concept Scoring in LLMs}
+\label{sec:judge_prompt}
+
+To assess the quality of steering, we compute a \emph{concept score} that gauges the 
+presence of a specific concept in generated text. The score ranges from 0 to 10:
+\begin{itemize}
+    \item A score of 0 indicates the text is completely irrelevant to the concept.
+    \item A score of 10 indicates strong and explicit relevance to the concept.
+    \item Scores from 1 through 9 represent gradations of partial relevance.
+\end{itemize}
+
+The following prompt was used to query the model for concept scoring:
+
+\begin{verbatim}
+Score the text on a scale of 0 to 10, where the score reflects the extent 
+to which it demonstrates relevance to the concept of {concept}. A score of 0 
+indicates the text is completely irrelevant and shows no connection to {concept}, 
+whereas a score of 10 signifies strong and explicit relevance to {concept}. For 
+texts that suggest varying degrees of relevance, use the intermediate numbers 
+(1 through 9) to represent the gradation of connection to {concept}. 
+Output just a single number.
+
+Text to evaluate: ```
+{text}
+```
+
+\end{verbatim}
+
+The exact score is obtained by doing a forward pass of Llama3.1-7B model and taking argmax across token probabilities corresponding to score tokens (from 0 to 10). 
+
+\clearpage
+\section{Template Prompts for Steering Quality Assessment}
+\label{sec:template_prompts}
+
+To evaluate the effectiveness of steering, we constructed a set of template prompts. 
+In each case, the \texttt{\{\}} placeholder was substituted with the concept under 
+consideration (as defined in \ref{sec:experimental_setup}). Each template was used to generate multiple 
+model responses. These responses were then evaluated either by a judge model 
+(for text/LLM outputs) or by CLIP score (for images), to compute the Concept Score 
+as well as related metrics such as FID and BERTScore.
+
+\subsection{LLM Assessment Prompts}
+\label{sec:template_prompts_llm}
+
+The following template prompts were used for large language model (LLM) evaluation. 
+The placeholder \texttt{\{\}} is substituted with a concept.
+
+\begin{verbatim}
+ 1.  Write a short story about a {}
+ 2.  Write a poem about a {}
+ 3.  What is the history of {}
+ 4.  What is the most famous {}?
+ 5.  What is the most expensive {}?
+ 6.  How to make a {}?
+ 7.  How to maintain a {}?
+ 8.  How to dispose of a {}?
+ 9.  How to store a {}?
+10.  How to transport a {}?
+11.  How to use a {}?
+12.  What is important to know about {}?
+13.  How to tell age of a {}?
+14.  What is a {}?
+15.  What types of {} are there?
+16.  What are the most common {}?
+17.  Describe an appearance of {} in detail.
+18.  How does {} look like?
+19.  How does {} sound like?
+20.  How does {} feel like?
+21.  How does {} behave like?
+22.  What is the purpose of {}?
+23.  What are the main components of a {}?
+24.  How to identify a {}?
+25.  Where can you find a {}?
+26.  What are the dangers of a {}?
+27.  What tools do you need for a {}?
+28.  How much does a {} typically cost?
+29.  What are alternatives to a {}?
+30.  How to choose a good {}?
+31.  What are common problems with a {}?
+32.  How long does a {} typically last?
+33.  What size is a typical {}?
+34.  How to clean a {}?
+35.  What skills are needed to handle a {}?
+36.  What are the benefits of having a {}?
+37.  How has {} changed over time?
+38.  What cultures use {} the most?
+39.  How to test if a {} is working properly?
+40.  What safety precautions are needed for a {}?
+41.  How to upgrade or improve a {}?
+42.  How does weather affect a {}?
+43.  What are the environmental impacts of a {}?
+44.  How to measure the quality of a {}?
+45.  What accessories go with a {}?
+46.  How to protect a {} from damage?
+47.  What are myths about {}?
+48.  How to teach someone about a {}?
+49.  What industries use {}?
+50.  How is a {} different from similar things?
+51.  What are the legal considerations for owning a {}?
+52.  How to pack a {} for moving?
+53.  What are seasonal considerations for a {}?
+54.  How to customize a {}?
+55.  What are expert tips for using a {}?
+56.  How to troubleshoot issues with a {}?
+57.  What is the lifecycle of a {}?
+58.  How to estimate the value of a {}?
+59.  What are cultural significances of a {}?
+60.  How to take a picture of a {}?
+61.  How to make a sculpture of a {}?
+62.  What is the future of {}?
+63.  How to draw a {}?
+64.  When was {} first mentioned in human history?
+65.  Can one ride a {}?
+66.  Write a song about {}
+67.  Define a {}
+68.  Write a positive review on a book about {}
+69.  Write a negative review on a book about {}
+70.  Do people make toys of {}?
+71.  How is {} used in the economy?
+72.  Write an abstract for a science paper about {}
+73.  How does temperature affect a {}?
+74.  What are the origins of the word {}?
+75.  What are superstitions about {}?
+76.  How to simulate a {} digitally?
+77.  What are the physics of a {}?
+78.  How to teach children about {}?
+79.  What are famous artworks featuring {}?
+80.  What are the nutritional aspects of a {}?
+81.  Describe the most famous {} competitions.
+\end{verbatim}
+
+
+\clearpage
+\subsection{Image Assessment Prompts}
+\label{sec:template_prompts_image}
+
+
+The following template prompts were used for image model evaluation. 
+The placeholder \texttt{\{\}} was substituted with a concept.
+
+\begin{verbatim}
+ 1.  a bad photo of a {}.
+ 2.  a photo of many {}.
+ 3.  a sculpture of a {}.
+ 4.  a photo of the hard to see {}.
+ 5.  a low resolution photo of the {}.
+ 6.  a rendering of a {}.
+ 7.  graffiti of a {}.
+ 8.  a bad photo of the {}.
+ 9.  a cropped photo of the {}.
+10.  a tattoo of a {}.
+11.  the embroidered {}.
+12.  a photo of a hard to see {}.
+13.  a bright photo of a {}.
+14.  a photo of a clean {}.
+15.  a photo of a dirty {}.
+16.  a dark photo of the {}.
+17.  a drawing of a {}.
+18.  a photo of my {}.
+19.  the plastic {}.
+20.  a photo of the cool {}.
+21.  a close-up photo of a {}.
+22.  a black and white photo of the {}.
+23.  a painting of the {}.
+24.  a painting of a {}.
+25.  a pixelated photo of the {}.
+26.  a sculpture of the {}.
+27.  a bright photo of the {}.
+28.  a cropped photo of a {}.
+29.  a plastic {}.
+30.  a photo of the dirty {}.
+31.  a jpeg corrupted photo of a {}.
+32.  a blurry photo of the {}.
+33.  a photo of the {}.
+34.  a good photo of the {}.
+35.  a rendering of the {}.
+36.  a {} in a video game.
+37.  a photo of one {}.
+38.  a doodle of a {}.
+39.  a close-up photo of the {}.
+40.  a photo of a {}.
+41.  the origami {}.
+42.  the {} in a video game.
+43.  a sketch of a {}.
+44.  a doodle of the {}.
+45.  a origami {}.
+46.  a low resolution photo of a {}.
+47.  the toy {}.
+48.  a rendition of the {}.
+49.  a photo of the clean {}.
+50.  a photo of a large {}.
+51.  a rendition of a {}.
+52.  a photo of a nice {}.
+53.  a photo of a weird {}.
+54.  a blurry photo of a {}.
+55.  a cartoon {}.
+56.  art of a {}.
+57.  a sketch of the {}.
+58.  a embroidered {}.
+59.  a pixelated photo of a {}.
+60.  itap of the {}.
+61.  a jpeg corrupted photo of the {}.
+62.  a good photo of a {}.
+63.  a plushie {}.
+64.  a photo of the nice {}.
+65.  a photo of the small {}.
+66.  a photo of the weird {}.
+67.  the cartoon {}.
+68.  art of the {}.
+69.  a drawing of the {}.
+70.  a photo of the large {}.
+71.  a black and white photo of a {}.
+72.  the plushie {}.
+73.  a dark photo of a {}.
+74.  itap of a {}.
+75.  graffiti of the {}.
+76.  a toy {}.
+77.  itap of my {}.
+78.  a photo of a cool {}.
+79.  a photo of a small {}.
+80.  a tattoo of the {}.
+\end{verbatim}
+
+\clearpage
+\section{Number of prompts for covariance calculation}
+\label{sec:covariances_ablation}
+
+
+To find the optimal number of prompts used to calculate unconditional covariances $\Sigma_{XX}$ for concept switching, we perform the following ablation study. For each number of prompts used for covariances generation from the set $\{100, 500, 1000, 5000, 10000, 20000\}$ we run the same base experiment as outlined in Sec. \ref{sec:experiments}. We then compute $\Delta CS$ and 1 - BERT Precision @ MMLU metrics on a small set of MidSteer steering strengths (to show if the steering strength can affect the optimal number of prompts). We do it on LLM experiment setup (sec. \ref{sec:experiment_setup_llm}) and use LLama2-7B model.
+
+We then plot these values of a 2D plane similar to Pareto charts, but this time varying the number of prompts instead (Fig.~\ref{fig:num_covs}). This in essence forms a curve that, after a certain threshold, settles in a small region of metric space. As can be seen from the chart below, increasing the number of prompts used beyond 5000 has limited impact.
+
+Fig.~\ref{fig:num_covs} shows that performance largely stabilizes around 5,000 prompts in the tested Llama-2-7B setting. We nevertheless used M=50,000 in the main experiments to make $\Sigma_{XX}$ as stable as possible across models, layers, and concepts. Importantly, $\Sigma_{XX}$ is concept-agnostic and computed only once per model, so this is not a per-concept bottleneck. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\linewidth]{artefacts/phase/llama2_noclip.pdf}
+    \caption{$\Delta$ concept score vs MMLU score (1-BERT Precision) when using different number of prompts for covariance estimation.}
+    \label{fig:num_covs}
+\end{figure}
+
+\clearpage
+
+\input{content/suppl_safety}
+
+
+\clearpage
+\section{GPT-4o-mini judge cross-validation}
+\label{sec:gpt4omini_judge}
+
+The concept-switching evaluation in Sec.~\ref{sec:experiments} uses Llama-3.1-8B-Instruct as the LLM judge for Concept Scores (CS). To validate that our findings do not depend on the choice of judge, we re-score every generation produced by the LLM concept-switching experiment with a second, larger, instruction-tuned judge, OpenAI's GPT-4o-mini, using the identical $0$--$10$ scoring prompt as described in the Sec.~\ref{sec:experimental_setup}.
+
+We re-run the LLM concept-switching pipeline on Llama-2-7B-chat for the three nominal concept pairs of Sec.~\ref{sec:experiments} -- $p_1 = $ (Horse $\to$ Motorcycle), $p_2 = $ (Dog $\to$ Cat), $p_3 = $ (Chihuahua $\to$ Muffin). For each pair we generate completions at $\beta \in \{1, 2, 3, 4, 5\}$ for vanilla steering, LEACE-Switch and MidSteer, plus an unsteered baseline. Each generation is then scored with GPT-4o-mini both on the source-concept test prompts, the target-concept test prompts, and the four unrelated-concept test prompts $t_i = \{c_i\}_{i=1}^{4}$ as defined in Sec.~\ref{sec:experiments}. Scoring uses chat-completions API with temperature $0$, $8$ concurrent requests, and the same prompt template as the Llama-3.1-8B judge so the two judges differ only in the underlying model.
+
+Tab.~\ref{tab:gpt4omini_summary} reports Source-CS / Target-CS on the source-concept test prompts for each pair at $\beta\in\{3, 5\}$; Tabs.~\ref{tab:flip_llama2-7b_horses_to_motorcycles_gpt4omini}--\ref{tab:flip_llama2-7b_chihuahuas_to_muffins_gpt4omini} give the full per-$\beta$, per-concept breakdown for each pair (same layout as Tabs.~\ref{tab:flip_llama2-7b_noclip_horses_to_motorcycles}--\ref{tab:flip_llama2-7b_noclip_dogs_to_cats}, minus the BERT-Precision consistency columns, which were not recomputed for this cross-validation). The GPT-4o-mini numbers agree with the Llama-3.1-8B-Instruct numbers reported in Sec.~\ref{sec:experiments} and Appendix~\ref{sec:tables_llm_switch}: in every pair, at every $\beta$, the two judges produce the same relative ordering of the three methods on both source-CS and target-CS, so the conclusions of Sec.~\ref{sec:experiments} are robust to the choice of judge.
+
+\input{artefacts/safety_suppl/llm_flip_gpt4omini_summary_table}
+
+\input{artefacts/safety_suppl/llm_flip_gpt4omini_tables}
+
+
+
+\input{content/switching_suppl}
+% \clearpage
+
+\input{content/erasure_suppl}

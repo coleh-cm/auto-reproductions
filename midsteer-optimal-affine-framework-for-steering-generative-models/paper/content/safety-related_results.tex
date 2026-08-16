@@ -1,0 +1,16 @@
+
+% \label{sec:safety_switching}
+
+\input{artefacts/tables/safety_table}
+
+\noindent \textbf{Safety-related concept switching.} In contrast to the concrete object-switching setup, these experiments involve more abstract concepts, where the source concept corresponds to an undesirable or harmful behavior and the target concept corresponds to a desirable alternative. 
+We report our main results on toxicity $\to$ helpfulness switching on Llama-2-7B-chat, and for diffusion models, we consider switching violence $\to$ peace on SDXL. We report full results on all $\beta \in \{1, 2, 3, 4, 5\}$, as well as results on Qwen 2.5 and SANA in the Appendix Sec.~\ref{sec:safety_switching_suppl}.
+
+The main results are summarized in Tab.~\ref{tab:safety_summary}.
+For Llama-2-7B-chat, MidSteer achieves the strongest reduction in toxicity, decreasing the RTP toxicity score from $.371$ to $.281$ at $\beta=5$, while preserving helpfulness at the baseline level and maintaining high scores on unrelated concepts. 
+Vanilla steering does not reliably improve toxicity and substantially degrades unrelated-concept preservation at higher strength, with the unrelated concept score dropping from $8.46$ to $3.11$. 
+LEACE-Switch preserves general capabilities slightly better, as reflected by the highest MMLU BERT-F1 among interventions, but achieves much weaker toxicity reduction than MidSteer. 
+These results suggest that MidSteer provides a better trade-off between safety improvement and preservation of unrelated behavior.
+
+A similar trend appears for SDXL in the violence $\to$ peace setting.  MidSteer most effectively suppresses the source concept, reducing the violence score from $99.6$ to $6.0$, while also achieving the strongest peace score among intervention methods.  Vanilla steering also reduces violence, but either underperforms MidSteer on source suppression or causes larger distortions, as reflected by higher FID. LEACE-Switch yields the lowest FID among interventions but is substantially less effective at inducing the target concept. 
+Overall, these results show that MidSteer extends beyond concrete object substitutions and remains effective for abstract, safety-related concept switching across both language and vision modalities.

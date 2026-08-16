@@ -1,0 +1,63 @@
+\section{Detailed results on concrete concept switching}
+
+\subsubsection{Pareto charts for LLM concept switching}
+\label{sec:pareto_llm_switch}
+
+In this section, we provide more Pareto charts for LLM concept switching. When switching concept $c_s$ to $c_t$, for each LLM model we provide 9 types of Pareto plots: 
+\begin{itemize}
+    \item 1 - BERT Precision score for unrelated concepts (horizontal axis) vs \textbf{$\Delta$} Concept Score (CS) for the target $c_t$ and source $c_s$ concepts (fig.~\ref{fig:llama2-7b-flip-noclip-unrelated-bertp.svg},~\ref{fig:qwen-14b-flip-unrelated-bertp.svg},~\ref{fig:qwen-7b-flip-noclip-unrelated-bertp.svg})
+    \item 1 - BERT Precision score for MMLU (horizontal axis) vs\textbf{$\Delta$} Concept Score (CS) for the target $c_t$ and source $c_s$ concepts (vertical axis) (fig.~\ref{fig:llama2-7b-flip-noclip-mmlu-bertp.svg},~\ref{fig:qwen-14b-flip-mmlu-bertp.svg},~\ref{fig:qwen-7b-flip-noclip-mmlu-bertp.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs \textbf{$\Delta$} Concept Score (CS) for the target $c_t$ and source $c_s$ concepts (vertical axis)  (fig.~\ref{fig:llama2-7b-flip-noclip-unrelated-cs.svg},~\ref{fig:qwen-14b-flip-unrelated-cs.svg},~\ref{fig:qwen-7b-flip-noclip-unrelated-cs.svg})
+    
+    \item 1 - BERT Precision score for unrelated concepts (horizontal axis) vs Concept Score (CS) for the \textbf{source} $c_s$ concept (vertical axis) (fig.~\ref{fig:llama2-7b-flip-noclip-unrelated-bertp-scs.svg},~\ref{fig:qwen-14b-flip-unrelated-bertp-scs.svg},~\ref{fig:qwen-7b-flip-noclip-unrelated-bertp-scs.svg})
+    \item BERT Precision score for MMLU (horizontal axis) vs Concept Score (CS) for the \textbf{source} $c_s$ concept (vertical axis) (fig.\ref{fig:llama2-7b-flip-noclip-mmlu-bertp-scs.svg},~\ref{fig:qwen-14b-flip-mmlu-bertp-scs.svg},~\ref{fig:qwen-7b-flip-noclip-mmlu-bertp-scs.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs Concept Score (CS) for the \textbf{source} $c_s$ concept (vertical axis) (fig.\ref{fig:llama2-7b-flip-noclip-unrelated-cs-scs.svg},~\ref{fig:qwen-14b-flip-unrelated-cs-scs.svg},~\ref{fig:qwen-7b-flip-noclip-unrelated-cs-scs.svg})
+
+    \item 1 - BERT Precision score for unrelated concepts (horizontal axis) vs Concept Score (CS) for the \textbf{target} $c_s$ concept (vertical axis) (fig.~\ref{fig:llama2-7b-flip-noclip-unrelated-bertp-scs.svg},~\ref{fig:qwen-14b-flip-unrelated-bertp-tcs.svg},~\ref{fig:qwen-7b-flip-noclip-unrelated-bertp-scs.svg})
+    \item BERT Precision score for MMLU (horizontal axis) vs Concept Score (CS) for the \textbf{target} $c_s$ concept (vertical axis) (fig.\ref{fig:llama2-7b-flip-noclip-mmlu-bertp-scs.svg},~\ref{fig:qwen-14b-flip-mmlu-bertp-scs.svg},~\ref{fig:qwen-7b-flip-noclip-mmlu-bertp-scs.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs Concept Score (CS) for the \textbf{target} $c_s$ concept (vertical axis) (fig.\ref{fig:llama2-7b-flip-noclip-unrelated-cs-scs.svg},~\ref{fig:qwen-14b-flip-unrelated-cs-scs.svg},~\ref{fig:qwen-7b-flip-noclip-unrelated-cs-scs.svg})
+\end{itemize}
+
+In each case, we see clear superiority of MidSteer over other steering approaches.
+
+We additionally provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_t, c_i$ in the tables in sec.~\ref{sec:tables_llm_switch}
+
+\include{artefacts/pareto_includes/llm_flip_noclip}
+
+\clearpage
+\subsection{Pareto charts for image diffusion concept switching}
+\label{sec:pareto_diffusion_switch}
+
+In this section, we provide more Pareto charts for Diffusion Models concept switching. When switching concept $c_s$ to $c_t$, for each LLM model we provide 9 types of Pareto plots: 
+\begin{itemize}
+    \item FID score for unrelated concepts (horizontal axis) vs \textbf{$\Delta$} Concept Score (CS) for the target $c_t$ and source $c_s$ concepts (fig.~\ref{fig:sana-flip-noclip-unrelated-fid.svg},~\ref{fig:sdxl-flip-noclip-unrelated-fid.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs \textbf{$\Delta$} Concept Score (CS) for the target $c_t$ and source $c_s$ concepts (vertical axis)  (fig.~\ref{fig:sana-flip-noclip-unrelated-cs.svg},~\ref{fig:sdxl-flip-noclip-unrelated-cs.svg})
+    
+    \item FID score for unrelated concepts (horizontal axis) vs Concept Score (CS) for the \textbf{source} $c_s$ concept (vertical axis) (fig.~\ref{fig:sana-flip-noclip-unrelated-fid-scs.svg},~\ref{fig:sdxl-flip-noclip-unrelated-fid-scs.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs Concept Score (CS) for the \textbf{source} $c_s$ concept (vertical axis) (fig.\ref{fig:sana-flip-noclip-unrelated-cs-scs.svg},~\ref{fig:sdxl-flip-noclip-unrelated-cs-scs.svg})
+
+    \item FID score for unrelated concepts (horizontal axis) vs Concept Score (CS) for the \textbf{target} $c_s$ concept (vertical axis) (fig.~\ref{fig:sana-flip-noclip-unrelated-fid-tcs.svg},~\ref{fig:sdxl-flip-noclip-unrelated-fid-tcs.svg})
+    \item Average Concept Score (CS) for unrelated concepts $c_i$ (horizontal axis) vs Concept Score (CS) for the \textbf{target} $c_s$ concept (vertical axis) (fig.\ref{fig:sana-flip-noclip-unrelated-cs-tcs.svg},~\ref{fig:sdxl-flip-noclip-unrelated-cs-tcs.svg})
+\end{itemize}
+
+In each case, we see clear superiority of MidSteer over other steering approaches.
+
+We additionally provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_t, c_i$ in the tables in sec.~\ref{sec:tables_diffusion_switch}
+
+\include{artefacts/pareto_includes/diffusion_flip_noclip}
+
+\clearpage
+\subsection{Detailed results for LLM concept switching}
+\label{sec:tables_llm_switch}
+
+In this section, in tab.~\ref{tab:flip_llama2-7b_noclip_dogs_to_cats},\ref{tab:flip_llama2-7b_noclip_horses_to_motorcycles},\ref{tab:flip_qwen2.5-14b_noclip_dogs_to_cats},\ref{tab:flip_qwen2.5-14b_noclip_horses_to_motorcycles},\ref{tab:flip_qwen2.5-7b_noclip_dogs_to_cats},\ref{tab:flip_qwen2.5-7b_noclip_horses_to_motorcycles} we provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_t, c_i$. Pareto plots in sec.~\ref{sec:pareto_llm_switch} were created based on the scores provided in these tables.
+
+\include{artefacts/tables/llm_flip_tables_noclip}
+
+
+\clearpage
+\subsection{Detailed results for for Diffusion Models concept switching}
+\label{sec:tables_diffusion_switch}
+In this section, in tab.~\ref{tab:flip_sana_noclip_horse_to_motorcycle},\ref{tab:flip_sana_noclip_chihuahua_to_muffin},\ref{tab:flip_sdxl_noclip_horse_to_motorcycle},\ref{tab:flip_sdxl_noclip_chihuahua_to_muffin} we provide detailed breakdown of scores for all $\beta$ values and all concepts $c_s, c_t, c_i$. Pareto plots in sec.~\ref{sec:pareto_llm_switch} were created based on the scores provided in these tables.
+
+\include{artefacts/tables/diffusion_flip_tables_noclip}

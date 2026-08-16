@@ -1,0 +1,39 @@
+% Requires: \usepackage{subcaption} (and \usepackage{svg}).
+% ==================== Task: erase (new) ====================
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/sana-erase-noclip-unrelated-cs.pdf}
+  \caption{Unrelated vs CS}
+  \label{fig:sana-erase-noclip-unrelated-cs.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/sana-erase-noclip-unrelated-fid.pdf}
+  \caption{Unrelated vs FID}
+  \label{fig:sana-erase-noclip-unrelated-fid.svg}
+\end{subfigure}
+\caption{Pareto plot for concept erase on model sana}
+\label{fig:sana-erase-grid}
+\vspace{-0.3cm}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/sdxl-erase-noclip-unrelated-cs.pdf}
+  \caption{Unrelated vs CS}
+  \label{fig:sdxl-erase-noclip-unrelated-cs.svg}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{artefacts/pareto/sdxl-erase-noclip-unrelated-fid.pdf}
+  \caption{Unrelated vs FID}
+  \label{fig:sdxl-erase-noclip-unrelated-fid.svg}
+\end{subfigure}
+\caption{Pareto plot for concept erase on model sdxl}
+\label{fig:sdxl-erase-grid}
+\vspace{-0.3cm}
+\end{figure}
