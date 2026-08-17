@@ -691,8 +691,8 @@
       "quote": "Fig.~\\ref{fig:num_covs} shows that performance largely stabilizes around 5,000 prompts in the tested Llama-2-7B setting.",
       "citation": "paper/content/suppl.tex:642",
       "name": "Sigma_XX estimation with M>=5000 prompts matches the paper's Fig. 5 plateau values within tolerance",
-      "quantity": "measured.midsteer.bertp_mmlu",
-      "quantity_description": "[measured.midsteer.bertp_mmlu(beta, M) for M in x] ; each entry is the mean over the ablation beta grid {2.0, 2.5, 3.0} (figure legend); bertp_mmlu = 1 - (1 - BERT-Precision on MMLU) with the Sigma_XX prompt count set to M, Llama-2-7B-chat, horse->motorcycle, MidSteer. Stored as the existing per-x (M) sequence measured.midsteer.bertp_mmlu (the beta-averaged BERT-Precision at each M in x), so the gate matches it elementwise to the claimed sequence rather than evaluating a list comprehension with x (the gate provides no x in the predicate namespace).",
+      "quantity": "measured.midsteer.c22_bertp_mmlu",
+      "quantity_description": "[measured.midsteer.c22_bertp_mmlu(beta, M) for M in x] ; each entry is the mean over the ablation beta grid {2.0, 2.5, 3.0} (figure legend); c22_bertp_mmlu = 1 - (1 - BERT-Precision on MMLU) with the Sigma_XX prompt count set to M, Llama-2-7B-chat, horse->motorcycle, MidSteer. Stored as the derived per-x (M) sequence measured.midsteer.c22_bertp_mmlu (the beta-averaged BERT-Precision at each M in x), so the gate matches it elementwise to the claimed sequence rather than evaluating a list comprehension with x (the gate provides no x in the predicate namespace). The name c22_bertp_mmlu (not bertp_mmlu) avoids a scalar/curve collision: bertp_mmlu is the e2-concrete scalar BERT-Precision (unused by any claim) and would, on a GPU host, clobber this 3-element ablation curve if they shared a name.",
       "x": [
         5000,
         10000,

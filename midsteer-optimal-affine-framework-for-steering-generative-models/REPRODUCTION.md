@@ -293,6 +293,39 @@ untested=0, refuted=0 — no `unevaluable`. `selfcheck.json` agrees. The model a
 remain BLOCKED (no CUDA / no HF_TOKEN), which is the correct blocked result for this
 sandbox, not a defect.
 
+**Adversarial review of the 6 fixed claims against the paper** (the orchestrate backend
+was down — HTTP 500 on a trivial ping — so the review was done inline, reading the
+paper `.tex` at each claim's cited lines byte-for-byte):
+- C1 (`paper/content/guardedness.tex:73-85`): A_hat = I − W⁺(WΣ_XZ)(WΣ_XZ)⁺W,
+  b_hat = E[X] − A_hat E[X], W = (Σ_XX^{1/2})⁺; constraint Cov(AX+b,Z)=0 (l.71);
+  objective E‖AX+b−X‖² (l.64-67). The predicate thresholds all three sub-claims
+  (constraint, minimal disturbance over the feasible set, vanilla special case
+  Cor. 4.1 `main.tex:297-315` incl. the authors' `s`-normalisation caveat l.302).
+  Faithful.
+- C2 (`main.tex:343-367`): A_hat = I − 2W⁺(WΣ_XZ)(WΣ_XZ)⁺W (l.365); flip constraint
+  Cov(AX+b,Z) = −Cov(X,Z) (l.359); Cor. 4.3 `main.tex:377-394` (vanilla-switch
+  special case, unit-norm s per l.381). Faithful.
+- C3 (`main.tex:418-448`): A_hat = I + W⁺(Σ_{WX,Z2}−Σ_{WX,Z1})Σ_{WX,Z1}⁺W (l.447);
+  matched-covariance constraint Cov(AX+b,Z1)=Cov(X,Z2) (l.441); erasure special case
+  Z2 constant ⇒ MidSteer≡LEACE (`main.tex:461`). Faithful.
+- C20 (`switching_suppl.tex:21` + `llm_flip_tables_noclip.tex`): verified
+  MidSteer source-CS below BOTH baselines at β∈{3,4,5} for both pairs
+  (horses→motorcycles: MidSteer 1.7/1.6/1.4 vs vanilla 2.9/3.0/3.0 & LEACE
+  3.7/3.5/3.4; dogs→cats: MidSteer 1.9/1.6/1.6 vs vanilla 4.8/4.6/4.4 & LEACE
+  3.7/3.6/3.6). min-of-averages and average-of-mins both give dominance; margins ≥1.2.
+  Faithful.
+- C21 (`experiments.tex:121` + `diffusion_flip_tables_noclip.tex`,
+  tab:flip_sdxl_noclip_horse_to_motorcycle): MidSteer horse src-CS 51.2/50.0/49.2/48.8/48.3
+  below both CASteer 70.0/52.1/51.4/51.0/50.7 and LEACE 65.0/51.2/50.5/50.2/49.9 at
+  β∈{1..5}; margins ≥1.2 (1.2 at β=2). Faithful.
+- C22 (`suppl.tex:642`): "stabilises around 5,000 prompts" encoded as the
+  β-averaged BERT-Precision sequence over M∈{5000,10000,20000} matching the Fig.5
+  plateau values within tolerance. Review found a latent scalar/curve NAME
+  COLLISION: `bertp_mmlu` was both C22's 3-element ablation curve and the e2-concrete
+  scalar (unused by any claim) — on a GPU host the scalar would clobber the curve.
+  Fixed by renaming C22's curve metric to `c22_bertp_mmlu` (distinct), leaving e2's
+  scalar `bertp_mmlu` separate. Faithful after the rename.
+
 ### Blockers (model arms, honestly BLOCKED)
 
 - **No CUDA** (`torch.cuda.is_available()` is False; `nvidia-smi` absent) and **no

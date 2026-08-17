@@ -304,7 +304,7 @@
       ],
       "tolerance": 0.03,
       "spread": "BLOCKED",
-      "detail": "curve metric midsteer.bertp_mmlu blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "curve metric midsteer.c22_bertp_mmlu blocked in this sandbox (no CUDA / no HF_TOKEN)"
     }
   ],
   "summary": {

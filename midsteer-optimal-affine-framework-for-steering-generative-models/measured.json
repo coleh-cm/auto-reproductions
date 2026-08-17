@@ -1,11 +1,7 @@
 {
   "base": {
     "0": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -18,6 +14,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -65,11 +66,7 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -82,6 +79,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -129,11 +131,7 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -146,6 +144,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -195,11 +198,7 @@
   },
   "vanilla": {
     "0": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -212,6 +211,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -259,11 +263,7 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -276,6 +276,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -323,11 +328,7 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -340,6 +341,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -389,11 +395,7 @@
   },
   "leace_switch": {
     "0": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -406,6 +408,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -453,11 +460,7 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -470,6 +473,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -517,11 +525,7 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -534,6 +538,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -583,11 +592,7 @@
   },
   "midsteer": {
     "0": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -600,6 +605,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -647,11 +657,7 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -664,6 +670,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -711,11 +722,7 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": "BLOCKED",
       "c1_minimal_disturbance_gap": "BLOCKED",
       "c1_n_feasible": "BLOCKED",
@@ -728,6 +735,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -777,11 +789,7 @@
   },
   "e1_synth": {
     "0": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": 5.146610762057739e-13,
       "c1_minimal_disturbance_gap": 0.0,
       "c1_n_feasible": 16.0,
@@ -794,6 +802,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -841,11 +854,7 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": 8.294663976433091e-13,
       "c1_minimal_disturbance_gap": 0.0,
       "c1_n_feasible": 16.0,
@@ -858,6 +867,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"
@@ -905,11 +919,7 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": [
-        "BLOCKED",
-        "BLOCKED",
-        "BLOCKED"
-      ],
+      "bertp_mmlu": "BLOCKED",
       "c1_constraint": 6.979898958767834e-13,
       "c1_minimal_disturbance_gap": 0.0,
       "c1_n_feasible": 16.0,
@@ -922,6 +932,11 @@
       "c21_min_baseline_horse": [
         "BLOCKED",
         "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
+      "c22_bertp_mmlu": [
         "BLOCKED",
         "BLOCKED",
         "BLOCKED"

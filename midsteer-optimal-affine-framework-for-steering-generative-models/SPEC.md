@@ -1439,4 +1439,8 @@ Additional implementation choices:
   `c20_min_baseline_src` and `c21_min_baseline_horse` (elementwise min of the two
   baselines' per-beta sequences — the weakest-dominance reference) are computed by
   `assemble_measured.py` so the elementwise-min semantics are correct on a real host,
-  not the lexicographic `min(list, list)` a naive expression would give.
+  not the lexicographic `min(list, list)` a naive expression would give. C22 uses a
+  distinct curve metric `c22_bertp_mmlu` (not `bertp_mmlu`) to avoid a scalar/curve
+  name collision: `bertp_mmlu` is the e2-concrete scalar BERT-Precision (unused by any
+  claim) and would clobber C22's 3-element ablation curve on a GPU host if they shared
+  a name.
