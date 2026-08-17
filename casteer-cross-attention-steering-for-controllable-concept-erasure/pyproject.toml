@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Make the vendored upstream packages (core/, scripts/) importable as top-level
+# modules from the repo root, regardless of how pytest is invoked.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

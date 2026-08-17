@@ -1,0 +1,45 @@
+# CASteer reproduction — pinned dependencies for the vendored upstream
+# implementation (https://github.com/Atmyre/CASteer, pinned at commit
+# 135912a555a8606c01f55843c738cf8062319ed7; see UPSTREAM_COMMIT.txt).
+#
+# Python 3.13. Target: CPU build of the environment for the import gate; the
+# paper's GPU experiments (SD-1.4 / SDXL / SANA on 8x V100, supplementary.tex:30)
+# run under the CUDA base image in ./Dockerfile.
+#
+# Upstream's own requirements/base.txt omits the `clip` package that
+# core/eval/clip.py imports (`import clip`); it is added here (clip-anytorch,
+# an API-compatible maintained fork of OpenAI CLIP that provides the `clip`
+# module on Python 3.13). diffusers is pinned to a release that exposes both
+# SanaPipeline and SanaSprintPipeline used in core/utils.py.
+
+# --- Deep-learning stack -------------------------------------------------
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+transformers==4.47.1
+diffusers==0.33.1
+accelerate==1.4.0
+datasets==3.2.0
+huggingface_hub==0.28.1
+safetensors==0.5.2
+
+# --- Numerics / data -----------------------------------------------------
+numpy==2.2.3
+scipy==1.15.2
+pandas==2.2.3
+pillow==11.1.0
+
+# --- Steering / eval libraries ------------------------------------------
+clean-fid==0.1.35
+clip-anytorch==2.6.0
+ftfy==6.3.1
+regex==2024.11.6
+
+# --- Misc ----------------------------------------------------------------
+tqdm==4.67.1
+matplotlib==3.10.1
+# clip-anytorch imports `pkg_resources` (provided by setuptools)
+setuptools==75.8.0
+
+# --- Test runner ---------------------------------------------------------
+pytest==8.3.4

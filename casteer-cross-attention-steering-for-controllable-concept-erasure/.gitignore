@@ -1,0 +1,23 @@
+/.venv/
+/cache/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+
+# Generated artefacts (steering vectors, images, scores) — never commit
+/results/
+/steering_vectors/
+/images/
+/scores/
+/scores.tsv
+
+# HuggingFace / model cache
+/.cache/
+/hub/
+
+# Local scratch
+session_log.txt
+*.pt
+!paper/**/*.pt

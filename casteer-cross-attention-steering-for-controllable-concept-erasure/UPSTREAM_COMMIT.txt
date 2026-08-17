@@ -1,0 +1,7 @@
+Upstream CASteer repository vendored into this reproduction folder.
+
+Source: https://github.com/Atmyre/CASteer
+Pinned commit: 135912a555a8606c01f55843c738cf8062319ed7
+Commit message: "Fix human related prompt categories"
+
+Vendored top-level dirs/files: core/, scripts/, exp/, imagenet_classes.txt, assets/, UPSTREAM_README.md
