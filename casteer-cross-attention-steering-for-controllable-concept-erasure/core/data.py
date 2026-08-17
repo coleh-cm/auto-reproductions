@@ -89,34 +89,76 @@ def coco_captions_fingerprint(path: str = "exp/datasets/eval/coco/coco_30k.csv")
     }
 
 
-def load_i2p_prompts() -> list[str]:
-    """The 4,703 I2P prompts (experiments.tex:39; AIML-TUDA/i2p, split 'train').
+I2P_FULL_SET = 4703  # experiments.tex:39
 
-    Returns the 'prompt' column. The companion columns (sd_seed, categories,
-    q16_percentage, nudity_percentage, ...) are available via the raw dataset;
-    this loader exposes only the prompts because the paper generates one
-    image per prompt and re-scores with NudeNet/Q16 (SPEC U7).
-    """
+
+def _load_i2p_dataset():
+    """Load the AIML-TUDA/i2p 'train' split once. Raises if the row count is not
+    4,703 (the paper-stated size) -- never substitutes a synthetic corpus."""
     from datasets import load_dataset
 
     ds = load_dataset("AIML-TUDA/i2p", split="train")
     n = len(ds)
-    if n != 4703:
+    if n != I2P_FULL_SET:
         raise RuntimeError(f"I2P split has {n} rows; paper states 4,703 (experiments.tex:39)")
+    return ds
+
+
+def load_i2p_prompts() -> list[str]:
+    """The 4,703 I2P prompts (experiments.tex:39; AIML-TUDA/i2p, split 'train').
+
+    Returns the 'prompt' column. The companion columns (sd_seed, categories,
+    q16_percentage, nudity_percentage, ...) are available via load_i2p_seeds()
+    and the raw dataset; this loader exposes the prompts because the paper
+    generates one image per prompt and re-scores with NudeNet/Q16 (SPEC U7).
+    """
+    ds = _load_i2p_dataset()
     return list(ds["prompt"])
 
 
-def i2p_fingerprint() -> dict:
-    from datasets import load_dataset
+def load_i2p_seeds() -> list[int]:
+    """The per-prompt curated `sd_seed` column of the 4,703 I2P prompts, aligned
+    1:1 with load_i2p_prompts() (AIML-TUDA/i2p, split 'train').
 
-    ds = load_dataset("AIML-TUDA/i2p", split="train")
+    The paper's I2P eval protocol -- and the vendored
+    `scripts/diffusion/run_i2p_eval.py:71` (`seed=row['sd_seed']`) that produced
+    the paper's numbers -- generates each I2P image with its CURATED per-prompt
+    seed. These are the very seeds from which the SD-1.4 Total=646 anchor
+    (sd14_tables/nudity.tex:10) and every prior-art nudity count were produced.
+    Fresh seeds (one continuous generator per arm-seed) would plausibly
+    DEFLATE nudity counts on every arm (the curated seeds elicit the
+    inappropriate content), making the gated orderings easier to pass than under
+    the paper's protocol. The gated driver therefore uses these per-prompt
+    seeds for the I2P task (review: I2P seed-protocol divergence, fixed).
+
+    Raises if the `sd_seed` column is absent (no silent fallback to a fresh
+    seed stream). Returns int seeds in dataset order.
+    """
+    ds = _load_i2p_dataset()
+    if "sd_seed" not in ds.column_names:
+        raise RuntimeError(
+            f"I2P dataset missing 'sd_seed' column; have {ds.column_names}. The "
+            "paper's I2P protocol needs the curated per-prompt seed (vendored "
+            "run_i2p_eval.py:71); refusing to fall back to a fresh seed stream."
+        )
+    return [int(s) for s in ds["sd_seed"]]
+
+
+def i2p_fingerprint() -> dict:
+    ds = _load_i2p_dataset()
     prompts = list(ds["prompt"])
     joined = "\n".join(prompts[:200]).encode("utf-8")
-    return {
+    cols = list(ds.column_names)
+    fp = {
         "n": len(prompts),
         "sha256_first8": hashlib.sha256(joined).hexdigest()[:8],
-        "columns": list(ds.column_names),
+        "columns": cols,
     }
+    if "sd_seed" in cols:
+        seeds = list(ds["sd_seed"])
+        fp["sd_seed_first"] = int(seeds[0])
+        fp["sd_seed_count"] = len(seeds)
+    return fp
 
 
 def load_coco_reference_images() -> str:

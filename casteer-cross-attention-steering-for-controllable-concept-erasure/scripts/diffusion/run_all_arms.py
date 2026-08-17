@@ -11,14 +11,18 @@ measured.json shape: {arm: {seed: {metric: value-or-"BLOCKED"}}} covering every
 are claims.json's; do not rename. A sidecar measured_blocked_reasons.json
 records why each BLOCKED value could not be produced.
 
-On a CPU-only host the paper's full config (50 steps, >=1000 prompts, 3 seeds)
-is infeasible (paper used 8xV100, supplementary.tex:30): is_arm_feasible returns
-False and the arm emits BLOCKED without downloading any model. On a CUDA host
-the same script runs the arms for real via _run_and_evaluate (review F2: this
-is no longer an unconditional stub -- the arm->eval->measured.json driver is
-implemented, the per-task steering vector is selected via TASK_VECTOR (review
-F3), and the 7-concept Eq.9 average for the I2P-overall task is composed on the
-fly from the 7 per-concept stores).
+On a CPU-only host the paper's full config (50 steps, 4,703 I2P / 800-per-
+concept snoopy / 3,000 COCO prompts, 3 seeds) is infeasible (paper used 8xV100,
+supplementary.tex:30): is_arm_feasible returns False and the arm emits BLOCKED
+without downloading any model. On a CUDA host the same script runs the arms for
+real via _run_and_evaluate -- the arm->eval->measured.json driver is
+implemented, the per-task steering vector is selected via TASK_VECTOR, the
+7-concept Eq.9 average for the I2P-overall task is composed on the fly from the
+7 per-concept stores, and the sd14 normalization reference for snoopy/other/
+style is generated on demand per steered arm (review-driven fixes this pass:
+nudity_total full-set scaling + inconclusive floor, per-prompt sd_seed for I2P,
+declared image counts via n_per, bare-concept CS reference text, in-memory sd14
+references so the normalized Snoopy claims are reachable on a GPU host).
 """
 from __future__ import annotations
 
@@ -45,18 +49,20 @@ _MEASURED_RE = re.compile(r"measured\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)")
 
 def arm_metrics_from_claims(claims: dict) -> dict:
     """Parse every measured.<arm>.<metric> reference in the claims (quantity,
-    against, and curve x/against lists) -> {arm: set(metrics)}. claims.json is
-    the single source of arm/metric names."""
+    against, curve x/against lists, AND predicate) -> {arm: set(metrics)}.
+    claims.json is the single source of arm/metric names. `predicate` is parsed
+    too so an invariant-only claim (e.g. `house`, which has no quantity/against)
+    still registers the metrics its predicate references (review F-13: a
+    predicate-only metric would otherwise silently never be produced)."""
     out: dict[str, set[str]] = {}
     texts = []
     for c in claims.get("claims", []):
-        for key in ("quantity", "against"):
+        for key in ("quantity", "against", "predicate"):
             v = c.get(key)
             if isinstance(v, str):
                 texts.append(v)
             elif isinstance(v, list):
                 texts.extend(str(x) for x in v)
-        # value claims reference measured.* in quantity too (already above)
     for t in texts:
         for arm, metric in _MEASURED_RE.findall(t):
             out.setdefault(arm, set()).add(metric)
@@ -105,6 +111,13 @@ def main():
                 print(f"FINAL {arm}={pv}")
                 for m in metrics:
                     measured[arm][seed][m] = value.get(m, "BLOCKED")
+                # Record companion (non-gated) keys the driver produced, e.g.
+                # nudity_total_raw recorded beside the gated (scaled)
+                # nudity_total so a reader can see both bases (claims.json
+                # metrics.nudity_total). Not referenced by any claim.
+                for k, v in value.items():
+                    if k not in measured[arm][seed]:
+                        measured[arm][seed][k] = v
             except MissingEvaluatorError as e:
                 print(f"FINAL {arm}=BLOCKED")
                 for m in metrics:
@@ -125,7 +138,6 @@ def main():
 
 def _primary_metric(arm, metrics):
     """The one metric printed on the FINAL line for this arm."""
-    # Prefer nudity_total for nudity arms, coco_fid30k for coco arms, etc.
     for pref in ("nudity_total", "i2p_overall_pct", "coco_fid30k", "snoopy_cs",
                  "mean_others_fid", "vangogh_lpips_e"):
         if pref in metrics:
@@ -140,12 +152,30 @@ def _run_and_evaluate(arm, seed, metrics, reasons):
     BLOCKED reasons are recorded here as they arise.
 
     Only invoked on a feasible (GPU) host. Generates images per task using the
-    per-task steering vector (review F3: snoopy->Snoopy, style->Van Gogh,
-    i2p->nudity, i2p_overall->7-class average, coco->nudity), then scores each
-    metric INDEPENDENTLY -- a MissingEvaluatorError for one metric (e.g.
-    NudeNet not installed) marks that metric BLOCKED but lets the other metrics
-    for the same arm (e.g. snoopy_cs, which only needs CLIP) still get real
-    values. No success path reports OK on an empty result.
+    per-task steering vector (review F3), then scores each metric INDEPENDENTLY
+    -- a MissingEvaluatorError for one metric (e.g. NudeNet not installed) marks
+    that metric BLOCKED but lets the other metrics for the same arm still get
+    real values. No success path reports OK on an empty result.
+
+    Review-driven corrections applied here (this pass):
+      - I2P uses the per-prompt curated `sd_seed` (vendored run_i2p_eval.py:71),
+        not a fresh continuous generator (review: I2P seed-protocol divergence).
+      - nudity_total is recorded on the FULL-SET basis (scaled; raw recorded
+        under nudity_total_raw) and reports inconclusive (BLOCKED) below the
+        declared 2000-prompt floor (review: nudity_total never scaled / below
+        the declared floor).
+      - snoopy/other/style generate the DECLARED image count (80 templates x
+        n_per, 50 classes x n_per), not 80/50 (review: dead n_per under-generated
+        below the repo's own >=200 restriction).
+      - snoopy_cs / other_cs score against the BARE concept string (vendored
+        produce_scores.py:43 -> clip.py:191 `[concept]*N`), not the full
+        template (review: CLIP-score reference-text divergence).
+      - the sd14 normalization reference for snoopy/other/style is generated
+        ON DEMAND per steered arm at the same seed (lazily cached on disk) and
+        scored in-memory -- the sd14 arm no longer needs to pre-generate those
+        reference sets, and norm_snoopy_cs / mean_norm_others_cs / mean_others_fid
+        / vangogh_lpips_e are reachable on a GPU host (review: 6-7 claims
+        structurally unsettleable on any host).
 
     The Q16 classifier checkpoint is not named by the paper and not vendored
     (metrics.q16_inappropriate_count raises by construction), so i2p_overall_pct
@@ -156,20 +186,19 @@ def _run_and_evaluate(arm, seed, metrics, reasons):
     measured_blocked_reasons.json.
     """
     import os
+    import glob as _glob
     import torch
 
-    from core.runner import run_generation, ARM_CONFIG, FULL_CONFIG_MIN_IMAGES
-    from core.data import (
-        load_i2p_prompts, load_coco_captions, load_coco_reference_images,
-        load_imagenet_classes, load_clip_templates,
+    from core.runner import (
+        run_generation, FULL_CONFIG_MIN_IMAGES, expand_template_prompts,
     )
-    from core.construct_prompts import (
-        get_prompts_concrete, get_prompts_style,
+    from core.data import (
+        load_i2p_prompts, load_i2p_seeds, load_coco_captions,
+        load_coco_reference_images, load_imagenet_classes, load_clip_templates,
     )
     from core.eval import metrics as EM
     from core.invariants import cpu_invariant_metrics
 
-    cfg = ARM_CONFIG[arm]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     out_root = os.path.join(REPO, "results", "arms", arm, f"seed{seed}")
     os.makedirs(out_root, exist_ok=True)
@@ -191,86 +220,164 @@ def _run_and_evaluate(arm, seed, metrics, reasons):
         except RuntimeError as e:
             _blocked(metric, f"RuntimeError: {e}")
 
+    def _ensure_sd14_reference(rel_dir, prompts, task):
+        """Generate vanilla sd14 images for `prompts` at this seed into
+        results/arms/sd14/seed{seed}/<rel_dir> if not already cached, return the
+        dir. The sd14 arm has beta=None so build_controller returns None (no
+        steering) regardless of `task`; the SAME generation config (50 steps,
+        512^2, gs 7.5) and the SAME continuous seed stream as the steered arm are
+        used, so the steered-vs-vanilla comparison is exactly latent-paired per
+        prompt index (experiments.tex:72-73). Reused across steered arms (same
+        task+seed+prompts -> same cache dir), so the sd14 reference is generated
+        once per seed."""
+        ref_dir = os.path.join(REPO, "results", "arms", "sd14",
+                               f"seed{seed}", rel_dir)
+        existing = sum(len(_glob.glob(os.path.join(ref_dir, f"*.{e}")))
+                       for e in EM.EXTENSIONS) if os.path.isdir(ref_dir) else 0
+        if existing < len(prompts):
+            run_generation("sd14", seed, prompts, ref_dir, task=task, device=device)
+        return ref_dir
+
     # ------------------------------------------------------------------
     # I2P nudity task (nudity_total) and I2P-overall task (i2p_overall_pct)
+    # Both use the per-prompt curated sd_seed (review: I2P seed protocol).
     # ------------------------------------------------------------------
     if "nudity_total" in metrics or "i2p_overall_pct" in metrics:
         try:
-            i2p_prompts = load_i2p_prompts()
-            i2p_prompts = i2p_prompts[:FULL_CONFIG_MIN_IMAGES["i2p"]]
+            i2p_prompts_all = load_i2p_prompts()
+            i2p_seeds_all = load_i2p_seeds()
         except Exception as e:
-            for m in ("nudity_total", "i2p_overall_pct"):
-                if m in metrics:
-                    _blocked(m, f"I2P prompts unavailable: {e}")
-            i2p_prompts = None
+            for m in ("nudity_total", "i2p_overall_pct", "nudity_total_raw"):
+                if m in metrics or m == "nudity_total_raw":
+                    _blocked(m, f"I2P dataset unavailable: {e}")
+            i2p_prompts_all = None
 
-        if i2p_prompts is not None:
-            # nudity erasure (nudity task) -> nudity_total
+        if i2p_prompts_all is not None:
+            n_i2p = FULL_CONFIG_MIN_IMAGES["i2p"]
+            i2p_prompts = i2p_prompts_all[:n_i2p]
+            i2p_seeds = i2p_seeds_all[:n_i2p]
+            n_subset = len(i2p_prompts)
+
+            # nudity erasure (nudity task) -> nudity_total (full-set basis)
             if "nudity_total" in metrics:
                 nudity_dir = os.path.join(out_root, "i2p")
                 run_generation(arm, seed, i2p_prompts, nudity_dir, task="i2p",
-                               device=device)
-                _safe("nudity_total", EM.nudity_total, nudity_dir)
+                               device=device, prompt_seeds=i2p_seeds)
+                # raw count over the subset
+                raw = None
+                try:
+                    raw = float(EM.nudity_total(nudity_dir))
+                    values["nudity_total_raw"] = raw
+                except EM.MissingEvaluatorError as e:
+                    _blocked("nudity_total", f"MissingEvaluatorError: {e}")
+                    _blocked("nudity_total_raw", f"MissingEvaluatorError: {e}")
+                except RuntimeError as e:
+                    _blocked("nudity_total", f"RuntimeError: {e}")
+                    _blocked("nudity_total_raw", f"RuntimeError: {e}")
+                if raw is not None:
+                    scaled, reason = EM.nudity_scaled_or_inconclusive(
+                        int(raw), n_subset)
+                    if reason is None:
+                        values["nudity_total"] = float(scaled)
+                    else:
+                        _blocked("nudity_total", reason)
             # 7-class average erasure (i2p_overall task) -> i2p_overall_pct
             if "i2p_overall_pct" in metrics:
                 overall_dir = os.path.join(out_root, "i2p_overall")
                 run_generation(arm, seed, i2p_prompts, overall_dir,
-                               task="i2p_overall", device=device)
+                                task="i2p_overall", device=device,
+                                prompt_seeds=i2p_seeds)
                 _safe("i2p_overall_pct", EM.i2p_overall_pct, overall_dir)
 
     # ------------------------------------------------------------------
     # Snoopy task: snoopy_cs / norm_snoopy_cs / mean_norm_others_cs / mean_others_fid
     # The Snoopy vector erases Snoopy; preservation metrics score the 5 'other'
     # concepts (mickey/spongebob/pikachu/dog/legislator, experiments.tex:64).
+    # CLIP reference text = the BARE concept string (vendored produce_scores.py:43
+    # -> clip.py:191 `[concept]*N`), matching the paper's CS scale (review: CS
+    # reference-text divergence). The sd14 normalization reference is generated
+    # on demand (review: structurally-unsettleable claims).
     # ------------------------------------------------------------------
     snoopy_metrics = {"snoopy_cs", "norm_snoopy_cs",
                       "mean_norm_others_cs", "mean_others_fid"}
     if snoopy_metrics & set(metrics):
         try:
             templates = load_clip_templates()
-            n_per = max(1, FULL_CONFIG_MIN_IMAGES["snoopy"] // len(templates))
-            # Snoopy prompts (the erased concept)
-            snoopy_prompts = [t.format("Snoopy") for t in templates][:FULL_CONFIG_MIN_IMAGES["snoopy"]]
+            # Snoopy prompts (the erased concept): each template repeated n_per
+            # times to reach the declared count (80 templates x 10 = 800,
+            # experiments.tex:67). review: the dead `n_per` previously left this
+            # at 80, below the >=200 restriction.
+            snoopy_prompts = expand_template_prompts(
+                templates, "Snoopy", FULL_CONFIG_MIN_IMAGES["snoopy"])
             snoopy_dir = os.path.join(out_root, "snoopy")
             run_generation(arm, seed, snoopy_prompts, snoopy_dir, task="snoopy",
                            device=device)
-            sd14_snoopy_dir = os.path.join(REPO, "results", "arms", "sd14",
-                                           f"seed{seed}", "snoopy")
+            sd14_snoopy_dir = _ensure_sd14_reference("snoopy", snoopy_prompts, "snoopy")
+            n_snoop = len(snoopy_prompts)
+            # snoopy_cs (arm) -- bare "Snoopy" reference text (paper pipeline)
             if "snoopy_cs" in metrics:
-                _safe("snoopy_cs", EM.clip_score_mean, snoopy_dir, snoopy_prompts, device=device.type)
-                if os.path.isdir(sd14_snoopy_dir):
-                    _safe("norm_snoopy_cs",
-                          lambda a, b: EM.norm_snoopy_cs(a, b),
-                          values.get("snoopy_cs", 0.0) or _sd14_metric("snoopy_cs", seed),
-                          _sd14_metric("snoopy_cs", seed))
-            # 'other' concepts: erase Snoopy, generate mickey/spongebob/pikachu/dog/legislator
+                _safe("snoopy_cs", EM.clip_score_mean, snoopy_dir,
+                      EM.cs_reference_prompts("Snoopy", n_snoop), device=device.type)
+            # norm_snoopy_cs = snoopy_cs(arm)/snoopy_cs(sd14) at the same seed
+            # (experiments.tex:75). Computed from IN-MEMORY sd14 CS, not a disk
+            # read of a previous run (review: _sd14_metric read stale measured.json).
+            if "norm_snoopy_cs" in metrics:
+                try:
+                    sd14_cs = float(EM.clip_score_mean(sd14_snoopy_dir,
+                                                      EM.cs_reference_prompts("Snoopy", n_snoop),
+                                                      device=device.type))
+                    arm_cs = values.get("snoopy_cs")
+                    if arm_cs is None:
+                        arm_cs = float(EM.clip_score_mean(snoopy_dir,
+                                                          EM.cs_reference_prompts("Snoopy", n_snoop),
+                                                          device=device.type))
+                    _safe("norm_snoopy_cs", EM.norm_snoopy_cs, arm_cs, sd14_cs)
+                except (EM.MissingEvaluatorError, RuntimeError) as e:
+                    _blocked("norm_snoopy_cs", f"Snoopy CS reference error: {e}")
+            # 'other' concepts: erase Snoopy, generate mickey/spongebob/pikachu/
+            # dog/legislator; score CS (bare concept) and FID vs the sd14 ref.
             others = ["Mickey", "Spongebob", "Pikachu", "dog", "legislator"]
             arm_others_cs = {}
+            sd14_others_cs = {}
             arm_others_fid = {}
             for concept in others:
-                cprompts = [t.format(concept) for t in templates][:FULL_CONFIG_MIN_IMAGES["other"]]
+                cprompts = expand_template_prompts(
+                    templates, concept, FULL_CONFIG_MIN_IMAGES["other"])
                 cdir = os.path.join(out_root, "other", concept)
                 run_generation(arm, seed, cprompts, cdir, task="snoopy", device=device)
-                sd14_cdir = os.path.join(REPO, "results", "arms", "sd14",
-                                         f"seed{seed}", "other", concept)
+                sd14_cdir = _ensure_sd14_reference(f"other/{concept}", cprompts, "snoopy")
+                nc = len(cprompts)
                 try:
-                    arm_others_cs[concept] = EM.clip_score_mean(
-                        cdir, cprompts, device=device.type)
+                    arm_others_cs[concept] = float(
+                        EM.clip_score_mean(cdir, EM.cs_reference_prompts(concept, nc), device=device.type))
                 except (EM.MissingEvaluatorError, RuntimeError):
                     pass
-                if os.path.isdir(sd14_cdir):
-                    try:
-                        arm_others_fid[concept] = EM.other_fid(cdir, sd14_cdir)
-                    except (EM.MissingEvaluatorError, RuntimeError):
-                        pass
-            if "mean_norm_others_cs" in metrics and arm_others_cs:
-                sd14_others = _sd14_others_cs(seed, set(arm_others_cs))
-                if sd14_others:
-                    _safe("mean_norm_others_cs",
-                          lambda a, b: EM.mean_norm_others_cs(a, b),
-                          arm_others_cs, sd14_others)
+                try:
+                    sd14_others_cs[concept] = float(
+                        EM.clip_score_mean(sd14_cdir, EM.cs_reference_prompts(concept, nc), device=device.type))
+                except (EM.MissingEvaluatorError, RuntimeError):
+                    pass
+                try:
+                    arm_others_fid[concept] = float(EM.other_fid(cdir, sd14_cdir))
+                except (EM.MissingEvaluatorError, RuntimeError):
+                    pass
+            if "mean_norm_others_cs" in metrics and arm_others_cs and sd14_others_cs:
+                common = {c: arm_others_cs[c] for c in arm_others_cs
+                          if c in sd14_others_cs}
+                if common:
+                    _safe("mean_norm_others_cs", EM.mean_norm_others_cs,
+                          common, {c: sd14_others_cs[c] for c in common})
+                else:
+                    _blocked("mean_norm_others_cs",
+                             "no common other-concept CS pairs with sd14 reference")
+            elif "mean_norm_others_cs" in metrics:
+                _blocked("mean_norm_others_cs",
+                         "other-concept CS not produced (CLIP unavailable?)")
             if "mean_others_fid" in metrics and arm_others_fid:
                 _safe("mean_others_fid", EM.mean_others_fid, arm_others_fid)
+            elif "mean_others_fid" in metrics:
+                _blocked("mean_others_fid",
+                         "other-concept FID not produced (FID/reference unavailable?)")
         except (EM.MissingEvaluatorError, RuntimeError, FileNotFoundError) as e:
             for m in snoopy_metrics:
                 if m in metrics and m not in values:
@@ -279,6 +386,9 @@ def _run_and_evaluate(arm, seed, metrics, reasons):
     # ------------------------------------------------------------------
     # COCO task: coco_fid30k (+ coco_clip30k if requested)
     # Erases nudity on COCO-30k captions (supplementary.tex:544).
+    # coco_fid30k compares against the REAL COCO-30k reference (SPEC U10); the
+    # sd14 arm computes its OWN coco_fid30k the same way, so coco_fid_vs_vanilla
+    # = FID(arm,real) - FID(sd14,real) (both vs the same reference).
     # ------------------------------------------------------------------
     if "coco_fid30k" in metrics or "coco_clip30k" in metrics:
         try:
@@ -302,21 +412,25 @@ def _run_and_evaluate(arm, seed, metrics, reasons):
 
     # ------------------------------------------------------------------
     # Style task: vangogh_lpips_e (paired steered vs vanilla sd14 Van Gogh)
+    # 50 ImageNet classes x n_per to reach the declared >=200 (review: the prior
+    # 50-image style set was below the lpips_eval_images survives band [200,1000]).
     # ------------------------------------------------------------------
     if "vangogh_lpips_e" in metrics:
         try:
-            vprompts = [f"{c}, Van Gogh style" for c in load_imagenet_classes()][:FULL_CONFIG_MIN_IMAGES["style"]]
+            classes = load_imagenet_classes()
+            # 50 ImageNet classes x n_per to reach the declared >=200 (review:
+            # the prior 50-image style set was below the lpips_eval_images
+            # survives band [200,1000]). The paper does not state a style-eval
+            # prompt count (it defers to SAFREE, experiments.tex:127); we use
+            # "{class}, Van Gogh style" prompts.
+            n_style = FULL_CONFIG_MIN_IMAGES["style"]
+            n_per_s = max(1, (n_style + len(classes) - 1) // len(classes))
+            vprompts = [f"{c}, Van Gogh style" for c in classes
+                        for _ in range(n_per_s)][:n_style]
             vdir = os.path.join(out_root, "style_vangogh")
             run_generation(arm, seed, vprompts, vdir, task="style", device=device)
-            # vanilla sd14 generations for the same prompts (paired)
-            sd14_vdir = os.path.join(REPO, "results", "arms", "sd14",
-                                     f"seed{seed}", "style_vangogh")
-            if not os.path.isdir(sd14_vdir):
-                _blocked("vangogh_lpips_e",
-                         "vanilla sd14 style_vangogh generations not found; "
-                         "run the sd14 arm first (paired LPIPS needs both sets)")
-            else:
-                _safe("vangogh_lpips_e", EM.vangogh_lpips_e, vdir, sd14_vdir)
+            sd14_vdir = _ensure_sd14_reference("style_vangogh", vprompts, "style")
+            _safe("vangogh_lpips_e", EM.vangogh_lpips_e, vdir, sd14_vdir)
         except (EM.MissingEvaluatorError, RuntimeError, FileNotFoundError) as e:
             _blocked("vangogh_lpips_e", f"style task error: {e}")
 
@@ -325,32 +439,6 @@ def _run_and_evaluate(arm, seed, metrics, reasons):
         if m not in values:
             _blocked(m, "metric not produced by the driver (no OK-on-empty)")
     return values
-
-
-# module-level cache so the sd14 reference arm's per-task metrics are read once
-_SD14_CACHE: dict = {}
-
-
-def _sd14_metric(metric: str, seed: int):
-    """Read a sd14-arm metric from measured.json (already produced, since sd14
-    is the first arm in claims.json `arms`). Used as the per-seed normalization
-    denominator (experiments.tex:75). Returns None if unavailable."""
-    if "sd14" not in _SD14_CACHE:
-        try:
-            with open(MEASURED_PATH) as f:
-                _SD14_CACHE.update(json.load(f))
-        except Exception:
-            return None
-    sd14 = _SD14_CACHE.get("sd14", {}).get(str(seed), {})
-    return sd14.get(metric)
-
-
-def _sd14_others_cs(seed: int, concepts: set):
-    """Read sd14's per-concept other_cs dict for `seed`. The driver does not
-    persist per-concept other_cs, so this returns None (and the caller marks the
-    normalized mean BLOCKED rather than substituting). A future run that
-    persists sd14 per-concept CS can fill this in."""
-    return None
 
 
 if __name__ == "__main__":

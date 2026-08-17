@@ -173,14 +173,22 @@ class CrossAttentionOutputSteering(VectorControl):
             alpha = max(beta * <ca_X, ca_out>, 0)
             ca_out_new = ca_out - alpha * ca_X
         The steering vector `b` is used AS STORED -- NOT re-normalized (review
-        A3 / SPEC U9). For single-concept stores `b` is already unit-L2 (so the
-        prior `b_norm = b/||b||` was a no-op); for the Eq.9 multi-concept average
-        `b` is the sub-unit mean, and using it as-is applies (I - beta * b b^T) c
+        A3 / SPEC U9). For single-concept (unit) stores `b` is already unit-L2
+        (so the prior `b_norm = b/||b||` was a no-op); for the Eq.9 multi-concept
+        average `b` is the sub-unit mean, and using it as-is applies (I - beta * b b^T) c
         with the sub-unit `b` -- the paper-literal "simply averaging" form
         (supplementary.tex:1068-1071), NOT the renormalized form that would
         multiply effective suppression by ~1/||mean|| (~2.6x for 7 concepts).
-        This also makes the dot-product path consistent with the matrix form
-        `steer_matrix_form`, which already used `steering_vector` directly.
+
+        NOTE: this dot-product path (as-is, no renorm) and the matrix path
+        `steer_matrix_form` (P = I - beta * s s^+, built in __init__) AGREE only
+        for unit `b` (where s s^+ == s s^T). For the sub-unit Eq.9 mean the
+        matrix path's `s @ pinv(s)` renormalizes (== b b^T / ||b||^2), so the two
+        paths DIVERGE for non-unit `b` (review F-3). Production arms route
+        through this dot-product path (the paper-literal reading); the matrix
+        path is kept for the Eq.5/6 two-ways-derive-the-same-quantity invariant
+        test, which runs it at unit `b` where the two agree. Do not assume the
+        two paths are mutually consistent for the multi-concept average.
         """
         assert len(vector.shape) == 4
 

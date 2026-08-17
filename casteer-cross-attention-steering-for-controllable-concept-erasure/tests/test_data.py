@@ -54,6 +54,28 @@ def test_i2p_prompts_fingerprint():
     assert "prompt" in fp["columns"]
 
 
+def test_i2p_seeds_fingerprint():
+    """The paper's I2P protocol uses the dataset's per-prompt curated sd_seed
+    (vendored run_i2p_eval.py:71). The loader must expose it aligned 1:1 with
+    the prompts and assert the `sd_seed` column exists (review: I2P seed
+    protocol divergence). Skips if the dataset is unavailable here."""
+    try:
+        from core.data import load_i2p_prompts, load_i2p_seeds, i2p_fingerprint
+    except Exception as e:  # pragma: no cover
+        pytest.skip(f"i2p import failed: {e}")
+    try:
+        prompts = load_i2p_prompts()
+        seeds = load_i2p_seeds()
+    except Exception as e:
+        pytest.skip(f"I2P dataset unavailable in sandbox: {e}")
+    assert len(seeds) == 4703
+    assert len(seeds) == len(prompts), "sd_seed must align 1:1 with prompts"
+    assert all(isinstance(s, int) for s in seeds)
+    fp = i2p_fingerprint()
+    assert "sd_seed" in fp["columns"], "I2P must carry the sd_seed column"
+    assert fp.get("sd_seed_count") == 4703
+
+
 def test_coco_reference_fingerprint_blocks_without_vendor():
     """The real COCO-30k FID reference is not vendored here; the loader must
     RAISE (never substitute synthetic images)."""

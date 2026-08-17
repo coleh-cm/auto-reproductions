@@ -34,23 +34,31 @@ import torch
 # a single `vector`; build_controller(arm, task, ...) picks it.
 ARM_CONFIG = {
     "sd14": dict(model="sd14", beta=None, clip=False, mode=None,
-                 use_first=False, tasks=["coco", "i2p", "snoopy", "style"]),
+                 use_first=False, vector_model=None,
+                 tasks=["coco", "i2p", "snoopy", "style"]),
     "casteer_noclip": dict(model="sd14", beta=2.0, clip=False, mode="dotproduct",
-                           use_first=False, tasks=["i2p", "snoopy", "style"]),
+                           use_first=False, vector_model="sd14",
+                           tasks=["i2p", "snoopy", "style"]),
     "casteer_clip": dict(model="sd14", beta=2.0, clip=True, mode="dotproduct",
-                         use_first=False, tasks=["i2p", "snoopy", "coco", "style"]),
+                         use_first=False, vector_model="sd14",
+                         tasks=["i2p", "snoopy", "coco", "style"]),
     "const_a2_clip": dict(model="sd14", beta=2.0, clip=True, mode="constant",
-                          use_first=False, tasks=["i2p", "snoopy", "coco"]),
+                          use_first=False, vector_model="sd14",
+                          tasks=["i2p", "snoopy", "coco"]),
     "const_a2_noclip": dict(model="sd14", beta=2.0, clip=False, mode="constant",
-                            use_first=False, tasks=["i2p", "snoopy", "coco"]),
+                            use_first=False, vector_model="sd14",
+                            tasks=["i2p", "snoopy", "coco"]),
     "const_a1_clip": dict(model="sd14", beta=1.0, clip=True, mode="constant",
-                          use_first=False, tasks=["i2p", "snoopy"]),
+                          use_first=False, vector_model="sd14",
+                          tasks=["i2p", "snoopy"]),
     "const_a1_noclip": dict(model="sd14", beta=1.0, clip=False, mode="constant",
-                            use_first=False, tasks=["i2p", "snoopy"]),
+                            use_first=False, vector_model="sd14",
+                            tasks=["i2p", "snoopy"]),
     "sdxl": dict(model="sdxl", beta=None, clip=False, mode=None,
-                 use_first=False, tasks=["i2p"]),
+                 use_first=False, vector_model=None, tasks=["i2p"]),
     "sdxl_casteer_clip": dict(model="sdxl", beta=2.0, clip=True, mode="dotproduct",
-                               use_first=True, tasks=["i2p"]),
+                               use_first=True, vector_model="sdxl-turbo",
+                               tasks=["i2p"]),
 }
 
 # Per-task steering-vector selection (SPEC sec 6; review F3). Each task erases
@@ -61,9 +69,17 @@ ARM_CONFIG = {
 # The COCO FID task erases nudity (supplementary.tex:544: "CLIP score and FID on
 # images generated with CASteer for ``nudity'' erasure based on prompts from
 # validation set of COCO-30k").
+#
+# The 7-concept list is taken from the appendix's precise enumeration
+# (supplementary.tex:1071: "...hate", "harassment", "violence", "self-harm",
+# "sexual", "shocking", "illegal activity"). The main text paraphrases the 7th
+# concept as "illegal content" (experiments.tex:39); we adopt the appendix's
+# "illegal activity" because it is the explicit enumeration the authors used to
+# generate the I2P-overall steering vectors (the prior "illegal" matched
+# neither paper variant -- review F-12e, fixed).
 I2P_OVERALL_CONCEPTS = [
     "hate", "harassment", "violence", "self-harm",
-    "shocking", "sexual", "illegal",  # experiments.tex:39; supplementary.tex:1071
+    "shocking", "sexual", "illegal activity",  # supplementary.tex:1071
 ]
 TASK_VECTOR = {
     "i2p": "nudity",                       # nudity erasure (nudity.tex)
@@ -74,20 +90,47 @@ TASK_VECTOR = {
 }
 
 # Paper full-config image counts (per arm, per seed) -- the situations the
-# claims narrow to (claims.json `restrictions`): I2P >=1000 of 4703, COCO
-# >=3000 of 30000, concrete 200 of 800 per concept (5 concepts), snoopy 200 of
-# 800, style 200 of 1000.
+# claims narrow to (claims.json `restrictions`). I2P = all 4,703 prompts (the
+# paper's full set, experiments.tex:39); the nudity count is then directly on
+# the full-set basis (no subset scaling needed) and commensurate with the
+# paper's constants (18, 7, 646). COCO-30k -> 3,000-caption prefix (the
+# restriction floor; the paper's 30k is the full set). Concrete concepts = the
+# paper's 80 templates x 10 images = 800/concept (experiments.tex:67); snoopy
+# and each of the 5 'other' concepts use 800. Style = 200 (the survives-band
+# floor; the paper defers to SAFREE, experiments.tex:127, and does not state a
+# style-eval image count -- SPEC U14/§12). review: the prior driver generated
+# only 80 snoopy / 50 style images (1 image/template, dead `n_per`), below the
+# declared >=200 restriction; the driver now expands each template `n_per` times
+# to reach the declared count.
 FULL_CONFIG_MIN_IMAGES = {
-    "i2p": 1000,
+    "i2p": 4703,
     "coco": 3000,
-    "snoopy": 200,      # gated subset (>=200 of 800)
-    "other": 200,       # per concept, 5 concepts
-    "style": 200,
+    "snoopy": 800,      # 80 templates x 10 (experiments.tex:67)
+    "other": 800,       # per concept, 5 concepts (experiments.tex:67)
+    "style": 200,       # survives-band floor (paper does not state; SPEC U14)
 }
 
 # Stepping at the paper's full config (experiments.tex:19; core/utils.get_num_denoising_steps).
 FULL_STEPS = {"sd14": 50, "sdxl": 30, "sdxl-turbo": 1}
 FULL_RES = {"sd14": 512, "sdxl": 1024}
+
+
+def expand_template_prompts(templates, concept, n_target):
+    """Expand CLIP templates into `n_target` generation prompts for `concept`
+    by repeating each template `ceil(n_target/len(templates))` times, then
+    truncating to `n_target` (the paper's 80 templates x 10 images = 800,
+    experiments.tex:67). The prior driver took templates[:n_target] of an
+    80-template list -> only 80 images, below the declared >=200 restriction
+    (review: dead n_per under-generated). Pure function so it is unit-tested +
+    mutated independently of the GPU driver. Returns the prompt list (each
+    template .format(concept))."""
+    if not templates:
+        raise ValueError("expand_template_prompts: empty template list (no OK-on-empty)")
+    if n_target <= 0:
+        raise ValueError("expand_template_prompts: n_target must be > 0")
+    n_per = max(1, (n_target + len(templates) - 1) // len(templates))
+    prompts = [t.format(concept) for t in templates for _ in range(n_per)]
+    return prompts[:n_target]
 
 
 def detect_gpu() -> bool:
@@ -117,9 +160,11 @@ def is_arm_feasible(arm: str, scale: str = "full") -> tuple[bool, str]:
     # sd14 likewise needs >=3000 COCO images for the FID reference.
     return (False,
             "CPU-only host; SD-1.4/SDXL at the paper full config "
-            f"({FULL_STEPS[cfg['model']]} steps, >={FULL_CONFIG_MIN_IMAGES['i2p']} "
-            "prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 "
-            "(supplementary.tex:30). Run on a CUDA host or mark BLOCKED.")
+            f"({FULL_STEPS[cfg['model']]} steps, I2P={FULL_CONFIG_MIN_IMAGES['i2p']} "
+            "prompts / snoopy+other={FULL} per concept / COCO={COCO} captions x 3 "
+            "seeds) is infeasible without a GPU. The paper used 8xV100 "
+            "(supplementary.tex:30). Run on a CUDA host or mark BLOCKED.".format(
+                FULL=FULL_CONFIG_MIN_IMAGES["snoopy"], COCO=FULL_CONFIG_MIN_IMAGES["coco"]))
 
 
 def init_pipeline(model: str, device: torch.device, cache_dir: str = "./cache"):
@@ -203,14 +248,28 @@ def build_controller(arm: str, task: str, device: torch.device, vector_dir: str 
     F3): snoopy->Snoopy, style->Van Gogh, i2p->nudity, i2p_overall->7-class
     average, coco->nudity. The previous implementation hardcoded vector='nudity'
     for every steered SD-1.4 arm, which would have measured the wrong quantity
-    for the snoopy/style tasks."""
+    for the snoopy/style tasks.
+
+    The steering-vector STORE is per ESTIMATION model (review F7): `vector_dir`
+    is the base directory; vectors are loaded from `<vector_dir>/<vector_model>`
+    where `vector_model` is the model the vectors were estimated on. sd14 arms
+    load from `./steering_vectors/sd14`; `sdxl_casteer_clip` loads from
+    `./steering_vectors/sdxl-turbo` (its vectors are estimated on SDXL-Turbo,
+    method_2.tex:191-197 / supplementary.tex:253-255). A shared `vector_dir`
+    would let sdxl_casteer_clip silently load SD-1.4's `nudity.pt` -- a
+    dim-mismatch crash at best, silent wrong-model steering at worst.
+    """
     from core.controller import CrossAttentionOutputSteering
     cfg = ARM_CONFIG[arm]
     if cfg["beta"] is None:
         return None
     if task not in TASK_VECTOR:
         raise ValueError(f"build_controller: unknown task {task!r}")
-    store = _resolve_task_vector(task, device, vector_dir)
+    vmodel = cfg.get("vector_model")
+    if vmodel is None:
+        raise ValueError(f"build_controller: arm {arm!r} has beta but no vector_model")
+    vdir = os.path.join(vector_dir, vmodel)
+    store = _resolve_task_vector(task, device, vdir)
     return CrossAttentionOutputSteering(
         source_concepts=[store], target_concepts=[None],
         strength=float(cfg["beta"]), device=device,
@@ -233,12 +292,22 @@ def run_generation(
     guidance_scale: Optional[float] = None,
     cache_dir: str = "./cache",
     vector_dir: str = "./steering_vectors",
+    prompt_seeds: Optional[list] = None,
 ):
     """Generate one image per prompt for `arm` at `seed` for `task`, save PNGs
     to output_dir/{i:05d}.png, return the list of saved paths. RAISES if zero
     images are generated (no OK-on-empty). The steering vector is selected per
     `task` (review F3): snoopy/style/i2p/i2p_overall/coco each load their own
-    concept vector via build_controller(arm, task, ...)."""
+    concept vector via build_controller(arm, task, ...).
+
+    `prompt_seeds` (optional): per-prompt curated seeds, aligned 1:1 with
+    `prompts`. When provided (the I2P task), each image is generated with its
+    curated `sd_seed` (vendored run_i2p_eval.py:71 `seed=row['sd_seed']` -- the
+    protocol that produced the paper's Total=646 anchor, sd14_tables/
+    nudity.tex:10). When None, a single continuous generator seeded from `seed`
+    is advanced per prompt (the snoopy/other/style/coco tasks; SPEC U6 3 fixed
+    seeds). The two modes never mix within a call.
+    """
     cfg = ARM_CONFIG[arm]
     mdl = model or cfg["model"]
     if device is None:
@@ -263,6 +332,10 @@ def run_generation(
 
     if not prompts:
         raise ValueError("run_generation: empty prompt list (no OK-on-empty)")
+    if prompt_seeds is not None and len(prompt_seeds) != len(prompts):
+        raise ValueError(
+            f"run_generation: {len(prompt_seeds)} prompt_seeds vs {len(prompts)} prompts"
+        )
 
     pipe = init_pipeline(mdl, device, cache_dir=cache_dir)
     control = build_controller(arm, task, device, vector_dir=vector_dir)
@@ -278,8 +351,13 @@ def run_generation(
 
     os.makedirs(output_dir, exist_ok=True)
     saved = []
-    gen = torch.Generator(device=device).manual_seed(int(seed))
+    # One continuous generator for the non-I2P tasks (SPEC U6); per-prompt
+    # curated seeds for the I2P task (the paper's protocol, review I2P seed).
+    if prompt_seeds is None:
+        gen = torch.Generator(device=device).manual_seed(int(seed))
     for i, prompt in enumerate(prompts):
+        if prompt_seeds is not None:
+            gen = torch.Generator(device=device).manual_seed(int(prompt_seeds[i]))
         out = pipe(
             prompt=prompt, num_inference_steps=int(n_steps),
             guidance_scale=float(guidance_scale),

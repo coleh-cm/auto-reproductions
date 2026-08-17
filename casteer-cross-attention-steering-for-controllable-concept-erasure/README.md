@@ -38,8 +38,8 @@ configuration. The pinned environment lives in `requirements.txt`.
 | `run_all_arms.sh`, `smoke.sh` | Entry points for the full arm sweep (BLOCKED on CPU) and the CPU smoke run. |
 | `selfcheck_claims.py` → `selfcheck.json` | Our own evaluator (NOT `claims_result.json`): `house` PASS, 16 diffusion claims BLOCKED. |
 | `measured.json`, `measured_blocked_reasons.json` | Per-arm/seed/metric values (BLOCKED on CPU) + reason sidecar. |
-| `instruments.json` | Every correctness-deciding instrument (data loader, CLIP, FID, degeneracy, Householder, NudeNet, Q16, LPIPS) with positive/negative tests. |
-| `mutations.json` | 6 deliberate defects, each caught by its `must_fail` test. |
+| `instruments.json` | Every correctness-deciding instrument (data loader, CLIP, FID, degeneracy, Householder, NudeNet, Q16, LPIPS, per-task/per-model vector mapping, driver dispatch) with positive/negative tests. |
+| `mutations.json` | 16 deliberate defects, each caught by its `must_fail` test. |
 | `exp/datasets/eval/` | Shipped eval templates: `clip_templates.json` (80 CLIP/ImageNet templates), `imagenet/template.json`, `coco/coco_30k.csv`. |
 | `imagenet_classes.txt` | 50 ImageNet classes used for concrete/style prompt pairs (SPEC U8). |
 | `paper/` | arXiv 2503.09630 LaTeX source (authoritative) + rendered HTML. |
@@ -80,12 +80,16 @@ bash smoke.sh
 # 5. Run every arm at the paper's full config across all 3 seeds.
 #    On this CPU-only host every diffusion arm is BLOCKED (paper used 8xV100,
 #    supplementary.tex:30). On a CUDA host the same script runs them for real
-#    via the implemented arm->eval->measured.json driver (per-task steering
-#    vector via TASK_VECTOR, 7-concept Eq.9 average for the I2P-overall task).
-#    Two metrics remain BLOCKED on every host until their references are
-#    supplied: i2p_overall_pct (the Q16 classifier checkpoint is not named by
-#    the paper and not vendored) and coco_fid30k (the real COCO-30k FID
-#    reference is not vendored; set COCO_REF_DIR to the 30k real COCO images).
+#    via the implemented arm->eval->measured.json driver: per-task steering
+#    vector via TASK_VECTOR, 7-concept Eq.9 average for I2P-overall, I2P
+#    per-prompt curated sd_seed, nudity_total on the full-set basis (raw under
+#    nudity_total_raw; inconclusive below 2000 prompts), declared image counts
+#    (snoopy/other 800/concept, style 200) via n_per, bare-concept CLIP
+#    reference text, and on-demand sd14 references so the normalized Snoopy
+#    claims are reachable. Two metrics remain BLOCKED on every host until
+#    their references are supplied: i2p_overall_pct (the Q16 classifier
+#    checkpoint is not named by the paper and not vendored) and coco_fid30k
+#    (the real COCO-30k FID reference is not vendored; set COCO_REF_DIR).
 bash run_all_arms.sh
 # -> one "FINAL <arm>=BLOCKED" line per arm/seed on CPU; measured.json
 
@@ -164,11 +168,11 @@ python scripts/diffusion/run_i2p_eval.py \
 
 Rung reached: **implementation + correctness** (the `numbers` rung is BLOCKED on this CPU-only host).
 
-- The pinned environment builds from scratch (`requirements.txt` + `Dockerfile`), every third-party dependency and every vendored `core`/`scripts` module imports cleanly under Python 3.13, and `tests/` passes (53 tests): the import gate, the SPEC `house` Householder invariant, the degeneracy test (β=0 == baseline, bit-exact), the Eq.6/7/4/9 invariants, the fingerprinted data loader, the eval-metric instruments (CLIP, FID, NudeNet 8-exposed-class filter, NudeNet/Q16/LPIPS raise-when-missing), and the per-task steering-vector mapping (snoopy→Snoopy, style→Van Gogh, i2p→nudity, i2p_overall→7-class Eq.9 average, coco→nudity).
+- The pinned environment builds from scratch (`requirements.txt` + `Dockerfile`), every third-party dependency and every vendored `core`/`scripts` module imports cleanly under Python 3.13, and `tests/` passes (65 tests): the import gate, the SPEC `house` Householder invariant, the degeneracy test (β=0 == baseline, bit-exact), the Eq.6/7/4/9 invariants, the fingerprinted data loader (incl. I2P `sd_seed`), the eval-metric instruments (CLIP bare-concept reference, FID, NudeNet 8-exposed-class filter + full-set scaling + inconclusive floor, NudeNet/Q16/LPIPS raise-when-missing), the per-task/per-model steering-vector mapping, and the driver dispatch (predicate parse, `n_per` expansion to the declared counts).
 - The full code path runs end-to-end on CPU via `smoke.sh` (load SD-1.4 → estimate 64 steering vectors (16 CA blocks × 4 steps) → steer → generate), proving the implementation works on the real model.
-- `mutations.json` (6 deliberate defects) are each caught by their `must_fail` test (verified); `instruments.json` records every correctness-deciding instrument with positive/negative tests.
+- `mutations.json` (16 deliberate defects) are each caught by their `must_fail` test (verified); `instruments.json` records every correctness-deciding instrument with positive/negative tests.
 - **`house` is reproduced** (`selfcheck.json`: PASS, max norm error 3.5e-14). It is the one high-invariance claim that needs no generation.
-- **The 16 diffusion-number claims are BLOCKED**: this sandbox is CPU-only and the paper's full config (50 steps × ≥1,000 prompts × 3 seeds × multiple arms, on 8×V100, `supplementary.tex:30`) is infeasible on CPU. `measured.json` records `BLOCKED` for every diffusion metric with a reason sidecar; `run_all_arms.sh` emits `FINAL <arm>=BLOCKED` per arm/seed. The external evaluators (NudeNet, Q16, LPIPS) are not installed and the real COCO-30k FID reference is not vendored — documented blockers, not synthetic substitutes.
+- **The 16 diffusion-number claims are BLOCKED**: this sandbox is CPU-only and the paper's full config (50 steps × 4,703 I2P / 800-per-concept snoopy / 3,000 COCO prompts × 3 seeds × multiple arms, on 8×V100, `supplementary.tex:30`) is infeasible on CPU. `measured.json` records `BLOCKED` for every diffusion metric with a reason sidecar; `run_all_arms.sh` emits `FINAL <arm>=BLOCKED` per arm/seed. The external evaluators (NudeNet, Q16, LPIPS) are not installed and the real COCO-30k FID reference is not vendored — documented blockers, not synthetic substitutes. The driver fixes (full-set scaling, per-prompt sd_seed, declared image counts, bare-concept CS, on-demand sd14 references) make the normalized Snoopy claims reachable on a GPU host; on CPU the BLOCKED reason is honestly "CPU-only host", no longer a structural block.
 - `claims_result.json` is NOT produced here; it is written by the workflow's numbers gate. Our own evaluator is `selfcheck_claims.py` → `selfcheck.json`.
 
-See `REPRODUCTION.md` for the full log and `SPEC.md` (§11 Constructed truth, §12 unstated-value sweeps, §13 environment constraint) for the arms, restrictions, and unstated-items analysis (U1-U14).
+See `REPRODUCTION.md` for the full log and `SPEC.md` (§11 Constructed truth, §12 unstated-value sweeps incl. the Eq.9 renormalization fork, §13 environment constraint, §14–§15 review-driven fixes) for the arms, restrictions, and unstated-items analysis (U1-U14).

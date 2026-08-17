@@ -80,7 +80,70 @@
       "find": "    \"snoopy\": \"Snoopy\",                     # concrete erasure (snoopy.tex)",
       "replace": "    \"snoopy\": \"nudity\",                    # MUTATION snoopy_task_uses_nudity_vector (wrong concept)",
       "must_fail": "tests/test_runner.py::test_snoopy_style_tasks_use_their_own_vectors_not_nudity"
+    },
+    {
+      "name": "i2p_overall_concept_illegal",
+      "covers": ["core", "runner"],
+      "description": "Revert the 7th I2P-overall concept to 'illegal' (matching neither paper variant) instead of the appendix's explicit 'illegal activity' (supplementary.tex:1071). The 7-concept test must catch this (review F-12e).",
+      "file": "core/runner.py",
+      "find": "    \"shocking\", \"sexual\", \"illegal activity\",  # supplementary.tex:1071",
+      "replace": "    \"shocking\", \"sexual\", \"illegal\",  # MUTATION i2p_overall_concept_illegal (neither paper variant)",
+      "must_fail": "tests/test_runner.py::test_i2p_overall_is_the_seven_concept_average"
+    },
+    {
+      "name": "vector_dir_not_per_model",
+      "covers": ["core", "runner"],
+      "description": "Make build_controller load the steering vector from the shared base vector_dir instead of the per-model subdir <vector_dir>/<vector_model>, so sdxl_casteer_clip would silently load SD-1.4's vectors (dim-mismatch / wrong-model steering, review F7). The per-model isolation test must catch this.",
+      "file": "core/runner.py",
+      "find": "    vdir = os.path.join(vector_dir, vmodel)\n    store = _resolve_task_vector(task, device, vdir)",
+      "replace": "    vdir = vector_dir  # MUTATION vector_dir_not_per_model (shared store -> wrong model)\n    store = _resolve_task_vector(task, device, vdir)",
+      "must_fail": "tests/test_runner.py::test_build_controller_per_model_vector_dir_isolates_sdxl_from_sd14"
+    },
+    {
+      "name": "n_per_not_expanded",
+      "covers": ["core", "runner"],
+      "description": "Fix n_per=1 in expand_template_prompts so 80 templates yield only 80 prompts (the pre-fix under-generation below the >=200 restriction, review). The template-expansion test must catch this.",
+      "file": "core/runner.py",
+      "find": "    n_per = max(1, (n_target + len(templates) - 1) // len(templates))",
+      "replace": "    n_per = 1  # MUTATION n_per_not_expanded (under-generates below the >=200 restriction)",
+      "must_fail": "tests/test_driver.py::test_expand_template_prompts_reaches_declared_count"
+    },
+    {
+      "name": "scale_count_returns_raw",
+      "covers": ["core", "eval"],
+      "description": "Make scale_count_to_full_set return the raw subset count unscaled, so nudity_total would be on the subset basis (not the full-set basis) and compare deflated counts against the paper's 18/7 constants -- the exact subset-bias failure the review exists to catch.",
+      "file": "core/eval/metrics.py",
+      "find": "    return float(raw_count) * (float(n_full) / float(n_subset))",
+      "replace": "    return float(raw_count)  # MUTATION scale_count_returns_raw (no full-set scaling)",
+      "must_fail": "tests/test_eval.py::test_scale_count_to_full_set"
+    },
+    {
+      "name": "nudity_skip_inconclusive_floor",
+      "covers": ["core", "eval"],
+      "description": "Disable the inconclusive floor so nudity_total emits a (deflated) number below the declared 2000-prompt subset instead of reporting inconclusive (review: nudity_total below the declared floor).",
+      "file": "core/eval/metrics.py",
+      "find": "    if n_subset < floor:",
+      "replace": "    if n_subset < 0:  # MUTATION nudity_skip_inconclusive_floor (emit a number below the floor)",
+      "must_fail": "tests/test_eval.py::test_nudity_scaled_or_inconclusive_below_floor_is_inconclusive"
+    },
+    {
+      "name": "cs_reference_full_template",
+      "covers": ["core", "eval"],
+      "description": "Make the CLIP-score reference text the full filled template instead of the bare concept string, diverging from the paper's own pipeline (vendored produce_scores.py:43 -> [concept]*N, review). The bare-concept test must catch this.",
+      "file": "core/eval/metrics.py",
+      "find": "    return [str(concept)] * int(n)",
+      "replace": "    return [f\"a photo of {concept}\"] * int(n)  # MUTATION cs_reference_full_template",
+      "must_fail": "tests/test_eval.py::test_cs_reference_prompts_is_bare_concept"
+    },
+    {
+      "name": "arm_metrics_skip_predicate",
+      "covers": ["core", "driver"],
+      "description": "Make arm_metrics_from_claims skip the `predicate` field, so a predicate-only metric (e.g. house_pass/house_max_norm_err) is silently never registered (review F-13). The predicate-parse test must catch this.",
+      "file": "scripts/diffusion/run_all_arms.py",
+      "find": "        for key in (\"quantity\", \"against\", \"predicate\"):",
+      "replace": "        for key in (\"quantity\", \"against\"):  # MUTATION arm_metrics_skip_predicate",
+      "must_fail": "tests/test_driver.py::test_arm_metrics_from_claims_parses_predicate"
     }
   ],
-  "note": "A suite nobody has broken on purpose is not evidence. Each mutation is a deliberately inserted defect; the named must_fail test node currently PASSES and must FAIL when the find->replace is applied. covers lists the aspects the mutation exercises; the set covers core, degeneracy, eval and data."
+  "note": "A suite nobody has broken on purpose is not evidence. Each mutation is a deliberately inserted defect; the named must_fail test node currently PASSES and must FAIL when the find->replace is applied. covers lists the aspects the mutation exercises; the set covers core, degeneracy, eval, data, runner and driver."
 }

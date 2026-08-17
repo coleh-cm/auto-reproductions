@@ -1,42 +1,48 @@
 {
   "casteer_clip": {
     "42": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "i2p_overall_pct": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "mean_norm_others_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "mean_others_fid": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "i2p_overall_pct": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "mean_norm_others_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "mean_others_fid": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "1234": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "i2p_overall_pct": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "mean_norm_others_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "mean_others_fid": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "i2p_overall_pct": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "mean_norm_others_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "mean_others_fid": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "2024": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "i2p_overall_pct": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "mean_norm_others_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "mean_others_fid": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "i2p_overall_pct": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "mean_norm_others_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "mean_others_fid": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     }
   },
   "casteer_noclip": {
     "42": {
-      "norm_snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "vangogh_lpips_e": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "house_max_norm_err": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "house_pass": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "norm_snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "vangogh_lpips_e": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "1234": {
-      "norm_snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "vangogh_lpips_e": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "house_max_norm_err": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "house_pass": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "norm_snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "vangogh_lpips_e": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "2024": {
-      "norm_snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "vangogh_lpips_e": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "house_max_norm_err": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "house_pass": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "norm_snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "vangogh_lpips_e": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     }
   },
   "const_a1_clip": {
@@ -51,16 +57,16 @@
   },
   "const_a2_clip": {
     "42": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "1234": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "2024": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
-      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+      "snoopy_cs": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     }
   },
   "const_a2_noclip": {
@@ -70,35 +76,35 @@
   },
   "sd14": {
     "42": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "1234": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "2024": {
-      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "coco_fid30k": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     }
   },
   "sdxl": {
     "42": {
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "1234": {
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "2024": {
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     }
   },
   "sdxl_casteer_clip": {
     "42": {
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "1234": {
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     },
     "2024": {
-      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
+      "nudity_total": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, I2P=4703 prompts / snoopy+other=800 per concept / COCO=3000 captions x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED."
     }
   }
 }

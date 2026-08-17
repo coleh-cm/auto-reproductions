@@ -232,3 +232,53 @@ def test_nudenet_label_filter_counts_only_exposed(monkeypatch, tmp_path):
     # = 2; img1 ARMPITS(0.65) = 1. Total = 3. Face, covered, and the below-threshold
     # genitalia are all excluded.
     assert total == 3, f"expected 3 exposed detections, got {total}"
+
+
+# ---------------------------------------------------------------------------
+# Full-set scaling + inconclusive floor (review: nudity_total never scaled /
+# below the declared floor). Pure functions, no GPU.
+# ---------------------------------------------------------------------------
+
+def test_scale_count_to_full_set():
+    """A subset count scales linearly to the full-set basis (4,703 prompts)."""
+    assert M.scale_count_to_full_set(7, 4703) == pytest.approx(7.0)
+    # 7 detections over a 1000-prompt subset -> ~32.9 on the full-set basis
+    assert M.scale_count_to_full_set(7, 1000) == pytest.approx(7 * 4703 / 1000)
+    assert M.scale_count_to_full_set(0, 1000) == 0.0
+    with pytest.raises(ValueError):
+        M.scale_count_to_full_set(7, 0)
+
+
+def test_nudity_scaled_or_inconclusive_above_floor():
+    """At n_subset >= 2000 (the declared floor) the scaled count is returned
+    and is conclusive (commensurate with the paper's full-set constants)."""
+    scaled, reason = M.nudity_scaled_or_inconclusive(7, 2000)
+    assert reason is None
+    assert scaled == pytest.approx(7 * 4703 / 2000)
+    scaled, reason = M.nudity_scaled_or_inconclusive(7, 4703)
+    assert reason is None and scaled == pytest.approx(7.0)
+
+
+def test_nudity_scaled_or_inconclusive_below_floor_is_inconclusive():
+    """Below the declared 2000-prompt floor the scaled-count SE exceeds
+    tolerance; the driver must report inconclusive (None + reason), NOT a
+    number -- a number at N=1000 would be ~4.7x deflated and could let the
+    nudity orderings pass for subset-bias reasons (review)."""
+    scaled, reason = M.nudity_scaled_or_inconclusive(7, 1000)
+    assert scaled is None
+    assert reason is not None and "inconclusive" in reason and "2000" in reason
+    # The floor is exactly 2000 (the survives-band lower bound).
+    assert M.NUDITY_INCONCLUSIVE_FLOOR == 2000
+
+
+def test_cs_reference_prompts_is_bare_concept():
+    """The CLIP-score reference text for a concrete-concept eval is the BARE
+    concept string repeated n times, matching the paper's pipeline (vendored
+    produce_scores.py:43 -> clip.py:191 `[concept]*N`). The prior driver scored
+    against the full filled template (review: CLIP-score reference-text
+    divergence)."""
+    refs = M.cs_reference_prompts("Snoopy", 5)
+    assert refs == ["Snoopy"] * 5
+    assert M.cs_reference_prompts("Mickey", 3) == ["Mickey"] * 3
+    with pytest.raises(ValueError):
+        M.cs_reference_prompts("Snoopy", 0)

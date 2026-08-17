@@ -36,10 +36,14 @@ def test_task_vector_covers_every_task_in_arm_config():
 def test_i2p_overall_is_the_seven_concept_average():
     """experiments.tex:39 + supplementary.tex:1071: the I2P 'all inappropriate'
     erasure averages 7 per-concept vectors: hate, harassment, violence,
-    self-harm, shocking, sexual, illegal."""
+    self-harm, sexual, shocking, illegal activity. The 7th concept is
+    'illegal activity' per the appendix's explicit enumeration
+    (supplementary.tex:1071) -- the main text paraphrases it as 'illegal
+    content' (experiments.tex:39); the prior 'illegal' matched neither paper
+    variant (review F-12e, fixed)."""
     assert I2P_OVERALL_CONCEPTS == [
         "hate", "harassment", "violence", "self-harm",
-        "shocking", "sexual", "illegal",
+        "shocking", "sexual", "illegal activity",
     ]
     assert len(I2P_OVERALL_CONCEPTS) == 7
     assert isinstance(TASK_VECTOR["i2p_overall"], list)
@@ -106,14 +110,18 @@ def test_build_controller_vanilla_arm_returns_none():
 
 def test_build_controller_steered_arm_uses_per_task_vector(tmp_path, monkeypatch):
     """build_controller(casteer_clip, 'snoopy', ...) must load Snoopy.pt, NOT
-    nudity.pt. Verifies the F3 fix end-to-end: the controller is built with the
-    per-task store."""
+    nudity.pt, from the PER-MODEL vector subdir (review F3 + F7: vectors are
+    loaded from <vector_dir>/<vector_model>; casteer_clip's vector_model is
+    'sd14', so the file is read from <vdir>/sd14/Snoopy.pt). Verifies the F3 fix
+    end-to-end: the controller is built with the per-task store."""
     vdir = str(tmp_path)
-    # Save a Snoopy vector and a nudity vector with different contents.
+    # Per-model vector store: sd14 vectors live under <vdir>/sd14/.
+    sd14_dir = os.path.join(vdir, "sd14")
+    os.makedirs(sd14_dir, exist_ok=True)
     snoopy_v = torch.ones(16); snoopy_v = snoopy_v / snoopy_v.norm()
     nudity_v = torch.zeros(16); nudity_v[0] = 1.0
-    torch.save({0: {"down": [snoopy_v.view(1, 1, 16)]}}, os.path.join(vdir, "Snoopy.pt"))
-    torch.save({0: {"down": [nudity_v.view(1, 1, 16)]}}, os.path.join(vdir, "nudity.pt"))
+    torch.save({0: {"down": [snoopy_v.view(1, 1, 16)]}}, os.path.join(sd14_dir, "Snoopy.pt"))
+    torch.save({0: {"down": [nudity_v.view(1, 1, 16)]}}, os.path.join(sd14_dir, "nudity.pt"))
 
     ctrl = build_controller("casteer_clip", "snoopy", torch.device("cpu"), vector_dir=vdir)
     # The loaded steering vector b should be Snoopy (all-equal), NOT nudity (axis).
@@ -122,6 +130,45 @@ def test_build_controller_steered_arm_uses_per_task_vector(tmp_path, monkeypatch
     # Snoopy is uniform; nudity is an axis vector. Check it's the Snoopy one.
     assert abs(b_flat[0].item() - b_flat[1].item()) < 1e-6, "must be the Snoopy (uniform) vector"
     assert abs(b_flat[0].item() - (1.0 / 16**0.5)) < 1e-5
+
+
+def test_build_controller_per_model_vector_dir_isolates_sdxl_from_sd14(tmp_path):
+    """review F7: sdxl_casteer_clip's vector_model is 'sdxl-turbo', so its
+    vectors load from <vdir>/sdxl-turbo/, NOT the shared <vdir>/ or <vdir>/sd14/.
+    A shared store would let sdxl_casteer_clip silently load SD-1.4's nudity.pt
+    (dim-mismatch crash at best, silent wrong-model steering at worst)."""
+    vdir = str(tmp_path)
+    # SD-1.4 nudity vector (the wrong-model trap) at the OLD shared location
+    # and at <vdir>/sd14 -- neither should be loaded by sdxl_casteer_clip.
+    sd14_dir = os.path.join(vdir, "sd14"); os.makedirs(sd14_dir, exist_ok=True)
+    turbo_dir = os.path.join(vdir, "sdxl-turbo"); os.makedirs(turbo_dir, exist_ok=True)
+    sd14_v = torch.zeros(16); sd14_v[0] = 1.0  # axis vector (the trap)
+    torch.save({0: {"down": [sd14_v.view(1, 1, 16)]}}, os.path.join(sd14_dir, "nudity.pt"))
+    torch.save({0: {"down": [sd14_v.view(1, 1, 16)]}, 1: {"down": [sd14_v.view(1, 1, 16)]}},
+               os.path.join(vdir, "nudity.pt"))
+    turbo_v = torch.ones(16); turbo_v = turbo_v / turbo_v.norm()  # uniform (correct)
+    torch.save({0: {"down": [turbo_v.view(1, 1, 16)]}}, os.path.join(turbo_dir, "nudity.pt"))
+
+    ctrl = build_controller("sdxl_casteer_clip", "i2p", torch.device("cpu"), vector_dir=vdir)
+    b, _ = ctrl.casteer_vectors[0][0]["down"][0]
+    b_flat = b.view(-1)
+    # Must be the SDXL-Turbo uniform vector, NOT the SD-1.4 axis vector.
+    assert abs(b_flat[0].item() - b_flat[1].item()) < 1e-6, "must be the sdxl-turbo (uniform) vector"
+    assert abs(b_flat[0].item() - (1.0 / 16**0.5)) < 1e-5
+
+
+def test_arm_config_vector_model_is_set_for_steered_arms():
+    """Every steered arm (beta is not None) must declare vector_model so
+    build_controller can route to the per-model store. A regression that drops
+    vector_model would make build_controller raise (caught here)."""
+    for arm, cfg in ARM_CONFIG.items():
+        if cfg["beta"] is not None:
+            assert cfg.get("vector_model") is not None, (
+                f"steered arm {arm!r} must declare vector_model (per-model vector "
+                "store, review F7)")
+        else:
+            assert cfg.get("vector_model") is None, (
+                f"vanilla arm {arm!r} must have vector_model=None")
 
 
 def test_arm_config_has_no_single_vector_field():
