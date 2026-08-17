@@ -84,12 +84,18 @@ class CrossAttentionOutputSteering(VectorControl):
         num_layers: int = None,
         intermediate_clipping: bool = True,
         use_first_diffusion_step: bool = False,
+        steering_mode: str = 'dotproduct',
     ):
         super().__init__(num_layers=num_layers)
         self.device = device
         self.intermediate_clipping = intermediate_clipping
         self.strength = strength
         self.use_first_diffusion_step = use_first_diffusion_step
+        # steering_mode: 'dotproduct' = Eq.6/7 (data-dependent alpha = beta*<s,c>);
+        #   'constant' = Eq.4 (fixed alpha = strength for every patch, SPEC U13).
+        if steering_mode not in ('dotproduct', 'constant'):
+            raise ValueError(f"steering_mode must be 'dotproduct' or 'constant', got {steering_mode!r}")
+        self.steering_mode = steering_mode
 
         if self.strength < 0:
             raise ValueError('Negative values of strength are not supported')
@@ -133,6 +139,24 @@ class CrossAttentionOutputSteering(VectorControl):
         )).transpose(0, 1).reshape(batch_size, sequence_length, num_heads, hidden_dim)
         return vector_steered
 
+    def steer_constant(self, vector: torch.Tensor, *steering_tensors: torch.Tensor) -> torch.Tensor:
+        """
+        Apply constant-alpha steering (Eq. 4, supplementary.tex:544 / method_2.tex:90-93):
+            alpha = strength   (a FIXED constant, the same for every patch; NOT beta*<s,c>)
+            if intermediate_clipping: alpha = max(alpha, 0)   # no-op for strength > 0 (SPEC U13)
+            ca_out_new = ca_out - alpha * ca_X
+        The steering vector is re-normalized to unit L2 (consistent with the
+        dot-product path and SPEC U1).
+        """
+        (b, _) = steering_tensors
+        b_norm = b / torch.linalg.norm(b, dim=-1, keepdim=True).clamp(min=EPS)
+        alpha = float(self.strength)
+        if self.intermediate_clipping:
+            alpha = max(alpha, 0.0)
+        # b_norm: [1, 1, d] -> broadcast as [1, 1, 1, d] over [B, seq, num_heads, d]
+        delta = -alpha * b_norm.to(vector.device).view(1, 1, 1, -1)
+        return vector.to(self.device) + delta
+
     def steer_with_clipping(self, vector: torch.Tensor, *steering_tensors: torch.Tensor) -> torch.Tensor:
         """
         Apply steering with intermediate clipping (Eq. 6):
@@ -175,15 +199,48 @@ class CrossAttentionOutputSteering(VectorControl):
         else:
             batch_slice = slice(None, None)
 
+        # Preserve the caller's dtype (the vendored code hardcoded .half(), which
+        # breaks float32/float64 tests on CPU; on GPU float16 inputs this still
+        # returns float16).
+        in_dtype = vector.dtype
         vector = vector.detach().clone()
 
         if place_in_unet in ['up', 'mid', 'down', 'joint', 'single', 'sana']:
             # Use first step vectors for all steps (turbo/sprint) or per-step vectors
             num_steer = 0 if self.use_first_diffusion_step else diffusion_step
 
+            steer_fn = self.steer_with_clipping if self.steering_mode == 'dotproduct' else self.steer_constant
             for casteer_vectors in self.casteer_vectors:
-                vector[batch_slice, ...] = self.steer_with_clipping(
+                vector[batch_slice, ...] = steer_fn(
                     vector[batch_slice, ...],
                     *casteer_vectors[num_steer][place_in_unet][block_index]
                 )
-        return vector.half()
+        return vector.to(in_dtype)
+
+
+def average_concept_vectors(concept_vectors: list[SteeringVectors]) -> SteeringVectors:
+    """Multi-concept steering vector (Eq. 9, supplementary.tex:1068-1070):
+    the elementwise MEAN of individually-normalized per-concept steering-vector
+    stores, WITHOUT re-normalizing the mean (SPEC U9: "no re-normalization").
+
+    Each input is the store format dict[step:int][place:str][list[Tensor[1,1,d]]]
+    (already unit-L2 per vector). Returns a store of the same shape whose
+    per-(step,place,block) tensor is the mean across concepts. Used for the
+    7-class I2P erasure (experiments.tex:39).
+    """
+    if not concept_vectors:
+        raise ValueError('average_concept_vectors requires at least one concept store')
+
+    result: SteeringVectors = {}
+    for step in concept_vectors[0]:
+        result[step] = {}
+        for place in concept_vectors[0][step]:
+            n_blocks = len(concept_vectors[0][step][place])
+            result[step][place] = []
+            for block_idx in range(n_blocks):
+                vecs = [cv[step][place][block_idx] for cv in concept_vectors]
+                stacked = torch.stack(vecs, dim=0)  # [n_concepts, 1, 1, d]
+                mean = stacked.mean(dim=0)         # [1, 1, d]
+                result[step][place].append(mean)
+    return result
+

@@ -1,0 +1,561 @@
+{
+  "_summary": {
+    "counts": {
+      "BLOCKED": 16,
+      "PASS": 1
+    },
+    "n_claims": 17
+  },
+  "coco_fid_beats_prior_art_value": {
+    "kind": "value",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "coco_fid_vs_vanilla": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sd14",
+        "metric": "coco_fid30k",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sd14",
+        "metric": "coco_fid30k",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sd14",
+        "metric": "coco_fid30k",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "dotprod_weighting_matters_fid": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "const_a2_clip",
+        "metric": "coco_fid30k",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "const_a2_clip",
+        "metric": "coco_fid30k",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "const_a2_clip",
+        "metric": "coco_fid30k",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "coco_fid30k",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "dotprod_weighting_matters_snoopy": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "const_a2_clip",
+        "metric": "snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "const_a2_clip",
+        "metric": "snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "const_a2_clip",
+        "metric": "snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "fig_clip_shape": {
+    "kind": "curve",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "fig_fid_shape": {
+    "kind": "curve",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "house": {
+    "measured": {
+      "max_norm_err": 3.552713678800501e-14,
+      "unit_norm_ok": true
+    },
+    "predicate": "max | ||(I-2 s s^T)c|| - ||c|| | < 1e-5 (float64, 100 trials x 3 dims) and ||v/||v|||| == 1",
+    "verdict": "PASS"
+  },
+  "i2p_overall_beats_receler": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "i2p_overall_pct",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "i2p_overall_pct",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "i2p_overall_pct",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "nudity_beats_all_prior": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "nudity_total_value": {
+    "kind": "value",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "nudity_two_times_fewer": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "nudity_total",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "sdxl_distilled_transfer_nudity": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (30 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "sdxl_casteer_clip",
+        "metric": "nudity_total",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sdxl_casteer_clip",
+        "metric": "nudity_total",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sdxl_casteer_clip",
+        "metric": "nudity_total",
+        "seed": "2024",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sdxl",
+        "metric": "nudity_total",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sdxl",
+        "metric": "nudity_total",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "sdxl",
+        "metric": "nudity_total",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "snoopy_erasure_ordering": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "snoopy_erasure_vs_doco": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "norm_snoopy_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "snoopy_fid_preservation_vs_esd_receler": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_others_fid",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "snoopy_preservation_vs_esd_receler": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_norm_others_cs",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_norm_others_cs",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_clip",
+        "metric": "mean_norm_others_cs",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  },
+  "style_vangogh_lpips_ordering": {
+    "kind": "ordering",
+    "reason": "CPU-only host; SD-1.4/SDXL at the paper full config (50 steps, >=1000 prompts x 3 seeds) is infeasible without a GPU. The paper used 8xV100 (supplementary.tex:30). Run on a CUDA host or mark BLOCKED.",
+    "references": [
+      {
+        "arm": "casteer_noclip",
+        "metric": "vangogh_lpips_e",
+        "seed": "42",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "vangogh_lpips_e",
+        "seed": "1234",
+        "value": "BLOCKED"
+      },
+      {
+        "arm": "casteer_noclip",
+        "metric": "vangogh_lpips_e",
+        "seed": "2024",
+        "value": "BLOCKED"
+      }
+    ],
+    "verdict": "BLOCKED"
+  }
+}

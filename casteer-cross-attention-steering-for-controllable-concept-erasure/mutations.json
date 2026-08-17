@@ -1,0 +1,59 @@
+{
+  "mutations": [
+    {
+      "name": "degeneracy_offset",
+      "covers": ["core", "degeneracy"],
+      "description": "Add a non-zero constant offset to the steered output so that beta=0 (the no-op setting) no longer reproduces the baseline. The degeneracy test must catch this.",
+      "file": "core/controller.py",
+      "find": "        return vector + steering_delta",
+      "replace": "        return vector + steering_delta + 0.001  # MUTATION degeneracy_offset",
+      "must_fail": "tests/test_degeneracy.py::test_degeneracy_strength_zero_dotproduct_bitexact"
+    },
+    {
+      "name": "half_strength_projection",
+      "covers": ["core"],
+      "description": "Scale the projection matrix by 0.5, so with strength=2 the controller applies (I - 1*s s^T) instead of the Householder reflection (I - 2 s s^T). This does NOT preserve ||c|| and breaks Eq.6.",
+      "file": "core/controller.py",
+      "find": "                        res = self.strength * (steering_vector @ torch.linalg.pinv(steering_vector))",
+      "replace": "                        res = 0.5 * self.strength * (steering_vector @ torch.linalg.pinv(steering_vector))  # MUTATION half_strength_projection",
+      "must_fail": "tests/test_method_core.py::test_eq6_noclip_matches_matrix_form"
+    },
+    {
+      "name": "disable_intermediate_clipping",
+      "covers": ["core"],
+      "description": "Make the Eq.7 clip a no-op so negative-projection patches are also steered, breaking the clipping invariant.",
+      "file": "core/controller.py",
+      "find": "            projection_scores = torch.where(projection_scores > 0, projection_scores, 0)",
+      "replace": "            projection_scores = projection_scores  # MUTATION disable_intermediate_clipping",
+      "must_fail": "tests/test_method_core.py::test_eq7_clip_only_positive_projections"
+    },
+    {
+      "name": "constant_mode_sign_flip",
+      "covers": ["core"],
+      "description": "Flip the sign of the Eq.4 constant-alpha update so c_new = c + alpha*s instead of c - alpha*s, breaking the constant-mode arm.",
+      "file": "core/controller.py",
+      "find": "        delta = -alpha * b_norm.to(vector.device).view(1, 1, 1, -1)",
+      "replace": "        delta = alpha * b_norm.to(vector.device).view(1, 1, 1, -1)  # MUTATION constant_mode_sign_flip",
+      "must_fail": "tests/test_method_core.py::test_constant_mode_eq4"
+    },
+    {
+      "name": "no_ok_on_empty_disabled",
+      "covers": ["core", "eval"],
+      "description": "Make _list_images return [] instead of raising on an empty directory, so metrics silently report on zero images (the no-OK-on-empty failure mode).",
+      "file": "core/eval/metrics.py",
+      "find": "    if not imgs:\n        raise ValueError(f\"no images found in {directory} (no OK-on-empty)\")",
+      "replace": "    if not imgs:\n        return []  # MUTATION no_ok_on_empty_disabled",
+      "must_fail": "tests/test_eval.py::test_metrics_no_ok_on_empty_dirs"
+    },
+    {
+      "name": "imagenet_first_class_skipped",
+      "covers": ["core", "data"],
+      "description": "Skip the first line of imagenet_classes.txt so the loader returns 'goldfish' instead of 'tench', breaking the data fingerprint.",
+      "file": "core/data.py",
+      "find": "    with open(p, \"r\") as f:\n        for line in f:",
+      "replace": "    with open(p, \"r\") as f:\n        next(f)  # MUTATION imagenet_first_class_skipped\n        for line in f:",
+      "must_fail": "tests/test_data.py::test_imagenet_classes_fingerprint"
+    }
+  ],
+  "note": "A suite nobody has broken on purpose is not evidence. Each mutation is a deliberately inserted defect; the named must_fail test node currently PASSES and must FAIL when the find->replace is applied. covers lists the aspects the mutation exercises; the set covers core, degeneracy, eval and data."
+}

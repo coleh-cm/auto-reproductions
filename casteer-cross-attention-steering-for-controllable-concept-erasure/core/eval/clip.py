@@ -14,6 +14,10 @@ from torchvision.transforms import CenterCrop, Compose, Normalize, Resize, ToTen
 EXTENSIONS = ["png", "jpg"]
 
 
+def _default_device():
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def get_clip_preprocess(n_px=224):
     def Convert(image):
         return image.convert("RGB")
@@ -45,6 +49,7 @@ def clip_score(
     clip_model: str = "ViT-B/32",
     n_px: int = 224,
     cross_matching: bool = False,
+    device: str = None,
 ):
     """
     Compute CLIPScore (https://arxiv.org/abs/2104.08718) for generated images according to their prompts.
@@ -60,6 +65,7 @@ def clip_score(
         clip_model (str, optional): The name of CLIP model. Defaults to "ViT-B/32".
         n_px (int, optional): The size of images. Defaults to 224.
         cross_matching (bool, optional): Whether to compute the similarity between images and texts in cross-matching manner.
+        device (str, optional): torch device; defaults to cuda if available else cpu (CPU-only hosts must use cpu).
 
     Returns:
         score (np.ndarray): The CLIPScore of generated images.
@@ -72,36 +78,43 @@ def clip_score(
         texts
     ), "The length of images and texts should be the same if cross_matching is False."
 
-    model, _ = clip.load(clip_model, device="cuda")
+    if not images:
+        raise ValueError("clip_score received an empty image list; refusing to score (no OK-on-empty).")
+
+    if device is None:
+        device = _default_device()
+    model, _ = clip.load(clip_model, device=device)
     image_preprocess, text_preprocess = get_clip_preprocess(
         n_px
     )  # following the official implementation, rather than using the default CLIP preprocess
 
     sc = None
-#     print(images)
-    for i in tqdm(range(len(images) // 50)):
+    chunk = max(1, 50)
+    n_chunks = (len(images) + chunk - 1) // chunk
+    for i in tqdm(range(n_chunks)):
         # extract all texts
-        texts_feats = text_preprocess(texts[i*50:(i+1)*50]).cuda()
+        lo, hi = i * chunk, min((i + 1) * chunk, len(images))
+        texts_feats = text_preprocess(texts[lo:hi]).to(device)
         texts_feats = model.encode_text(texts_feats)
-    
+
         # extract all images
-        images_feats = [Image.open(img) for img in images[i*50:(i+1)*50]]
+        images_feats = [Image.open(img) for img in images[lo:hi]]
         images_feats = [image_preprocess(img) for img in images_feats]
-        images_feats = torch.stack(images_feats, dim=0).cuda()
+        images_feats = torch.stack(images_feats, dim=0).to(device)
         images_feats = model.encode_image(images_feats)
-    
+
         # compute the similarity
         images_feats = images_feats / images_feats.norm(dim=1, p=2, keepdim=True)
         texts_feats = texts_feats / texts_feats.norm(dim=1, p=2, keepdim=True)
-        
+
         score = w * images_feats * texts_feats
         if sc is None:
             sc = score
         else:
             sc = torch.cat([sc, score], dim=0)
-        
-        
-    return sc.sum(dim=1).clamp(min=0).cpu().numpy()
+
+
+    return sc.sum(dim=1).clamp(min=0).detach().cpu().numpy()
 
 
 
@@ -114,6 +127,7 @@ def clip_accuracy(
     w: float = 2.5,
     clip_model: str = "ViT-B/32",
     n_px: int = 224,
+    device: str = None,
 ):
     """
     Compute CLIPAccuracy according to CLIPScore.
@@ -126,6 +140,7 @@ def clip_accuracy(
         w (float, optional): The weight of the similarity score. Defaults to 2.5.
         clip_model (str, optional): The name of CLIP model. Defaults to "ViT-B/32".
         n_px (int, optional): The size of images. Defaults to 224.
+        device (str, optional): torch device; defaults to cuda if available else cpu.
 
     Returns:
         accuracy (float): The CLIPAccuracy of generated images. size: (len(images), )
@@ -139,8 +154,8 @@ def clip_accuracy(
         anchor_texts
     ), "The length of ablated_texts and anchor_texts should be the same."
 
-    ablated_clip_score = clip_score(images, ablated_texts, w, clip_model, n_px)
-    anchor_clip_score = clip_score(images, anchor_texts, w, clip_model, n_px)
+    ablated_clip_score = clip_score(images, ablated_texts, w, clip_model, n_px, device=device)
+    anchor_clip_score = clip_score(images, anchor_texts, w, clip_model, n_px, device=device)
     accuracy = np.mean(anchor_clip_score < ablated_clip_score).item()
 
     return accuracy
@@ -153,6 +168,7 @@ def clip_eval_by_image(
     w: float = 2.5,
     clip_model: str = "ViT-B/32",
     n_px: int = 224,
+    device: str = None,
 ):
     """
     Compute CLIPScore and CLIPAccuracy with generated images.
@@ -165,6 +181,7 @@ def clip_eval_by_image(
         w (float, optional): The weight of the similarity score. Defaults to 2.5.
         clip_model (str, optional): The name of CLIP model. Defaults to "ViT-B/32".
         n_px (int, optional): The size of images. Defaults to 224.
+        device (str, optional): torch device; defaults to cuda if available else cpu.
 
     Returns:
         score (float): The CLIPScore of generated images.
@@ -173,9 +190,9 @@ def clip_eval_by_image(
     num_images = len(images)
     target_prompts = [concept] * num_images
     anchor_prompts = [""] * num_images
-                
-    ablated_clip_score = clip_score(images, target_prompts, w, clip_model, n_px)
-    anchor_clip_score = clip_score(images, anchor_prompts, w, clip_model, n_px)
+
+    ablated_clip_score = clip_score(images, target_prompts, w, clip_model, n_px, device=device)
+    anchor_clip_score = clip_score(images, anchor_prompts, w, clip_model, n_px, device=device)
     accuracy = np.mean(anchor_clip_score < ablated_clip_score).item()
     score = np.mean(ablated_clip_score).item()
 
@@ -187,10 +204,13 @@ def compute_clip(
     path: str,
     concept: str,
     fname: str = None,
+    device: str = None,
 ):
     if fname is not None:
         images = glob.glob(f'{path}/**/{fname}', recursive=True)
     else:
         images = reduce(operator.add, [glob.glob(f'{path}/**/*.{ext}', recursive=True) for ext in EXTENSIONS])
-    score, accuracy = clip_eval_by_image(images, concept)
+    if not images:
+        raise ValueError(f"no images found under {path} for CLIP scoring (no OK-on-empty)")
+    score, accuracy = clip_eval_by_image(images, concept, device=device)
     return score, accuracy

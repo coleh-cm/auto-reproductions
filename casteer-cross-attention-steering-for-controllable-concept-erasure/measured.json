@@ -1,0 +1,104 @@
+{
+  "casteer_clip": {
+    "42": {
+      "coco_fid30k": "BLOCKED",
+      "i2p_overall_pct": "BLOCKED",
+      "mean_norm_others_cs": "BLOCKED",
+      "mean_others_fid": "BLOCKED",
+      "nudity_total": "BLOCKED",
+      "snoopy_cs": "BLOCKED"
+    },
+    "1234": {
+      "coco_fid30k": "BLOCKED",
+      "i2p_overall_pct": "BLOCKED",
+      "mean_norm_others_cs": "BLOCKED",
+      "mean_others_fid": "BLOCKED",
+      "nudity_total": "BLOCKED",
+      "snoopy_cs": "BLOCKED"
+    },
+    "2024": {
+      "coco_fid30k": "BLOCKED",
+      "i2p_overall_pct": "BLOCKED",
+      "mean_norm_others_cs": "BLOCKED",
+      "mean_others_fid": "BLOCKED",
+      "nudity_total": "BLOCKED",
+      "snoopy_cs": "BLOCKED"
+    }
+  },
+  "casteer_noclip": {
+    "42": {
+      "norm_snoopy_cs": "BLOCKED",
+      "vangogh_lpips_e": "BLOCKED"
+    },
+    "1234": {
+      "norm_snoopy_cs": "BLOCKED",
+      "vangogh_lpips_e": "BLOCKED"
+    },
+    "2024": {
+      "norm_snoopy_cs": "BLOCKED",
+      "vangogh_lpips_e": "BLOCKED"
+    }
+  },
+  "const_a1_clip": {
+    "42": {},
+    "1234": {},
+    "2024": {}
+  },
+  "const_a1_noclip": {
+    "42": {},
+    "1234": {},
+    "2024": {}
+  },
+  "const_a2_clip": {
+    "42": {
+      "coco_fid30k": "BLOCKED",
+      "snoopy_cs": "BLOCKED"
+    },
+    "1234": {
+      "coco_fid30k": "BLOCKED",
+      "snoopy_cs": "BLOCKED"
+    },
+    "2024": {
+      "coco_fid30k": "BLOCKED",
+      "snoopy_cs": "BLOCKED"
+    }
+  },
+  "const_a2_noclip": {
+    "42": {},
+    "1234": {},
+    "2024": {}
+  },
+  "sd14": {
+    "42": {
+      "coco_fid30k": "BLOCKED"
+    },
+    "1234": {
+      "coco_fid30k": "BLOCKED"
+    },
+    "2024": {
+      "coco_fid30k": "BLOCKED"
+    }
+  },
+  "sdxl": {
+    "42": {
+      "nudity_total": "BLOCKED"
+    },
+    "1234": {
+      "nudity_total": "BLOCKED"
+    },
+    "2024": {
+      "nudity_total": "BLOCKED"
+    }
+  },
+  "sdxl_casteer_clip": {
+    "42": {
+      "nudity_total": "BLOCKED"
+    },
+    "1234": {
+      "nudity_total": "BLOCKED"
+    },
+    "2024": {
+      "nudity_total": "BLOCKED"
+    }
+  }
+}

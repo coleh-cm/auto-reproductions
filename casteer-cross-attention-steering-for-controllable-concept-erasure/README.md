@@ -29,12 +29,21 @@ configuration. The pinned environment lives in `requirements.txt`.
 | `Dockerfile` | Builds the same environment from scratch (CUDA 12.4 base). |
 | `pyproject.toml` | Adds the repo root to `sys.path` so `import core` works under pytest. |
 | `tests/test_environment.py` | Import gate: every dependency + every `core` module must import; plus the Householder / unit-norm invariants (SPEC claim `house`, `experiments.tex:21-22`) and a closed-form check that `CrossAttentionOutputSteering` (no clip) implements `c <- (I - 2 s s^T) c`. |
-| `core/` | Upstream library: `controller.py` (CASteer Eq. 5/6, `CrossAttentionOutputSteering`), `diffusion_steering.py` (attn2 forward hooks), `vector_dump.py` (per-patch/per-pair mean stats, Algorithm 1), `construct_prompts.py` (concrete/style/human-related prompt pairs), `utils.py` (pipeline init for SD-1.4/SDXL/SANA), `pickle.py`, `eval/{clip,fid}.py`. |
-| `scripts/diffusion/` | Upstream entrypoints: `estimate_steering_vectors.py` (Step 1), `run_with_steering.py` (Step 2), `produce_scores.py` (Step 3), `run_i2p_eval.py` (I2P benchmark). |
+| `tests/test_method_core.py` | Invariants from the paper's maths: Householder norm preservation (claim `house`), Eq.6 matrix==dot-product, Eq.7 clip-only-positive, Eq.4 constant-α, Eq.9 multi-concept average, CFG conditional-half-only. |
+| `tests/test_degeneracy.py` | Degeneracy test: the method at β=0 reproduces the baseline EXACTLY (bit-identical) on both dotproduct and constant modes. |
+| `tests/test_data.py` | Fingerprint tests for the data loader (ImageNet 50/`tench`, 80 CLIP templates, 30,000 COCO captions, 4,703 I2P prompts); COCO reference raises when not vendored. |
+| `tests/test_eval.py` | Instrument tests for the eval metrics (CLIP positive/negative, FID identical/different/empty, NudeNet/Q16/LPIPS raise-when-missing). |
+| `core/` | Upstream library + reproduction additions: `controller.py` (Eq. 5/6/7 + Eq.4 constant mode + Eq.9 `average_concept_vectors`), `diffusion_steering.py` (attn2 hooks), `vector_dump.py` (Algorithm 1 stats), `construct_prompts.py`, `utils.py` (vendored pipeline init), `pickle.py`, `data.py` (fingerprinted data loader), `runner.py` (CPU-friendly runner + per-arm config), `eval/{clip.py (device-agnostic), metrics.py (all claims metrics), fid.py}`. |
+| `scripts/diffusion/` | Upstream entrypoints + `run_all_arms.py` (runs every arm/seed, writes measured.json), `smoke.py` (CPU smoke run). |
+| `run_all_arms.sh`, `smoke.sh` | Entry points for the full arm sweep (BLOCKED on CPU) and the CPU smoke run. |
+| `selfcheck_claims.py` → `selfcheck.json` | Our own evaluator (NOT `claims_result.json`): `house` PASS, 16 diffusion claims BLOCKED. |
+| `measured.json`, `measured_blocked_reasons.json` | Per-arm/seed/metric values (BLOCKED on CPU) + reason sidecar. |
+| `instruments.json` | Every correctness-deciding instrument (data loader, CLIP, FID, degeneracy, Householder, NudeNet, Q16, LPIPS) with positive/negative tests. |
+| `mutations.json` | 6 deliberate defects, each caught by its `must_fail` test. |
 | `exp/datasets/eval/` | Shipped eval templates: `clip_templates.json` (80 CLIP/ImageNet templates), `imagenet/template.json`, `coco/coco_30k.csv`. |
 | `imagenet_classes.txt` | 50 ImageNet classes used for concrete/style prompt pairs (SPEC U8). |
 | `paper/` | arXiv 2503.09630 LaTeX source (authoritative) + rendered HTML. |
-| `SPEC.md`, `claims.json`, `figure_transcript.md` | Reproduction spec, claims, figure reads. |
+| `SPEC.md`, `claims.json`, `figure_transcript.md` | Reproduction spec (incl. §11 Constructed truth, §12 sweeps, §13 environment constraint), claims, figure reads. |
 
 ## Quickstart
 
@@ -54,42 +63,41 @@ cd auto-reproductions/casteer-cross-attention-steering-for-controllable-concept-
 uv venv --python 3.13 .venv
 uv pip install --python .venv -r requirements.txt
 
-# 3. Prove the environment resolves (the import gate) and the Householder
-#    invariant (SPEC claim `house`) holds.
+# 3. Prove the environment resolves (import gate), the Householder invariant
+#    (SPEC claim `house`), the degeneracy test (beta=0 == baseline), the
+#    invariants from the paper's maths, and the fingerprinted data + eval
+#    instruments.
 source .venv/bin/activate
-python -m pytest tests/ -q          # 6 passed
+python -m pytest tests/ -q          # 33 passed (CPU-only, no model download)
 
-# 4. Smoke-test the CASteer erasure operator directly (no network, no weights).
-python - <<'PY'
-import torch
-from core.controller import CrossAttentionOutputSteering        # Eq. 5/6
-d = 320
-s = torch.randn(d); s = s / s.norm()                             # unit steering vector (U1)
-store = {0: {"down": [s.view(1, 1, d)]}}                          # dict[step][place][block]->[1,1,d]
-ctrl = CrossAttentionOutputSteering(
-    source_concepts=[store], target_concepts=[None], strength=2.0,
-    device=torch.device("cpu"), intermediate_clipping=False,
-    use_first_diffusion_step=True, num_layers=1,
-)
-c = torch.randn(2, 4, 1, d)                                      # B=2 (CFG uncond+cond)
-out = ctrl.forward(c.clone(), diffusion_step=0, place_in_unet="down", block_index=0).float()
-# conditional half (index 1) is the Householder reflection (I - 2 s s^T) c -> norm preserved
-assert torch.allclose(out[1,:,0,:].norm(dim=-1), c[1,:,0,:].norm(dim=-1), atol=1e-3)
-print("CASteer Householder erasure OK")
-PY
+# 4. Smoke-test the FULL code path on CPU: load SD-1.4, estimate steering
+#    vectors (Algorithm 1), steer (Eq. 7) and generate 1 image each for
+#    casteer_clip and sd14 at 4 steps / 256x256 / seed 42. ~1-2 min once
+#    SD-1.4 is cached. Prints one FINAL line; NOT evidence about the paper.
+bash smoke.sh
+# -> results/smoke/{casteer_clip,sd14}.png , FINAL smoke=...
+
+# 5. Run every arm at the paper's full config across all 3 seeds.
+#    On this CPU-only host every diffusion arm is BLOCKED (paper used 8xV100,
+#    supplementary.tex:30); on a CUDA host the same script runs them for real.
+#    Writes measured.json (+ measured_blocked_reasons.json sidecar).
+bash run_all_arms.sh
+# -> one "FINAL <arm>=BLOCKED" line per arm/seed on CPU; measured.json
+
+# 6. Self-check the claims (our own evaluator; writes selfcheck.json).
+#    `house` PASSES (pure math); the 16 diffusion claims are BLOCKED on CPU.
+python selfcheck_claims.py
 ```
 
 ### Reproduce with Docker (CUDA 12.4 base, builds the same environment)
 
 ```bash
 docker build -t casteer-repro .
-docker run --rm casteer-repro python -m pytest tests/ -q   # 6 passed
+docker run --rm casteer-repro python -m pytest tests/ -q   # 33 passed
 # GPU + HF_TOKEN required for the model arms (steering-vector estimation,
 # steered generation, I2P, CLIP/FID scoring):
 docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN casteer-repro \
-    python scripts/diffusion/estimate_steering_vectors.py \
-        --model_name sdxl-turbo --concept snoopy --mode concrete \
-        --num_prompts 50 --output_dir ./results/sdxl/steering_vectors
+    bash run_all_arms.sh   # runs every arm at full config on CUDA; writes measured.json
 ```
 
 ## Running the method (GPU + HF_TOKEN required)
@@ -143,14 +151,13 @@ python scripts/diffusion/run_i2p_eval.py \
 
 ## Status
 
-Rung reached: **environment**. The pinned environment builds from scratch
-(`requirements.txt` + `Dockerfile`), every third-party dependency and every
-vendored `core`/`scripts` module imports cleanly under Python 3.13, and the
-SPEC `house` invariant (Householder norm-preservation under `beta=2`, unit
-steering vector) plus the `CrossAttentionOutputSteering` Eq. 5/6 closed-form
-match pass in `tests/` (6 passed). The model arms (steering-vector estimation,
-steered generation, I2P, CLIP/FID scoring) need a CUDA GPU and `HF_TOKEN`;
-this sandbox is CPU-only, so the paper's empirical claims (the 17 claims in
-`claims.json`) are not yet tested by this run. See `REPRODUCTION.md` for the
-full log and `SPEC.md` for the arms, restrictions, and unstated-items analysis
-(U1-U14).
+Rung reached: **implementation + correctness** (the `numbers` rung is BLOCKED on this CPU-only host).
+
+- The pinned environment builds from scratch (`requirements.txt` + `Dockerfile`), every third-party dependency and every vendored `core`/`scripts` module imports cleanly under Python 3.13, and `tests/` passes (33 tests): the import gate, the SPEC `house` Householder invariant, the degeneracy test (β=0 == baseline, bit-exact), the Eq.6/7/4/9 invariants, the fingerprinted data loader, and the eval-metric instruments (CLIP, FID, NudeNet/Q16/LPIPS raise-when-missing).
+- The full code path runs end-to-end on CPU via `smoke.sh` (load SD-1.4 → estimate 80 steering vectors → steer → generate), proving the implementation works on the real model.
+- `mutations.json` (6 deliberate defects) are each caught by their `must_fail` test (verified); `instruments.json` records every correctness-deciding instrument with positive/negative tests.
+- **`house` is reproduced** (`selfcheck.json`: PASS, max norm error 3.5e-14). It is the one high-invariance claim that needs no generation.
+- **The 16 diffusion-number claims are BLOCKED**: this sandbox is CPU-only and the paper's full config (50 steps × ≥1,000 prompts × 3 seeds × multiple arms, on 8×V100, `supplementary.tex:30`) is infeasible on CPU. `measured.json` records `BLOCKED` for every diffusion metric with a reason sidecar; `run_all_arms.sh` emits `FINAL <arm>=BLOCKED` per arm/seed. The external evaluators (NudeNet, Q16, LPIPS) are not installed and the real COCO-30k FID reference is not vendored — documented blockers, not synthetic substitutes.
+- `claims_result.json` is NOT produced here; it is written by the workflow's numbers gate. Our own evaluator is `selfcheck_claims.py` → `selfcheck.json`.
+
+See `REPRODUCTION.md` for the full log and `SPEC.md` (§11 Constructed truth, §12 unstated-value sweeps, §13 environment constraint) for the arms, restrictions, and unstated-items analysis (U1-U14).

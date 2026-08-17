@@ -404,3 +404,46 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
 - **Weight-injection zero-overhead form** (`method_2.tex:206-210`): equivalent numerics to the matrix arm, plus an engineering claim.
 - **Expressive-power theorem** (`supplementary.tex:908-1053`): mathematical result, not an empirical one.
 - **β-sweep tables** (`strength_tables`, `supplementary.tex:549-556`): directional findings only (β<2 erases less, β>2 degrades SD-1.4 fidelity); if any compute remains after gated arms, run SD-1.4 β∈{1,3} clip on the nudity subset as a bonus ordering check — but it is not gated.
+
+## 11. Constructed truth
+
+Which of the standard constructed-truth oracles apply here, and where one does not, why.
+
+- **Degeneracy (the method at its no-op setting reproduces the baseline EXACTLY): APPLIES.** CASteer's no-op setting is β (strength) = 0: the erasure update `c ← c − β⟨s,c⟩s` (Eq.6) and `c ← c − β s` (Eq.4) both collapse to `c ← c`. `tests/test_degeneracy.py` asserts `torch.equal(out, c_in)` for both the dotproduct and constant modes at β=0 (float32, after the dtype-preserving fix in `core/controller.py:forward`). This is the cheapest real correctness evidence and ships in the repo.
+- **Brute force at toy scale against any closed form claiming a max/min/worst case: APPLIES** for the Householder claim `house`. `(I − 2 s sᵀ)` preserves `‖c‖₂` is a closed-form statement; `tests/test_method_core.py::test_householder_norm_preservation` brute-forces 100 random unit `s` × random `c` in dims {320,640,1280} (float64), max error < 1e-5 (selfcheck measured 3.5e-14). This is the one high-invariance claim fully reproduced here.
+- **The same quantity derived two ways (papers often hand you this for free): APPLIES.** Eq.6's matrix form `(I − β s sᵀ) c` and the per-patch dot-product form `c − β⟨s,c⟩s` are the same quantity; `tests/test_method_core.py::test_eq6_noclip_matches_matrix_form` derives the controller output both ways and asserts they agree (and that `‖c‖` is preserved at β=2). The constant Eq.4 path is checked separately (`test_constant_mode_eq4`).
+- **Planting a known structure in synthetic input and requiring the pipeline to recover it: APPLIES** (partially). `tests/test_method_core.py::test_eq7_clip_only_positive_projections` plants a known projection sign per patch and requires the Eq.7 clip to steer only the positive-projection patch and leave the negative one bit-exact.
+- **A slow exact or convex reference solver: NOT APPLICABLE.** CASteer is training-free with no optimization; there is no solver to be a reference for.
+- **The method's limiting cases: APPLIES.** β=0 (degeneracy, above) and β=2 (Householder reflection) are the two limiting cases; both are tested.
+- **The naive implementation agreeing with the fast one: APPLIES.** The controller exposes both the matrix path (`steer_with_clipping` via the precomputed `P = I − β s s⁺`) and the explicit per-patch dot-product path; `test_eq6_noclip_matches_matrix_form` checks the fast matrix path against the naive `c − β⟨s,c⟩s`.
+- **The paper's standard baseline, whose value is common knowledge and therefore an oracle you already have: DECLARED but NOT EMPIRICALLY COMPARED HERE.** `claims.json.baseline_constants` records the oracles (SD-1.4 COCO FID 14.04, SD nudity Total 646, SAeUron 18, SPM/SAFREE/DoCo/ESD/Receler CS and FID, SAFREE LPIPS_e 0.42) with citations. On this CPU-only host the diffusion arms are BLOCKED (§13), so the value/ordering claims that lean on these oracles are not empirically settled here; the oracles remain the declared reference for a GPU run.
+
+## 12. Unstated-value sweeps (declared survival ranges)
+
+For any claim whose verdict depends on a value the paper never states, the survival RANGE (not merely a point) is the evidence a reader needs. The ranges below are **declared** in `claims.json` (each claim's `sensitivity.plausible` / `sensitivity.survives`); a verdict holding across most of the plausible range rests on a weak reading of the paper, one holding only near a chosen point rests on a strong reading (Bennett, arXiv:2301.12987). **Empirical sweeping of the diffusion claims was not performed here because the arms are BLOCKED on CPU (§13)** — the declared widths are what a GPU run must confirm. Recording them so the gate can check the width, not just the point.
+
+| claim | unstated value | plausible range | survives range | width note |
+|---|---|---|---|---|
+| `nudity_beats_all_prior`, `nudity_two_times_fewer`, `i2p_overall_beats_receler`, `sdxl_distilled_transfer_nudity` | i2p_images_per_prompt | [1, 2] | [1, 2] | full width (mean-over-images metric; k∈{1,2} leaves the expectation unchanged) — weak reading |
+| `i2p_overall_beats_receler` | i2p_prompt_subset_size | (declared) full 4,703 needed | below ~3,000 reports inconclusive | the 1.42pp margin needs the full set (binomial SE ~0.64pp); subsets report inconclusive, never a relaxed number |
+| `coco_fid_vs_vanilla`, `coco_fid_beats_prior_art_value`, `dotprod_weighting_matters_fid` | coco_subset_size | [3000, 30000] | [8000, 30000] for the ordering; [3000,30000] for the value | partial width — strong reading below 8000 (subset FID variance can exceed the ~1.0 margin) |
+| `snoopy_erasure_ordering`, `snoopy_erasure_vs_doco`, `snoopy_preservation_vs_esd_receler`, `fig_clip_shape` | clip_cs_checkpoint_dim | [512, 768] | [512, 768] | full width — per-seed normalization by our own sd14 CS (experiments.tex:75) damps the checkpoint shift below the margins |
+| `snoopy_fid_preservation_vs_esd_receler`, `fig_fid_shape` | eval_images_per_concept | [200, 800] | [200, 800] | full width (margin ≥22.6 FID vs subset noise ≤3) |
+| `nudity_total_value` | i2p_prompt_subset_size | [1000, 4703] | [2000, 4703] | partial width — below 2000 the scaled-count SE exceeds the tolerance (inconclusive) |
+| `style_vangogh_lpips_ordering` | lpips_eval_images | [200, 1000] | [200, 1000] | full width (margin 0.04 vs SE ~0.005 at 200) |
+| `fig_clip_shape`, `fig_fid_shape` | reading_error_of_figure | [0.0, 0.02] | [0.0, 0.02] | full width — vision read confirmed the table-derived coords |
+| `house` | β | fixed_by_paper (β=2) | n/a | no sweep; β=2 is stated (experiments.tex:21) |
+
+The one value this reproduction chose and could have fit to a known answer is the normalization `f_norm` (SPEC U1: the paper prints `v/‖v‖²` but its own projection-length and Householder statements require unit `v/‖v‖`). We adopted unit-norm and the `house` invariant confirms it (norm preservation holds ONLY for unit `s`); a `v/‖v‖²` reading would fail `test_householder_norm_preservation`, so this is not a free choice — it is forced by the paper's own maths.
+
+## 13. Environment constraint — what this run can and cannot produce
+
+This sandbox is **CPU-only** (`torch.cuda.is_available()==False`; torch 2.6.0+cpu). SD-1.4 loads and generates on CPU (fp32, ~7s/step @512), but the paper's full config is 50 PNDM steps × ≥1,000 prompts × 3 seeds × multiple arms (paper used 8×V100, `supplementary.tex:30`) — tens of thousands of images at ~6 min/image on CPU, i.e. weeks. That is infeasible in any reasonable budget, so:
+
+- **`measured.json` records `BLOCKED` for every diffusion-dependent metric** with a reason sidecar (`measured_blocked_reasons.json`). `run_all_arms.sh` detects the CPU host via `is_arm_feasible` and emits `FINAL <arm>=BLOCKED` per arm/seed without downloading any model; on a CUDA host the same script runs the arms for real.
+- **`smoke.sh` runs the full code path at smoke scale** (2 prompt pairs → estimate 80 steering vectors → 1 steered + 1 vanilla image, 4 steps / 256² / seed 42, ~41 s on CPU once SD-1.4 is cached). It proves the path runs and is **not** evidence about the paper.
+- **The only claim settled here is `house`** (the Householder norm-preservation invariant), reproduced exactly via `tests/test_method_core.py` and `selfcheck.json` (`PASS`, max error 3.5e-14). It is high-compute-invariance and pure-math — no generation needed.
+- The external-tool evaluators (NudeNet, Q16, LPIPS) are **not installed** in this CPU venv; `core/eval/metrics.py` makes them RAISE `MissingEvaluatorError` (never return a verdict), and `instruments.json` marks them `requires_tools / not_applicable` here.
+- The real COCO-30k FID reference set is **not vendored** (SPEC U10); `core/data.load_coco_reference_images` RAISES rather than substituting a synthetic corpus. A prior closed-book run silently fell back to a synthetic corpus and produced chance-level numbers; this run does not.
+
+This is a **blocked result at the implementation+correctness rung**, reported honestly: the code is built, the path runs (smoke), the degeneracy and maths invariants are tested and pass, six deliberate mutations are each caught by a test, and the one pure-math claim (`house`) is reproduced. The diffusion-number claims are blocked by the absence of a GPU, not by a defect in the implementation.
