@@ -206,6 +206,88 @@
       }
     }
   },
+  "restrictions": {
+    "synth_none": {
+      "kind": "none",
+      "detail": "Added sanity arm, not a paper experiment: finite Gaussian samples (n=20000, d=32, k=3) stand in for the population-level theory of Sec. 3-4 (paper/main.tex:330-531). Nothing in the paper's own experiments is narrowed; C1 carries an explicit finite-sample tolerance so what counts as correct (numerically zero cross-covariance; probe at majority) is the paper's condition up to numerical precision, unchanged in definition."
+    },
+    "synth_leace": {
+      "kind": "none",
+      "detail": "LEACE applied to the added synthetic distribution; the closed form has no hyperparameters to narrow (affine, plain sample covariance, numerical-rank pseudoinverse, trace constraint per the paper's Appendix). Same finite-sample caveat and tolerance treatment as synth_none."
+    },
+    "synth_oracle": {
+      "kind": "none",
+      "detail": "Oracle LEACE (paper/main.tex:1001-1003) on the same synthetic data; added comparator arm; deterministic closed form, no paper experiment narrowed."
+    },
+    "synth_sal": {
+      "kind": "none",
+      "detail": "Full-rank SAL (paper/main.tex:851, main.tex:664) on the same synthetic data; added comparator arm, no paper experiment narrowed."
+    },
+    "synth_leace_toy": {
+      "kind": "none",
+      "detail": "Exact 4-point distribution of the paper's Appendix E example (paper/main.tex:932-945); population quantities computed exactly from the stated distribution, so nothing is narrowed - deterministic, seeds nominal."
+    },
+    "synth_sal_toy": {
+      "kind": "none",
+      "detail": "Full-rank SAL on the same 4-point distribution (= P_ortho of paper/main.tex:935-939); exact population computation, nothing narrowed."
+    },
+    "bios_none": {
+      "kind": "narrows_situations",
+      "detail": "Per-seed uniform subsample of 60000 train / 20000 test biographies from bias_in_bios (257540/99392 full splits, dataset cited at paper/main.tex:541-542). Same model (bert-base-uncased, named at paper/main.tex:597), same [CLS]-of-last-layer embedding protocol (paper/main.tex:541), same metric definitions (gender probe accuracy, majority accuracy, MSE, TPR-gap RMS, correlation). What counts as correct for direction/ordering claims (C3-C6, C12) is unchanged; magnitude claims (C7-C11) are rated low with tolerances set to absorb the subsample shift."
+    },
+    "bios_leace": {
+      "kind": "narrows_situations",
+      "detail": "Same subsample as bios_none; LEACE is the paper's closed form fit on the subsampled train embeddings (rank-1 gender concept, matching rebuttal.tex:18); evaluation protocol and metric definitions identical to bios_none. The closed form means the narrower data is the only restriction."
+    },
+    "bios_inlp_r1": {
+      "kind": "narrows_situations",
+      "detail": "Same subsample as bios_none; runs the 1-iteration point of the paper's 8-point INLP rank grid (1,4,8,16,32,50,64,100 per rebuttal.tex:18). No claim is settled on a grid point that is not run. INLP probe = multinomial LogisticRegression; probe choice among readings is recorded in SPEC.md unstated #15 and swept in C4's sensitivity, it does not redefine the metric."
+    },
+    "bios_inlp_r50": {
+      "kind": "narrows_situations",
+      "detail": "Same subsample as bios_none; restricts the paper's INLP grid to the 50-iteration point; context for C3/C4, not magnitude-gated."
+    },
+    "bios_inlp_r100": {
+      "kind": "narrows_situations",
+      "detail": "Same subsample as bios_none; restricts the paper's INLP grid to the 100-iteration point (the paper's most aggressive INLP setting on this dataset); informative analogue of the rightmost INLP region of paper/figures/acc-vs-mse.pdf, not magnitude-gated."
+    },
+    "bios_leace_refit": {
+      "kind": "narrows_situations",
+      "detail": "Same subsample and erasure as bios_leace; the profession classifier is re-fit on the projected embeddings per paper/main.tex:578; metric definitions unchanged."
+    },
+    "amnesic_none": {
+      "kind": "narrows_situations",
+      "detail": "Per-seed subsample of UD English EWT sentences: 4096 to fit statistics, 1024 to evaluate. Same model (bert-base-uncased), all 12 layers, 18-way coarse POS concept (paper/main.tex:597-599), same MLM metric definitions (top-1 masked accuracy, cross-entropy per layer). Masking at 15% 80/10/10 per standard BERT (paper silent; SPEC.md unstated #10). Absolute accuracies shift with corpus size and are not claimed; curve-shape claims C13-C15 and their correctness criterion (argmax layer of the drop; LEACE drop above random drop) are unchanged."
+    },
+    "amnesic_random": {
+      "kind": "narrows_situations",
+      "detail": "Same corpus restriction as amnesic_none; random orthogonal projection rank 18 = k per the literal text (paper/main.tex:599, 'same rank as the label space (18)'); fresh subspace per eval batch per paper/main.tex:668; {17,18} swept in C15's sensitivity."
+    },
+    "amnesic_leace": {
+      "kind": "narrows_situations",
+      "detail": "Same corpus restriction as amnesic_none; LEACE closed form fit per layer on unmasked embeddings (paper/main.tex:599 states the fitted statistics are computed on unmasked text); removes rank(Sigma_XZ) <= k-1 = 17 dimensions exactly as the paper describes."
+    },
+    "amnesic_inlp": {
+      "kind": "narrows_situations",
+      "detail": "Same corpus restriction as amnesic_none; 20 iterations with the 18-class probe per iteration, exactly the paper's count (paper/main.tex:599); no other restriction."
+    },
+    "scrub_none": {
+      "kind": "narrows_situations",
+      "detail": "Pythia-160m only (1 of the paper's 7 models; the largest CPU-runnable member) and 2^20 fit + 2^20 eval tokens (paper used 2^22 + 2^22, paper/main.tex:662). Hook point (input of each block after normalization, paper/main.tex:666), bpb unit (paper/main.tex:656), arm layout and metric definitions unchanged. Cannot speak to model-size trends or the LLaMA rows (listed in not_tested); supports one member of each universal claim, and each affected claim's settlement says so."
+    },
+    "scrub_random": {
+      "kind": "narrows_situations",
+      "detail": "Same model/token restriction as scrub_none; random subspace rank = rank(Sigma_XZ) per layer per paper/main.tex:668 ('same rank as the cross-covariance matrix'), expected k-1 = 17; {17,18} swept in sensitivity for C17/C18."
+    },
+    "scrub_leace": {
+      "kind": "narrows_situations",
+      "detail": "Same model/token restriction as scrub_none; Algorithm 1 sequential per-layer fitting exactly as paper/main.tex:609-626; both sublayer norms scrubbed (upstream default) with the weaker block-input-only reading in C16's sensitivity sweep (SPEC.md unstated #6); metric definitions unchanged."
+    },
+    "scrub_sal": {
+      "kind": "narrows_situations",
+      "detail": "Same model/token restriction as scrub_none; full-rank SAL with no bias term and no whitening adjustment, as the paper states (paper/main.tex:664)."
+    }
+  },
   "claims": [
     {
       "id": "C1",
@@ -470,7 +552,8 @@
       "kind": "curve",
       "compute_invariance": "high",
       "arm_role": "amnesic probing (figure-derived; paper/figures/bios_frozen_bert_layer_vs_drop_in_acc.pdf shows 'Random' flat near 'No Intervention' with 'Ours' below it)",
-      "quantity": "measured.amnesic_leace.mlm_drop - measured.amnesic_random.mlm_drop",
+      "quantity": "measured.amnesic_leace.mlm_drop",
+      "against": "measured.amnesic_random.mlm_drop",
       "x": [
         0,
         1,
