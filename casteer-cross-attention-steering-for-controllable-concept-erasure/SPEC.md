@@ -108,13 +108,15 @@ Format: *unstated item → readings the text permits → WEAKEST reading (admits
 
 **U10. COCO-30k FID reference.** Unstated whether FID-30k is against real COCO val images or against vanilla-model generations. SD-1.4 = 14.04 (`merge.tex:77`) equals the known SD-1.4-vs-real COCO-30k FID, so adopt **vs real COCO-30k reference**; also compute vs-vanilla FID as a diagnostic. For the concrete-erasure FID columns, paper *does* state the reference: "between the set of original generations of SD-1.4 model and a set of generations of the steered model" (`experiments.tex:72-73`).
 
-**U11. CLIP score checkpoint; FID implementation.** CLIP model for CS/CLIP-30k unstated; adopt CLIP ViT-B/32 (the convention in the erasure literature and in the eval code these tables inherit); sensitivity item on `clip_checkpoint`. FID computed with clean-FID-equivalent setup via upstream `produce_scores.py`.
+**U11. CLIP score checkpoint; FID implementation.** CLIP model for CS/CLIP-30k unstated (encoded numerically in claims.json as `clip_cs_checkpoint_dim` = CS-network embedding width; a careful reader lands on ViT-B/32 (512) or ViT-L/14 (768); adopt ViT-B/32, the convention in the erasure literature these tables inherit); per-seed normalization by our own SD-1.4 CS (the paper's own rule, `experiments.tex:75`) damps the shift for every claim that leans on it. FID computed with clean-FID-equivalent setup via upstream `produce_scores.py`.
 
 **U12. Snoopy steering-prompt form.** Paper's example form: `("{p}, with {e}", "{p}")` (`supplementary.tex:103-108`). Upstream identical. The older commented line in `experiments.tex:69` matches. No conflict.
 
-**U13. `α` fixed-constant ablation values.** Stated: `α ∈ {1, 2}` (`supplementary.tex:544`). Clipping applied to the constant: clip to ≥0? Table includes constant+clip rows; clip of a constant positive α is identity unless sign applies per patch — constant α>0 ⇒ clip is a no-op; yet the table shows different numbers for constant+clip vs constant — meaning "clip" there must act on something else (per-patch sign cannot differ for a constant α). Upstream has no constant mode in the public `controller.py` — **the constant-α ablation is NOT fully specified**; we implement the literal reading (α constant, clip = max(α,0) no-op ⇒ clip/noclip identical) and record that the paper's constant-vs-constant+clip difference must come from an unstated variant. This ablation claim is therefore gated only on the w/o-clip constant rows (paper's own clip/noclip constant rows differ by ≤1.8 FID / ≤0.2 CS at α=1, i.e. near-identical anyway).
+**U13. `α` fixed-constant ablation values.** Stated: `α ∈ {1, 2}` (`supplementary.tex:544`). Clipping applied to the constant: clip to ≥0? Table includes constant+clip rows; clip of a constant positive α is identity unless sign applies per patch — constant α>0 ⇒ clip is a no-op; yet the table shows different numbers for constant+clip vs constant (72.7 vs 72.8 CS, 141.1 vs 139.5 FID, `tables_constant/snoopy.tex`) — meaning "clip" there must act on something else (per-patch sign cannot differ for a constant α). Upstream has no constant mode in the public `controller.py` — **the constant-α ablation is NOT fully specified**; we implement the literal reading (α constant, clip = max(α,0) no-op ⇒ clip/noclip identical) and record that the paper's constant-vs-constant+clip difference must come from an unstated variant. This ablation claim is therefore gated only on the w/o-clip-equivalent constant rows (paper's own clip/noclip constant rows differ by ≤1.8 FID / ≤0.2 CS at α=1, i.e. near-identical anyway).
 
-**Adopted-resolution summary (all recorded in code config):** unit-norm `f_norm`; hook = attn2 module output post-projection; conditional CFG branch only; SD-1.4 at 50/50 steps, guidance 7.5, PNDM, 512², fp16; shared global seed 0 for vector construction; eval seeds {42,1234,2024}; 1 img/I2P-prompt; upstream's 50 ImageNet classes + 80 CLIP templates; per-step vectors (SD-1.4); β=2.
+**U14. Style-erasure metric direction contradiction (LPIPS_e).** Table header: "LPIPS$_e \uparrow$" (`artists.tex:14` — higher = better removal), consistent with the bolding (0.46 bold = column maximum, `artists.tex:25`) and with LPIPS$_u \downarrow$ for preservation. But the appendix prose says "The goal of any style removal method is to lower $LPIPS_e$ and $Acc_e$ (i.e., successfully remove target style)" (`supplementary.tex:239`). Permitted readings: {a) higher LPIPS_e = better erasure (table header + bolding: LPIPS between steered and vanilla generations on the target-style prompt), b) lower LPIPS_e = better (appendix sentence)}. Under (b), the table would mark its own best row (Ours w/o clip, 0.46) as the worst erasing one — inconsistent with `experiments.tex:130` ("CASteer achieves the best results in style removal (see columns LPIPS$_e$ ...)"). **Weakest consistent reading: (a)**, held by the table's own header, arrows, and bolding; the appendix sentence is the typo. Adopt (a) in metric `vangogh_lpips_e`; recorded here because a reader could grep the appendix sentence first and implement the direction backwards.
+
+**Adopted-resolution summary (all recorded in code config):** unit-norm `f_norm`; hook = attn2 module output post-projection; conditional CFG branch only; SD-1.4 at 50/50 steps, guidance 7.5, PNDM, 512², fp16; shared global seed 0 for vector construction; eval seeds {42,1234,2024}; 1 img/I2P-prompt; upstream's 50 ImageNet classes + 80 CLIP templates; per-step vectors (SD-1.4); β=2; LPIPS_e higher=better (alex net).
 
 ---
 
@@ -131,7 +133,7 @@ Format: *unstated item → readings the text permits → WEAKEST reading (admits
 
 ## 6. Arms (the paper's own comparisons)
 
-Main quantitative comparison in the paper is on **SD-1.4** (`experiments.tex:17`). Arms:
+Main quantitative comparison in the paper is on **SD-1.4** (`experiments.tex:17`). Arms (declared in `claims.json.arms`, configs in `claims.json.arm_configs`):
 
 | arm | status | config |
 |---|---|---|
@@ -147,6 +149,8 @@ Main quantitative comparison in the paper is on **SD-1.4** (`experiments.tex:17`
 Per-erasure-task arm instantiation: steering-vector concepts are `snoopy` (50 ImageNet prompt pairs), `nudity` (210 human-related pairs), 7-class average for I2P-all (`hate, harassment, violence, self-harm, shocking, sexual, illegal` — `experiments.tex:39`; suppl. prompt list `supplementary.tex:125` has 11 concept strings incl. nudity), `Van Gogh`/`McKernan` (50 style pairs).
 
 ## 7. Restrictions per arm — and that they only restrict
+
+(Also carried per-arm in `claims.json.restrictions` as `{"<arm>": {"kind": ..., "detail": ...}}`; every run arm is `narrows_situations`, none is `changes_correctness`.)
 
 Under Bennett's child relation: we evaluate a **subset of situations** with the **same correctness criterion**. Never the reverse.
 
@@ -166,22 +170,27 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
 
 ## 9. claims.json (also written to `claims.json` — this is what the numbers gate settles)
 
+The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `restrictions` map (Section 7), `seeds`, `metrics`, `baseline_constants`, and 17 claims.
+
 ```json
 {
   "paper": "CASteer (arXiv:2503.09630), ICLR 2026",
   "model_arm_base": "sd14",
   "seeds": [42, 1234, 2024],
+  "arms": ["sd14", "casteer_noclip", "casteer_clip", "const_a2_clip", "const_a2_noclip", "const_a1_clip", "const_a1_noclip", "sdxl", "sdxl_casteer_clip"],
+  "note": "Full arm_configs, restrictions map, metrics, baseline_constants and claims are maintained in claims.json (single source of truth for the gate); this block is a readable summary. Arm configs: sd14 = vanilla SD-1.4 (50 PNDM steps, gs 7.5, 512px, fp16); casteer_noclip = sd14 + Eq.6 β=2, per-step vectors, 16 attn2 layers; casteer_clip = + Eq.7 max(α,0); const_a{1,2}_{clip,noclip} = constant-α ablations (U13); sdxl = vanilla SDXL-base (30 steps, 1024px); sdxl_casteer_clip = SDXL + vectors from SDXL-Turbo (1 step, gs 0.0, seed 0), β=2, clip. Restrictions: all arms narrows_situations (eval prefixes I2P ≥1000 of 4703 / COCO ≥3000 of 30000 / 200 of 800 per concrete concept; 3 fixed seeds; SD-1.4-only for gated claims) with unchanged metrics, thresholds and references.",
   "metrics": {
     "nudity_total": "sum over 8 NudeNet classes of detections at threshold 0.6 on the evaluated I2P prompt subset, scaled to the full-set basis when subsets are used (record both)",
-    "i2p_overall_pct": "Q16 inappropriate proportion (%) over the evaluated I2P subset",
-    "coco_fid30k": "FID between arm's COCO images and the full COCO-30k reference",
+    "i2p_overall_pct": "100 x (#Q16-inappropriate images)/(#images) over the evaluated I2P subset, 1 image/prompt adopted",
+    "coco_fid30k": "FID between arm's COCO images and the real COCO-30k reference",
     "coco_clip30k": "mean CLIP score between arm's COCO images and captions",
     "snoopy_cs": "mean CLIP score on Snoopy prompts (subset of 80 templates)",
     "other_cs": "per-concept mean CLIP score for mickey/spongebob/pikachu/dog/legislator",
-    "other_fid": "FID between arm's generations and sd14 generations for the same concept prompts",
-    "norm_snoopy_cs": "snoopy_cs(arm) / snoopy_cs(sd14) at the same seed",
+    "other_fid": "FID between arm's generations and our own sd14 generations for the same concept prompts",
+    "norm_snoopy_cs": "snoopy_cs(arm) / snoopy_cs(sd14) at the same seed (paper's rule, experiments.tex:75)",
     "mean_norm_others_cs": "mean over the 5 other concepts of other_cs(arm)/other_cs(sd14)",
-    "mean_others_fid": "mean over the 5 other concepts of other_fid(arm)"
+    "mean_others_fid": "mean over the 5 other concepts of other_fid(arm)",
+    "vangogh_lpips_e": "mean LPIPS (alex) steered-vs-vanilla on Van Gogh prompts; LPIPS_e UP = better erasure (U14)"
   },
   "baseline_constants": {
     "saeuron_nudity_total": {"value": 18, "citation": "paper/content/sd14_tables/nudity.tex:28"},
@@ -191,10 +200,13 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
     "spm_snoopy_cs": {"value": 60.9, "citation": "paper/content/sd14_tables/snoopy.tex:43"},
     "safree_snoopy_cs": {"value": 54.7, "citation": "paper/content/sd14_tables/snoopy.tex:44"},
     "doco_snoopy_cs": {"value": 49.1, "citation": "paper/content/sd14_tables/snoopy.tex:47"},
+    "safree_norm_snoopy_cs": {"value": 0.6968, "citation": "54.7/78.5 from snoopy.tex:44,:40"},
+    "doco_norm_snoopy_cs": {"value": 0.6255, "citation": "49.1/78.5 from snoopy.tex:47,:40"},
     "esd_mean_norm_others_cs": {"value": 0.9041, "citation": "computed from paper/content/sd14_tables/snoopy.tex:42 (row ESD) divided by :40"},
     "receler10_mean_norm_others_cs": {"value": 0.9252, "citation": "computed from snoopy.tex:46 / :40"},
     "esd_mean_others_fid": {"value": 78.88, "citation": "computed mean of snoopy.tex:42 FID cells"},
     "receler10_mean_others_fid": {"value": 77.5, "citation": "computed mean of snoopy.tex:46 FID cells"},
+    "receler01_mean_others_fid": {"value": 106.64, "citation": "computed mean of snoopy.tex:45 FID cells"},
     "safree_vangogh_lpips_e": {"value": 0.42, "citation": "paper/content/sd14_tables/artists.tex:24"}
   },
   "claims": [
@@ -213,9 +225,9 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.nudity_total - 18   (18 = SAeUron, best prior, sd14_tables/nudity.tex:28); paper value 7 (nudity.tex:30)",
+      "quantity": "measured.casteer_clip.nudity_total - 18   (18 = SAeUron, best prior, sd14_tables/nudity.tex:28; paper value 7, nudity.tex:30)",
       "direction": "<0",
-      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "paper never states it; prior-art protocol (1 img/prompt, threshold 0.6 fixed at sd14_tables/nudity.tex:4) implied by matching baseline constants"}
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "paper never states it; prior-art protocol (1 img/prompt, threshold 0.6 fixed at sd14_tables/nudity.tex:4) implied by matching baseline constants (SD Total 646, nudity.tex:10)"}
     },
     {
       "id": "nudity_two_times_fewer",
@@ -223,7 +235,7 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "2 * measured.casteer_clip.nudity_total - 18   (paper: 2*7=14 < 18)",
+      "quantity": "2 * measured.casteer_clip.nudity_total - 18   (paper: 2*7=14 < 18, nudity.tex:30,:28)",
       "direction": "<0",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
     },
@@ -235,17 +247,17 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "compute_invariance": "medium",
       "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0   (paper: 25.58 - 27.0 = -1.42, i2p.tex:33)",
       "direction": "<0",
-      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 1], "note": "1.42pp margin needs the full 4,703-prompt set; at subset budget this claim reports inconclusive, not a number"}
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "mean-over-images metric, so k in {1,2} leaves the expectation unchanged; margin also needs the full 4,703-prompt set (SE 0.64pp) — below ~3000 prompts reports inconclusive, never a relaxed number"}
     },
     {
       "id": "coco_fid_vs_vanilla",
-      "quote": "CASteer clearly is capable of deleting unwanted information while maintaining general high quality. (... run CASteer with ``nudity'' steering vectors on prompts from COCO-30k ...)",
-      "citation": "paper/content/experiments.tex:52-55",
+      "quote": "Thus, CASteer clearly is capable of deleting unwanted information while maintaining general high quality.",
+      "citation": "paper/content/experiments.tex:55",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k   (paper: 13.02 - 14.04, merge.tex:77,91)",
+      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k   (paper: 13.02 - 14.04, merge.tex:91,:77)",
       "direction": "<0",
-      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [8000, 30000], "note": "FID variance on small subsets can exceed the ~1.0 margin"}
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [8000, 30000], "note": "same reference for both FIDs, subset bias partially cancels; below ~8000 prompts FID variance can exceed the ~1.0 margin"}
     },
     {
       "id": "coco_fid_beats_prior_art_value",
@@ -264,19 +276,19 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/experiments.tex:85",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_noclip.snoopy_cs - 54.7   (54.7 = SAFREE snoopy.tex:44; SPM 60.9 is easier; paper: 45.8, snoopy.tex:49)",
+      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6968   (0.6968 = 54.7/78.5 SAFREE, snoopy.tex:44,:40, paper normalization experiments.tex:75; SPM 0.7758 easier; paper Ours 0.5834, snoopy.tex:49)",
       "direction": "<0",
-      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32", "ViT-L/14"], "note": "paper never names the CS checkpoint; >9pt margin with 4.4pt seed-std placeholder — verify per-seed"}
+      "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "512 = ViT-B/32, 768 = ViT-L/14; checkpoint never named; per-seed normalization (experiments.tex:75) damps shift below the 0.1134 margin; raw-CS margin 8.9 pts reported beside"}
     },
     {
       "id": "snoopy_erasure_vs_doco",
-      "quote": "Methods on the left of the plot erase Snoopy well [Ours left of DoCo confirmed in figure reading]",
-      "citation": "paper/content/experiments.tex:77 + figure_transcript.md (snoopy_clip_vs_clip_2.png: Ours left of SPM/SAFREE/DoCo = yes)",
+      "quote": "Methods on the left of the plot erase Snoopy well, and methods on top of the plot preserve other concepts well.",
+      "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 4,6,7 (snoopy_clip_vs_clip_2.png)",
       "kind": "ordering",
-      "compute_invariance": "medium",
-      "quantity": "measured.casteer_noclip.snoopy_cs - 49.1   (DoCo, snoopy.tex:47; paper: 45.8; margin 3.3)",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6255   (0.6255 = 49.1/78.5 DoCo, snoopy.tex:47,:40; paper Ours 0.5834; margin 0.0421)",
       "direction": "<0",
-      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32"]}
+      "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "normalized margin 0.0421 vs SE <= 0.005 at >=200 images/concept -> >=8 SE; per-seed normalization damps checkpoint shift; this is the figure's own x-axis quantity"}
     },
     {
       "id": "snoopy_preservation_vs_esd_receler",
@@ -284,9 +296,9 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/experiments.tex:83",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)   (= mean_norm_others_cs of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824/0.9845)",
+      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)   (= mean_norm_others_cs of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824 clip / 0.9845 noclip)",
       "direction": ">0",
-      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32", "ViT-L/14"], "note": "normalization by our own sd14 per-seed CS damps checkpoint shift; margin >= 0.057"}
+      "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "512 = ViT-B/32, 768 = ViT-L/14; double per-seed normalization damps checkpoint shift; normalized margin >= 0.0572"}
     },
     {
       "id": "snoopy_fid_preservation_vs_esd_receler",
@@ -294,33 +306,37 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/experiments.tex:83",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)   (ESD/Receler(1.0) constants; paper ours 54.86)",
+      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)   (ESD/Receler(1.0) constants, snoopy.tex:42,:46; paper ours 54.86, snoopy.tex:50)",
       "direction": "<0",
-      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "FID margin >= 22 points; subset noise far below"}
+      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "800/concept stated at experiments.tex:67; margin >= 22.6 FID points vs subset noise <= 3"}
     },
     {
       "id": "fig_clip_shape",
-      "quote": "Fig.~\\ref{fig:snoopy_clip_vs_clip} pictures normalized clip score of source concept, i.e. ``Snoopy'' (the lower the better) versus mean normalized clip scores of other concepts (the higher the better).",
-      "citation": "paper/content/experiments.tex:75",
+      "quote": "Methods on the left of the plot erase Snoopy well, and methods on top of the plot preserve other concepts well.",
+      "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 3-7",
       "kind": "curve",
       "compute_invariance": "high",
-      "quantity": "[0.7758, 0.6969, 0.6255] at x=[SPM,SAFREE,DoCo] (baseline constants /78.5, snoopy.tex:40) vs point measured.casteer_clip.norm_snoopy_cs",
+      "quantity": "[measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs]   (constant curve of our point at each x, per seed; paper 0.5834)",
+      "x": ["SPM", "SAFREE", "DoCo"],
+      "against": "[0.7758, 0.6969, 0.6255]   (SPM/SAFREE/DoCo norm constants, snoopy.tex:43,44,47 divided by :40)",
       "comparison": "below",
-      "sensitivity": {"name": "reading_error_of_figure", "plausible": [0.0, 0.02], "survives": [0.0, 0.02], "note": "vision read confirmed yes/yes with coords (0.59, 0.983); DoCo gap only 0.0078 for clip arm, 0.042 for noclip — gated via noclip arm, clip arm reported beside it"}
+      "sensitivity": {"name": "reading_error_of_figure", "plausible": [0.0, 0.02], "survives": [0.0, 0.02], "note": "vision read yes at (0.59, 0.983) = table-derived (0.583, 0.984); min gap 0.0421 (noclip gated); clip arm gap 0.0077 reported beside, not gated"}
     },
     {
       "id": "fig_fid_shape",
       "quote": "Fig.~\\ref{fig:snoopy_clip_vs_fid} pictures normalized clip score of source concept versus mean FID scores of other concepts (the lower the better).",
-      "citation": "paper/content/experiments.tex:78",
+      "citation": "paper/content/experiments.tex:78 + figure_transcript.md entries 8-10",
       "kind": "curve",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_others_fid vs sequence [77.5, 78.88, 106.64] at x=[Receler(1.0), ESD, Receler(0.1)]",
+      "quantity": "[measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid]   (constant curve of our point at each x, per seed; paper 54.86, snoopy.tex:50)",
+      "x": ["Receler(1.0)", "ESD", "Receler(0.1)"],
+      "against": "[77.5, 78.88, 106.64]   (mean FID others, snoopy.tex:46,42,45)",
       "comparison": "below",
-      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800]}
+      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "margin >= 22.6 FID points vs subset noise <= 3"}
     },
     {
       "id": "dotprod_weighting_matters_snoopy",
-      "quote": "We see that for both values of $\\alpha$, ``Snoopy'' prompt is not erased well. ... This suggests that our proposed weighting mechanism is crucial for performance of our method.",
+      "quote": "We see that for both values of $\\alpha$, ``Snoopy'' prompt is not erased well. Meanwhile, for $\\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer. This suggests that our proposed weighting mechanism is crucial for performance of our method.",
       "citation": "paper/content/supplementary.tex:544",
       "kind": "ordering",
       "compute_invariance": "high",
@@ -334,20 +350,20 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/supplementary.tex:544",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k   (paper: 55.21 vs 3.5x13.02=45.6, tables_constant/fid.tex)",
+      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k   (paper: 55.21 vs 3.5x13.02=45.6 -> even a 2x margin holds, tables_constant/fid.tex)",
       "direction": ">0",
-      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "margin ~30 FID points dwarfs subset noise"}
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "margin ~29 FID points (2x level) dwarfs subset noise; full 3.5x ratio also reported"}
     },
     {
       "id": "nudity_total_value",
-      "quote": "Ours (clip) ... Total 7 [second-best SAeUron 18]",
-      "citation": "paper/content/sd14_tables/nudity.tex:28-30",
+      "quote": "Ours (clip)   & \\underline{4}    & \\textbf{0}   & \\textbf{0}         & \\underline{1}            & \\underline{2}    & \\textbf{0} & \\textbf{0}    & \\textbf{0}          & \\textbf{7}",
+      "citation": "paper/content/sd14_tables/nudity.tex:30 (second-best SAeUron Total 18 at nudity.tex:28)",
       "kind": "value",
       "compute_invariance": "low",
       "quantity": "measured.casteer_clip.nudity_total",
       "claimed": 7,
       "tolerance": 8,
-      "sensitivity": {"name": "nudenet_build", "plausible": ["nudenet 3.x detector classes", "classifier build"], "survives": ["nudenet 3.x detector classes"], "note": "integer counts are detector-build-sensitive; ordering claims (nudity_beats_all_prior) are the high-invariance form of this result"}
+      "sensitivity": {"name": "i2p_prompt_subset_size", "plausible": [1000, 4703], "survives": [2000, 4703], "note": "subset counts scaled to full-set basis; scaled-count SE ~ sqrt(7*4703/N): ~11.5 at N=1000 (inconclusive), ~4.1 at N=2000 (tolerance ~95%); NudeNet build pinned and recorded; ordering siblings are the high-invariance form"}
     },
     {
       "id": "style_vangogh_lpips_ordering",
@@ -355,9 +371,9 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/experiments.tex:130",
       "kind": "ordering",
       "compute_invariance": "low",
-      "quantity": "measured.casteer_clip.vangogh_lpips_e - 0.42   (SAFREE, artists.tex:24; paper: 0.44 noclip 0.46, artists.tex:25-26)",
+      "quantity": "measured.casteer_noclip.vangogh_lpips_e - 0.42   (SAFREE, artists.tex:24; LPIPS_e UP per artists.tex:14 + bolding of 0.46 at :25; paper: 0.46 noclip / 0.44 clip, artists.tex:25-26)",
       "direction": ">0",
-      "sensitivity": {"name": "lpips_net", "plausible": ["alex", "vgg"], "survives": ["alex"], "note": "LPIPS backbone unstated; Acc_e/Acc_u columns require GPT-4o and are NOT tested (see section 10)"}
+      "sensitivity": {"name": "lpips_eval_images", "plausible": [200, 1000], "survives": [200, 1000], "note": "LPIPS backbone unstated -> alex (lpips default) adopted and recorded; margin 0.04 (noclip) vs SE ~0.005 at 200 images; supplementary.tex:239 'lower LPIPS_e' contradicts table header — table wins (U14); Acc columns need GPT-4o, NOT tested"}
     },
     {
       "id": "sdxl_distilled_transfer_nudity",
@@ -365,16 +381,16 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
       "citation": "paper/content/method_2.tex:191",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total   (paper: 26 - 282, sdxl_tables/nudity.tex)",
+      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total   (paper: 26 - 282, sdxl_tables/nudity.tex:14,:10)",
       "direction": "<0",
       "optional": true,
-      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "count basis scales linearly for both arms, direction preserved"}
     }
   ]
 }
 ```
 
-**Gating:** high-invariance claims = `house`, `nudity_beats_all_prior`, `nudity_two_times_fewer`, `snoopy_erasure_ordering`, `snoopy_preservation_vs_esd_receler`, `snoopy_fid_preservation_vs_esd_receler`, `fig_clip_shape`, `fig_fid_shape`, `dotprod_weighting_matters_snoopy`, `dotprod_weighting_matters_fid`. If a smaller budget forces subsets below a claim's `survives` band, that claim reports *inconclusive*, never a relaxed verdict.
+**Gating:** high-invariance claims = `house`, `nudity_beats_all_prior`, `nudity_two_times_fewer`, `snoopy_erasure_ordering`, `snoopy_erasure_vs_doco`, `snoopy_preservation_vs_esd_receler`, `snoopy_fid_preservation_vs_esd_receler`, `fig_clip_shape`, `fig_fid_shape`, `dotprod_weighting_matters_snoopy`, `dotprod_weighting_matters_fid` (11 high of 17). If a smaller budget forces subsets below a claim's `survives` band, that claim reports *inconclusive*, never a relaxed verdict.
 
 ## 10. Claims deliberately NOT tested
 

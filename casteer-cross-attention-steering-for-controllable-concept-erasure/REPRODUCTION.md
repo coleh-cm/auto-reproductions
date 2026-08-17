@@ -15,7 +15,8 @@
 - [x] Reproduction folder created; branch `repro/casteer-cross-attention-steering-for-controllable-concept-erasure` pushed.
 - [x] arXiv e-print 2503.09630 fetched and unpacked under `paper/` — `.tex`/`.bib` committed, figure images and style files gitignored (no `.bbl` present in the source tarball).
 - [x] Rendered HTML saved as `paper/paper.html` and committed.
-- [x] SPEC.md — method written up as an algorithm with symbol shapes and cited equations; unstated-items analysis (U1–U13); arms, restrictions, 17-claim `claims.json`.
+- [x] SPEC.md — method written up as an algorithm with symbol shapes and cited equations; unstated-items analysis (U1–U14, U14 = LPIPS_e direction contradiction); arms, restrictions, 17-claim `claims.json`.
+- [x] claims.json validator round 1 fixed: `arms` (9) + `arm_configs` declared; per-arm `restrictions` map (all `narrows_situations`); curve claims carry `x` + `against`; every `sensitivity` numeric `plausible`/`survives` with non-degenerate survival ratio (i2p claim reframed to images-per-prompt with full-width survival + inconclusive-below-3000 note); Snoopy CS claims moved to the paper's own per-seed normalized CS (`experiments.tex:75`) so the CLIP-checkpoint sensitivity is honestly survivable across [512,768].
 - [x] Upstream code search — **official code exists**: `abstract.tex:36` → https://github.com/Atmyre/CASteer (pinned at `135912a555a8606c01f55843c738cf8062319ed7`); plan: vendor upstream, run its entrypoints, log every change needed.
 - [ ] Implementation / environment setup.
 - [ ] Smallest end-to-end run producing a parsed number.
