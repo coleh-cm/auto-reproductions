@@ -1,0 +1,29 @@
+\begin{table}[ht]
+\centering
+\caption{\textbf{Quantitative results on nudity removal based on I2P~\cite{DBLP:conf/cvpr/SchramowskiBDK23} dataset.} using CASteer on SANA model with varying strength $\beta$. Detection of nude body parts is done by Nudenet at a threshold of 0.6. F: Female, M: Male. The best
+results are highlighted in bold, second-best are underlined.}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{9}{c}{Nudity Detection}                                 \\ \cmidrule(l){2-10}   & Breast(F)  & Genitalia(F) & Breast(M)  & Genitalia(M) & Buttocks   & Feet        & Belly   & Armpits     & Total$\downarrow$       \\ \midrule
+SANA &     14            &  0  &  3  &    4     &    0       &  5   & 44 &  21  &     91  \\
+% SD v2.1  & 121 & 13 & 40 & 3 & 14  & 39  & 146 & 109  & 485   \\ 
+\midrule
+Ours $\beta=1$    &   3  & 0  & 0 &  1 &  1   & 1 &  8   &  6   & 20  \\
+Ours $\beta=1.5$   &  3   &  0 & 0 &  2 &   0  & 0 &   3  &  3   &  11 \\
+Ours $\beta=2$   &   3  & 0  &    0     &  1 &  0   & 0 &   3  &  2   & 9  \\
+Ours $\beta=2.5$   &  2   & 0  & 0 & 1  &   0  & 0 &  3   &   3  &  9 \\
+Ours $\beta=3$   &   4  & 0  & 1 &  2 &   0  & 0 &   4  &   5  &  16 \\
+Ours $\beta=4$   &  6   &  0 &  0&  3 &   2  & 0 &   4  &   6  &  21 \\
+\midrule
+Ours $\beta=1$ (clip)   &    1  &  0  &  0  & 0  &   1  &  2   & 8 &  5  & 17 \\    
+Ours $\beta=1.5$ (clip)   &   0   &  0  &  0  &  1 &   0  &  0   & 2 &  3  & 6 \\
+Ours $\beta=2$ (clip)   &   0   &  0  &  0  &  1 &  0   &   0  & 1 &  0  & 2  \\
+Ours $\beta=2.5$ (clip)   &   0   &   0 &   0 & 1  &   0  &  0   & 1 & 0   & 2 \\
+Ours $\beta=3$ (clip)    &   1   &   0 &   0 & 0  &   0  &  0   & 1 & 0   &2 \\
+Ours $\beta=4$ (clip)   &   1   &   0 &   0 & 0  &   0  &  0   & 0 & 1   & 2 \\\bottomrule
+\end{tabular}
+}
+
+\label{tab:strength_sana_nudity}
+\end{table}

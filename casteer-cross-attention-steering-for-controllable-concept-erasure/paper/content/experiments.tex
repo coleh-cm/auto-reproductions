@@ -1,0 +1,182 @@
+\section{Experiments}
+\label{sec:experiments}
+
+% \subsection{Considered tasks}
+% Recall that CASteer is capable of doing tasks of concept erasure, concept switch and concept addition. In our experiments, we primarily focus on the task of concept erasure, as this is an important task which has well-established benchmarks and prior work, which we use to provide quantiative results and show that CASteer achieves state-of-the-art performance. As for concept flip and addition, due to the lack of the established benchmarks for these tasks, we provide qualitative results in the appendix. Additionally, for the concept switch, we formulate quantiative evaluation setup and report metric of CASteer.   
+
+We evaluate the performance of our method on the task of erasing different concepts. 
+%
+We show that our method succeeds in suppressing both 
+abstract (e.g., ``nudity'', ``violence'') and
+concrete concepts (e.g., ``Snoopy''). 
+%
+Moreover, we demonstrate the advantages of our method in removing implicitly defined concrete concepts (e.g., if a concept is ``Mickey'', prompting ``a mouse from a Disneyland'' should not result in a generation of Mickey).
+
+
+\textbf{Implementation details. }
+For a fair comparison, we report our main quantitative results using StableDiffusion-v1.4 (SD-v1.4)~\cite{DBLP:conf/cvpr/RombachBLEO22}. 
+%
+SD-1.4 model does not have a Turbo version, so for these experiments we use per-step steering vectors computed from the original SD-1.4. We apply steering to all of the CA layers in the model.
+%
+We set $\beta=2$ for the concept erasure in all experiments. This choice is motivated by the fact that with $\beta=2$, the Eq.~\ref{eq:casteer_erasure_matrix} becomes a Householder operator (reflection) of the CA activation vector $c$
+across the hyperplane orthogonal to the steering vector $s$. This operation preserves $L_2$-norm of the vector $c$, thus keeping relative and absolute values of all the information  present in $c$ that is orthogonal to $s$ intact after transformation. In Appendix Sec.~\ref{sec:ablation_strength} we ablate the choice of $\beta$. We show $\beta < 2$ leads to lower level of concept suppression, while still producing high quality images, enabling control on the level of concept erasure. We also show that for SDXL and SANA models, values of $\beta > 2$ lead to stronger concept erasure, while also leaving general quality of images high.
+We use 50 prompt pairs for generating steering vectors for concrete concepts (e.g., ``Snoopy''), and 210 prompt pairs for generating steering vectors for abstract concepts (e.g., ``nudity''). Information about prompts used for generation of the steering vectors is in the Appendix Sec.~\ref{sec:prompts}. 
+
+We also show effectiveness of CASteer on bigger models, such as SDXL and SANA, and present results on these models in the Appendix Sec.~\ref{sec:sdxl_res} and Sec.~\ref{sec:sana_res}. For SDXL~\cite{DBLP:conf/iclr/PodellELBDMPR24} and SANA, we use steering vectors obtained from SDXL-Turbo and SANA-Sprint models, respectively. %\ili{go back to this if we put them here}
+
+
+
+% \input{content/table_safety}
+
+% \input{content/table_artists}
+\input{content/sd14_tables/nudity}
+\input{content/sd14_tables/i2p}
+%\input{content/sd14_tables/fid}
+
+\subsection{Results}
+\vspace{-0.2cm}
+\textbf{Abstract concept erasure.}
+In this section, we present results on inappropriate content erasure based on I2P dataset~\cite{DBLP:conf/cvpr/SchramowskiBDK23}. I2P is a dataset of 4,703 curated prompts designed to test generative models, where most prompts lead to images containing inappropriate content. Following prior work, we test CASteer on two I2P-based tasks: 1) removing nudity, 2) removing all inappropriate content at once. For nudity removal, we utilize CASteer with steering vectors generated for the concept of "nudity". For inappropriate content removal, we use CASteer with steering vectors obtained as average of steering vectors generated for each type of inappropriate content, i.e., hate, harassment, violence, self-harm, shocking, sexual, and illegal content. 
+
+We compare our method with the following state-of-the-art approaches: Ablating (CA)~\cite{DBLP:conf/iccv/KumariZWS0Z23}, FMN~\cite{zhang2023forgetmenot},
+SAeUron~\cite{cywinski2025saeuron},
+SLD~\cite{DBLP:conf/cvpr/SchramowskiBDK23}, ESD~\cite{DBLP:conf/iccv/GandikotaMFB23}, UCE~\cite{DBLP:conf/wacv/GandikotaOBMB24},
+MACE~\cite{DBLP:conf/cvpr/LuWLLK24},
+SA~\cite{DBLP:conf/nips/HengS23},
+Receler~\cite{huang2023receler},
+RECE~\cite{DBLP:conf/eccv/GongCWCJ24}, CPE~\cite{lee2024cpe}, and AdvUn~\cite{zhang2024defensive}. Following prior art, we utilize the NudeNet~\footnote{https://github.com/notAI-tech/NudeNet} to detect nude body parts on generated images for nudity erasure task, and the NudeNet with the Q16 detector to detect inappropriate content.
+
+We present the results for CASteer versions with and without intermediate clipping applied in Tab.~\ref{tab:sd14_nudity} and Tab.~\ref{tab:sd14_i2p}. We show that both versions of CASteer outperform all prior models on nudity erasure, with CASteer version with clipping having more than 2 times fewer images with detected nudity than the second-best result. On the inappropriate content removal, CASteer version with clipping also achieves state-of-the-art result, surpassing second-best model Receler by $1.42\%$ overall.
+
+
+To assess general generation quality of CASteer, we follow prior work and run CASteer with ``nudity'' steering vectors on prompts from COCO-30k~\cite{DBLP:conf/eccv/LinMBHPRDZ14}. We report FID~\cite{DBLP:conf/nips/HeuselRUNH17} for general visual quality and CLIP score~\cite{DBLP:conf/emnlp/HesselHFBC21} for image-prompt alignment. Results are presented in Tab.~\ref{table:sd14_fid}. Both versions of CASteer have better FID than prior art. 
+
+%
+Thus, CASteer clearly is capable of deleting unwanted information while maintaining general high quality. Note that these datasets feature adversarial prompts, i.e., the ``nudity'' concept is encoded in the prompts implicitly.
+
+\input{content/sd14_tables/merge}
+
+
+
+\noindent \textbf{Concrete concepts erasure.}
+To assess ability of CASteer to remove concrete concepts, we follow the experimental setup of SPM~\cite{DBLP:conf/cvpr/Lyu0HCJ00HD24}.
+%
+In this setting, the concept to be erased is $\textit{Snoopy}$, and images of five additional concepts (\textit{Mickey}, \textit{Spongebob}, \textit{Pikachu}, \textit{dog} and \textit{legislator}) are generated to test the capability of the method to preserve content not related to the concept being removed.
+The first four of these are specifically chosen to be semantically close to the concept being removed to show the model's ability to perform precise erasure. 
+%
+Following SPM~\cite{DBLP:conf/cvpr/Lyu0HCJ00HD24} and DoCo~\cite{wu2025unlearning}, we augment each concept using $80 $ CLIP~\cite{DBLP:conf/icml/RadfordKHRGASAM21} templates, and generate $10$ for each concept-template pair, so that for each concept there are $800$ images. 
+%
+% We use 50 prompt pair of form (``\textit{X}, with Snoopy'', ``\textit{X}'') to generate steering vectors of $\textit{Snoopy}$. 
+%
+We evaluate the results using two metrics. First, we utilize CLIP Score (CS)~\cite{DBLP:conf/emnlp/HesselHFBC21} to confirm the level of the existence of the concept within the generated content. 
+%
+Second, we calculate FID~\cite{DBLP:conf/nips/HeuselRUNH17} scores between the set of original generations of SD-1.4 model and a set of generations of the steered model. We use it to assess how much images of additional (non-Snoopy) concepts generated by the steered model differ from those of generated by the original model. A higher FID value demonstrates more severe generation alteration. 
+%
+We present the results in Fig.~\ref{fig:snoopy_plots}, showing two types of plots. Fig.~\ref{fig:snoopy_clip_vs_clip} pictures normalized clip score of source concept, i.e. ``Snoopy'' (the lower the better) versus mean normalized clip scores of other concepts (the higher the better). Normalization is done to ensure equal importance of all the concepts in the mean, and done by dividing clip score of images produced by erasing method by clip score of images produced by vanilla SD-1.4. 
+% For reference, SD-1.4 is marked as having normalized CS scores of 1. 
+Methods on the left of the plot erase Snoopy well, and methods on top of the plot preserve other concepts well. 
+Fig.~\ref{fig:snoopy_clip_vs_fid} pictures normalized clip score of source concept versus mean FID scores of other concepts (the lower the better). 
+% For reference, SD-1.4 is marked as having normalized CS score of 1 and FID of 0. 
+Methods on the left of the plot erase Snoopy well, and methods on top of the plot tend not to affect images of other concepts much. \\
+% Our method reaches the second-best overall results getting a good balance between erasing the desired concept and leaving the other notions intact.
+%
+Results show that CASteer maintains good balance between erasing unwanted concept, while preserving other concepts intact. ESD ~\cite{DBLP:conf/iccv/GandikotaMFB23} and Receler erase Snoopy well, but also highly affect other concepts, especially related ones such as \textit{Mickey} or \textit{Spongebob}. Note that their CS of unrelated concepts (e.g. ``Mickey'' or ``Spongebob'') are significantly lower than that of original SD-1.4, indicating that these concepts are also being affected when erasure of ``Snoopy'' is done. High FID of these methods on these concepts supports this observation.
+%
+SAFREE shows a reduced level of \textit{Snoopy} erasure compared to that of CASteer, and has lower CS and higher FID on all the other concepts.
+%
+SPM keeps unrelated concepts almost intact (High CS and low FID), but has a much lower intensity of \textit{Snoopy} erasure. Moreover, SPM fails to erase implicitly defined concepts (see Fig.~\ref{fig:spm_fail_main} and Sec.~\ref{sec:user_study} in the Appendix).
+%
+% Note that SAFREE and CASteer experience a rise in CLIP score for the $\textit{dog}$ concept after erasing Snoopy. 
+% %
+% We hypothesize this happens because the removal of $\textit{Snoopy}$ component from the prompt including $\textit{dog}$ results in more realistic images of dogs.
+%
+We provide qualitative results on comparisons in  Fig.~\ref{fig:main_qual_snoopy_removal} and in the Appendix Sec.~\ref{sec:sdxl_res} and Sec.~\ref{sec:sana_res}.% material (sec.~\ref{sec:remove_snoopy}).
+
+\begin{figure}[htbp]
+\centering
+% \begin{subfigure}{0.7\textwidth}
+    \begin{subfigure}{0.4\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{content/images/snoopy_clip_vs_clip_2.png}
+      \caption{Normalized CLIP score on ``Snoopy'' vs normalized CLIP scores of other concepts}
+      \label{fig:snoopy_clip_vs_clip}
+    \end{subfigure}
+    %\hfill
+    \hspace{0.5cm}
+    \begin{subfigure}{0.4\textwidth}
+      \includegraphics[width=\linewidth]{content/images/snoopy_clip_vs_fid_2.png}
+      \caption{Normalized CLIP score on ``Snoopy'' vs FID scores of other concepts}
+      \label{fig:snoopy_clip_vs_fid}
+    \end{subfigure}
+    \vspace{-0.3cm}
+    \caption{Comparison of various methods on concrete concept erasure (removing ``Snoopy'')}
+\label{fig:snoopy_plots}
+% \vspace{-0.5cm}
+\end{figure}
+
+\noindent \textbf{Style erasure.} Following SAFREE~\cite{DBLP:journals/corr/abs-2410-12761} and ESD~\cite{DBLP:conf/iccv/GandikotaMFB23}, we also evaluate our method on two \textbf{artist-style removal
+tasks}. One task focuses on the styles of five famous artists (Van Gogh, Picasso, Rembrandt, Warhol,
+Caravaggio) and the other uses five modern artists (McKernan, Kinkade, Edlin, Eng, Ajin: Demi-Human), with the task being removing the style of Van Gogh and McKernan. Following SAFREE~\cite{DBLP:journals/corr/abs-2410-12761}, we use LPIPS~\cite{8578166} and prompt GPT-4o to identify an artist on generated images as evaluation metrics. 
+
+%
+%We present the results on Tab.~\ref{tab:t2i_art}.
+%
+
+\input{content/sd14_tables/artists}
+
+We follow SAFREE~\cite{DBLP:journals/corr/abs-2410-12761} evaluation procedure, please refer 
+to it or our Appendix Sec.~\ref{sec:details_style_removal} for more details on the procedure and metrics.
+%
+From Tab.~\ref{tab:sd14_t2i_art}, we see that CASteer achieves the best results in style removal (see columns LPIPS$_e$ and Acc$_e$), while preserving other styles well (see columns LPIPS$_u$ and Acc$_u$). 
+%
+Among all the approaches, CASteer achieves great balance between target style removal and preservation of other styles.
+
+\noindent \textbf{CASteer is capable of erasing implicitly defined concepts.} We check what happens if we define the prompts implicitly, e.g., ``A mouse from Disneyland''. We run CASteer, SPM and DoCo trained on the \textit{Mickey} concept on these prompts and show the results in Fig. \ref{fig:spm_fail_main}.
+%
+We clearly see that SPM and DoCo fail to erase the concepts when they are not explicitly defined.
+%
+In contrast, our method does a much better job of erasing the concepts, despite being implicitly defined. This is also supported by the results on nudity erasure in Tab.~\ref{tab:sd14_nudity}, as considered datasets contain specially selected adversarial nudity prompts.
+%
+We provide additional results on implicitly defined prompts in the Appendix Sec.~\ref{sec:spm_casteer}. %sec.~\ref{sec:spm_casteer}.
+
+
+\noindent \textbf{Overall} experimental results show that CASteer performs precise erasure of both concrete and abstract concepts and concepts defined implicitly while leaving other concepts intact and not affecting the overall quality of generated images.
+%
+% More qualitative results showing the performance of CASteer on prompts related and not related to the target concept can be found in the Appendix.
+\vspace{-0.3cm}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{content/images/qualitative_snoopy.png}
+    \caption{Qualitative results on SDXL (left) and SANA (right) on removing ``Snoopy''. Top: original model generations, bottom: generations of model steered to remove ``Snoopy''}
+    \label{fig:main_qual_snoopy_removal}
+    \vspace{-0.3cm}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{content/images/style_removal_main.png}
+    \caption{Qualitative results on SANA (right) on removing style of ``Van Gogh''. Top: original model generations, bottom: generations of model steered to remove ``Van Gogh'' style. Left 2 images correspond to prompts with ``Van Gogh style'', images on the right correspond to prompts mentioning other artists ( ``Picasso'',  ``Rembrandt'',  ``Warhol'',  ``Caravaggio'')}
+    \label{fig:modern}
+    \vspace{-0.5cm}
+\end{figure*}
+
+
+\subsection{Ablation Study}
+\vspace{-0.2cm}
+
+\noindent \textbf{Steering other layers.} As mentioned in Sec.~\ref{3.1}, we ablate to determine for which type of layer in the DiT backbone steering is most effective. We show in the Appendix Sec.~\ref{sec:ablations} that steering the CA outputs is the most effective. We also ablate steering only a fraction of CA layers in Sec.~\ref{sec:steering_fraction}. 
+
+\noindent \textbf{Number of prompt pairs to construct steering vectors.} In the Appendix Sec.\ref{sec:ablations}, we provide an ablation on the number of prompt pairs needed to produce high-quality outputs after steering. We find that as little as 50 prompts is enough for the steering vectors to capture the desired concept well.  
+
+\noindent \textbf{Interpretation of steering vectors.} %\ili{this is not valid anymore, right?} 
+Here, we propose a way to interpret the meaning of steering vectors generated by CASteer. Suppose we have steering vectors generated for a concept $X$ $\{ca^{X}_{it}\}, 1 \leqslant i \leqslant l, 1 \leqslant t \leqslant T$, where $l$ is the number of model layers and $T$ is the number of denoising steps performed for generating steering vectors. To interpret these vectors, we prompt the diffusion model with a placeholder prompt ``X'' and at each denoising step, we substitute outputs of the model's CA layers with corresponding steering vectors. This conditions the diffusion model only on the information from the steering vectors, completely suppressing other information from the text prompt. Results are presented in Fig.~\ref{fig:interpretation} and in the Appendix Sec.~\ref{sec:interpretation}.  \\
+\noindent \textbf{UMap.} We  generate steering vectors for vocabulary tokens of SDXL text encoder and apply UMap \cite{DBLP:journals/corr/abs-1802-03426} on these steering vectors. We present the results in the Appendix Sec.~\ref{sec:interpretation}, showing that structure emerges in the space of these steering vectors, similar to that of Word2Vec \cite{DBLP:journals/corr/abs-1301-3781}, supporting that steering vectors carry the meaning of the desired concept. 
+
+\noindent \textbf{Modern models.} We show qualitative results in SANA and SDXL in Fig. \ref{fig:modern}. We provide more qualitative and quantitative results in  SDXL (Sec. \ref{sdxl_res}) and SANA (Sec. \ref{sec:sana_res}).
+
+\noindent \textbf{User studies.} In Sec. \ref{sec:user_study}, we give several user studies, showing that in most cases, the users prefer our results compared to SPM and Receler.
+
+
+
+

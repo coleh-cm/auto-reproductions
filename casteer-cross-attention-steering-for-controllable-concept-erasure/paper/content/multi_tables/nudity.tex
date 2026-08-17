@@ -1,0 +1,17 @@
+\begin{table}[h]
+\centering
+\caption{\textbf{Quantitative results on nudity removal based on I2P (\cite{DBLP:conf/cvpr/SchramowskiBDK23}) dataset.} with CASteer applied on SD-1.4 for 2 concepts erasure: ``\textit{nudity}" and ``\textit{Snoopy}". Detection of nude body parts is done by Nudenet at a threshold of 0.6. F: Female, M: Male.}
+\resizebox{0.75\linewidth}{!}{
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{9}{c}{Nudity Detection}                                 \\ \cmidrule(l){2-10}   & Breast(F)  & Genitalia(F) & Breast(M)  & Genitalia(M) & Buttocks   & Feet        & Belly   & Armpits     & Total$\downarrow$       \\ \midrule
+SD-1.4 & 183  & 21  & 46 & 10  & 44  & 42 & 171 & 129  & 646  \\
+% SD v2.1  & 121 & 13 & 40 & 3 & 14  & 39  & 146 & 109  & 485   \\ 
+\midrule
+Ours (w/o clip)   &  9  &  1 &  0 & 2  &  2 & &  0   & 0  & 14\\
+Ours (clip)   & 8  & 2  & 0 &  1  & 2 & 1 &  0  &  1  & 15\\\bottomrule
+\end{tabular}
+}
+
+\label{tab:multi_nudity}
+\end{table}

@@ -1,0 +1,24 @@
+\begin{table}
+\caption{{Comparison of "Van Gogh" Removal tasks on SDXL model}.}
+\label{tab:up_art}
+\small
+\centering
+\setlength{\tabcolsep}{1.mm}
+\resizebox{0.4\textwidth}{!}{
+\begin{tabular}{l|cccc}
+\toprule
+&\multicolumn{4}{c}{\textbf{Remove ``Van Gogh"}}\\ 
+\cmidrule(lr){2-5}
+\textbf{Method}&
+\textbf{LPIPS}$_e \uparrow$ &\textbf{LPIPS}$_u \downarrow$ & \textbf{Acc}$_e \downarrow$& \textbf{Acc}$_u \uparrow$\\
+\midrule
+SDXL&-&-&0.95&0.95\\
+\midrule
+Ours (last 36 layers) & 0.30 & 0.12 &0.00 & 0.85  \\
+Ours & 0.34 & 0.19 &0.00 & 0.84  \\
+
+\bottomrule
+\end{tabular}
+}
+\vspace{-0.5cm}
+\end{table}

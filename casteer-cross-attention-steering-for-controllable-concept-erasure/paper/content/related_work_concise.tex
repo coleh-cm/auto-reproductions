@@ -1,0 +1,57 @@
+\section{Related work}
+\label{sec:related_work}
+
+\noindent\textbf{Data-driven AI Safety.} Ensuring the safety of image and text-to-image generative models hinges on preventing the generation of harmful or unwanted content.
+%
+Common approaches include curating training data with licensed material \cite{adobefirefly, DBLP:conf/nips/SchuhmannBVGWCC22}, fine-tuning models to suppress harmful outputs \cite{DBLP:conf/cvpr/RombachBLEO22, DBLP:journals/corr/abs-2006-11807}, or deploying post-hoc content detectors \cite{nudenet, DBLP:journals/corr/abs-2210-04610}.
+%
+While promising, these strategies face critical limitations: data filtering introduces inherent biases \cite{DBLP:journals/corr/abs-2006-11807}, detectors are computationally efficient but often inaccurate or easily bypassed \cite{DBLP:conf/iccv/GandikotaMFB23, remove_nsfw_detection}, and model retraining becomes costly when new harmful concepts emerge.
+%
+Alternative methods leverage text-domain interventions, such as prompt engineering \cite{DBLP:journals/corr/abs-2006-11807} or negative prompts \cite{DBLP:journals/corr/abs-2305-16807, DBLP:conf/cvpr/SchramowskiBDK23}.
+% , or orthogonalizing embeddings of prompt tokens \cite{DBLP:journals/corr/abs-2410-12761}. 
+%
+Yet these remain vulnerable to adversarial attacks, lack flexibility and precision as they operate in the discrete space of tokens, and often fail to address the disconnect between text prompts and visual outputs—models can still generate undesired content even when text guidance is ``safe''.
+%
+Our approach instead operates in the joint image-text latent space of diffusion models, enabling more robust and granular control over generated content without relying solely on textual constraints.  
+
+\noindent\textbf{Model-driven AI Safety.} Current methods \cite{DBLP:conf/iccv/GandikotaMFB23,DBLP:conf/iccv/KumariZWS0Z23,DBLP:conf/nips/HengS23,zhang2023forgetmenot,huang2023receler,lee2024cpe} erase unwanted concepts by fine-tuning or otherwise optimising models and adapters to shift probability distributions toward null or surrogate tokens, often combined with regularization or generative replay \cite{DBLP:conf/nips/ShinLKK17}. Other methods, such as \cite{DBLP:conf/wacv/GandikotaOBMB24,DBLP:conf/eccv/GongCWCJ24}, use direct weight editing to remove unwanted concepts.
+%
+Although effective, these approaches lack precision, inadvertently altering or removing unrelated concepts.
+%
+Advanced techniques like SPM~\cite{DBLP:conf/cvpr/Lyu0HCJ00HD24} and MACE~\cite{DBLP:conf/cvpr/LuWLLK24} improve specificity through LoRA adapters \cite{DBLP:conf/iclr/HuSWALWWC22}, transport mechanisms, or prompt-guided projections to preserve model integrity.
+%
+However, while promising for concrete concepts (e.g., Mickey Mouse), they still struggle with abstract concepts (e.g., nudity) and require parameter updates.
+%
+Another group of methods focuses on interventions into internal mechanisms of generative models. Methods like Prompt-to-Prompt \cite{DBLP:conf/iclr/HertzMTAPC23} enable fine-grained control over text-specified concepts (e.g., amplifying or replacing elements) through interventions to cross-attention maps, yet fail to fully suppress undesired content, particularly when concepts are implicit or absent from prompts. 
+%
+This task-specific specialization limits their utility for safety-critical erasure, where complete removal is required. 
+%
+CASteer bridges this gap, enabling precise, universal concept suppression without relying on textual priors or compromising unrelated model capabilities.
+%
+Another area of research focuses on removing information about undesired concepts from text embeddings that generative models are conditioned on \cite{DBLP:journals/corr/abs-2410-12761,DBLP:journals/corr/abs-2410-02710,DBLP:journals/corr/abs-2411-10329}. However, as these methods operate on a discrete space of token embeddings, their trade-off between the effectiveness of erasure and the preservation of other features is limited.
+%
+\cite{zhang2024defensive} proposes using adversarial training for concept unlearning; however, training this method is computationally intensive.
+%
+In contrast, CASteer eliminates training entirely, enabling direct, non-invasive concept suppression in the model’s latent space without collateral damage to unrelated features.
+
+\noindent\textbf{Utilizing directions in latent spaces.}  
+This area of research focuses on finding interpretable directions in various intermediate spaces of diffusion models~\cite{DBLP:conf/iclr/KwonJU23, DBLP:conf/nips/ParkKCJU23, DBLP:conf/cvpr/SiH0024, DBLP:conf/cvpr/TumanyanGBD23}, which can then be used to control the semantics of generated images. Based on this idea, SDID~\cite{DBLP:conf/cvpr/0010S00G24} recently proposed to learn a vector for each given concept, which is then added to the intermediate activation of a bottleneck layer of the diffusion model during inference to provoke the presence of this concept in the generated image. However, this method is highly architecture-specific and fails to deliver precise control over attributes. In our work, we propose a training-free method for constructing interpretable directions in intermediate activation spaces of various diffusion models for more precise control of image generation. SAeUron~\cite{cywinski2025saeuron} utilizes Sparse Autoencoders~\cite{Olshausen1997SparseCW} (SAEs) to find interpretable directions in the activation space of the diffusion model. However, SAEs are unstable, require extensive training, and do not provide initial control over the set of attributes that can be erased. In contrast, CASteer does not require training and provides direct control over the manipulated attributes.
+
+% \noindent\textbf{Text-Based Style Transfer.} Text-driven style transfer aims to adapt images to match textual style descriptions (e.g., "impressionism") while preserving semantic content. 
+% %
+% While most methods focus on image-guided style transfer, text-based approaches face unique challenges.
+% %
+% ClipStyler \cite{DBLP:conf/cvpr/KwonY22} optimizes a patch-wise CLIP \cite{DBLP:conf/icml/RadfordKHRGASAM21} loss to align text-image pairs of source and target in the CLIP embedding space. 
+% %
+% LDAST \cite{DBLP:journals/corr/abs-2106-00178} jointly models style and content via text-image pairs, yet requires curated paired training data.
+% %
+% ITstyler \cite{DBLP:journals/corr/abs-2301-10916} bypasses pairing constraints by mapping text prompts to VGG style spaces and refining with CLIP guidance.
+% %
+% Our method addresses these gaps by enabling direct, training-free style manipulation in the diffusion latent space, achieving finer control without relying on paired data or predefined style mappings.
+
+
+%
+%Critically, our approach operates orthogonally to existing methods, enabling nice integration with prompt engineering, detector-based filters, or adapter modules while preserving model integrity. \ili{if we say this, we need to ablate it, aka, show some results combined with other methods}
+
+
+

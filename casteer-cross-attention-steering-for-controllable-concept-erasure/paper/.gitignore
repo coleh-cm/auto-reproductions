@@ -1,0 +1,10 @@
+# Commit only LaTeX/BibTeX source files from the arXiv e-print; ignore the rest
+# (figure images, .sty/.bst style files, metadata JSON, etc.). Patterns are
+# relative to this paper/ directory.
+*
+!.gitignore
+!paper.html
+!**/
+!**/*.tex
+!**/*.bbl
+!**/*.bib

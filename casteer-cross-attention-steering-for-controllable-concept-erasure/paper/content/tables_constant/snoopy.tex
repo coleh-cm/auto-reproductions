@@ -1,0 +1,32 @@
+\begin{table}
+\caption{\textbf{Quantitative evaluation of concrete object erasure}. The best
+results are highlighted in bold, second-best are underlined. Results of other methods are taken from SPM\cite{DBLP:conf/cvpr/Lyu0HCJ00HD24} or reproduced.}
+\label{tab:constant_snoopy}
+\centering
+% \label{tab:constant_snoopy}
+\setlength{\tabcolsep}{2.0pt}
+\resizebox{0.65\textwidth}{!}{
+\definecolor{mygray}{gray}{.9}
+\begin{tabular}{l|c|cc}
+    \toprule
+    
+    & \multicolumn{1}{c|}{Snoopy} & \multicolumn{2}{c}{Mickey}  \\
+
+    \cmidrule{2-4}
+    Method & CS$\downarrow$ &  CS$\uparrow$ & FID$\downarrow$  \\
+    \midrule
+    SD-1.4 & 78.5 & 74.7 & - \\
+    \midrule
+    Constant steering $\beta=1$ (w/o clip) & 76.3 & 74.3 & 51.5 \\
+    Constant steering $\beta=1$ (clip) &  76.5 & 74.0 & 53.4 \\
+    Constant steering $\beta=2$ (w/o clip) & 72.7 & 70.7 & 141.1 \\
+    Constant steering $\beta=2$ (clip) &  72.8 & 70.8 & 139.5 \\
+    \midrule
+    Dot Product steering (CASteer, w/o clip)  & 45.8  & 70.4 & 93.0 \\
+    Dot Product steering (CASteer, clip)  & 48.5  & 70.4 & 89.6\\
+
+    \bottomrule
+\end{tabular}
+}
+% \vspace{-0.7cm}
+\end{table}

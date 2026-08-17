@@ -1,0 +1,31 @@
+\begin{table}
+\caption{{Comparison of Artist Concept Removal tasks}: Famous (left)  and Modern artists (right).}
+\label{tab:sd14_t2i_art}
+\small
+\centering
+\setlength{\tabcolsep}{1.mm}
+\resizebox{0.65\textwidth}{!}{
+\begin{tabular}{l|cccc|cccc}
+\toprule
+&\multicolumn{4}{c}{\textbf{Remove ``Van Gogh''}}&\multicolumn{4}{c}{\textbf{Remove ``Kelly McKernan''}}\\ 
+\cmidrule(lr){2-5}
+\cmidrule(lr){6-9}
+\textbf{Method}&
+\textbf{LPIPS}$_e \uparrow$ &\textbf{LPIPS}$_u \downarrow$ & \textbf{Acc}$_e \downarrow$& \textbf{Acc}$_u \uparrow$&
+\textbf{LPIPS}$_e \uparrow$ &\textbf{LPIPS}$_u \downarrow$ & \textbf{Acc}$_e \downarrow$& \textbf{Acc}$_u \uparrow$\\
+\midrule
+SD-v1.4&-&-&0.95&0.95&-&-&0.80&0.83\\
+\midrule
+CA~\citep{DBLP:conf/iccv/KumariZWS0Z23}&0.30&0.13&0.65&0.90&0.22&0.17&0.50&0.76\\
+RECE~\citep{DBLP:conf/eccv/GongCWCJ24}&0.31&\underline{0.08}&0.80&\underline{0.93}&0.29&\underline{0.04}&0.55&0.76\\
+UCE~\citep{DBLP:conf/wacv/GandikotaOBMB24}&0.25&\textbf{0.05}&0.95&\textbf{0.98}&0.25&\textbf{0.03}&0.80&\textbf{0.81}\\
+\midrule
+SLD-Medium~\citep{DBLP:conf/cvpr/SchramowskiBDK23}&0.21&0.10&0.95&0.91&0.22&0.18&0.50&0.79\\
+SAFREE \citep{DBLP:journals/corr/abs-2410-12761} &0.42&\underline{0.31}&\underline{0.35}&0.85&\underline{0.40}&0.39&\underline{0.40}&0.78\\ \midrule
+Ours (w/o clip)& \textbf{0.46} & \underline{0.31} & \underline{0.35} & 0.88 & \textbf{0.54} & 0.27 & \textbf{0.05} & \underline{0.80} \\
+Ours (clip)& \underline{0.44} & \textbf{0.30} &  \textbf{0.25} & 0.86 & \textbf{0.54} & 0.28 & \textbf{0.05} &  \textbf{0.81} \\
+\bottomrule
+\end{tabular}
+}
+\vspace{-0.5cm}
+\end{table}

@@ -1,0 +1,48 @@
+%\vspace{-1.7cm}
+
+\section{Introduction}
+\label{sec:intro}
+
+
+Recent advances in diffusion models \cite{DBLP:conf/nips/HoJA20, DBLP:conf/cvpr/RombachBLEO22} have revolutionized image \cite{DBLP:conf/iclr/PodellELBDMPR24} and video generation \cite{emu-video}, achieving unprecedented realism.
+%
+These models operate by gradually adding noise to data during a forward process and then learning to reverse this noise through a series of iterative steps, reconstructing the original data from randomness.
+%
+By leveraging this denoising process, diffusion models generate high-quality, realistic outputs, making them a powerful tool for creative and generative tasks.
+
+However, the same capabilities that make diffusion models transformative also raise profound ethical and practical concerns. The ability to generate hyper-realistic content amplifies societal vulnerabilities. Risks range from deepfakes and misinformation to subtler effects such as erosion of trust in digital media and targeted manipulation. Addressing these challenges requires not only reactive safeguards (e.g., blocking explicit content) but proactive methods to constrain or remove harmful concepts at the level of the model itself. Current approaches to moderation often treat symptoms rather than causes, limiting their adaptability as risks and applications evolve.
+
+Existing methods for concept erasure in diffusion models remain narrow in scope. LoRA-based fine-tuning \cite{DBLP:conf/iclr/HuSWALWWC22} is effective for removing specific objects or styles but struggles with abstract or composite concepts (e.g., nudity, violence, or ideological symbolism), and scales poorly when multiple concepts must be removed, requiring separate adapters or costly retraining. Prompt-based interventions \cite{DBLP:journals/corr/abs-2410-12761} offer greater flexibility for abstract harm reduction but lack precision in suppressing concrete attributes, often failing to generalize across concept variations. As a result, existing strategies fall short of delivering reliable, efficient, and broad-spectrum concept erasure.
+
+
+In this work, we introduce CASteer, a training-free method for controllable concept erasure that leverages the principle of \textit{steering} to influence hidden representations of diffusion models dynamically. Our method builds on recent findings that deep neural networks encode features into approximately linear subspaces~\cite{elhage2021mathematical,DBLP:conf/nips/WuGIPG23}. Prior research has shown that intermediate subspaces of diffusion backbones also exhibit this property, with directions that modulate the strength of particular features~\cite{DBLP:conf/iclr/KwonJU23, DBLP:conf/nips/ParkKCJU23, DBLP:conf/cvpr/SiH0024, DBLP:conf/cvpr/TumanyanGBD23, DBLP:conf/cvpr/0010S00G24}. Yet, these techniques remain limited in scope, often restricted to specific subspaces, requiring training, or offering only coarse control.
+
+Our approach departs from this paradigm. We show that \textit{multiple} subspaces within diffusion models exhibit linear properties that can be harnessed for precise concept erasure. %CASteer computes \textit{steering vectors} offline by contrasting the averaged hidden representations of $k$ positive images (containing a concept) with $k$ negative images (excluding it). 
+For each concept of interest, we generate 
+$k$ \textit{positive} images (where $k \geq 1$)  containing the concept and $k$ \textit{negative} images not containing it, and compute the steering vectors by subtracting the averaged hidden representations of the network across \textit{negative} images from those of \textit{positive} ones.
+%
+During inference, these precomputed vectors are applied directly to the model activations, allowing us to selectively suppress undesirable concepts without retraining or degrading the overall image quality.
+%
+Experiments demonstrate that CASteer achieves fine-grained erasure of harmful or unwanted concepts (e.g., nudity, violence), while maintaining robustness across a wide range of diffusion models, including SD 1.4, SDXL~\cite{DBLP:conf/iclr/PodellELBDMPR24}, Sana~\cite{xie2025sana}, and their distilled variants (e.g., SDXL-Turbo~\cite{DBLP:conf/eccv/SauerLBR24}, Sana-Sprint~\cite{chen2025sana-sprint}).
+
+%In our work, we show that \textit{ multiple} subspaces of the diffusion models exhibit linear properties and propose a simple technique to find directions in these subspaces that are responsible for certain features of the generated images. Unlike traditional approaches that require training, our method operates by computing steering vectors offline. For each concept of interest, we generate 
+%$k$ \textit{positive} images (where $k \geq 1$)  containing the concept and $k$ \textit{negative} images not containing it and compute the steering vectors by subtracting the averaged hidden representations of the network across \textit{negative} images from those of \textit{positive} ones. During inference, we apply the precomputed vectors to the network's activations, enabling precise control over the presence or absence of specific concepts in the generated output. Experiment results show that the directions found by CASteer carry the desired meaning and allow it to achieve precise control over image features without any loss in overall quality.
+
+%Overall, CASteer is versatile, capable of addressing a wide range of concept manipulation tasks, including removing undesirable concepts (e.g., nudity), adding desired ones (e.g., happiness), replacing objects (e.g., swapping one character for another), or altering styles (e.g., converting to a cubist aesthetic). 
+%
+%In all cases, these transformations are achieved by adding or removing steering vectors based on the specific requirements of the task.
+%
+%To ensure precision and avoid unintended interference, we design a heuristic that dynamically applies steering vectors only when necessary. 
+%
+%That is, for concept removal, the heuristic ensures that steering is applied exclusively to images containing the target concept, preventing unnecessary alterations to unrelated content. 
+%
+
+In summary, our \textbf{contributions} are the following:
+\vspace{-0.2cm}
+\begin{itemize}
+\item We \textbf{propose} a novel training-free framework for controllable concept erasure in diffusion models, leveraging steering vectors to suppress unwanted image features without retraining.
+\item We \textbf{demonstrate} that CASteer effectively handles both concrete (e.g., specific characters) and abstract (e.g., nudity, violence) concepts, and scales to multiple simultaneous erasures.
+\item We \textbf{achieve} state-of-the-art performance in concept erasure across diverse tasks and diffusion backbones, validating the robustness, versatility, and practicality of our approach.
+\end{itemize}
+
+%To promote reproducibility and further research, we provide the implementation of our framework as part of the supplementary material.

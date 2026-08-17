@@ -1,0 +1,215 @@
+\section{Methodology}
+% \vspace{-0.1cm}
+\label{sec:method}
+
+%\subsection{Method overview}
+
+The main operating principle of CASteer is to modify outputs of certain intermediate layers during inference in order to affect the semantics of generated images, thus preventing the generation of a desired concept. These outputs are modified using specially designed \textit{steering vectors}. In this section, we begin by justifying the choice of the intermediate layers that CASteer modifies (Sec.~\ref{3.1}), then proceed with the procedure of construction of steering vectors (Sec.~\ref{method:create_steering}), and after that describe how these steering vectors are used during inference to control the generation process (Sec.~\ref{method_use_steering}). Finally, we elaborate on practical aspects regarding the calculation and use of the steering vectors (Sec.~\ref{3.4}).
+\vspace{-0.1cm}
+\subsection{Choice of layers to steer}
+\vspace{-0.1cm}
+\label{3.1}
+
+Most modern diffusion models use U-Net or Diffusion Transformers (DiT)~\cite{DBLP:conf/iccv/PeeblesX23} as a backbone. They  consist of a set of Transformer blocks, each having three main components: cross-attention (CA) layer, self-attention (SA) layer, and MLP layer, all of which contribute to the residual stream of the model. Among those, CA layers are the only place in the model where information from the text prompt goes into the model, guiding text-to-image generation. For every image patch and prompt embedding, each CA layer generates a vector matching the size of the image patch embedding. After summation, these vectors transmit text-prompt information to corresponding image regions~\cite{DBLP:conf/iclr/HertzMTAPC23}.
+
+As the semantics of the resulting image is mostly determined by the text prompt, we modify the outputs of the CA layers during inference, which results in effective, yet precise, control over the features of the generated image. Thus, CASteer constructs steering vectors for the outputs of every CA layer in the model. 
+%
+In the appendix, we present experiments on applying CASteer to steer outputs of other layers (SA, MLP, and outputs of intermediate layers inside CA blocks).% These results show that steering CA layers indeed results in most effective and precise control over the image semantics.
+%
+\vspace{-0.1cm}
+\subsection{Construction of steering vectors}
+\vspace{-0.1cm}
+\label{method:create_steering}
+
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/method.png}
+    \caption{Main pipeline. (Bottom left, gray background) For computing a steering vector, we prompt diffusion model with two prompts that differ in a desired concept, e.g., ``anime style'' and save CA outputs at each timestamp $t$ and each CA layer $i$. We average these outputs over image patches and get averaged CA outputs $ca^{pos\_avg}_{it}$ and $ca^{neg\_avg}_{it}$ for each $t$ and $i$. We subtract the latter from the former, getting a steering vector for the layer $i$ and timestamp $t$ $ca^{anime}_{it}$. (Right) For deleting concept $X$ from generation, at each denoising step $t$, we subtract steering vector $ca^{anime}_{it}$ multiplied by intensity $\alpha$ from the CA outputs of the layer $i$.}
+    \label{fig:steering_pipeline}
+    \vspace{-0.5cm}
+\end{figure*}
+
+
+We propose to construct steering vectors for each concept we aim to manipulate.
+%
+These vectors correspond to the cross-attention (CA) outputs we modify.
+%
+Each steering vector matches the size of the CA outputs and encodes the desired concept’s information.
+%
+For preventing the concept from being present in the generated image, we subtract steering vectors of an unwanted concept from cross-attention outputs during generation. 
+
+We construct steering vectors as follows. 
+%
+Given a concept $X$ to manipulate, we create paired positive and negative prompts differing only by the inclusion of $X$.  
+%
+For example, if $X= \text{``baroque style''}$, example prompts are $p_{\text{pos}} = \text{``A picture of a man, baroque style''}$ and $p_{\text{neg}} = \text{``A picture of a man''}$.
+%
+Assume a DiT backbone has $N$ Transformer blocks, each containing one CA layer, totaling $N$ CA layers.
+%
+We generate images from both prompts, saving outputs from each of the $N$ cross-attention layers across all $T$ denoising steps.
+%
+This yields $NT$ cross-attention output pairs $\langle \text{ca}^{pos}_{it}, \text{ca}^{neg}_{it} \rangle$ for $ 1 \leqslant i \leqslant N$ and $1 \leqslant t \leqslant T$, where $i$ denotes the layer and $t$ is the denoising step.
+%
+Each $\text{ca}^{pos}_{it}$ and $\text{ca}^{neg}_{it}$ has dimensions $ \text{patch\_num}_i \times \text{emb\_size}_i $, corresponding to the number of patches and embedding size at layer $ i $. 
+%
+We average $ \text{ca}^{pos}_{it} $ and $ \text{ca}^{neg}_{it}$ over image patches to obtain averaged cross-attention outputs:
+\begin{equation}
+    ca^{pos\_avg}_{it} = \frac{\sum_{k=1}^{patch\_num_i} ca^{pos}_{itk}}{patch\_num_i} \;
+    ; \;
+    ca^{neg\_avg}_{it} = \frac{\sum_{k=1}^{patch\_num_i} ca^{neg}_{itk}}{patch\_num_i}
+\end{equation}
+\noindent where $ca^{pos\_avg}_{it}$ and $ca^{neg\_avg}_{it}$ are vectors of size $\text{emb\_size}_i$.
+%
+% We then $L_2$-normalize the resulting vectors:
+% \begin{equation}
+%     ca^{pos\_avg}_{it} = \frac{ca^{pos\_avg}_{it}}{||ca^{pos\_avg}_{it}||^2_2}, 
+% \end{equation}  
+% \begin{equation}
+% ca^{neg\_avg}_{it} = \frac{ca^{neg\_avg}_{it}}{||ca^{neg\_avg}_{it}||^2_2},
+% \end{equation}
+%
+Then, for each of these $N$ layers and each of $T$ denoising steps, we construct a corresponding steering vector carrying a notion of $X$ by subtracting its averaged cross-attention output that corresponds to the negative prompt from that corresponding to the positive one as: 
+\begin{equation}
+ca^{X}_{it} = f_{norm}(ca^{pos\_avg}_{it} - ca^{neg\_avg}_{it}).
+\end{equation} 
+%
+% And then we $L_2$-normlize the resulting steering vectors: 
+% \begin{equation}
+% ca^{X}_{it} = \frac{ca^{X}_{it}}{||ca^{X}_{it}||^2_2}.
+% \end{equation} 
+\noindent where $f_{norm}$ is an $L_2$-normalization function: $f_{norm}(v) = \frac{v}{||v||_2^2}$.
+%
+\vspace{-0.1cm}
+\subsection{Using steering vectors to control generation}
+\vspace{-0.1cm}
+\label{method_use_steering}
+Computed steering vectors can be seen as directions in a space of intermediate representations of a model (in the space of CA activations) that represent a notion of $X$. 
+%
+Thus, we should be able to control the expressiveness of certain feature $X$ by steering the model representations along the steering vector representing $X$. That is, we can prevent a concept from appearing on the generated image by subtracting some amount of steering vectors for that concept from corresponding CA outputs of a model during inference: 
+\begin{equation}
+ca^{out\_new}_{itk} = ca^{out}_{itk} - \alpha ca^{X}_{itk},
+\label{eq:4}
+\end{equation}
+\noindent Here $1 \leqslant k \leqslant \text{patch\_num}_i$, and $\alpha$ is a hyperparameter that controls the strength of concept suppression. 
+%
+Larger values of $\alpha$ lead to higher suppression of the concept $X$ in the generated image. Below we propose a way to adjust $\alpha$ dynamically based on activations of diffusion model during generation, achieving effective and precise erasure of unwanted concepts in the resulting image.
+
+\noindent \textbf{Choice of alpha.}
+Most often when we aim to suppress the concept of $X$, our goal is to completely prevent it from appearing on any generated image given any input prompt. This is the case of such tasks as nudity/violence removal or privacy, when we do not want the model to ever generate somebody's face or artwork. However, there might be different magnitudes for concept $X$ in the original text prompt (e.g., prompts ``an angry man'' or ``a furious man'' express different levels of anger). A concept $X$ can have different magnitudes of expression in different patches of the image being generated. Consequently, if we use Eq.~\ref{eq:4} for suppression, different values of $\alpha$ are needed to completely suppress $X$ for different prompts and individual image patches while not affecting other features in the image.
+
+\iffalse
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.5\linewidth]{content/images/dot_prods_maps.png}
+    \caption{Heatmaps for dot product values between CA outputs of SDXL model (layer 15, denoising step 0) and steering vector for ``Snoopy concept''. Top: generated images, bottom: heatmaps. Images are generated basd on the prompt ``A bright photo of a {X}'', where X $\in$ {``Snoopy'', ``Pikachu'', ``dog''}.  We see that for the image that contains Snoopy (left), dot product values are high for those image tokens that correspond to the place in the generated image that actually contains Snoopy. For images that do not contain Snoopy, dot product values are low for all image tokens.}
+    \label{fig:dot_products}
+    \vspace{-0.5cm}
+\end{figure*}
+\fi
+
+\begin{figure*}[t]
+\centering
+\begin{minipage}{0.55\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{content/images/dot_prods_maps.png}
+\end{minipage}
+\begin{minipage}{0.43\linewidth}
+    \caption{Heatmaps of dot product values between CA outputs of SDXL model (layer 15, denoising step 0) and steering vector for the ``Snoopy'' concept. Top: generated images, bottom: heatmaps. Images are generated based on the prompt ``A bright photo of a $X$'', where $X \in \{$``Snoopy'', ``Pikachu'', ``dog''$\}$. We see that for the image that contains Snoopy (left), dot product values are high for those image tokens that correspond to the image tokens that actually produce Snoopy. For images that do not contain Snoopy, dot product values are low for all image tokens.}
+    \label{fig:dot_products}
+\end{minipage}
+\vspace{-0.5cm}
+\end{figure*}
+
+
+We propose to estimate $\alpha$ for concept deletion by using the dot product between $ca^{X}_{it}$ and corresponding CA output $ca^{out}_{itk}$  ($\langle ca^{X}_{it}, ca^{out}_{itk} \rangle$) as an assessment of amount of $X$ that is present in the image part corresponding to $k^{th}$ patch of $ca^{out}_{it}$ (see Fig.~\ref{fig:dot_products}). As $ca^{X}_{it}$ is normalized, the value of this dot product is the length of the projection of the CA output $ca^{out}_{itk}$ onto the steering vector $ca^{X}_{it}$. As $ca^{X}_{it}$ can be seen as a direction in a linear subspace corresponding to the concept $X$, the length of the projection can be seen as the amount of $X$ that is present in $ca^{out}_{itk}$. That said, for removing information about $X$ from $ca^{out}_{itk}$, we propose to subtract the amount of $ca^{X}_{it}$ proportionate to the dot product between $ca^{X}_{it}$ and $ca^{out}_{itk}$ from $ca^{out\_new}_{itk}$, i.e., define $\alpha = \beta (ca^{X}_{it}, ca^{out}_{itk})$. Consequently, Eq.~\ref{eq:4} becomes the following:
+\begin{equation}
+\label{eq:6}
+ca^{out\_new}_{itk} = ca^{out}_{itk}- \beta \langle ca^{X}_{it}, ca^{out}_{itk} \rangle ca^{X}_{it}.
+\end{equation}  
+Here $1 \leqslant k \leqslant \text{patch\_num}_i$, and $\beta$ is a hyperparameter that controls the strength of the suppression. 
+
+Note that Eq.~\ref{eq:6} can be reformulated in a matrix form as a projection operator onto the subspace orthogonal to steering vector $s=ca^{X}_{it}$:
+\begin{equation}
+    s^{new} = f_{\text{delete}}(c, s) = (I - \beta ss^T)c 
+    \label{eq:casteer_erasure_matrix}
+\end{equation}
+
+Here $s^{new}=ca^{out\_new}_{itk}$, $c=ca^{out}_{itk}$, $s=ca^{X}_{it}$, $I$ is an identity matrix. 
+
+\noindent \textbf{Intermediate clipping}. We now introduce a mechanism of clipping the value of $\alpha$ to get better control over concept suppression. Note that using Eq.~\ref{eq:6} we only want to influence those CA outputs $ca^{out}_{itk}$ which have a positive amount of unwanted concept $X$. As dot product $ \langle ca^{X}_{it}, ca^{out}_{itk} \rangle$ measures the amount of $X$ present in CA output $ca^{out}_{itk}$, we only want to steer those CA outputs $ca^{out}_{itk}$, which have a positive dot product with $ca^{X}_{it}$. So the equation becomes the following:
+\begin{equation}
+\begin{split}
+\label{eq:7}
+    \alpha = \max(\beta \langle ca^{X}_{it}, ca^{out}_{itk}\rangle, 0) \\
+    ca^{out\_new}_{itk} = ca^{out}_{itk}- \alpha ca^{X}_{it}.
+\end{split}
+\end{equation}  
+
+Note that if intermediate clipping is used, Eq.~\ref{eq:7} can no longer be formulated in a matrix form. In the experiments section, we present results of applying CASteer for concept erasure both with and without intermediate clipping (i.e. using Eq.~\ref{eq:6} and Eq.~\ref{eq:7}).
+
+% \noindent \textbf{Concept Switch.} We also propose a way to switch one concept on the image being generated into another. Recall from above that value of the dot product $(ca^{X}_{it} \cdot ca^{out}_{itk})$ can be seen as amount of $X$ that is present in $ca^{out}_{itk}$. Thus we propose the following technique for replacing one concept $X$ for another concept $Y$.
+% %
+% We first construct steering vectors $ca^{XY}_{it}$ from $X$ to $Y$ using the same idea described above, using similar prompts with the only difference that the positive prompt contains $X$ (``a girl with an apple'') while the negative one contains $Y$ (``a girl with pear'').
+% %
+% Then we use this steering vector to modify cross-attention outputs as:
+% \begin{equation}
+% \label{eq:7}
+% ca^{out\_new}_{itk} = f_{renorm}(ca^{out}_{itk}- 2 (ca^{XY}_{it} \cdot ca^{out}_{itk}) ca^{XY}_{it}),
+% \end{equation}
+% \noindent where
+% $1 \leqslant k \leqslant \text{patch\_num}_i$. This operation can be seen as removing all the information about concept $X$ from $ca^{out}_{itk}$ and instead adding the same amount of information about concept $Y$, that is, we reflect $ca^{out}_{itk}$ relatively to the vector orthogonal to $ca^{XY}_{it}$.
+% Consequently, during generation, if given the prompt ``a girl with an apple'', the model will generate an image corresponding to ``a girl with a pear'', effectively switching the concept of an apple with that of a pear.
+ 
+\subsection{Practical considerations}
+\label{3.4}
+
+\noindent\textbf{Multiple Prompts for Steering Vector.} 
+We described in the previous section how to construct and use steering vectors to alter one concept,  based on one pair of prompts, e.g., ``a picture of a man'' and ``a picture of a man, baroque style''.
+%
+As mentioned, a steering vector can be seen as the direction in the space of intermediate representations of a model that points from an area of embeddings not containing a concept $X$, to an area that contains it.
+%
+In order for this direction to be more precise, we propose to construct steering vectors based on multiple pairs of prompts instead of one.
+%
+More precisely, we obtain $P \geqslant 1$ pairs of $ca^{pos\_avg}_{itp}$ and $ca^{neg\_avg}_{itp}$, $1 \leqslant p \leqslant P$, then average them over P:
+\begin{equation}
+    ca^{pos\_avg}_{it} = \frac{\sum_{p=1}^{P}ca^{pos\_avg}_{itp}}{P}, ca^{neg\_avg}_{it} = \frac{\sum_{p=1}^{P}ca^{neg\_avg}_{itp}}{P}
+\end{equation}
+\noindent and obtain steering vectors as $ca^{X}_{it} = ca^{pos\_avg}_{it} - ca^{neg\_avg}_{it}$.
+
+\noindent\textbf{Steering multiple concepts.} It is easy to erase multiple concepts during a generation by either mutually orthogonalizing a set of steering vectors corresponding to these concepts and applying them to the cross-attention output successively, or constructing single steering vector corresponding to multiple concepts by simply averaging individual steering vectors. In the experimental section, we show results on applying a steering vector constructed for multiple concepts using averaging approach to prevent generation of inappropriate concepts. Additionally, in the appendix (Sec.~\ref{sec:erasing_multiple_concepts}) we show results on erasing multiple concepts by orthogonalizing their corresponding steering vectors.
+
+\noindent\textbf{Efficiency: Transferring vectors from distilled models.} 
+% \ili{We need to considerably shorten this paragraph (should be 1-2 sentences), while potentially putting the current text in the related work. }Modern diffusion models typically require 30-50 denoising steps to generate good-quality images.
+%
+Adversarial Diffusion Distillation (ADD)~\cite{DBLP:conf/eccv/SauerLBR24} is a fine-tuning approach that allows sampling large-scale foundational image diffusion models in $1$ to $4$ steps, while producing high-quality images, with many methods such as SDXL and Sana having distilled versions (SDXL-Turbo and Sana-Sprint).
+%
+% This approach uses score distillation to leverage large-scale off-the-shelf image diffusion models as a teacher signal and combines this with an adversarial loss to ensure high image fidelity even in the low-step regime of one or two sampling steps. 
+%SDXL-Turbo is the ADD-fine-tuned version of the SDXL, and Sana-Sprint is a version of the SANA model tuned with hybrid distillation strategy. 
+%There is an ADD-fine-tuned version of the SDXL model publicly available, named SDXL-Turbo.
+%
+We observe that steering vectors obtained from the distilled models can successfully be used for steering generations of its corresponding non-distilled variants. 
+%
+More formally, having a pair of prompts, we obtain $ca^{pos\_avg}_{i}$ and $ca^{neg\_avg}_{i}$ from the distilled model using $1$ denoising step. 
+%
+Note that there is no second index $t$ as we use only one denoising iteration, i.e. $T=1$.
+%
+We then construct steering vectors for the concept $X$ as $ca^{X}_{i} = ca^{pos\_avg}_{i} - ca^{neg\_avg}_{i}$ and then use it to steer non-Turbo variant of the model by using $ca^{X}_{i}$ for each denoising step $1 \leqslant j \leqslant T$.
+
+\noindent\textbf{Injecting CASteer into model weights.}
+% Note that as SD-1.4 model does not have a corresponding ADD-distilled version, we need to construct steering vector for each denoising step for every CA layer. However,
+Note that when steering more advanced models (SDXL or Sana), we use steering vectors from Turbo/Sprint model versions, where we have only one steering vector per model CA layer. 
+Also note that the last layer of CA block in SDXL/SANA is Linear layer with no bias and no activation function, i.e., essentially is a matrix multiplication:
+$h_{out} = W_{proj\_out}h_{in}.$
+%\end{equation*}
+Here $W_{proj\_out}$ is a weight matrix of the last $proj\_out$ layer of CA block of SDXL/SANA, $h_{in}$ and $h_{out}$ are input and output to that layer, $h_{out}$ being the final output of CA layer.
+In this case, by combining last layer of CA block with CASteer formulation in a matrix form (Eq.~\ref{eq:casteer_erasure_matrix}), we can incorporate CASteer directly into weights of the model, by multiplying weight matrix of the last layer of CA block with $I - ss^T$ matrix from Eq.~\ref{eq:casteer_erasure_matrix}:
+\begin{equation}
+    h_{out} = (I - ss^T)W_{proj\_out}h_{in}  = W^{s}_{proj\_out}h_{in}
+\end{equation}
+$W^{s}_{proj\_out}$ is a matrix of the same size as $W_{proj\_out}$. This results in having zero inference overhead compares to original SDXL/SANA model similar to LoRA-like tuning approaches. 
+
+
+
+
+

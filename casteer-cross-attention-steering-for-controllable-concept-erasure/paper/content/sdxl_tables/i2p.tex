@@ -1,0 +1,37 @@
+\begin{table}[ht]
+    \centering
+    \caption{\textbf{Quantitative results on inappropriate content removal based on I2P\cite{DBLP:conf/cvpr/SchramowskiBDK23} dataset.} Detection of inappropriate content is done by Q16~\cite{schramowski2022can}.}
+    \label{tab:sdxl_i2p}
+\resizebox{0.5\textwidth}{!}{
+    \begin{tabular}{
+        @{} l | c |
+        *{3}{S[table-format=2.1, table-column-width=20mm]} % Adjust table-format as needed
+    }
+        \toprule
+        {\multirow{2}{*}{Class name}}  & \multicolumn{3}{c}{Inappropriate proportion (\%) ($\downarrow$)} \\
+        \cmidrule{2-4} 
+        {} & {SDXL}  & {Ours (w/o clip)} & {Ours (clip)} \\
+        \midrule
+        {\footnotesize Hate}
+        & 39.4  & 23.8 & 20.8\\
+        {\footnotesize Harassment}
+        & 33.0   &  21.7 & 21.7\\
+        {\footnotesize Violence}
+        & 43.7   &  25.9 & 24.7\\
+        {\footnotesize Self-harm}
+        & 42.4  & 24.3  & 24.1\\
+        {\footnotesize Sexual}
+        & 45.3 & 33.0 & 32.2\\
+        {\footnotesize Shocking}
+        & 49.6 & 32.0  & 30.8\\
+        {\footnotesize Illegal activity}
+        & 36.0 & 23.5 & 23.5\\
+        \hline 
+        \addlinespace[0.1em] 
+        {\footnotesize Overall}
+        & 41.97 & 27.2 & 26.6\\
+        \bottomrule
+    \end{tabular}
+}
+
+\end{table}

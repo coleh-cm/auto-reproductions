@@ -1,0 +1,1115 @@
+\clearpage
+% \setcounter{page}{1}
+%\maketitlesupplementary
+
+\appendix
+
+
+% \startcontents[sections]
+% \printcontents[sections]{l}{1}{\setcounter{tocdepth}{2}}
+
+\tableofcontents
+
+\clearpage
+
+\section{Limitations and Broader Impact}
+
+\textbf{Limitations. } While CASteer demonstrates strong performance on a wide range of concept erasure tasks without retraining, several limitations remain. First, the current method is designed specifically for diffusion models with a Transformer-based cross-attention architecture. Its generalizability to architectures that do not use cross-attention has not been evaluated and may require additional methodological adjustments. 
+%
+Second, although the construction of steering vectors is training-free, it depends on curated positive and negative prompts, which may introduce human bias and require domain knowledge for effective pairing. 
+%
+%Third, CASteer currently requires storing multiple per-layer, per-timestep vectors for each concept, which may pose memory challenges when scaling to thousands of concepts. 
+%
+While CASteer demonstrates effective and precise control over concept suppression tasks, there is still limited understanding of how steering vectors affect the broader semantic space. Deep learning research has largely moved forward through empirical results, often ahead of solid theoretical explanations. We believe such explanations are both useful and ultimately necessary. Still, important progress has often come from work without clear theory, as seen in the case of the batch normalization paper. We hope our work contributes to ongoing efforts to better understand and apply steering methods, especially to improve control and interpretability in diffusion models. 
+
+
+\textbf{Broader Impact. } CASteer contributes toward the democratization of safe and controllable image generation by offering a lightweight, training-free solution for concept steering in diffusion models. Its ability to remove specific concepts without retraining lowers the barrier for safety interventions in generative models, potentially empowering developers with limited resources to implement moderation tools and creative controls. This is particularly relevant for applications in content moderation, personalized media generation, and bias mitigation. However, CASteer also presents risks. The same mechanisms that allow the removal of harmful or copyrighted content can be used to suppress beneficial or truthful concepts for deceptive purposes. Moreover, the capability to switch or add identities (e.g., celebrity faces) raises ethical concerns regarding consent, misrepresentation, and deepfake generation. While we do not endorse any misuse of this technology, we believe transparency in capabilities and limitations is essential. Further safeguards and usage guidelines should accompany any deployment to ensure CASteer is used responsibly.
+
+\textbf{Future Work. } The construction of steering vectors used by CASteer depends on curated positive and negative prompts, which may introduce human bias and require domain knowledge for effective pairing. Future work on finding the best ways of constructing prompt pairs would be beneficial. Next, deep theoretical understanding of mechanisms behind CASteer would help develop further methods of controlling generation of diffusion models. Finally, applicability of steering diffusion models to other tasks, such as image editing or controllable image generation, is not yet explored.
+
+\textbf{Code. } The code is available at \href{https://github.com/Atmyre/CASteer}{https://github.com/Atmyre/CASteer}. The code was developed and tested using 8 V100 GPUs.
+
+
+\clearpage
+\section{Algorithms} 
+
+We give the algorithms of our model.
+%
+In Algorithm \ref{alg:1}, we describe how we compute the steering vectors, while in Algorithm \ref{alg:2}, we describe how we use them to perform concept erasure.
+%
+The algorithms closely follow the descriptions in Sec. \ref{method:create_steering} and Sec \ref{method_use_steering}.
+
+\begin{algorithm}[h!]
+\caption{Computing steering vectors}\label{alg:cap}
+\begin{algorithmic}
+\Require Diffusion model $DM$ with $n$ CA layers, number of denoising steps $T$, concepts $X, Y$, $P$ prompt pairs $(\mathcal{P}^{X}_p, \mathcal{P}^{Y}_p)$, $1 \leqslant p \leqslant P$, with $\mathcal{P}^{X}_p$ containing $X$ and $\mathcal{P}^{Y}_p$ containing $Y$, numbers of image patches per layer $\{m_i\}_{i=1}^n$
+\State Get $z_T \sim \mathbb{N}(0,I)$ a unit Gaussian random variable;
+\State $z_T^{X}  \leftarrow z_T$
+\State $z_T^{Y}  \leftarrow z_T$
+\For{$p= 1,\dots,P$}
+    \For{$t= T,T-1,\dots ,1$}
+        \State $z^{Y}_{t-1}, \{ca^{Y}_{itp}\} \leftarrow DM(z^{Y}_t, \mathcal{P}^{Y}_p, t)$, $1 \leqslant i \leqslant n$
+        \State $z^{X}_{t-1}, \{ca^{X}_{itp}\} \leftarrow DM(z^{X}_t, \mathcal{P}^{X}_p, t)$, $1 \leqslant i \leqslant n$
+    \EndFor
+\EndFor
+\State $ca^{X\_avg}_{it} = \frac{\sum_{k=1}^{m_i} \sum_{p=1}^P ca^{X}_{itpk}}{Pm_i}$
+% \State $ca^{X\_avg}_{it} = \frac{ca^{X\_avg}_{it}}{||ca^{X\_avg}_{it} ||^2_2}$ \Comment{Normalize}
+\State $ca^{Y\_avg}_{it} = \frac{\sum_{k=1}^{m_i} \sum_{p=1}^P ca^{Y}_{itpk}}{Pm_i}$
+% \State $ca^{Y\_avg}_{it} = \frac{ca^{Y\_avg}_{it}}{||ca^{Y\_avg}_{it}||^2_2}$ \Comment{Normalize}
+\State $ca^{X}_{it} = ca^{X\_avg}_{it} - ca^{Y\_avg}_{it}$
+\State $ca^{X}_{it} = \frac{ca^{X}_{it}}{||ca^{X}_{it}||^2_2}$ \Comment{Normalize}
+\end{algorithmic}
+\label{alg:1}
+\end{algorithm}
+
+\begin{algorithm}[h!]
+\caption{Using steering vectors}\label{alg:cap_2}
+\begin{algorithmic}
+\Require Diffusion model $DM$ with $n$ CA layers, number of denoising steps $T$, steering vectors $ca^{X}_{it}$ for concept $X$ to remove, input prompt $\mathcal{P}$,
+number of image patches on layers$\{m_i\}_{i=1}^n$, steering intensity $\beta$, flag of intermediate clipping $do\_clip$ 
+\State Get $z_T \sim \mathbb{N}(0,I)$ a unit Gaussian random variable;
+\For{$t= T,T-1,\dots ,1$}
+    \For{$i= 1,\dots , n$}
+        
+        \State $z_{tmp}, ca^{out}_{itk} \leftarrow DM(z^{Y}_t, \mathcal{P}, t)$ 
+
+        \State $\alpha \leftarrow \langle ca^{out}_{it}, ca^{X}_{it} \rangle$
+        \If{$do\_clip$}
+            \For{$k= 1,\dots ,m_i$} \Comment{Clipping dot product value for each image patch}
+                \State $\alpha_{k} \leftarrow \max(\alpha_{k}, 0)$
+            \EndFor
+        \EndIf
+            
+        \State $ca^{out\_new}_{it} \leftarrow ca^{out}_{it}-  \alpha ca^{X}_{it}$ 
+        
+
+        \State $z^{Y}_{t-1} \leftarrow DM(z_{tmp}, ca^{out}_{it})$ \Comment{Continue inference}
+        
+    \EndFor
+\EndFor
+\end{algorithmic}
+\label{alg:2}
+\end{algorithm}
+
+\clearpage
+
+\section{Prompts for generating steering vectors}
+\label{sec:prompts}
+
+In this section, we describe the construction of prompt pairs that we use to compute steering vectors for our experiments.
+
+\subsection{Prompts for erasing concrete concepts}
+\label{sec:prompts_erasure}
+For erasing concrete concepts, we use prompt pairs of the form: 
+$$(``\mathbf{p},\ with\ \mathbf{e}", \  ``\mathbf{p}")$$
+\noindent Here $\mathbf{p} \in \mathbf{P}$, where $\mathbf{P}$ is a set of $N$ ImageNet classes, and $\mathbf{e}$ describes the concept we want to manipulate, e.g. we use  $\mathbf{e} =$``Snoopy'' for \textit{Snoopy} erasure, $\mathbf{e} =$``Mickey'' for \textit{Mickey} erasure.
+\noindent Examples of prompts: \\
+$(``junco,\ with\ Snoopy'', \  ``junco")$\\
+$(``mud\ turtle,\ with\ Mickey'',$ $``mud\ turtle")$ 
+
+\noindent Inside each prompt pair, the same generation seed is used. \\
+\noindent Our main results in Tab.~\ref{tab:results_snoopy} are produced using steering vectors calculated on $N=50$ prompts pairs.
+
+\input{content/sd14_tables/snoopy}
+
+\subsection{Prompts for human-related concepts}
+\label{sec:prompts_human}
+For manipulating abstract human-related concepts, we use prompt pairs of the form: 
+$$(``\mathbf{b}\ \mathbf{c},\ \mathbf{e}", \  ``\mathbf{b}\ \mathbf{c}")$$
+Here $\mathbf{b} \in \mathbf{B}$ and $\mathbf{c} \in \mathbf{C}$, where\\
+$\mathbf{B}$ = $\{$``a girl", ``a boy", ``two men", ``two women", ``two people", ``a man", ``a woman", ``an old man", ``an old woman", ``boys", ``girls", ``men", ``women", ``group of people", ``a human",$\}$ \\
+$\mathbf{C}$ = $\{$``", ``gloomy image", ``zoomed in", ``talking", ``on the street", ``in a strange pose", ``realism", ``colorful background", ``on a beach", ``playing guitar", ``enjoying nature", ``smiling", ``in a futuristic spaceship", ``with kittens"$\}$,\\
+\noindent and $\mathbf{e}$ describes the concept we want to manipulate. \\
+\noindent$|\mathbf{b}|=15,\ |\mathbf{C}|=14$, which results in a total of 210 prompt pairs for each concept $\mathbf{e}$. 
+
+\noindent Following Receler, we use  $\mathbf{e} = $``nudity'' for nudity erasure, and set of $\{ ``hate", ``harassment", ``violence", ``suffering", ``humiliation", ``harm", ``suicide", \allowbreak ``sexual", ``nudity'', ``bodily fluids", ``blood" \}$ for harmful content erasure.
+
+\noindent Examples of prompts for nudity erasure: \\
+$(``a\ girl\ on\ a\ beach,\ nudity'', \  ``a\ girl\ on\ a\ beach")$\\
+$(``boys\ talking,\ nudity'',$ \   $``boys\ talking")$ 
+
+\noindent Inside each prompt pair, the same generation seed is used.
+
+\subsection{Prompts for style manipulation}
+For erasing or adding (Sec.~\ref{sec:style_transfer}) style, we use prompt pairs of the form: 
+$$(``\mathbf{p},\ \mathbf{e}\ style", \  ``\mathbf{p}")$$ 
+\noindent Here $\mathbf{p} \in \mathbf{P}$, where $\mathbf{P}$ is a set of ImageNet classes as used for concrete concept erasure, and $\mathbf{e}$ describes the style we want to manipulate, e.g. ``baroque or ``Van Gogh''. \\
+
+\noindent Examples of prompts: \\
+$(``junco,\ baroque\ style", \  ``junco")$\\
+$(``mud\ turtle,\ Van\ Gogh\ style",$ $``mud\ turtle")$ 
+
+\noindent Inside each prompt pair, the same generation seed is used. \\
+% \noindent Our main results in Tab.~\ref{tab:t2i_art} are produced using steering vectors calculated on 50 prompts pairs. 
+% \input{content/sd14_tables/style}
+\clearpage
+
+
+\section{User studies}
+\label{sec:user_study}
+In this section, we provide user studies to complement quantitative and qualitative results of CASteer. 
+
+In the first user study, we compare SPM and CASteer on removing a concept of ``Mickey'' based on \textit{explicit} prompts. For this study, we generated 800 images using ``Mickey'' prompts augmented with CLIP templates. Then, we randomly selected multiple sets of 20 pairs of images and provided them to our evaluators. We asked the users to select which model is best at removing the Mickey concept, by asking ``Which image has the lower level of ``Mickey'' concept present?'' and providing 3 options as answers: 1)``Image A'', 2)``Image B'', 3)``Both images completely removed the Mickey concept''. We show in Tab. \ref{tab:explicit_mickey} that our model was preferred for generating images without the Mickey concept, even when the concept was explicitly defined.
+\begin{table}[h!]
+\centering
+
+    \caption{User preferences for which model removed the \textit{explicit} concept Mickey better. Our model was preferred for removing Mickey from images.}
+    \label{tab:explicit_mickey}
+    \begin{tabular}{lcc}
+    \hline
+    \textbf{Model} & \textbf{Images Preferred} & \textbf{Percentage (\%)} \\
+    \hline
+    SPM & 9 & 4.86\% \\
+    CASteer & \textbf{108} & \textbf{58.38}\% \\
+    Both & 68 & 36.76\% \\
+    \hline
+    \textbf{Total} & 185 & 100\% \\
+    \hline
+    \end{tabular}
+\end{table}
+
+Next, we run another user study, this time testing removal of the concept of ``Mickey'' based on \textit{implicit} prompts. For this study, we generated 100 images using prompts ``A mouse from Disneyland'' and ``A Walt Disney's most popular character''. Then, we randomly selected 20 image pairs and provided them to our evaluators. We asked the users to select which model is best at removing the Mickey concept, by asking ``Which image has the lower level of ``Mickey'' concept present?'' and providing 3 options as answers: 1)``Image A'', 2)``Image B'', 3)``Both images completely removed the Mickey concept''. Tab.~\ref{tab:implicit_mickey} shows that CASteer was again preferred for generating images without the ``Mickey'' concept.
+
+\begin{table}[h!]
+    \centering
+    \caption{User preferences for which model removed the \textit{implicit} ``Mouse from Disneyland'' better. Our model was preferred for removing Mickey from images.}
+    \label{tab:implicit_mickey}
+    \begin{tabular}{lcc}
+    \hline
+    \textbf{Model} & \textbf{Images Preferred} & \textbf{Percentage (\%)} \\
+    \hline
+    SPM & 4 & 2.17\% \\
+    CASteer & \textbf{156} & \textbf{84.32}\% \\
+    Both & 25 & 13.51\% \\
+    \hline
+    \textbf{Total} & 185 & 100\% \\
+    \hline
+    \end{tabular}
+\end{table}
+
+Based on the results above, we can see that users consider that CASteer removes specific concepts from generated images better than SPM. This matches our quantitative results presented in the paper.
+
+Next, we compare CASteer, SPM and Receler models in removing the ``Snoopy'' concept, while preserving the concept of ``Mickey''.  First, we assess removal of the ``Snoopy'' concept. We generated 800 images using ``Snoopy'' prompts augmented with CLIP templates. Then, we randomly selected multiple sets of 20 image pairs and provided them to our evaluators. We asked them to select all the images where the concept of ``Snoopy'' is removed. Tab.~\ref{tab:3models_snoopy_rem_snoopy} shows that both CASteer and Receler have high rates of ``Snoopy'' erasure.
+
+\begin{table}[h!]
+\centering
+\caption{Percentage of generated images containing Snoopy detected for each model.}
+\label{tab:3models_snoopy_rem_snoopy}
+\begin{tabular}{lccc}
+\hline
+\textbf{Model} & \textbf{$\%$ Containing Snoopy $\downarrow$} & \textbf{$\%$Without Snoopy $\uparrow$} & \textbf{$\%$ Total} \\
+\hline
+Receler & \textbf{0} & \textbf{100} & 100 \\
+CASteer & \underline{3.3} & \underline{96.7} & 100 \\
+SPM & 44.4  & 55.6 & 100 \\
+\hline
+\end{tabular}
+\end{table}
+
+Lastly, we want to see how well SPM, Receler and CASteer preserve concept ``Mickey'' when ``Snoopy'' is removed. We provide users with 3 images, one for each model, and ask them to rank these images based on how much the ``Mickey'' concept is preserved in the images. We thus ask them ``Rank the images in order from higher level of ``Mickey'' concept present (1) to lowest level of ``Mickey'' concept present (3).''. We give each user a randomly selected subset of 15 triplets of images. We can observe in Tab.~\ref{tab:3models_mickey_rem_snoopy} that SPM preserves the best the concept of Mickey, followed by CASteer. However, from Tab.~\ref{tab:3models_snoopy_rem_snoopy} we see that SPM has a much higher tendency to preserve concepts, even the ones that should be removed, such as ``Snoopy''. Our model has been considered by users a more reliable model for both removing some concepts and preserving the rest.
+
+\begin{table}[h!]
+\centering
+\caption{User ranking of generated images by perceived Mickey content 
+(1 = most Mickey, 3 = least Mickey). Lower scores indicate more Mickey content which is what we want to preserve.}
+\label{tab:3models_mickey_rem_snoopy}
+\begin{tabular}{lcc}
+\hline
+\textbf{Model} & \textbf{Total Rank Score $\downarrow$} & \textbf{Average Rank $\downarrow$}\\
+\hline
+Receler & 480 & 2.73 \\
+CASteer & \underline{391} & \underline{2.22} \\
+SPM & \textbf{185} & \textbf{1.05} \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\clearpage
+
+\section{Details on style removal task}
+\label{sec:details_style_removal}
+The task focuses on the styles of five famous artists (Van Gogh, Picasso, Rembrandt, Warhol, Caravaggio) and the other uses five modern artists (McKernan, Kinkade, Edlin, Eng, Ajin: Demi-Human). Following SAFREE, we use $LPIPS$ and prompt GPT-4o to identify an artist on generated images as evaluation metrics.
+
+Following recent works, we experiment with removing one style of famous
+artist (Van Gogh) and one style of a modern artist (McKernan). We assess both how well our methods remove the desired style (e.g., Van Gogh) and preserve other styles in the
+same batch (e.g. Picasso, Rembrandt, Warhol and Caravaggio, if we remove Van Gogh). $LPIPS_e$ shows $LPIPS$ values for the images generated, when prompted with target style (``Van Gogh” or ``Kelly McKernan”), and $LPIPS_u$, shows $LPIPS$ values for the images generated with the other 4 styles. $Acc_e$ shows the accuracy of GPT-4o answers
+when asked to identify an artist on images generated with target style in prompt (``Van Gogh'' or ``Kelly McKernan''), and $Acc_u$ shows the accuracy of GPT-4o answers when asked
+to identify an artist on images generated with other styles in prompt. The goal of any style removal method is to
+lower $LPIPS_e$ and $Acce$ (i.e., successfully remove target style) while maintaining $LPIPS_u$ and $Acc_u$ high (i.e., not affecting the generation of other styles). 
+
+Questions to GPT-4o are formulated as ``Is this picture in \textbf{s} style? Just tell me Yes or No.'', where $s$ represents style, e.g., \textbf{s} =``Andy Warhol'' or \textbf{s} =``Van Gogh''. The number
+of ``Yes'' answers divided by the number of total answers is considered as Acc metric. We report results averaged over 3 runs for this metric.
+
+\clearpage
+
+\section{Results on SDXL model}
+\label{sdxl_res}
+
+Here we provide qualitative and qualitative results on removing concrete and abstract concepts using CASteer with the SDXL model.
+
+\subsection{Experimental setup}
+
+In SDXL experiments, we generate images using CASteer with $\beta=2$ on SDXL-base-1.0 model (stabilityai/stable-diffusion-xl-base-1.0) with steering vectors calculated on SDXL-Turbo model (stabilityai/sdxl-turbo).
+
+For calculation of steering vectors, we use fp16-version of SDXL-Turbo model. We generate images using default resolution, with one denoising step, using guidance scale=0.0 and seed=0. All other parameters are left default. To generate images, we use CASteer on SDXL-base-1.0 model with 30 denoising steps. All other parameters are left default.
+
+Generation of steering vector using 1 pair of prompts on SDXL-Turbo takes 8 seconds on V-100 GPU, i.e. generation of steering vectors for concrete concepts (see Sec.~\ref{sec:prompts}) using 50 prompts takes ~7 minutes, generation of steering vectors for human-related concepts (see Sec.~\ref{sec:prompts}) using 210 prompts takes ~28 minutes.
+
+\subsection{Quantitative results}
+
+We use the same experimental setups as for SD-1.4, described in Sec.~\ref{sec:experiments}. Results are shown in Tab.~\ref{tab:sdxl_nudity},~\ref{tab:sdxl_i2p},~\ref{tab:sdxl_fid},~\ref{tab:sdxl_snoopy},~\ref{tab:sdxl_t2i_art}.
+
+
+\input{content/sdxl_tables/nudity}
+\input{content/sdxl_tables/i2p}
+\input{content/sdxl_tables/fid}
+\input{content/sdxl_tables/snoopy}
+\input{content/sdxl_tables/artists}
+
+
+\subsection{Qualitative results}
+\label{sec:sdxl_res}
+
+In this section, we provide qualitative results on CASteer applied on SDXL model. 
+
+First, we show results on removing ``Snoopy'' concept when generating images with four prompt templates: ``\textit{An origami $X$}'', ``\textit{A drawing of the $X$}'', ``\textit{A photo of a cool $X$}'' and ``\textit{An art of the $X$}'', where $X \in $ [``\textit{Snoopy}'', ``\textit{Mickey}'', ``\textit{Spongebob}'', ``\textit{Pikachu}'', ``\textit{dog}'', ``\textit{legislator}'']. CASteer is applied with removal strength $\beta=2$.
+
+We see that our method removes Snoopy well (see Fig.~\ref{fig:rem_snoopy_snoopy_1} while preserving other concepts well (see Fig. ~\ref{fig:rem_snoopy_mickey_1}, ~\ref{fig:rem_snoopy_spongebob_1}, ~\ref{fig:rem_snoopy_pikachu_1},
+~\ref{fig:rem_snoopy_dog_1},
+~\ref{fig:rem_snoopy_legislator_1}). In fact, most of the images of non-related concepts generated with CASteer applied are almost identical to those generated by vanilla SDXL. 
+
+Second, we show images generated on COCO-30k prompts with applied CASteer for nudity removal. We see that quality of generated images does not degrade, supporting quantitative results of Tab.~\ref{tab:sdxl_fid} (see Fig.~\ref{fig:sdxl_coco_1},~\ref{fig:sdxl_coco_2},~\ref{fig:sdxl_coco_3})
+
+Next, on Fig.~\ref{fig:sdxl_style_removal} and Fig.~\ref{fig:sdxl_style_mosaic_origami} we show examples of CASteer applied for style removal.
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/rem_snoopy_snoopy.png}
+    \caption{Images generated with ``\textit{Snoopy}'' prompts  with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''. } 
+    \label{fig:rem_snoopy_snoopy_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/rem_snoopy_mickey.png}
+    \caption{Images generated with ``\textit{Mickey}'' prompts  with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:rem_snoopy_mickey_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/rem_snoopy_spongebob.png}
+    \caption{Images generated with ``\textit{Spongebob}'' prompts  with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:rem_snoopy_spongebob_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/rem_snoopy_pikachu.png}
+    \caption{Images generated with ``\textit{Pikachu}'' prompts  with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:rem_snoopy_pikachu_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/rem_snoopy_dog.png}
+    \caption{Images generated with ``\textit{dog}'' prompts  with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:rem_snoopy_dog_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/rem_snoopy_legislator.png}
+    \caption{Images generated with ``\textit{legislator}'' prompts  with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:rem_snoopy_legislator_1}
+\end{figure*}
+
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/sdxl_coco_1.png}
+    \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+    \label{fig:sdxl_coco_1}
+\end{figure*}
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/sdxl_coco_2.png}
+    \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+    \label{fig:sdxl_coco_2}
+\end{figure*}
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/sdxl_coco_3.png}
+    \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+    \label{fig:sdxl_coco_3}
+\end{figure*}
+% \begin{figure*}[h!]
+%     % \centering
+%     \includegraphics[width=\linewidth]{content/images/sdxl/sdxl_coco_4.png}
+%     \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SDXL, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+%     \label{fig:sdxl_coco_4}
+% \end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/style_removal.png}
+    \caption{Examples of style removal for SDXL. Top: original SDXL, bottom: CASteer applied for removing the style of ``\textit{Van Gogh}''}
+    \label{fig:sdxl_style_removal}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/style_mosaic_origami.png}
+    \caption{Examples of style removal for SDXL. Top: original SDXL, bottom: CASteer applied for removing the style of ``\textit{mosaic style}'' (left 4 images) and ``\textit{origami style}'' (right 4 images)}
+    \label{fig:sdxl_style_mosaic_origami}
+\end{figure*}
+
+% \clearpage
+% \subsection{Additional comparisons on SDXL model}
+
+% In this section, we provide quantitative comparison of CASteer on SDXL model with SAFREE~\cite{DBLP:journals/corr/abs-2410-12761}. The publicly available evaluation code provided by SAFREE~\cite{DBLP:journals/corr/abs-2410-12761} is used to produce scores. We see that CASteer outperforms SAFREE on all the datasets.
+
+% \input{content/sdxl_tables/safree_nudity}
+
+
+
+\clearpage
+\section{Results on SANA model}
+\label{sec:sana_res}
+
+\subsection{Experimental setup}
+
+In SANA experiments, we generate images using CASteer with $\beta=2$ on SANA\_Sprint\_1.6B\_1024px\_teacher model (Efficient-Large-Model/SANA\_Sprint\_1.6B\_1024px\_teacher\_diffusers) with steering vectors calculated on Sana\_Sprint\_1.6B\_1024px model (Efficient-Large-Model/Sana\_Sprint\_1.6B\_1024px\_diffusers).
+
+For calculation of steering vectors, we use fp16-version of Sana\_Sprint\_1.6B\_1024px\_diffusers model. We generate images using default resolution, with one denoising step, using guidance seed=0. All other parameters are left default. To generate images, we use CASteer on SANA\_Sprint\_1.6B\_1024px\_teacher model with 20 denoising steps. All other parameters are left default.
+
+Generation of steering vector using 1 pair of prompts on Sana\_Sprint\_1.6B\_1024px takes 5 seconds on V-100 GPU, i.e. generation of steering vectors for concrete concepts (see Sec.~\ref{sec:prompts}) using 50 prompts takes ~4.2 minutes, generation of steering vectors for human-related concepts (see Sec.~\ref{sec:prompts}) using 210 prompts takes ~18 minutes.
+
+\subsection{Quantitative results}
+
+In this section, we present quantitative results on steering SANA model. We use the same experimental setups as for SD-1.4, described in Sec.~\ref{sec:experiments}. Results on SANA model are shown in Tab.~\ref{tab:sana_nudity},~\ref{tab:sana_i2p},~\ref{tab:sana_fid},~\ref{tab:sana_snoopy},~\ref{tab:sana_t2i_art}.
+
+\input{content/sana_tables/nudity} 
+\input{content/sana_tables/i2p}
+\input{content/sana_tables/fid}
+\input{content/sana_tables/snoopy}
+\input{content/sana_tables/artists}
+
+\subsection{Qualitative results}
+
+In this section, we provide qualitative results on CASteer applied on SANA model. 
+
+First, we show results on removing ``Snoopy'' concept when generating images with four prompt templates: ``\textit{An origami $X$}'', ``\textit{A drawing of the $X$}'', ``\textit{A photo of a cool $X$}'' and ``\textit{An art of the $X$}'', where $X \in $ [``\textit{Snoopy}'', ``\textit{Mickey}'', ``\textit{Spongebob}'', ``\textit{Pikachu}'', ``\textit{dog}'', ``\textit{legislator}'']. CASteer is applied with removal strength $\beta=2$.
+
+We see that our method removes Snoopy well (see Fig.~\ref{fig:sana_rem_snoopy_snoopy_1} while preserving other concepts well (see Fig. ~\ref{fig:sana_rem_snoopy_mickey_1}, \ref{fig:sana_rem_snoopy_spongebob_1}, \ref{fig:sana_rem_snoopy_pikachu_1},
+\ref{fig:sana_rem_snoopy_dog_1},
+\ref{fig:sana_rem_snoopy_legislator_1}). In fact, most of the images of non-related concepts generated with CASteer applied are almost identical to those generated by vanilla SANA. 
+
+Second, we show images generated on COCO-30k prompts with applied CASteer for nudity removal. We see that quality of generated images does not degrade, supporting quantitative results of Tab.~\ref{tab:sana_fid} (see Fig.~\ref{fig:sana_coco_1},~\ref{fig:sana_coco_2},~\ref{fig:sana_coco_3}). In some cases, visual quality of image generated with CASteer exceeds that of original SANA (see Fig.~\ref{fig:sana_coco_2}, 3rd and 5th images for example).
+
+Next, on Fig.~\ref{fig:sana_style_removal} and Fig.~\ref{fig:sana_style_mosaic_origami}  we show examples of CASteer applied for style removal.
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/rem_snoopy_snoopy.png}
+    \caption{Images generated with ``\textit{Snoopy}'' prompts  with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''. } 
+    \label{fig:sana_rem_snoopy_snoopy_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/rem_snoopy_mickey.png}
+    \caption{Images generated with ``\textit{Mickey}'' prompts  with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:sana_rem_snoopy_mickey_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/rem_snoopy_spongebob.png}
+    \caption{Images generated with ``\textit{Spongebob}'' prompts  with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:sana_rem_snoopy_spongebob_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/rem_snoopy_pikachu.png}
+    \caption{Images generated with ``\textit{Pikachu}'' prompts  with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:sana_rem_snoopy_pikachu_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/rem_snoopy_dog.png}
+    \caption{Images generated with ``\textit{dog}'' prompts  with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:sana_rem_snoopy_dog_1}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/rem_snoopy_legislator.png}
+    \caption{Images generated with ``\textit{legislator}'' prompts  with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{Snoopy}''.} 
+    \label{fig:sana_rem_snoopy_legislator_1}
+\end{figure*}
+
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/sana_coco_1.png}
+    \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+    \label{fig:sana_coco_1}
+    % \vspace{-0.5cm}
+\end{figure*}
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/sana_coco_2.png}
+    \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+    \label{fig:sana_coco_2}
+    % \vspace{-0.5cm}
+\end{figure*}
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/sana_coco_3.png}
+    \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+    \label{fig:sana_coco_3}
+    % \vspace{-0.5cm}
+\end{figure*}
+% \begin{figure*}[h!]
+%     % \centering
+%     \includegraphics[width=\linewidth]{content/images/sana/sana_coco_4.png}
+%     \caption{Images generated with different COCO-30k prompts with different seeds. Top: original SANA, bottom: CASteer applied for removing the concept of ``\textit{nudity}''.} 
+%     \label{fig:sana_coco_4}
+%     % \vspace{-0.5cm}
+% \end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/style_removal.png}
+    \caption{Examples of style removal for SANA. Top: original SANA, bottom: CASteer applied for removing the style of ``\textit{Van Gogh}''}
+    \label{fig:sana_style_removal}
+\end{figure*}
+
+\begin{figure*}[h!]
+    % \centering
+    \includegraphics[width=\linewidth]{content/images/sana/style_mosaic_origami.png}
+    \caption{Examples of style removal for SANA. Top: original SANA, bottom: CASteer applied for removing the style of ``\textit{mosaic style}'' (left 4 images) and ``\textit{origami style}'' (right 4 images)}
+    \label{fig:sana_style_mosaic_origami}
+\end{figure*}
+
+
+
+\clearpage
+\section{Ablations on hyperparameters}
+\label{sec:ablations}
+
+In this section, we provide ablations on such hyperparameters as number and choice of prompt pairs to form a steering vector, a value of $\beta$, choice of the intermediate layer to steer, and importance of dot product weighting.
+
+\subsection{Number and choice of steering vectors}
+\label{ablation_num_vectors}
+First, we compute steering vectors for the concept of ``Snoopy'' using SD-1.4 model on varying number of prompt pairs. Then we fix $\beta=2$ and apply CASteer on SD-1.4 model using computed steering vectors on 800 prompts as described in Sec.~\ref{sec:experiments}. In particular, we augment each concept using $80 $ CLIP~\cite{DBLP:conf/icml/RadfordKHRGASAM21} templates, and generate $10$ for each concept-template pair, so that for each concept there are $800$ images. 
+%
+% We use 50 prompt pair of form (``\textit{X}, with Snoopy'', ``\textit{X}'') to generate steering vectors of $\textit{Snoopy}$. 
+%
+We calculate CLIP Score (CS)~\cite{DBLP:conf/emnlp/HesselHFBC21}  and FID~\cite{DBLP:conf/nips/HeuselRUNH17} on these generated images as described in Sec.~\ref{sec:experiments}. Specifically, we use CS to estimate the level of the existence of the ``Snoopy'' concept within the generated images. Next, we calculate average FID~\cite{DBLP:conf/nips/HeuselRUNH17} scores between the set of original generations of SD-1.4 model on prompts non-related to ``Snoopy'' and a set of generations of the steered model on these prompts. We use it to assess how much images of this related concept generated by the steered model differ from those of generated by the original model. Higher FID value demonstrate more severe generation alteration.
+
+For each number of prompt pairs, we compute the steering vector three times using different non-intersecting sets of prompts and different random seeds. Thus, for each number of prompt pairs, we report three metric values.
+
+Figures \ref{fig:abl_num_prompts_clip_score} and \ref{fig:abl_num_prompts_fid} show CS and FID metrics for different numbers of prompt pairs used for generation of steering vectors. We see that CASteer performance remains stable across different prompt sets, and using number of pairs 50 and above results in similar performance.
+
+\begin{figure}[htbp!]
+\centering
+\begin{subfigure}{0.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{content/images/params_abl/runs_clip.png}
+  \caption{}
+  \label{fig:abl_num_prompts_clip_score}
+\end{subfigure}
+%\hfill
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{content/images/params_abl/runs_fid.png}
+  \caption{}
+  \label{fig:abl_num_prompts_fid}
+\end{subfigure}
+\vspace{-0.6cm}
+\caption{Ablation on number of prompts for computing steering vectors on SD-1.4. (a) CLIP score for a concept ``Snoopy'' calculated for images generated by CASteer using prompts containing ``Snoopy''. (b) Averaged FID between original model generations for other concepts, and generations of a steered model. Blue line indicates mean values across three samples}
+\label{fig:test}
+\vspace{-0.5cm}
+\end{figure}
+
+\subsection{Importance of dot product weighting}
+\label{ablation_dot product}
+
+Our choice of steering vector weighting for concept erasure in Eq.~\ref{eq:6} is motivated by an observation that dot product between Cross-Attention (CA) output $c$ tokens and the steering vector $s^X$ for a concept $X$ serves as a good measure of amount of $X$ that is present in each token of $c$. In this section, we provide experimental ablation on importance of his weighting. We fix $\alpha$ in Eq.~\ref{eq:4} to be constant, and perform erasure of ``Snoopy'' concept using setup as described in Sec.~\ref{sec:experiments}. We measure CLIP score of ``Snoopy'' concept in the generated images based on prompts containing ``Snoopy'', and CLIP score and FID of ``Mickey'' concept in the generated images based on prompts containing ``Mickey''. We also report CLIP score and FID on images generated with CASteer for ``nudity'' erasure based on prompts from validation set of COCO-30k.
+
+Tab.~\ref{tab:constant_snoopy},~\ref{tab:constant_fid} show results for $\alpha=1,2$ with and without clipping applied. We also report results of CASteer as reference. We see that for both values of $\alpha$, ``Snoopy'' prompt is not erased well. Meanwhile, for $\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer. This suggests that our proposed weighting mechanism is crucial for performance of our method.
+
+\input{content/tables_constant/snoopy}
+\input{content/tables_constant/fid}
+
+\subsection{Steering strength}
+\label{sec:ablation_strength}
+Note that CASteer has a hyperparameter $\beta$, which determines the strength of steering for concept removal. While we set $\beta=2$ in all our experiments, and this choice is motivated by the properties of the resulting transformation (see Sec.~\ref{sec:experiments}), it is still possible to use CASteer with varying values of strength $\beta$. Although experimentally we observe that value of $\beta=2$ is optimal for all erasing scenarios and we use $\beta=2$ in all our experiments, $\beta$ still can be tuned for each use case, and varying values of $\beta$ can lead to different trade-offs between level of target concept erasure and alteration of generated images not containing target concept. To show how $\beta$ influences performance, in this section we provide results on ``Snoopy'' and ``nudity'' erasure using CASteer on SD-1.4, SDXL and SANA with different values of $\beta$ 
+
+Tab.~\ref{tab:strenghts_fid} shows image quality metrics obtained using CASteer erasing ``nudity'' on COCO-30k validation dataset. It can be seen that steering with strength up to 2 does not lower general image quality for all models. Next, for SDXL and SANA models, steering with strength $\beta>2$ up to $\beta=4$ also does not affect general image quality, while for SD-1.4 steering with $\beta>2$ results in degradation of image fidelity. 
+
+Tab.~\ref{tab:strength_sana_nudity} and Tab.~\ref{tab:strength_sdxl_nudity} show results on nudity erasure using varying steering strength $\beta$. We see that $\beta<2$ results in a lesser suppression of the erased concept. 
+In general, we see that as $\beta$ increases, level of concept suppression is increased. However, for SANA with $\beta \geqslant 3$, and for SDXL with $\beta \geqslant 4$, CASteer without clipping starts showing lower rates of erasure. We hypothesize that this happens due to the absence of clipping, when image tokens with negative dot product with steering vector of ``nudity'' start containing substantial positive amount of ``nudity'' after steering. This hypothesis is supported by that CASteer with clipping does not show degrading performance with large values of $\beta$.
+
+
+
+\input{content/strength_tables/fid}
+\input{content/strength_tables/nudity_sana}
+\input{content/strength_tables/nudity_sdxl}
+
+% We use CASteer on SD-1.4 to erase concept of ``Snoopy'' from images generated on ``Snoopy'' and ``Mickey'' prompts. We calculate CLIP Score (CS) and FID as described above in sec.\ref{ablation_num_vectors}. Fig.~\ref{fig:abl_beta_clip_score},\ref{fig:abl_beta_fid} shows the results. We see that value of $\beta$ indeed presents trade-off between strength of erasure of a desired concept (``Snoopy'') and preservation of another concept (``Mickey''). Hence, different strength $\beta$ might be used depending on the goal of the task.
+
+
+% \begin{figure}[htbp!]
+% \centering
+% \begin{subfigure}{0.5\textwidth}
+%   \centering
+%   \includegraphics[width=\linewidth]{content/images/params_abl/beta_clip_score.png}
+%   \caption{}
+%   \label{fig:abl_beta_clip_score}
+% \end{subfigure}
+% %\hfill
+% \begin{subfigure}{0.49\textwidth}
+%   \includegraphics[width=\linewidth]{content/images/params_abl/beta_fid.png}
+%   \caption{}
+%   \label{fig:abl_beta_fid}
+% \end{subfigure}
+% \vspace{-0.6cm}
+% \caption{Ablation on strength value $\beta$ for steering on SD-1.4 model for erasure. (a) CLIP score for a concept ``Snoopy'' calculated for images generated by CASteer using prompts containing ``Snoopy''. (b) FID between original model generations for a concept ``Mickey'', and generations of a steered model.}
+% \label{fig:test}
+% \vspace{-0.5cm}
+% \end{figure}
+\clearpage
+\subsection{Steering other layers}
+\label{ablation_other_layers}
+
+Here we provide results on steering other intermediate representations of DiT backbone rather than cross-attention (CA) output. 
+
+First, steering any part of DiT not inside CA does not result in the desired behaviour, producing completely out-of-distribution images. Next, we try to steer other parts of CA layer, namely, computing steering vectors and steering key and value vectors or steering outputs of individual attention heads. We steer key and value vectors here because they carry information from the input prompt. 
+
+We use CASteer on SD-1.4 to erase concept of ``Snoopy'' from images generated on ``Snoopy'' and ``Mickey'' prompts. We calculate CLIP Score (CS) and FID as described above in Sec.~\ref{ablation_num_vectors}. Tab.~\ref{tab:ablation_other_layers} presents the results. We see that steering key and value vector has less effect on the desired concept, and steering outputs of individual attention heads provides roughly the same results. 
+
+\begin{table}[h!]
+\caption{\textbf{Quantitative evaluation of steering other layers}.}
+\label{tab:ablation_other_layers}
+\centering
+\setlength{\tabcolsep}{2.0pt}
+\resizebox{0.5\textwidth}{!}{
+\definecolor{mygray}{gray}{.9}
+\begin{tabular}{l|c|c}
+    \toprule
+    & Snoopy & Mickey \\
+    \cmidrule{2-3}
+    Method & CS$\downarrow$ &  FID$\downarrow$  \\
+    \midrule
+    SD-1.4 & 74.3 & - \\
+    \midrule
+    Key-Value outputs ($\beta=2$)   & 62.79  & 43.5 \\
+    CA Heads outputs ($\beta=2$)  & 48.94  & 67.3 \\
+    CA outputs ($\beta=2$)  & 48.7  & 68.5  \\
+    \bottomrule
+\end{tabular}
+}
+% \vspace{-0.7cm}
+\end{table}
+
+
+
+\subsection{Steering only fraction of layers}
+\label{sec:steering_fraction}
+
+In all our experiments we apply CASteer to all of the CA layers in the models (SD-1.4, SDXL or SANA)/ In this section, we provide qualitative experiments on steering only a fraction of CA layers. 
+
+We ablate on three ways of choosing a subset of CA layers for steering: 
+\begin{itemize}
+\item Steering only $k$ first CA layers, $0 \leqslant k \leqslant n$;
+\item Steering only $k$ last layers, $0 \leqslant k \leqslant n$; 
+\item Steering only $k^{th}$ CA layer, $0 \leqslant k \leqslant n$.
+\end{itemize}
+
+We evaluate CASteer on SDXL with $\beta=2$ under these settings for erasing the concept of angriness (Fig.~\ref{fig:layers_forward_remove_angry}, ~\ref{fig:layers_backward_remove_angry}, ~\ref{fig:layers_k_remove_angry}). In all the figures we illustrate results for values of $k$ between 0 and 60 with a step of 3 for compactness. 
+
+Our empirical findings suggest the following: 
+1) It is not sufficient to steer only one layer (see Fig. ~\ref{fig:layers_k_remove_angry}). It can be seen that the effect of steering any single layer is negligible, not causing the desired effect. 
+%
+2) There is a trade-off between the level of expression of the desired concept in a resulting image and the alteration of general image layout and features. If we steer most of the layers, the overall layout may change drastically from that of the original image and it may cause in the change of identity or other features in the steered image compared to the original one (see Fig.~\ref{fig:layers_forward_remove_angry}, ~\ref{fig:layers_backward_remove_angry}). As Fig.~\ref{fig:layers_backward_remove_angry} suggests, steering only few last CA layers of the model results in a good trade-off between removing the unwanted concept and keeping other image details intact. 
+
+Based on our observations, we hypothesize that steering only few last CA layers of the model is sufficient for erasing texture-based concepts (e.g. styles), while not sufficient for erasing concrete concepts (e.g. ``Snoopy''). We test this experimentally by applying CASteer to only 36 last layers of SDXL model. We test erasing ``Snoopy'' concept and style of ``Van Gogh''. Results are presented in Tab.~\ref{tab:up_snoopy},~\ref{tab:up_art}. We see that steering only 36 last layers of SDXL model successfully removes style of ``Van Gogh'', while changing images of non-target styles less (see $LPIPS_u$). For the concept of ``Snoopy'', CASteer applied to only the last 36 layers of the model shows significantly worse erasure performance than CASteer applied to all layers.
+
+\input{content/up_tables/snoopy}
+\input{content/up_tables/artists}
+
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/forward_remove_angry.png}
+    \caption{Results on removing the concept of ``angry'' using CASteer on the prompt ``a realistic colorful portrait of an angry man'' with steering only $k$ last CA layers, $60 \geqslant k \geqslant 1$. Top left corner: image generated without CASteer, images from top to bottom, left to right: images generated using CASteer with varying $k$}
+    \label{fig:layers_forward_remove_angry}
+\end{figure*}
+\newpage
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/backward_remove_angry.png}
+    \caption{Results on removing the concept of ``angry'' using CASteer on the prompt ``a realistic colorful portrait of an angry man'' with steering only $k$ first CA layers, $1 \leqslant k \leqslant 60$. Top left corner: image generated without CASteer, images from top to bottom, left to right: images generated using CASteer with varying $k$}
+    \label{fig:layers_backward_remove_angry}
+\end{figure*}
+\newpage
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/sdxl/k_remove_angry.png}
+    \caption{Results on removing the concept of ``angry'' using CASteer on the prompt ``a realistic colorful portrait of an angry man'' with steering only CA layer number $k$, $1 \leqslant k \leqslant 60$. Top left corner: image generated without CASteer, images from top to bottom, left to right: images generated using CASteer with varying $k$}
+    \label{fig:layers_k_remove_angry}
+\end{figure*}
+%
+
+
+\clearpage
+
+\section{Other tasks}
+
+In this section, we provide evidence that using steering vectors calculated by CASteer, it is possible not only to erase concepts from generated images, but to solve other tasks, such as \textit{concept addition}, \textit{concept flipping} and \textit{concept interpolation}. We provide some quantitative and qualitative results on these tasks. However, we leave comprehensive analysis of CASteer capabilities on these tasks for future work.
+
+\subsection{Concept switch}
+
+In this section, we propose a way to modify CASteer to flip one concept on the image being generated into another, i.e. resulting generating concept $Y$ when prompted to generate concept $X$. 
+
+\subsubsection{Method}
+Recall from Sec.~\ref{sec:method} that the value of the dot product $(ca^{X}_{it} \cdot ca^{out}_{itk})$ can be seen as amount of $X$ that is present in $ca^{out}_{itk}$. Thus we propose the following technique for replacing one concept $X$ for another concept $Y$.
+%
+We first construct steering vectors $ca^{XY}_{it}$ from $X$ to $Y$ using the same idea described in Sec.~\ref{sec:method}, with the only difference that the positive prompt contains $X$ (``a girl with an apple'') while the negative one contains $Y$ (``a girl with pear'').
+%
+Then we use this steering vector to modify cross-attention outputs as:
+\begin{equation}
+\label{eq:flipping}
+ca^{out\_new}_{itk} = ca^{out}_{itk}- 2 \langle ca^{XY}_{it},  ca^{out}_{itk} \rangle ca^{XY}_{it},
+\end{equation}
+\noindent where
+$1 \leqslant k \leqslant \text{patch\_num}_i$. This operation can be seen as removing all the information about concept $X$ from $ca^{out}_{itk}$ and instead adding the same amount of information about concept $Y$, that is, we reflect $ca^{out}_{itk}$ relatively to the vector orthogonal to $ca^{XY}_{it}$.
+Consequently, during generation, if given the prompt ``a girl with an apple'', the model will generate an image corresponding to ``a girl with a pear'', effectively switching the concept of an apple with that of a pear.
+
+Here we can also add steering strength by introducing parameter $\beta$:
+\begin{equation}
+\label{eq:flipping_beta}
+ca^{out\_new}_{itk} = ca^{out}_{itk}- \beta \langle ca^{XY}_{it},  ca^{out}_{itk} \rangle ca^{XY}_{it},
+\end{equation}
+Higher $\beta$ will result in higher expression of concept $Y$ in the resulting image. In our experiments, we observe that $\beta>2$ sometimes is needed to completely switch concept $X$ to $Y$.
+
+\noindent \textbf{Adding Intermediate clipping}. Note that using Eq.\ref{eq:flipping} we only want to influence those CA outputs $ca^{out}_{itk}$ which have a positive amount of unwanted concept $X$ in them, i.e. we only want to flip $X$ to $Y$, and not on the opposite direction. As dot product $ \langle ca^{X}_{it}, ca^{out}_{itk} \rangle$ measures the amount of $X$ present in CA output $ca^{out}_{itk}$, we only want to steer those CA outputs $ca^{out}_{itk}$, which have a positive dot product with $ca^{X}_{it}$. So the equation becomes the following:
+\begin{equation}
+\begin{split}
+\label{eq:flipping_clip}
+    \alpha = \max(\beta \langle ca^{XY}_{it}, ca^{out}_{itk}\rangle, 0) \\
+    ca^{out\_new}_{itk} = ca^{out}_{itk}- \beta \alpha ca^{XY}_{it}
+\end{split}
+\end{equation}  
+
+% \subsubsection{Quantitative results}
+
+% Here, we provide quantitative results on flipping the concepts of ``Snoopy'' to ``Mickey'' using SDXL and SANA models.
+
+
+
+\subsubsection{Qualitative results}
+
+Here, we provide qualitative results on flipping different concepts. Fig.~\ref{fig:layers_identity_change_snoopy_winnie},~\ref{fig:layers_identity_change_cat_giraffe},~\ref{fig:layers_identity_change_caterpillar_butterfly} visualize results of switching concepts of ``Snoopy'' to ``Winnie-the-Pooh'', ``cat'' to ``giraffe'' and ``caterpillar'' to ``butterfly''. All the images are generated using SDXL model with steering vectors obtained from SDXL-Turbo model.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{content/images/task_flipping/snoopy-winnie.png}
+    \caption{Switching between concepts of ``Snoopy'' and ``Winnie-the-Pooh'' using CASteer. Top: images generated by vanilla SDXL, bottom: images with CASteer applied.}
+    \label{fig:layers_identity_change_snoopy_winnie}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{content/images/task_flipping/cat-giraffe.png}
+    \caption{Switching between concepts of ``cat'' and ``giraffe'' using CASteer. Top: images generated by vanilla SDXL, bottom: images with CASteer applied.}
+    \label{fig:layers_identity_change_cat_giraffe}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{content/images/task_flipping/caterpillar-butterfly.png}
+    \caption{Switching between concepts of ``caterpillar'' and ``butterfly'' using CASteer. Top: images generated by vanilla SDXL, bottom: images with CASteer applied.}
+    \label{fig:layers_identity_change_caterpillar_butterfly}
+\end{figure*}
+
+\subsection{Concept addition}
+
+In this section, we propose a way to use CASteer to add desired concepts on the image being generated. 
+
+\subsubsection{Method}
+
+Recall Eq.~\ref{eq:4}, which defined a mechanism of subtracting concept information from CA outputs of diffusion model to prevent generation of some concepts. We can use the same mechanism to instead add concept to the outputs:
+\begin{equation}
+ca^{out\_new}_{itk} = ca^{out}_{itk} + \alpha ca^{X}_{itk},
+\label{eq:addition}
+\end{equation}
+\noindent Here $1 \leqslant k \leqslant \text{patch\_num}_i$, and $\alpha$ is a hyperparameter that controls the strength of concept addition.
+
+\subsubsection{Qualitative results}
+
+Here, we provide qualitative results on adding different concepts. 
+
+Fig.~\ref{fig:layers_identity_change_snoopy_winnie},~\ref{fig:layers_identity_change_cat_giraffe},~\ref{fig:layers_identity_change_caterpillar_butterfly} visualize results of adding concepts of ``apple'', ``hat'', ``clothes'' and ``happiness'' using CASteer. Note that for different concepts, different values of $\alpha$ are optimal.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{content/images/concept_addition_2.png}
+    \caption{Adding concepts of ``apple'', ``hat'', ``clothes'' and ``happiness'' using CASteer. Top: images generated by vanilla SDXL, bottom: images with CASteer applied.}
+    \label{fig:concept_addition}
+\end{figure*}
+
+\subsection{Style Transfer}
+\label{sec:style_transfer}
+
+In this section, we propose a way to use CASteer to change styles of real images or images being generated.
+
+\subsubsection{Method}
+
+CASteer performs Style Transfer on real images as follows: we apply the reverse diffusion process following DDIM~\cite{DBLP:conf/iclr/SongME21} for $t$ number of steps, where $1 \leqslant t \leqslant T$. Then we denoise image back using CASteer (addition algorithm, see Eq.~\ref{eq:addition}). $t$ controls the trade-off between loss of image details and intensity of style applied. In Fig.~\ref{fig:st_anime}, ~\ref{fig:st_origami}, ~\ref{fig:st_gothic}, \ref{fig:st_retro} we show results on style transfer to four different styles with varying $t$. Intensity$=0.3$ here means that $t=0.3T$. 
+With such a process, we often get satisfactory results with no major loss of details. However, when $t$ is high, the loss of image content occurs (see the bottom lines of figures). 
+This is because the inversion is not sufficiently accurate. 
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/style_transfer/anime.png}
+    \caption{Examples of Style Transfer of real images into ``\textit{anime}'' style. From top to bottom: original image, style transfer applied with intensities from 0.1 to 0.7 with a step of 0.1}
+    \label{fig:st_anime}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/style_transfer/origami.png}
+    \caption{Examples of Style Transfer of real images into ``\textit{origami}'' style. From top to bottom: original image, style transfer applied with intensities from 0.1 to 0.7 with a step of 0.1}
+    \label{fig:st_origami}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/style_transfer/gothic_art.png}
+    \caption{Examples of Style Transfer of real images into ``\textit{Gothic Art}'' style. From top to bottom: original image, style transfer applied with intensities from 0.1 to 0.7 with a step of 0.1}
+    \label{fig:st_gothic}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/style_transfer/retro_art.png}
+    \caption{Examples of Style Transfer of real images into ``\textit{Retro Art}'' style. From top to bottom: original image, style transfer applied with intensities from 0.1 to 0.7 with a step of 0.1}
+    \label{fig:st_retro}
+\end{figure*}
+
+
+
+
+
+\clearpage
+\section{Interpreting steering vectors}
+\label{sec:interpretation}
+
+\subsection{Steering vectors visualization}
+
+In this section, we propose a way to interpret the meaning of steering vectors generated by CASteer. Suppose we have steering vectors generated for a concept $\mathbf{X}$ $\{ca^{\mathbf{X}}_{it}\}, 1 \leqslant i \leqslant n, 1 \leqslant t \leqslant T$, where $n$ is the number of model layers and $T$ is a number of denoising steps performed for generating steering vectors. To interpret these vectors, we prompt the diffusion model with a placeholder prompt ``X'' and at each denoising step, we substitute outputs of the model's CA layers with corresponding steering vectors. This makes the diffusion model be only conditioned on the information from the steering vectors, completely suppressing other information from the text prompt.
+
+Fig.~\ref{fig:interpretation} shows interpretations for the steering vectors of concepts ``\textit{hat}'', ``\textit{polka dot dress}'', ``\textit{Snoopy}'', ``\textit{angry}'', ``\textit{happy}'', from top to bottom. Note that vectors for concepts ``\textit{hat}'', ``\textit{polka dot dress}'' and ``\textit{Snoopy}'' were generated using prompt pair templates for concept deletion, i.e. pairs of the form (``\textit{fish with Snoopy}'', ``\textit{fish}''), (``\textit{a girl with a hat}'', ``\textit{a girl}'') (see Sec. ~\ref{sec:prompts_erasure}), and this is reflected in generated images, as they show these concepts not alone, but in a form of a girl in a hat, a girl in a polka dot dress or a boy with a Snoopy. As for the last two concepts (``\textit{angry}'', ``\textit{happy}''), their steering vectors were generated using prompt pair templates for human-related concepts (see Sec. ~\ref{sec:prompts_human}), and they illustrate these concepts as is.
+
+We note that images of each concept exhibit common features, e.g. all the images of hats and polka dots feature only female persons, and images corresponding to ``angry'' and ``happy'' concepts have certain styles. We believe that this reflects how diffusion models perceive different concepts and that this interpretation technique can be used for unveiling the hidden representations of concepts inside the diffusion model, but we leave it to future work.
+
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/interpreting/interp.png}
+    \caption{Visualization of generations of the model conditioned only on steering vectors. Images in rows from top to down were generated using steering vectors for the concepts ``\textit{hat}'', ``\textit{polka dot dress}'', ``\textit{Snoopy}'', ``\textit{angry}'', ``\textit{happy}''.}
+    \label{fig:interpretation}
+\end{figure*}
+
+\subsection{UMap on steering vectors}
+\label{sec:umap}
+
+We  generate steering vectors for all vocabulary tokens of SDXL text encoders and apply UMap \cite{DBLP:journals/corr/abs-1802-03426} on these steering vectors. Fig.~\ref{fig:17_hello},~\ref{fig:35_hello},~\ref{fig:17_work},~\ref{fig:35_work} show that structure emerges in the space of these steering vectors, similar to that of Word2Vec \cite{DBLP:journals/corr/abs-1301-3781}, supporting the hypothesis that steering vectors carry the meaning of the desired concept. This is observed for all the layers in the model. 
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.8\linewidth]{content/images/interpreting/17_hello.png}
+    \caption{Visualization of UMap applied to the steering vectors from the layer 17 of SDXL-Turbo formed by 3000 SDXL-Turbo vocabulary tokens.}
+    \label{fig:17_hello}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.8\linewidth]{content/images/interpreting/17_work.png}
+    \caption{Visualization of UMap applied to the steering vectors from the layer 17 of SDXL-Turbo formed by 3000 SDXL-Turbo vocabulary tokens.}
+    \label{fig:17_work}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.8\linewidth]{content/images/interpreting/35_hello.png}
+    \caption{Visualization of UMap applied to the steering vectors from the layer 35 of SDXL-Turbo formed by 3000 SDXL-Turbo vocabulary tokens.}
+    \label{fig:35_hello}
+\end{figure*}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.8\linewidth]{content/images/interpreting/35_work.png}
+    \caption{Visualization of UMap applied to the steering vectors from the layer 35 of SDXL-Turbo formed by 3000 SDXL-Turbo vocabulary tokens.}
+    \label{fig:35_work}
+\end{figure*}
+
+\clearpage
+\section{SPM and DoCo vs CASteer on adversarial prompts}
+\label{sec:spm_casteer}
+
+In this section, we present more qualitative examples of CASteer outperforming SPM~\cite{DBLP:conf/cvpr/Lyu0HCJ00HD24} and DoCo~\cite{wu2025unlearning} on adversarial prompts, i.e. prompts containing implicitly defined concepts. SD-1.4 is used as a backbone for both methods. We use prompts ``\textit{A mouse from Disneyland}'' and  ``\textit{A girl with a mouse from Disneyland}'' to test erasing of concept of ``\textit{Mickey}'', prompts ``\textit{A yellow Pokemon}'' and  ``\textit{A girl with a yellow Pokemon}'' to test erasing of concept of ``\textit{Pikachu}'', and prompt ``\textit{A picture of Iron Man actor}'' to test erasing of concept of ``\textit{Robert Downey Jr}''. We use the code provided by SPM and DoCo to produce checkpoints and images for testing removal of the concepts of ``\textit{Mickey}'' and ``\textit{Pikachu}'', and use checkpoint provided by DoCO to generate images for testing removal of a concept of ``\textit{Robert Downey Jr}''.
+
+We see that SPM and DoCo fail to substantially remove targeted concepts in many cases, while CASteer shows consistent performance. 
+
+\begin{figure*}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/spm_fail/mouse_disneyland.png}
+    \caption{Examples of 8 generated images from CASteer, SPM and DoCo when prompted ``\textit{A mouse from Disneyland}''. \textbf{Top:} generation of CASteer, \textbf{Middle:} generations of SPM, \textbf{Bottom:} generations of DoCo. We use the same diffusion hyperparameters and seeds when generating corresponding images from CASteer, SPM and DoCo.}
+    \label{fig:spm_fail_mouse}
+\end{figure*}
+
+\begin{figure*}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/spm_fail/girl_mouse.png}
+    \caption{Examples of 8 generated images from CASteer, SPM and DoCo when prompted ``\textit{A girl with a mouse from Disneyland}''. \textbf{Top:} generation of CASteer, \textbf{Middle:} generations of SPM, \textbf{Bottom:} generations of DoCo. We use the same diffusion hyperparameters and seeds when generating corresponding images from CASteer, SPM and DoCo.}
+    \label{fig:spm_fail_girl_mouse}
+\end{figure*}
+
+\begin{figure*}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/spm_fail/yellow_pokemon.png}
+    \caption{Examples of 8 generated images from CASteer and SPM when prompted ``\textit{A yellow Pokemon}''. \textbf{Top:} generation of CASteer, \textbf{Bottom:} generations of SPM. We use the same diffusion hyperparameters and seeds when generating corresponding images from CASteer and SPM.}
+    \label{fig:spm_fail_pokemon}
+\end{figure*}
+
+\begin{figure*}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/spm_fail/girl_pokemon.png}
+    \caption{Examples of 8 generated images from CASteer and SPM when prompted ``\textit{A girl with a yellow Pokemon}''. \textbf{Top:} generation of CASteer, \textbf{Bottom:} generations of SPM. We use the same diffusion hyperparameters and seeds when generating corresponding images from CASteer and SPM.}
+    \label{fig:spm_fail_girl_pokemon}
+\end{figure*}
+
+\begin{figure*}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{content/images/spm_fail/iron_man.png}
+    \caption{Examples of 8 generated images from CASteer and DoCo when prompted ``\textit{A picture of Iron Man actor}''. \textbf{Top:} generation of CASteer, \textbf{Bottom:} generations of DoCo. We use the same diffusion hyperparameters and seeds when generating corresponding images from CASteer and DoCo.}
+    \label{fig:spm_fail_iron_man}
+\end{figure*}
+
+\clearpage
+
+\section{Expressive Power of Steering Cross–Attention Outputs over Steering Prompt Embeddings}
+
+In this section we formalize a local, first–order theorem showing that applying linear interventions directly in the space of cross–attention (CA) outputs of diffusion models is 
+always at least as expressive as applying linear interventions in the space of prompt token embeddings, and is 
+strictly more expressive whenever the Jacobian of transformation from embeddings to CA space is not surjective. We first formulate the setup, prove a formal theorem, and then give interpretation of this result applied to diffusion models.
+
+\subsection{Setup}
+
+Let $e \in \mathbb{R}^{n}$ denote the (flattened) text embedding vector
+produced by the text encoder, and let 
+$h \in \mathbb{R}^{m}$ denote the (flattened) concatenation of all 
+cross–attention outputs across all chosen layers, heads, and spatial
+positions.
+
+Around a given forward pass with embedding $e_0$, consider linearization of the dependence of CA outputs $h$ on the embeddings $e$:
+\begin{equation}
+    h \approx h_0 + G (e - e_0),
+\end{equation}
+Here $G = J_{h,e}(e_0) \in \mathbb{R}^{m \times n}$ is Jacobian.
+Consider also a continuous loss function 
+$\mathcal{L} : \mathbb{R}^m \to \mathbb{R}$ 
+that measures the degree to which a concept is present in the final
+output.
+For a perturbation $\Delta h$, the perturbed loss becomes 
+$\mathcal{L}(h_0 + \Delta h)$.
+
+Now consider perturbations in CA space which are constrained by the magnitude of the perturbation by a radius $\rho > 0$:
+\begin{equation}
+    \|\Delta h\| \le \rho.
+\end{equation}
+
+Under these setting, we compare two steering mechanisms:
+
+\paragraph{Steering of Text Embeddings.}
+A perturbation $\delta e$ in the text embedding space induces perturbation in the CA output space $\Delta h = G \delta e$. 
+Then the feasible set of CA–space perturbations reachable through 
+embedding steering is:
+\begin{equation}
+    \mathcal{H}_{\mathrm{embed}}(\rho)
+    :=
+    \{\, \Delta h = G \delta e \;\mid\; \delta e \in \mathbb{R}^n,
+        \; \|G \delta e\| \le \rho \,\}.
+\end{equation}
+We refer to it as \textit{embedding–feasible set}. And the optimal achievable loss is:
+\begin{equation}
+    V_{\mathrm{embed}}(\rho)
+    :=
+    \inf_{\Delta h \in \mathcal{H}_{\mathrm{embed}}(\rho)}
+        \mathcal{L}(h_0 + \Delta h).
+\end{equation}
+
+\paragraph{Steering of Cross–Attention Outputs.}
+Here CA outputs are preturbed directly:
+\begin{equation}
+    \mathcal{H}_{\mathrm{CA}}(\rho)
+    :=
+    \{\, \Delta h \in \mathbb{R}^m \;\mid\; \|\Delta h\| \le \rho \,\},
+\end{equation}
+We refer to it as \textit{CA–feasible set}. Then the optimal achievable loss becomes:
+\begin{equation}
+    V_{\mathrm{CA}}(\rho)
+    :=
+    \inf_{\Delta h \in \mathcal{H}_{\mathrm{CA}}(\rho)}
+        \mathcal{L}(h_0 + \Delta h).
+\end{equation}
+
+\subsection{Main Result}
+
+\begin{theorem}[Expressive Power of CA Steering]
+\label{thm:ca-dominates}
+For any Jacobian $G \in \mathbb{R}^{m \times n}$ and any radius $\rho > 0$,
+the embedding–feasible set is a subset of the CA–feasible set:
+\begin{equation}
+    \mathcal{H}_{\mathrm{embed}}(\rho)
+    \subseteq 
+    \mathcal{H}_{\mathrm{CA}}(\rho).
+\end{equation}
+Moreover, equality ($\mathcal{H}_{\mathrm{embed}}(\rho) = \mathcal{H}_{\mathrm{CA}}(\rho)$
+for all $\rho > 0$) holds if and only if $G$ is surjective, i.e.
+$\operatorname{rank}(G) = m$.
+\end{theorem}
+
+\begin{proof}
+If $\Delta h \in \mathcal{H}_{\mathrm{embed}}(\rho)$, then by definition
+$\Delta h = G \delta e$ for some $\delta e$ and 
+$\|\Delta h\| = \|G \delta e\| \le \rho$. 
+Hence $\Delta h \in \mathcal{H}_{\mathrm{CA}}(\rho)$.
+Thus 
+$\mathcal{H}_{\mathrm{embed}}(\rho) \subseteq \mathcal{H}_{\mathrm{CA}}(\rho)$.
+
+If $G$ is surjective, then for any $\Delta h \in \mathbb{R}^m$ there exists
+$\delta e$ such that $G \delta e = \Delta h$; hence the two feasible
+sets coincide for every radius.
+
+Conversely, if $\operatorname{rank}(G) < m$, then 
+$\operatorname{im}(G)$ is a proper subspace of $\mathbb{R}^m$. 
+For any $\rho > 0$, the ball 
+$\{\Delta h : \|\Delta h\| \le \rho\}$ contains points outside 
+$\operatorname{im}(G)$; 
+hence $\mathcal{H}_{\mathrm{embed}}(\rho)$ is a strict subset of 
+$\mathcal{H}_{\mathrm{CA}}(\rho)$.
+\end{proof}
+
+\begin{corollary}[Optimal CA Steering Never Underperforms]
+\label{cor:value-order}
+Assume $\mathcal{L}$ is continuous and bounded below.
+For any $\rho > 0$:
+\begin{equation}
+    V_{\mathrm{CA}}(\rho)
+    \;\le\;
+    V_{\mathrm{embed}}(\rho).
+\end{equation}
+If $\mathcal{H}_{\mathrm{embed}}(\rho) \subsetneq \mathcal{H}_{\mathrm{CA}}(\rho)$
+and there exists 
+$\Delta h^\star \in \mathcal{H}_{\mathrm{CA}}(\rho)
+ \setminus \overline{\mathcal{H}_{\mathrm{embed}}(\rho)}$
+such that
+$\mathcal{L}(h_0 + \Delta h^\star) < V_{\mathrm{embed}}(\rho)$,
+then the inequality is strict:
+\begin{equation}
+    V_{\mathrm{CA}}(\rho)
+    \;<\;
+    V_{\mathrm{embed}}(\rho).
+\end{equation}
+\end{corollary}
+
+\begin{proof}
+Since 
+$\mathcal{H}_{\mathrm{embed}}(\rho)
+ \subseteq
+ \mathcal{H}_{\mathrm{CA}}(\rho)$,
+the infimum over the larger set is no greater than the infimum over the
+subset, establishing 
+$V_{\mathrm{CA}}(\rho) \le V_{\mathrm{embed}}(\rho)$.
+
+If there exists a feasible $\Delta h^\star$ in the larger set achieving
+strictly lower loss than any point in the closure of the embedding–feasible
+set, then clearly the infimum of $\mathcal{L}$ over the larger set is
+strictly lower. 
+\end{proof}
+
+\subsection{Interpretation for Diffusion Models}
+
+In text-to-image (T2I) diffusion models (SD-1.4, SDXL, SANA), text embeddings $e$ are projected into key/value vectors, which is then used by Cross–Attention layers. Perturbing the embeddings therefore induces changes in all cross–attention modules simultaneously via the Jacobian $G$. 
+
+However, Theorem~\ref{thm:ca-dominates} shows that steering directly in CA output space allows for perturbations that \emph{cannot} be produced by any embedding shift, because the image of $G$ typically forms a low-dimensional subspace of the full CA space ($\operatorname{im}(G)$). Consequently, Corollary~\ref{cor:value-order} guarantees that an idealized CA steering method (in the linearized regime) matches or outperforms any embedding-based method on any concept-erasure objective $\mathcal{L}$.
+
+\textbf{Intuitively}, CA output is closer to the residual stream of DiT, which produces resulting noise as part of denoising process. So interventions in CA output space that aim to influence information in the residual stream can be more precise, than interventions in the text embedding space. Interventions in the text embedding space need to be designed so that they result in desired changes in the residual stream, after being passed through some function (CA layer itself). Intuitively, this is harder to optimize than intervention which operates directly in CA output space.
+
+Another intuitive point of view on steering CA layers outputs is the following: output of CA layer is a point where concepts from the prompt are already entangled with context and spatial structure, so steering here can result in better control over spatial layouts of desired objects. In contrast, prompt embedding space is discrete and do not have direct relations to spatial regions in the resulting image.
+
+Also note, that CA activations encode \emph{layer-wise}, \emph{head-wise}, and \emph{spatially localized} information about how individual tokens influence different regions of the image~\cite{DBLP:conf/iclr/HertzMTAPC23}. Steering in CA space therefore can provide fine-grained control, e.g.\ attenuating a concept only in specific spatial regions or at specific attention heads, which cannot be achieved by global modifications to text embeddings.
+
+\clearpage
+\section{Erasing multiple concepts}
+\label{sec:erasing_multiple_concepts}
+
+In this section, we provide results on erasing multiple concepts simultaneously. 
+
+Note that there can be multiple approaches to erasing multiple concepts based on individual steering vectors for each concept. First approach is to use averaged steering vectors for multiple concepts:
+\begin{equation}
+ca^{X}_{it} = \frac{1}{n}\sum_{i=1}^n ca^{X^{i}}_{it}.
+\end{equation} 
+Here $\{X^i\}_{i=1}^n$ are concepts to delete. We use this approach in Sec.~\ref{sec:experiments}, where we report results on erasing harmful content based on I2P dataset (see Tab.~\ref{tab:sd14_i2p}). More precisely, we obtain steering vectors for harmful content erasure as average of steering vectors for the concepts ``\textit{hate}'', ``\textit{harassment}'', ``\textit{violence}'', ``\textit{self-harm}'', ``\textit{sexual}'', ``\textit{shocking}'', ``\textit{illegal activity}''. 
+
+However, for the concepts that do not share much common semantics (e.g., ``\textit{Snoopy}'' and ``\textit{nudity}'') simple averaging may lead to poor performance. Thus, we propose a second approach for erasing multiple concepts. Suppose we have concepts $\{X^i\}_{i=1}^n$ to erase and their corresponding steering vectors $ca^{X}_{it}$. We apply Gram–Schmidt algorithm for orthogonalizing these vectors, and get a new, mutually-orthogonal set of steering vectors $\widehat{ca}^{X}_{it}$. Then we apply CASteer using this orthogonalized set of vectors $\widehat{ca}^{X}_{it}$. Note that if CASteer is applied without clipping, then every steering operation with each steering vector can be formulated in a matrix form (Eq.~\ref{eq:casteer_erasure_matrix}), and, consequently, erasure transform with multiple steering vectors can also be expressed as a single matrix multiplication.
+
+We apply CASteer with orthogonalization on erasing pairs of concepts (``\textit{Snoopy}'', ``\textit{nudity}'') and (``\textit{Snoopy}'', ``\textit{Mickey}''). Results for erasure of ``\textit{Snoopy}'' and ``\textit{nudity}'' are presented in Tab.~\ref{tab:multi_nudity} and Tab.~\ref{tab:multi_snoopy_nudity}; results for erasure of ``\textit{Snoopy}'' and ``\textit{Mickey}'' are presented in Tab.~\ref{tab:multi_snoopy_mickey}. We see that CASteer successfully erases both concepts, achieving performance comparable to that of CASteer applied to erasing individual concepts.  
+
+\input{content/multi_tables/nudity}
+\input{content/multi_tables/snoopy_nudity}
+\input{content/multi_tables/snoopy_mickey}
+
+
+
+\clearpage
+\section{SD-1.5 on steering vectors from SD-1.4}
+\label{sd15_on_sd14}
+
+In this section, we provide results on CASteer applied to SD-1.5 model using steering vectors computed on SD-1.4 model. We use SD-1.5 with 50 denoising steps to match the number of steps used in SD-1.4. 
+
+We report results on all our main experiments setups. Tab.~\ref{tab:sd15_i2p},~\ref{tab:sd15_t2i_art},~\ref{tab:sd15_nudity},~\ref{tab:sd15_snoopy}, report results on erasing harmful content, artistic styles, and concepts of ``\textit{nudity}'' and ``\textit{Snoopy}'', respectively. Additionally, Tab.~\ref{tab:sd15_fid} reports image quality metrics based on CLIP and FID scores. Results show that steering vectors used in CASteer can be successfully transferred across different trained versions of models without losing in general image quality.
+
+\input{content/sd15_tables/nudity}
+\input{content/sd15_tables/snoopy}
+\input{content/sd15_tables/artists}
+\input{content/sd15_tables/i2p}
+\input{content/sd15_tables/fid}
+
+\clearpage
+\section{SD-1.4 on steering vectors computed on single denoising step}
+\label{sd14_on_sd14_0}
+
+In this section, we provide results on CASteer applied to SD-1.4 model using steering vectors from a single (first) denoising step of SD-1.4 model.
+
+We report results on all our main experiments setups. Tab.~\ref{tab:sd14_0_i2p},~\ref{tab:sd14_0_t2i_art},~\ref{tab:sd14_0_nudity},~\ref{tab:sd14_0_snoopy}, report results on erasing harmful content, artistic styles, and concepts of ``\textit{nudity}'' and ``\textit{Snoopy}'', respectively. Additionally, Tab.~\ref{tab:sd14_0_fid} reports image quality metrics based on CLIP and FID scores. Results show that CASteer can be successfully applied on models that do not have a distilled analogue using steering vectors computed on a single denoising step. 
+
+\input{content/sd14_0_tables/nudity}
+\input{content/sd14_0_tables/snoopy}
+\input{content/sd14_0_tables/artists}
+\input{content/sd14_0_tables/i2p}
+\input{content/sd14_0_tables/fid}
+
+
+
+
+
+

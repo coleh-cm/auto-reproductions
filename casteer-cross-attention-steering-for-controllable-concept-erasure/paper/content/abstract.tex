@@ -1,0 +1,37 @@
+\iffalse
+\begin{abstract}
+Diffusion models have transformed image generation, yet controlling their outputs for diverse applications, including content moderation and creative customization, remains challenging.  
+%
+Existing approaches usually require task-specific training and struggle to generalize across both concrete (e.g., objects) and abstract (e.g., styles) concepts. 
+%
+We propose CASteer (\textbf{C}ross-\textbf{A}ttention \textbf{Steer}ing), a training-free framework for controllable image generation using steering vectors to influence a diffusion model’s hidden representations dynamically. 
+%
+CASteer precomputes concept-specific steering vectors by averaging neural activations from images generated for each target concept. 
+%
+During inference, it dynamically applies these vectors to modify outputs only when necessary, either removing undesired concepts from images where they appear or adding desired concepts to images where they are absent. This selective activation ensures precise, context-aware adjustments without altering unaffected regions.
+%
+This approach enables precise control over a wide range of tasks, including removing harmful content, interpolating between desired attributes, replacing objects, all without model retraining. 
+%
+CASteer outperforms state-of-the-art techniques while preserving unrelated content and minimizing unintended effects. 
+%
+Code is provided in the supplementary.% 
+\end{abstract}
+\fi
+
+\begin{abstract}
+Diffusion models have transformed image generation, yet controlling their outputs to reliably erase undesired concepts remains challenging.
+%
+Existing approaches usually require task-specific training and struggle to generalize across both concrete (e.g., objects) and abstract (e.g., styles) concepts.
+%
+We propose CASteer (\textbf{C}ross-\textbf{A}ttention \textbf{Steer}ing), a training-free framework for concept erasure in diffusion models using steering vectors to influence hidden representations dynamically.
+%
+CASteer precomputes concept-specific steering vectors by averaging neural activations from images generated for each target concept.
+%
+During inference, it dynamically applies these vectors to suppress undesired concepts only when they appear, ensuring that unrelated regions remain unaffected. This selective activation enables precise, context-aware erasure without degrading overall image quality.
+%
+This approach achieves effective removal of harmful or unwanted content across a wide range of visual concepts, all without model retraining.
+%
+CASteer outperforms state-of-the-art concept erasure techniques while preserving unrelated content and minimizing unintended effects.
+%
+Code is available at \href{https://github.com/Atmyre/CASteer}{https://github.com/Atmyre/CASteer}.%
+\end{abstract}

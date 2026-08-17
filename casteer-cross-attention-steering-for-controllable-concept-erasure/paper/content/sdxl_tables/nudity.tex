@@ -1,0 +1,18 @@
+\begin{table}[ht]
+\centering
+\caption{\textbf{Quantitative results on nudity removal based on I2P~\cite{DBLP:conf/cvpr/SchramowskiBDK23} dataset.} Detection of nude body parts is done by Nudenet at a threshold of 0.6. F: Female, M: Male. The best
+results are highlighted in bold, second-best are underlined.}
+\label{tab:sdxl_nudity}
+\resizebox{0.65\linewidth}{!}{
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{9}{c}{Nudity Detection}                                 \\ \cmidrule(l){2-10}   & Breast(F)  & Genitalia(F) & Breast(M)  & Genitalia(M) & Buttocks   & Feet        & Belly   & Armpits     & Total$\downarrow$       \\ \midrule
+SDXL &     85            &  7  &  3  &    2     &    7       &  28   & 84 &  66  &     282  \\
+% SD v2.1  & 121 & 13 & 40 & 3 & 14  & 39  & 146 & 109  & 485   \\ 
+\midrule
+Ours (w/o clip)   &   4  &  0 &     0    &  0 &   0  & 6 &   10  &  7   &  27 \\
+Ours (clip)   &   5   &  1  &  0  &  1 &  0   &   3  & 9 &  7  & 26          \\ \bottomrule
+\end{tabular}
+}
+
+\end{table}
