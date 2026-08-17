@@ -8,3 +8,4 @@ eprint.tar.gz
 !*.bbl
 !*.bib
 !paper.txt
+!paper.html

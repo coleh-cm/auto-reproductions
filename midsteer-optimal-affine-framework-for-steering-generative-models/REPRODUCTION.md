@@ -20,7 +20,8 @@ code** as the base implementation. No running code yet.
 - [x] Repository cloned (`--depth 1 --filter=blob:none`) and branch `repro/midsteer-optimal-affine-framework-for-steering-generative-models` created and pushed.
 - [x] `paper/` contains the PDF-extracted paper text (`paper.txt`, convenience copy; maths NOT reliable from it) and the arXiv 2605.05220 v3 LaTeX source (authoritative for equations, tables, numbers).
 - [x] LaTeX source: `main.tex`, `flipping_main.tex`, `content/*.tex`, `artefacts/**/*.tex`, `example_paper.bib`. Build system per `00README.json` (ignored): pdflatex + texlive 2025, `icml2026` style (`.sty`/`.bst` ignored, compile-time only).
-- [x] `paper/.gitignore` keeps only `.tex`/`.bbl`/`.bib` + `paper.txt`; figures (`img/*.png`, `artefacts/{main,pareto,phase}/*.pdf`), `eprint.tar.gz`, styles and metadata are ignored.
+- [x] `paper/.gitignore` keeps only `.tex`/`.bbl`/`.bib` + `paper.txt` + `paper.html`; figures (`img/*.png`, `artefacts/{main,pareto,phase}/*.pdf`), `eprint.tar.gz`, styles and metadata are ignored.
+- [x] Rendered HTML copy saved as `paper/paper.html` (https://arxiv.org/html/2605.05220, LaTeXML, maths as MathML) for one-fetch reading; quotes/citations still come from the `.tex` source.
 - [x] Read paper properly; wrote `SPEC.md` (method as algorithm, symbols+shapes, every
   implemented equation cited to `paper/*.tex:<line>`, 19-item gap list G1–G19 with weakest
   readings, frozen component interfaces, 4 arms, per-arm restriction analysis).
