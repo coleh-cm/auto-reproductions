@@ -8,10 +8,18 @@ Pipeline exercised:
      pos-neg, unit-norm).
   3. Generate 1 steered image (casteer_clip, beta=2, Eq.7 clip) and 1 vanilla
      image (sd14) at the same seed/prompt.
-  4. Save both under results/smoke/ and print exactly one FINAL line.
+  4. Save both under results/smoke/.
+  5. Score the steered image with the paper's snoopy_cs metric (mean CLIP score
+     on a Snoopy prompt, claims.json `metrics.snoopy_cs`, ViT-B/32) via the
+     SAME eval code path the full arms use, and print exactly one stdout line:
+         FINAL casteer_clip=<snoopy_cs>
+     (`casteer_clip` is an arm name from claims.json; the number is a real
+     measurement the path produced). Provenance metadata goes to stderr.
 
-This proves the path runs. It is NOT evidence about the paper (subset is tiny,
-resolution and step count are reduced). Never report its output as a result.
+This proves the path runs (generation AND evaluation). It is NOT evidence about
+the paper (subset is tiny, resolution and step count are reduced; at 4 steps /
+256x256 the snoopy_cs is far below the paper's full-config value). Never report
+its output as a result.
 """
 from __future__ import annotations
 
@@ -30,6 +38,7 @@ from core.diffusion_steering import (
 )
 from core.vector_dump import CrossAttentionOutputStatsCollector, TokenAggregationMode
 from core.controller import CrossAttentionOutputSteering, EPS
+from core.eval.metrics import clip_score_mean
 
 RES = 256
 N_STEPS = 4
@@ -97,10 +106,28 @@ def main():
 
     out_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "results", "smoke")
     os.makedirs(out_dir, exist_ok=True)
-    steered.save(os.path.join(out_dir, "casteer_clip.png"))
-    vanilla.save(os.path.join(out_dir, "sd14.png"))
-    print(f"FINAL smoke=sd14=1img casteer_clip=1img vectors={n_vecs} steps={N_STEPS} res={RES} "
-          f"device={device.type} t={time.time()-t0:.1f}s")
+    steered_path = os.path.join(out_dir, "casteer_clip.png")
+    vanilla_path = os.path.join(out_dir, "sd14.png")
+    steered.save(steered_path)
+    vanilla.save(vanilla_path)
+
+    # Measurement: the paper's snoopy_cs metric (mean CLIP score on a Snoopy
+    # prompt, claims.json `metrics.snoopy_cs`) computed by the SAME eval code
+    # path the full arms use (core.eval.metrics.clip_score_mean, ViT-B/32,
+    # w=2.5). This is a real number the path produces; at 4 steps / 256x256 it is
+    # NOT the paper's number (smoke is not evidence) -- it only proves the path
+    # runs end to end through generation AND evaluation.
+    snoopy_cs = clip_score_mean([steered_path], [PROMPT], device=device.type)
+
+    # The FINAL line is exactly `FINAL <arm>=<number>` with an arm name from
+    # claims.json (`casteer_clip`) and a numeric measurement (the arm's
+    # snoopy_cs). Provenance metadata goes to stderr so it is not mistaken for
+    # the measurement line on stdout.
+    import sys as _sys
+    _sys.stderr.write(
+        f"smoke: sd14=1img casteer_clip=1img vectors={n_vecs} steps={N_STEPS} "
+        f"res={RES} device={device.type} t={time.time()-t0:.1f}s\n")
+    print(f"FINAL casteer_clip={snoopy_cs:.6f}")
 
 
 if __name__ == "__main__":
