@@ -70,11 +70,32 @@ PY
 
 ```bash
 docker build -t midsteer-repro .
-docker run --rm midsteer-repro python -m pytest tests/ -q   # 40 passed
-# GPU arms:
-docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN midsteer-repro \
-    python scripts/llm/estimate_covariances.py --help
+docker run --rm midsteer-repro python -m pytest tests/ -q   # 95 passed
+# GPU + HF_TOKEN required for the model arms (E2-E5); without them those arms BLOCKED:
+docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN midsteer-repro bash run_all_arms.sh
 ```
+
+## What runs in this repository
+
+| Path | Runs here? | What it does |
+| --- | --- | --- |
+| `midsteer_core/` (stats, crosscov, affine, data) | ✅ CPU | closed-form affine maps (Eqs. 6/13/19/22/23 + vanilla 21/24/25), Welford, the data loader (raises `BlockedException` w/o CUDA/HF_TOKEN) |
+| `midsteer_core/eval/*` | ✅ CPU (mock logic) | judge_cs / clip_cs / fid / detoxify / armorm / bertscore instruments; raise `BlockedException` on the real backbone here; scoring logic unit-tested |
+| `experiments/run_e1_synth.py` | ✅ CPU, REAL | claims C1–C3 closed-form invariant checks on synthetic Gaussian data of known covariance, seeds {0,1,2}. **All PASS.** |
+| `experiments/run_e{2..5}_*.py` | ❌ BLOCKED | Llama-2-7B-chat / SDXL arms; print `FINAL <arm>=BLOCKED`, write BLOCKED partials (no synthetic fallback) |
+| `run_all_arms.sh` | ✅ | runs E1 real + E2–E5 BLOCKED → `measured.json` + `results/e1_synth.json`; prints one `FINAL <arm>=...` per arm |
+| `smoke.sh` | ✅ | tiny E1 path, one FINAL line (NOT evidence about the paper) |
+| `evaluate_claims.py` → `claims_result.json` | ✅ | verdict table: pass=3 (C1–C3), fail=0, blocked=19 (model arms) |
+| `selfcheck_claims.py` → `selfcheck.json` | ✅ | the agent's own redundant check (different filename), agrees |
+| `tests/` | ✅ 95 passed | environment import gate, core/degeneracy/invariants, data, eval instruments, claims eval, mutations (5 defects, all caught) |
+| `instruments.json`, `mutations.json` | ✅ | every output-deciding instrument + positive/negative tests; 5 deliberate defects with `must_fail` nodes |
+| `core/`, `scripts/`, `helpers/`, `exp/`, `notebooks/` | vendored upstream | the authors' own implementation (HEAD `0f3b31e`), unchanged; `midsteer_core/` is the readable closed form beside it |
+
+**Blocker (honest):** this sandbox is CPU-only with no `HF_TOKEN`, so the model arms
+(Llama-2-7B-chat, SDXL) cannot run. Every model metric in `measured.json` is the string
+`"BLOCKED"`; every model-arm claim (C4–C22) is verdict `blocked`. The only real numbers
+produced here are the E1 closed-form invariant checks (C1, C2, C3), all PASS. See
+`REPRODUCTION.md` § Blockers and `SPEC.md` §12–14.
 
 ## Environment notes
 
@@ -92,7 +113,9 @@ docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN midsteer-repro \
 
 ## Status
 
-Environment rung complete: requirements pinned, Dockerfile written, venv
-reproducible from `requirements.txt`, import gate (40 tests) green. Next steps
-(per `REPRODUCTION.md`): run the smallest end-to-end arm (E1 synthetic
-closed-form checks, CPU-only) and produce a parsed number.
+Implementation rung complete. The closed-form core, E1 synthetic invariant checks
+(C1–C3, all PASS), eval instruments, run scripts, claims evaluator, mutation suite,
+`measured.json`, and `claims_result.json` (pass=3, fail=0, blocked=19) are committed
+and pushed. The model arms are BLOCKED (no CUDA / no HF_TOKEN). See `REPRODUCTION.md`
+for the full log, decisions, and blockers; `SPEC.md` §12–14 for constructed truth,
+sweep ranges, and every choice the paper left open.
