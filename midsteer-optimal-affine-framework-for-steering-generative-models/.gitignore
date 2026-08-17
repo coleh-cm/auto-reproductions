@@ -63,3 +63,7 @@ Untitled*.ipynb
 id_ed25519
 id_ed25519.pub
 *.pem
+
+# Smoke output is NOT evidence (it only proves the code path runs); never commit it.
+# The canonical evidence file results/e1_synth.json is written ONLY by the full run.
+/results/e1_synth_smoke.json

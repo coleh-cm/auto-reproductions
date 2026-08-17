@@ -105,6 +105,35 @@ only real numbers this environment produces are the E1 closed-form invariant che
     strictly stronger and mathematically meaningful. Recorded in SPEC §12–14 and in
     the `run_e1_synth.py` docstring.
 
+### Review-round fix (2026-08-17): smoke must not clobber evidence
+
+- **Defect found via feedback `FINAL e1_synth_smoke=PASS`:** `smoke.sh` ran
+  `experiments/run_e1_synth.py` with `MIDSTEER_SMOKE=1`, and that script wrote to the
+  CANONICAL evidence file `results/e1_synth.json` — overwriting the real 3-seed ×
+  16-perturbation results with smoke-sized data (1 seed, 4 perturbations). A reader
+  who ran `smoke.sh` to confirm the path runs had silently destroyed the only real
+  evidence in the repo. Reproduced: `bash smoke.sh` reduced `results/e1_synth.json`
+  from seeds {0,1,2}/nfeas=16 to seeds {0}/nfeas=4.
+- **Fix:** `run_e1_synth.py` now selects its output path from the env at import:
+  `results/e1_synth_smoke.json` when `MIDSTEER_SMOKE=1`, else the canonical
+  `results/e1_synth.json`. Smoke therefore NEVER touches the canonical file.
+  `results/e1_synth_smoke.json` is gitignored (smoke is not evidence; the canonical
+  `results/e1_synth.json` stays committed). Verified: after `bash smoke.sh` the
+  canonical file is byte-for-byte unchanged and `results/e1_synth_smoke.json` carries
+  the 1-seed smoke data.
+- **Reproducibility fix (same round):** `evaluate_claims._refs` returned a `set`, so
+  the blocked-detail arm name (e.g. "arm `<arm>`.moto_cs_on_moto blocked …") depended on
+  set-iteration order and churned between runs — `claims_result.json` and
+  `selfcheck.json` were not reproducible. `_refs` now returns a **sorted** list, so the
+  first-referenced (sorted) arm is named deterministically. Both files are now
+  byte-identical across reruns and agree with each other (0 detail mismatches).
+  Verdict counts unchanged: pass=3, fail=0, blocked=19.
+- **Regression guard:** `tests/test_smoke_no_clobber.py` (2 tests) runs the real smoke
+  entrypoint via `sys.executable` and asserts (1) `results/e1_synth.json` is
+  byte-for-byte unchanged after a smoke run and the smoke output lands in the separate
+  gitignored file, and (2) the non-smoke OUT path targets the canonical file. Full
+  suite: 98 passed.
+
 ### Blockers (model arms, honestly BLOCKED)
 
 - **No CUDA** (`torch.cuda.is_available()` is False; `nvidia-smi` absent) and **no
@@ -128,10 +157,12 @@ only real numbers this environment produces are the E1 closed-form invariant che
 
 ### What runs in this repository (and what does not)
 
-- **Runs (CPU, real):** `smoke.sh` (tiny E1, one FINAL line, not evidence); `run_all_arms.sh`
-  (runs E1 real + E2–E5 BLOCKED → `measured.json` + `results/e1_synth.json`); the full
-  `tests/` suite (95 passed: environment import gate, closed-form core/degeneracy/
-  invariants, data loader, eval-metric instruments, claims evaluator, mutations).
+- **Runs (CPU, real):** `smoke.sh` (tiny E1, one FINAL line, not evidence — now writes
+  only to the gitignored `results/e1_synth_smoke.json`, never the canonical
+  `results/e1_synth.json`); `run_all_arms.sh` (runs E1 real + E2–E5 BLOCKED →
+  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (98 passed:
+  environment import gate, closed-form core/degeneracy/invariants, data loader,
+  eval-metric instruments, claims evaluator, mutations, smoke no-clobber guard).
   `evaluate_claims.py` → `claims_result.json` (pass=3, fail=0, blocked=19).
 - **Does NOT run here (BLOCKED):** Llama-2-7B-chat arms (E2, E3), SDXL arms (E4, E5),
   the GPT-4o-mini judge cross-validation, Qwen/SANA arms (out of scope per SPEC §8).

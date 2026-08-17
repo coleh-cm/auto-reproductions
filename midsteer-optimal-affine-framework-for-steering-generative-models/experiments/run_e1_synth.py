@@ -32,7 +32,10 @@ Prints one 'FINAL e1_<claim>=PASS/FAIL' line per seed/claim.
 NO success path reports PASS on an empty result: n==0 or A_hat is None -> raise.
 
 Env: MIDSTEER_SMOKE=1 -> tiny config (d=8, n=20000, 1 seed, few perturbations) for
-smoke.sh; NOT evidence about the paper.
+smoke.sh; NOT evidence about the paper. SMOKE writes ONLY to
+results/e1_synth_smoke.json — it NEVER touches results/e1_synth.json (the canonical
+evidence file), so running smoke.sh cannot clobber the real per-seed results. The
+canonical file is written ONLY on the full (non-smoke) run.
 """
 from __future__ import annotations
 import json
@@ -46,7 +49,10 @@ import torch
 from midsteer_core import affine
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, 'results', 'e1_synth.json')
+# The canonical evidence file is results/e1_synth.json, written ONLY on the full run.
+# Smoke writes to a separate file so smoke.sh can NEVER overwrite the real evidence.
+OUT = os.path.join(REPO, 'results', 'e1_synth_smoke.json' if os.environ.get('MIDSTEER_SMOKE') == '1'
+                   else 'e1_synth.json')
 
 SMOKE = os.environ.get('MIDSTEER_SMOKE') == '1'
 

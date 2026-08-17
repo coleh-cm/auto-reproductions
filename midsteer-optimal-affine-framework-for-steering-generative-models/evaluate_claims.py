@@ -29,9 +29,11 @@ def _load(path):
 
 
 def _refs(quantity, against=None):
-    """Return set of (arm, metric) referenced in a claim's quantity/against strings."""
+    """Return sorted list of (arm, metric) referenced in a claim's quantity/against
+    strings. Sorted (not a set) so the blocked-detail arm name and any per-ref loop
+    order are deterministic and claims_result.json is reproducible across runs."""
     text = (quantity or '') + '\n' + (against or '')
-    return set(re.findall(r'measured\.(\w+)\.(\w+)', text))
+    return sorted(set(re.findall(r'measured\.(\w+)\.(\w+)', text)))
 
 
 def _is_blocked(measured, arm, metric, seed):

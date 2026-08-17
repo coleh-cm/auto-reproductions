@@ -140,7 +140,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.moto_cs_on_moto blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.moto_cs_on_moto blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C6",
@@ -164,7 +164,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm vanilla.horse_cs_on_moto blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.horse_cs_on_moto blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C8",
@@ -272,7 +272,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.peace_cs blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.peace_cs blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C17",
@@ -296,7 +296,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.fid blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.fid blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C19",
@@ -308,7 +308,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.tgt_cs_on_tgt blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.tgt_cs_on_tgt blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C20",
@@ -320,7 +320,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "curve metric vanilla.src_cs_on_src blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "curve metric leace_switch.src_cs_on_src blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C21",
@@ -332,7 +332,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "curve metric midsteer.horse_cs_on_horse blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "curve metric leace_switch.horse_cs_on_horse blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C22",

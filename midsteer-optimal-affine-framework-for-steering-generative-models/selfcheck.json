@@ -176,7 +176,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.rtp blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.rtp blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C9",
@@ -212,7 +212,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm vanilla.help blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm midsteer.help blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C12",
@@ -224,7 +224,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm vanilla.unrel_cs blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm midsteer.unrel_cs blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C13",
@@ -236,7 +236,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.mmlu_bert_f1 blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.mmlu_bert_f1 blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C14",
@@ -272,7 +272,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.peace_cs blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.peace_cs blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C17",
@@ -296,7 +296,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.fid blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.fid blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C19",
@@ -308,7 +308,7 @@
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "arm midsteer.tgt_cs_on_tgt blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "arm leace_switch.tgt_cs_on_tgt blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C20",
