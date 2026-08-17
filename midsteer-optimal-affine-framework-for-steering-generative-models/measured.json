@@ -1,14 +1,24 @@
 {
   "base": {
     "0": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -19,7 +29,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -27,14 +41,24 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -45,7 +69,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -53,14 +81,24 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -71,7 +109,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -81,14 +123,24 @@
   },
   "vanilla": {
     "0": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -99,7 +151,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -107,14 +163,24 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -125,7 +191,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -133,14 +203,24 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -151,7 +231,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -161,14 +245,24 @@
   },
   "leace_switch": {
     "0": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -179,7 +273,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -187,14 +285,24 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -205,7 +313,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -213,14 +325,24 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -231,7 +353,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -241,14 +367,24 @@
   },
   "midsteer": {
     "0": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -259,7 +395,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -267,14 +407,24 @@
       "viol_cs": "BLOCKED"
     },
     "1": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -285,7 +435,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
@@ -293,14 +447,24 @@
       "viol_cs": "BLOCKED"
     },
     "2": {
-      "bertp_mmlu": "BLOCKED",
+      "bertp_mmlu": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "cow_cs": "BLOCKED",
       "cow_fid": "BLOCKED",
       "dog_cs": "BLOCKED",
       "dog_fid": "BLOCKED",
       "fid": "BLOCKED",
       "help": "BLOCKED",
-      "horse_cs_on_horse": "BLOCKED",
+      "horse_cs_on_horse": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "horse_cs_on_moto": "BLOCKED",
       "legislator_cs": "BLOCKED",
       "legislator_fid": "BLOCKED",
@@ -311,7 +475,11 @@
       "pig_cs": "BLOCKED",
       "pig_fid": "BLOCKED",
       "rtp": "BLOCKED",
-      "src_cs_on_src": "BLOCKED",
+      "src_cs_on_src": [
+        "BLOCKED",
+        "BLOCKED",
+        "BLOCKED"
+      ],
       "src_cs_on_tgt": "BLOCKED",
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",

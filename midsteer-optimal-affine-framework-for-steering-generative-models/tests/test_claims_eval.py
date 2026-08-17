@@ -109,3 +109,23 @@ def test_invariant_fails_when_a_seed_fails(tmp_path):
     ep = tmp_path / 'e1_synth.json'; _write(ep, e1)
     r = evaluate_claims.evaluate(str(cp), str(mp), str(ep))
     assert r['verdicts'][0]['verdict'] == 'fail'
+
+
+def test_curve_blocked_sequence_is_blocked(tmp_path):
+    # curve metric stored as a per-x BLOCKED sequence (the measured.json shape this repo
+    # produces for curve claims in a blocked sandbox) must verdict 'blocked'.
+    claims = {'arms': {'vanilla': {}, 'midsteer': {}}, 'seeds': [0, 1, 2], 'claims': [
+        {'id': 'C20', 'kind': 'curve',
+         'quantity': '[min(measured.vanilla.src_cs_on_src, measured.midsteer.src_cs_on_src) for beta in x]',
+         'against': '[measured.midsteer.src_cs_on_src for beta in x]',
+         'x': [3, 4, 5], 'comparison': 'above', 'quote': '', 'citation': ''}]}
+    measured = {
+        'vanilla':  {s: {'src_cs_on_src': ['BLOCKED', 'BLOCKED', 'BLOCKED']} for s in ['0', '1', '2']},
+        'midsteer': {s: {'src_cs_on_src': ['BLOCKED', 'BLOCKED', 'BLOCKED']} for s in ['0', '1', '2']},
+    }
+    cp = tmp_path / 'claims.json'; _write(cp, claims)
+    mp = tmp_path / 'measured.json'; _write(mp, measured)
+    ep = tmp_path / 'e1_synth.json'; _write(ep, {})
+    r = evaluate_claims.evaluate(str(cp), str(mp), str(ep))
+    assert r['verdicts'][0]['verdict'] == 'blocked'
+    assert r['verdicts'][0]['spread'] == 'BLOCKED'

@@ -40,6 +40,26 @@ def _metric_union(claims):
     return sorted(metrics)
 
 
+def _curve_metric_xlists(claims):
+    """Map each curve-claim metric name to its x-list (one value per x in the claim's order).
+
+    A curve claim's quantity references measured.<arm>.<metric>(beta, ...) parametric in the
+    x-list; the measured sequence must be one value per x, same shape at every seed. If two
+    curve claims share a metric, the x-lists must agree (asserted).
+    """
+    out = {}
+    for cl in claims.get('claims', []):
+        if cl.get('kind') != 'curve':
+            continue
+        x = cl['x']
+        refs = set(re.findall(r'measured\.(\w+)\.(\w+)', cl.get('quantity', '') + (cl.get('against') or '')))
+        for _, metric in refs:
+            if metric in out and out[metric] != x:
+                raise RuntimeError(f"curve metric {metric} has conflicting x-lists: {out[metric]} vs {x}")
+            out[metric] = list(x)
+    return out
+
+
 def main():
     claims_path = os.path.join(REPO, 'claims.json')
     with open(claims_path) as f:
@@ -47,6 +67,14 @@ def main():
     arms = list(claims['arms'].keys())
     seeds = [str(s) for s in claims['seeds']]
     metrics = _metric_union(claims)
+    curve_x = _curve_metric_xlists(claims)
+
+    def _default(metric):
+        # curve metrics are sequences (one value per x, same shape at every seed);
+        # all other metrics are scalars. This sandbox produces BLOCKED for every model metric.
+        if metric in curve_x:
+            return ["BLOCKED"] * len(curve_x[metric])
+        return "BLOCKED"
 
     # load partials
     partials = {}
@@ -56,13 +84,15 @@ def main():
             with open(p) as f:
                 partials[exp] = json.load(f)
 
-    # assemble: every arm x seed x metric. Default BLOCKED; fill from partials where present.
+    # assemble: every arm x seed x metric. Default BLOCKED (scalar or sequence); fill from
+    # partials where present (in this sandbox all are BLOCKED).
     measured = {}
     for arm in arms:
         measured[arm] = {}
         for seed in seeds:
-            measured[arm][seed] = {m: "BLOCKED" for m in metrics}
-    # merge any real (non-BLOCKED) values from partials (in this sandbox all are BLOCKED)
+            measured[arm][seed] = {m: _default(m) for m in metrics}
+    # merge any real (non-BLOCKED) values from partials (in this sandbox all are BLOCKED,
+    # so the shape-correct default — sequence for curve metrics, scalar otherwise — is kept)
     for exp, part in partials.items():
         for arm, seed_dict in part.items():
             if arm not in measured:
@@ -71,7 +101,13 @@ def main():
                 if seed not in measured[arm]:
                     continue
                 for m, v in md.items():
-                    if m in measured[arm][seed]:
+                    if m not in measured[arm][seed]:
+                        continue
+                    # only overwrite with a real value; keep the shape-correct BLOCKED default otherwise
+                    if isinstance(v, list):
+                        if any(x != "BLOCKED" and x is not None for x in v):
+                            measured[arm][seed][m] = v
+                    elif v != "BLOCKED" and v is not None:
                         measured[arm][seed][m] = v
 
     # completeness gate
@@ -101,15 +137,19 @@ def main():
         for seed in seeds:
             for m in metrics:
                 v = measured[arm][seed][m]
-                if v != "BLOCKED":
+                if isinstance(v, list):
+                    if any(x != "BLOCKED" for x in v):
+                        val = v
+                        break
+                elif v != "BLOCKED":
                     val = v
                     break
             if val != "BLOCKED":
                 break
         print(f"FINAL {arm}={val}")
 
-    sys.stderr.write(f"measured.json: {len(arms)} arms x {len(seeds)} seeds x {len(metrics)} metrics; "
-                     f"all model metrics BLOCKED in this sandbox.\n")
+    sys.stderr.write(f"measured.json: {len(arms)} arms x {len(seeds)} seeds x {len(metrics)} metrics "
+                     f"(curve metrics as sequences per x); all model metrics BLOCKED in this sandbox.\n")
 
 
 if __name__ == '__main__':

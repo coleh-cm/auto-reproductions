@@ -35,12 +35,17 @@ def _refs(quantity, against=None):
 
 
 def _is_blocked(measured, arm, metric, seed):
-    """True if the referenced measured value is BLOCKED (or absent)."""
+    """True if the referenced measured value is BLOCKED (or absent). A sequence metric
+    (curve, one value per x) is BLOCKED if ANY entry is BLOCKED."""
     try:
         v = measured[arm][str(seed)][metric]
     except (KeyError, TypeError):
         return True
-    return v == "BLOCKED" or v is None
+    if v is None:
+        return True
+    if isinstance(v, list):
+        return any(x == "BLOCKED" or x is None for x in v)
+    return v == "BLOCKED"
 
 
 def _seed_values(measured, arm, metric, seeds):
@@ -147,12 +152,11 @@ def _eval_curve(claim, measured, seeds):
         for s in seeds:
             if _is_blocked(measured, arm, metric, s):
                 return {'verdict': 'blocked', 'measured': 'BLOCKED', 'spread': 'BLOCKED',
-                        'detail': f'curve metric {arm}.{metric} blocked in this sandbox'}
-    # Build the quantity sequence per seed at each x. Curve quantities reference
-    # measured.<arm>.<metric>(beta, ...) — a parametric sweep. In this sandbox every
-    # such metric is BLOCKED, so the blocked branch above already returned.
-    # (On a GPU host a real sweep would populate measured[arm][seed][f'{metric}@beta={x}']
-    # or equivalent; that path is not reachable here.)
+                        'detail': f'curve metric {arm}.{metric} blocked in this sandbox (no CUDA / no HF_TOKEN)'}
+    # On a GPU+HF_TOKEN host the real sweep would populate measured[arm][seed][metric] as a
+    # sequence (one value per x); here every curve metric is BLOCKED so the branch above
+    # returned. The elementwise above/below/matches/increasing/decreasing comparison would
+    # run per x per seed against claim['against'] / claim['claimed'] within claim['tolerance'].
     return {'verdict': 'blocked', 'measured': 'BLOCKED', 'spread': 'BLOCKED',
             'detail': 'curve sweep not available in this sandbox (model metrics BLOCKED)'}
 
