@@ -20,19 +20,27 @@ only real numbers this environment produces are the E1 closed-form invariant che
 
 ### Verdict table (claims_result.json, produced by evaluate_claims.py)
 
-- **pass = 3**: C1 (LEACE closed form: zero covariance + minimal disturbance + vanilla
+- **reproduced = 3**: C1 (LEACE closed form: zero covariance + minimal disturbance + vanilla
   special case), C2 (LEACE-Switch: sign flip + minimal disturbance + vanilla-switch
   special case), C3 (MidSteer: matched covariance + minimal disturbance + erasure special
   case). All evaluated on CPU with synthetic Gaussian data of known covariance, at
-  seeds {0,1,2}. Achieved tolerances ~1e-13 (constraint) / 0 (minimal disturbance) /
-  ~1e-15 (special cases) — well under the claims' 1e-6 / 1e-8 thresholds.
-- **fail = 0**.
+  seeds {0,1,2}. The C1–C3 `predicate` is an executable boolean expression over
+  `measured.e1_synth.*` residual thresholds (the per-seed residuals flow into
+  `measured.json` from `results/e1_synth.json`), so the verdict is judged from measured
+  evidence, not a precomputed pass bool. Achieved tolerances ~1e-13 (constraint) / 0
+  (minimal disturbance) / ~1e-15 (special cases) — well under the claims' 1e-6 / 1e-8
+  thresholds.
+- **refuted = 0**.
+- **untested = 0**.
 - **blocked = 19**: C4–C22 (every model-arm claim: LLM-concrete, LLM-safety,
-  SDXL-h2m, SDXL-safety). Each references `measured.<arm>.<metric>` for a model metric
-  that is the string "BLOCKED" in `measured.json` (no CUDA / no HF_TOKEN); the evaluator
-  marks the verdict `blocked` with detail `arm <arm>.<metric> blocked in this sandbox`.
+  SDXL-h2m, SDXL-safety, and the three curve claims C20–C22). Each references
+  `measured.<arm>.<metric>` for a model metric that is the string "BLOCKED" in
+  `measured.json` (no CUDA / no HF_TOKEN); the evaluator marks the verdict `blocked`
+  with detail `arm <arm>.<metric> blocked in this sandbox`. C20–C22 `quantity`/`against`
+  are plain `measured.<arm>.<metric>` refs to per-x SEQUENCES (BLOCKED here), so the gate
+  resolves them and returns `blocked` rather than `unevaluable` on a list-comprehension.
 - `selfcheck.json` (the agent's own redundant check, different filename) agrees:
-  pass=3, fail=0, blocked=19.
+  reproduced=3, refuted=0, untested=0, blocked=19.
 
 ### Setup log (completed through implementation rung)
 
@@ -235,6 +243,56 @@ only real numbers this environment produces are the E1 closed-form invariant che
   an `instruments` array or a top-level `not_applicable` sentence (the
   nothing-judges case), but not both. Full suite: 106 passed.
 
+### Review-round fix (2026-08-17, pass 5): make the 6 unevaluable claims gate-evaluable
+
+The numbers-gate feedback marked C1, C2, C3, C20, C21, C22 `unevaluable` because the
+gate evaluates each claim's `predicate` (invariant) / `quantity`+`against` (curve)
+directly as Python over `measured` with a restricted builtin set (abs/all/any/bool/
+float/int/len/max/min/round/sorted/sum) and NO `x` in scope — and those fields were
+natural-language descriptions of the math (the C1–C3 predicates) or list-comprehensions
+in `x` with trailing prose (the C20–C22 quantities). A claim that cannot be evaluated is
+a defect in the reproduction, not a result.
+
+Fixed without weakening any claim:
+- **C1–C3 (`invariant`):** `predicate` is now an executable boolean expression over
+  `measured.e1_synth.*` residual thresholds, e.g.
+  `measured.e1_synth.c1_n_feasible > 0 and measured.e1_synth.c1_constraint < 1e-6 and
+  measured.e1_synth.c1_minimal_disturbance_gap <= 1e-6 and
+  measured.e1_synth.c1_vanilla_special < 1e-8`. A new `e1_synth` arm (CPU, no model)
+  carries the per-seed invariant residuals in `measured.json` (assembled from
+  `results/e1_synth.json` by `assemble_measured.py`), so the gate judges the verdict
+  from measured evidence. The verbatim prose predicate is preserved in
+  `predicate_description`. The `e1_synth` metric keys are claim-prefixed
+  (`c1_constraint`, `c2_flip_constraint`, `c3_matched_cov_constraint`, …) to be
+  unambiguous across the three claims.
+- **C20–C22 (`curve`):** `quantity`/`against` are now plain `measured.<arm>.<metric>`
+  refs to PER-X SEQUENCES (the gate provides no `x`; it treats these refs as the stored
+  sequences and compares elementwise). C20/C21 use new derived metrics
+  `c20_min_baseline_src` / `c21_min_baseline_horse` = elementwise min of the two
+  baselines' per-beta sequences (the weakest-dominance reference), computed by
+  `assemble_measured.py` so the elementwise-min is correct on a real host (a naive
+  `min(list, list)` would be lexicographic, not elementwise). C22 uses the existing
+  `bertp_mmlu` sequence. The verbatim list-comprehensions are preserved in
+  `quantity_description` / `against_description`.
+- **`evaluation_rule`** rewritten in the gate's vocabulary (reproduced / refuted /
+  untested / blocked) with the executable-predicate and per-x-sequence model stated
+  explicitly; `evaluate_claims.py` emits `generated_by='workflow_subagent'` (the
+  WORKFLOW's table; the gate's `produced_by` form is never what this repo commits).
+- `evaluate_claims.py` now evaluates invariants by executing the predicate over
+  `measured.json` at every seed, and curves by elementwise per-x comparison; the
+  ordering path gained the within-noise `untested` verdict (|mean| <= cross-seed
+  spread). `tests/test_claims_eval.py` rewritten with positive AND negative tests for
+  every path (reproduced/refuted/untested/blocked for ordering, value, invariant,
+  curve), a test that a predicate referencing a disallowed name (`x`) is blocked (not a
+  rubber stamp), and a test that `generated_by=='workflow_subagent'` (not the gate's
+  `produced_by`). `instruments.json` `evaluate_claims` entry updated to reference the
+  new positive/negative tests. Full suite: 117 passed.
+
+Result: `claims_result.json` now has reproduced=3 (C1–C3), blocked=19 (C4–C22),
+untested=0, refuted=0 — no `unevaluable`. `selfcheck.json` agrees. The model arms
+remain BLOCKED (no CUDA / no HF_TOKEN), which is the correct blocked result for this
+sandbox, not a defect.
+
 ### Blockers (model arms, honestly BLOCKED)
 
 - **No CUDA** (`torch.cuda.is_available()` is False; `nvidia-smi` absent) and **no
@@ -261,11 +319,12 @@ only real numbers this environment produces are the E1 closed-form invariant che
 - **Runs (CPU, real):** `smoke.sh` (tiny E1, one FINAL line, not evidence — now writes
   only to the gitignored `results/e1_synth_smoke.json`, never the canonical
   `results/e1_synth.json`);   `run_all_arms.sh` (runs E1 real + E2–E5 BLOCKED →
-  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (106 passed:
+  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (117 passed:
   environment import gate, closed-form core/degeneracy/invariants, data loader,
-  eval-metric instruments, claims evaluator, mutations, smoke no-clobber guard,
-  instruments.json schema guard).
-  `evaluate_claims.py` → `claims_result.json` (pass=3, fail=0, blocked=19).
+  eval-metric instruments, claims evaluator with positive/negative tests for every
+  verdict path, mutations, smoke no-clobber guard, instruments.json schema guard).
+  `evaluate_claims.py` → `claims_result.json` (reproduced=3, refuted=0, untested=0,
+  blocked=19; `generated_by='workflow_subagent'`).
 - **Does NOT run here (BLOCKED):** Llama-2-7B-chat arms (E2, E3), SDXL arms (E4, E5),
   the GPT-4o-mini judge cross-validation, Qwen/SANA arms (out of scope per SPEC §8).
 - **Not implemented (out of scope, recorded in claims.json `not_tested`):** Appendix L

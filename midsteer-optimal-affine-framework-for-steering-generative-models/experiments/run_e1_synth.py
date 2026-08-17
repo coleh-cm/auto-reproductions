@@ -27,9 +27,11 @@ set, verified by a strong family of feasible perturbations A_hat + D with D Sxz 
 transversal. The constraint (i) and special-case (iii) sub-checks are unchanged.
 
 Writes results/e1_synth.json: {seed: {C1: {pass, detail, metrics}, C2: ..., C3: ...}}.
-The FULL (non-smoke) run prints one 'FINAL e1_<claim>=PASS/FAIL' line per seed/claim —
-PASS/FAIL here is the MEASURED value of an invariant claim (it is what flows into
-claims_result.json), so it is a result and it is evidence.
+The FULL (non-smoke) run prints per-claim/seed evidence lines `e1_<claim>=PASS/FAIL`
+(these are the MEASURED pass/fail of an invariant claim and flow into claims_result.json,
+so they are evidence) — note no `FINAL ` prefix: the e1_synth arm's single
+`FINAL e1_synth=<worst residual>` line is emitted by assemble_measured from the
+assembled measured.json (the arm summary a reader sees in the log).
 The SMOKE run prints exactly one line `FINAL e1_synth_smoke=<float>` whose value is the
 worst (max) covariance-constraint residual across C1/C2/C3 at smoke scale. This is a
 MEASURED NUMBER, not a verdict: smoke only proves the code path runs and is NOT
@@ -160,8 +162,8 @@ def _check_c1(seed, d, n):
     return {
         'pass': bool(passed),
         'detail': f"constr={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e}",
-        'metrics': {'constraint': constr, 'minimal_disturbance_gap': worst_gap,
-                     'n_feasible_perturbations': nfeas, 'vanilla_special_max': special},
+        'metrics': {'c1_constraint': constr, 'c1_minimal_disturbance_gap': worst_gap,
+                     'c1_n_feasible': nfeas, 'c1_vanilla_special': special},
     }
 
 
@@ -201,8 +203,8 @@ def _check_c2(seed, d, n):
     return {
         'pass': bool(passed),
         'detail': f"flip_constr={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e}",
-        'metrics': {'flip_constraint': constr, 'minimal_disturbance_gap': worst_gap,
-                     'n_feasible_perturbations': nfeas, 'vanilla_special_max': special},
+        'metrics': {'c2_flip_constraint': constr, 'c2_minimal_disturbance_gap': worst_gap,
+                     'c2_n_feasible': nfeas, 'c2_vanilla_special': special},
     }
 
 
@@ -237,8 +239,8 @@ def _check_c3(seed, d, n):
     return {
         'pass': bool(passed),
         'detail': f"matched_cov={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e}",
-        'metrics': {'matched_cov_constraint': constr, 'minimal_disturbance_gap': worst_gap,
-                     'n_feasible_perturbations': nfeas, 'erasure_special': special},
+        'metrics': {'c3_matched_cov_constraint': constr, 'c3_minimal_disturbance_gap': worst_gap,
+                     'c3_n_feasible': nfeas, 'c3_erasure_special': special},
     }
 
 
@@ -261,14 +263,17 @@ def main():
             # constraints were evaluated. Empty result is caught below (raises).
             res = results[str(seed)]
             worst = max(
-                res['C1']['metrics']['constraint'],
-                res['C2']['metrics']['flip_constraint'],
-                res['C3']['metrics']['matched_cov_constraint'],
+                res['C1']['metrics']['c1_constraint'],
+                res['C2']['metrics']['c2_flip_constraint'],
+                res['C3']['metrics']['c3_matched_cov_constraint'],
             )
             print(f"FINAL e1_synth_smoke={worst:.6e}")
         else:
             for claim in ('C1', 'C2', 'C3'):
-                print(f"FINAL e1_{claim}={'PASS' if results[str(seed)][claim]['pass'] else 'FAIL'}")
+                # Per-claim evidence lines (no 'FINAL ' prefix: the arm's single
+                # 'FINAL e1_synth=<worst residual>' line is emitted by assemble_measured
+                # from the assembled measured.json; these are per-claim diagnostics).
+                print(f"e1_{claim}={'PASS' if results[str(seed)][claim]['pass'] else 'FAIL'}")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w') as f:
         json.dump(results, f, indent=2)

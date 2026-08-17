@@ -4,30 +4,30 @@
       "pass": true,
       "detail": "constr=5.15e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15",
       "metrics": {
-        "constraint": 5.146610762057739e-13,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "vanilla_special_max": 2.6645352591003757e-15
+        "c1_constraint": 5.146610762057739e-13,
+        "c1_minimal_disturbance_gap": 0.0,
+        "c1_n_feasible": 16,
+        "c1_vanilla_special": 2.6645352591003757e-15
       }
     },
     "C2": {
       "pass": true,
       "detail": "flip_constr=1.66e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15",
       "metrics": {
-        "flip_constraint": 1.6555095387456028e-12,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "vanilla_special_max": 2.6645352591003757e-15
+        "c2_flip_constraint": 1.6555095387456028e-12,
+        "c2_minimal_disturbance_gap": 0.0,
+        "c2_n_feasible": 16,
+        "c2_vanilla_special": 2.6645352591003757e-15
       }
     },
     "C3": {
       "pass": true,
       "detail": "matched_cov=5.35e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=0.00e+00",
       "metrics": {
-        "matched_cov_constraint": 5.351029894803302e-13,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "erasure_special": 0.0
+        "c3_matched_cov_constraint": 5.351029894803302e-13,
+        "c3_minimal_disturbance_gap": 0.0,
+        "c3_n_feasible": 16,
+        "c3_erasure_special": 0.0
       }
     }
   },
@@ -36,30 +36,30 @@
       "pass": true,
       "detail": "constr=8.29e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15",
       "metrics": {
-        "constraint": 8.294663976433091e-13,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "vanilla_special_max": 2.6645352591003757e-15
+        "c1_constraint": 8.294663976433091e-13,
+        "c1_minimal_disturbance_gap": 0.0,
+        "c1_n_feasible": 16,
+        "c1_vanilla_special": 2.6645352591003757e-15
       }
     },
     "C2": {
       "pass": true,
       "detail": "flip_constr=1.44e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=2.44e-15",
       "metrics": {
-        "flip_constraint": 1.436961935261511e-12,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "vanilla_special_max": 2.4424906541753444e-15
+        "c2_flip_constraint": 1.436961935261511e-12,
+        "c2_minimal_disturbance_gap": 0.0,
+        "c2_n_feasible": 16,
+        "c2_vanilla_special": 2.4424906541753444e-15
       }
     },
     "C3": {
       "pass": true,
       "detail": "matched_cov=4.89e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=0.00e+00",
       "metrics": {
-        "matched_cov_constraint": 4.890347802879955e-13,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "erasure_special": 0.0
+        "c3_matched_cov_constraint": 4.890347802879955e-13,
+        "c3_minimal_disturbance_gap": 0.0,
+        "c3_n_feasible": 16,
+        "c3_erasure_special": 0.0
       }
     }
   },
@@ -68,30 +68,30 @@
       "pass": true,
       "detail": "constr=6.98e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15",
       "metrics": {
-        "constraint": 6.979898958767834e-13,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "vanilla_special_max": 2.6645352591003757e-15
+        "c1_constraint": 6.979898958767834e-13,
+        "c1_minimal_disturbance_gap": 0.0,
+        "c1_n_feasible": 16,
+        "c1_vanilla_special": 2.6645352591003757e-15
       }
     },
     "C2": {
       "pass": true,
       "detail": "flip_constr=1.29e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=2.22e-15",
       "metrics": {
-        "flip_constraint": 1.292806718808349e-12,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "vanilla_special_max": 2.220446049250313e-15
+        "c2_flip_constraint": 1.292806718808349e-12,
+        "c2_minimal_disturbance_gap": 0.0,
+        "c2_n_feasible": 16,
+        "c2_vanilla_special": 2.220446049250313e-15
       }
     },
     "C3": {
       "pass": true,
       "detail": "matched_cov=1.48e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=0.00e+00",
       "metrics": {
-        "matched_cov_constraint": 1.475441940013077e-12,
-        "minimal_disturbance_gap": 0.0,
-        "n_feasible_perturbations": 16,
-        "erasure_special": 0.0
+        "c3_matched_cov_constraint": 1.475441940013077e-12,
+        "c3_minimal_disturbance_gap": 0.0,
+        "c3_n_feasible": 16,
+        "c3_erasure_special": 0.0
       }
     }
   }

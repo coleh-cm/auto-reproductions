@@ -20,8 +20,9 @@ def main():
     out = os.path.join(REPO, 'selfcheck.json')
     with open(out, 'w') as f:
         json.dump(result, f, indent=2)
-    print(f"selfcheck.json: pass={result['summary']['pass']} "
-          f"fail={result['summary']['fail']} blocked={result['summary']['blocked']}")
+    print(f"selfcheck.json: reproduced={result['summary']['reproduced']} "
+          f"refuted={result['summary']['refuted']} untested={result['summary']['untested']} "
+          f"blocked={result['summary']['blocked']}")
 
 
 if __name__ == '__main__':

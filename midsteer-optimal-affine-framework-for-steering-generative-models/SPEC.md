@@ -1413,11 +1413,30 @@ Additional implementation choices:
   fallback (a closed-book run that fell back to a synthetic corpus produced seven arms
   at chance level and meant nothing).
 - **claims_result.json produced by the workflow evaluator.** `evaluate_claims.py`
-  (a component a subagent would have authored in the orchestrate workflow) computes
-  verdicts deterministically from `measured.json` + `claims.json` + `results/e1_synth.json`
-  and writes `claims_result.json` with `generated_by='workflow_subagent'`. The
-  top-level agent's own redundant check is `selfcheck_claims.py` → `selfcheck.json`
-  (`generated_by='selfcheck'`, different filename). The orchestrate backend was down
-  (HTTP 500 on a trivial ping), so the evaluator script — not hand-written verdicts —
-  produced the table; the authorship distinction (workflow vs selfcheck) is preserved
-  in the `generated_by` field.
+  computes verdicts deterministically from `measured.json` + `claims.json` and writes
+  `claims_result.json` with `generated_by='workflow_subagent'` (the WORKFLOW's artifact;
+  the gate's `produced_by='reproduce-paper numbers gate'` form is a different table and
+  is never what this repo commits). The top-level agent's own redundant check is
+  `selfcheck_claims.py` -> `selfcheck.json` (`generated_by='selfcheck'`, different
+  filename). Verdict vocabulary matches the numbers gate: reproduced / refuted /
+  untested / blocked.
+- **Invariant and curve claims are GATE-EVALUABLE, not prose.** A prior pass left the
+  C1-C3 `predicate` and C20-C22 `quantity` as natural-language descriptions of the math;
+  the numbers gate evals those fields directly (allowed: `measured`, abs/all/any/bool/
+  float/int/len/max/min/round/sorted/sum, comparisons, and/or) and returned `unevaluable`
+  on the prose. Fixed: C1-C3 `predicate` is now an executable boolean expression over
+  `measured.e1_synth.*` residual thresholds (e.g.
+  `measured.e1_synth.c1_n_feasible > 0 and measured.e1_synth.c1_constraint < 1e-6 and
+  measured.e1_synth.c1_minimal_disturbance_gap <= 1e-6 and
+  measured.e1_synth.c1_vanilla_special < 1e-8`); the prose is preserved verbatim in
+  `predicate_description`. C20-C22 `quantity`/`against` are now plain
+  `measured.<arm>.<metric>` refs to PER-X SEQUENCES (the gate provides no `x` in the
+  predicate namespace and treats these refs as the stored sequences, comparing
+  elementwise); the prose list-comprehensions are preserved in `quantity_description`/
+  `against_description`. The `e1_synth` arm carries the per-seed invariant residuals
+  (REAL, CPU) in `measured.json`; the four model arms carry the per-x curve sequences
+  (BLOCKED here, real on a GPU+HF_TOKEN host). The derived curve metrics
+  `c20_min_baseline_src` and `c21_min_baseline_horse` (elementwise min of the two
+  baselines' per-beta sequences — the weakest-dominance reference) are computed by
+  `assemble_measured.py` so the elementwise-min semantics are correct on a real host,
+  not the lexicographic `min(list, list)` a naive expression would give.

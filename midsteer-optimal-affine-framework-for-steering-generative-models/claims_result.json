@@ -9,8 +9,9 @@
       "kind": "invariant",
       "quote": "has the following solution, almost surely:\n\\begin{align}\n    \\widehat A\n    &=\n    I - W^+(W\\Sigma_{XZ})(W\\Sigma_{XZ})^+W,",
       "citation": "paper/content/guardedness.tex:73-77",
-      "verdict": "pass",
-      "measured": "PASS",
+      "compute_invariance": "high",
+      "verdict": "reproduced",
+      "measured": "true_at_every_seed",
       "claimed": null,
       "tolerance": null,
       "spread": [
@@ -18,37 +19,16 @@
         true,
         true
       ],
-      "detail": "constr=5.15e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15; constr=8.29e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15; constr=6.98e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15",
-      "metrics": {
-        "constraint": [
-          5.146610762057739e-13,
-          8.294663976433091e-13,
-          6.979898958767834e-13
-        ],
-        "minimal_disturbance_gap": [
-          0.0,
-          0.0,
-          0.0
-        ],
-        "n_feasible_perturbations": [
-          16,
-          16,
-          16
-        ],
-        "vanilla_special_max": [
-          2.6645352591003757e-15,
-          2.6645352591003757e-15,
-          2.6645352591003757e-15
-        ]
-      }
+      "detail": "predicate true at every seed: [True, True, True]"
     },
     {
       "id": "C2",
       "kind": "invariant",
       "quote": "\\widehat{A} &= I - 2W^+(W \\Sigma_{XZ}) (W \\Sigma_{XZ})^+ W",
       "citation": "paper/main.tex:365",
-      "verdict": "pass",
-      "measured": "PASS",
+      "compute_invariance": "high",
+      "verdict": "reproduced",
+      "measured": "true_at_every_seed",
       "claimed": null,
       "tolerance": null,
       "spread": [
@@ -56,37 +36,16 @@
         true,
         true
       ],
-      "detail": "flip_constr=1.66e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=2.66e-15; flip_constr=1.44e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=2.44e-15; flip_constr=1.29e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=2.22e-15",
-      "metrics": {
-        "flip_constraint": [
-          1.6555095387456028e-12,
-          1.436961935261511e-12,
-          1.292806718808349e-12
-        ],
-        "minimal_disturbance_gap": [
-          0.0,
-          0.0,
-          0.0
-        ],
-        "n_feasible_perturbations": [
-          16,
-          16,
-          16
-        ],
-        "vanilla_special_max": [
-          2.6645352591003757e-15,
-          2.4424906541753444e-15,
-          2.220446049250313e-15
-        ]
-      }
+      "detail": "predicate true at every seed: [True, True, True]"
     },
     {
       "id": "C3",
       "kind": "invariant",
       "quote": "\\widehat{A} &= I + W^+ (\\Sigma_{WX, Z_2} - \\Sigma_{WX, Z_1})\\Sigma_{WX, Z_1}^+ W",
       "citation": "paper/main.tex:447",
-      "verdict": "pass",
-      "measured": "PASS",
+      "compute_invariance": "high",
+      "verdict": "reproduced",
+      "measured": "true_at_every_seed",
       "claimed": null,
       "tolerance": null,
       "spread": [
@@ -94,35 +53,14 @@
         true,
         true
       ],
-      "detail": "matched_cov=5.35e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=0.00e+00; matched_cov=4.89e-13 min_disturb_gap=0.00e+00 (nfeas=16) special=0.00e+00; matched_cov=1.48e-12 min_disturb_gap=0.00e+00 (nfeas=16) special=0.00e+00",
-      "metrics": {
-        "matched_cov_constraint": [
-          5.351029894803302e-13,
-          4.890347802879955e-13,
-          1.475441940013077e-12
-        ],
-        "minimal_disturbance_gap": [
-          0.0,
-          0.0,
-          0.0
-        ],
-        "n_feasible_perturbations": [
-          16,
-          16,
-          16
-        ],
-        "erasure_special": [
-          0.0,
-          0.0,
-          0.0
-        ]
-      }
+      "detail": "predicate true at every seed: [True, True, True]"
     },
     {
       "id": "C4",
       "kind": "ordering",
       "quote": "In contrast, MidSteer keeps ``motorcycle'' intact.",
       "citation": "paper/content/experiments.tex:127",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -135,6 +73,7 @@
       "kind": "ordering",
       "quote": "In contrast, MidSteer keeps ``motorcycle'' intact.",
       "citation": "paper/content/experiments.tex:127",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -147,6 +86,7 @@
       "kind": "value",
       "quote": "MidSteer (ours) & 1.0 \n& 51.2 & 68.7 \n& 51.9 & 70.7 & 12.7",
       "citation": "paper/flipping_main.tex:46-48",
+      "compute_invariance": "low",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": 70.7,
@@ -159,6 +99,7 @@
       "kind": "ordering",
       "quote": "vanilla steering (CASteer) and LEACE fail when presented with prompt for the target concept (\"motorcycle\"), unable to distinguish between forward and reverse steering.",
       "citation": "paper/content/experiments.tex:108",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -171,6 +112,7 @@
       "kind": "ordering",
       "quote": "For Llama-2-7B-chat, MidSteer achieves the strongest reduction in toxicity, decreasing the RTP toxicity score from $.371$ to $.281$ at $\\beta=5$",
       "citation": "paper/content/safety-related_results.tex:10",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -183,6 +125,7 @@
       "kind": "ordering",
       "quote": "decreasing the RTP toxicity score from $.371$ to $.281$ at $\\beta=5$",
       "citation": "paper/content/safety-related_results.tex:10",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -195,6 +138,7 @@
       "kind": "value",
       "quote": "MidSteer-5  & \\textbf{.281}",
       "citation": "paper/artefacts/tables/safety_table.tex:71",
+      "compute_invariance": "low",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": 0.281,
@@ -207,6 +151,7 @@
       "kind": "ordering",
       "quote": "while preserving helpfulness at the baseline level",
       "citation": "paper/content/safety-related_results.tex:10",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -219,6 +164,7 @@
       "kind": "ordering",
       "quote": "substantially degrades unrelated-concept preservation at higher strength, with the unrelated concept score dropping from $8.46$ to $3.11$",
       "citation": "paper/content/safety-related_results.tex:11",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -231,6 +177,7 @@
       "kind": "ordering",
       "quote": "LEACE-Switch preserves general capabilities slightly better, as reflected by the highest MMLU BERT-F1 among interventions",
       "citation": "paper/content/safety-related_results.tex:12",
+      "compute_invariance": "medium",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -243,6 +190,7 @@
       "kind": "ordering",
       "quote": "Vanilla steering also reduces violence, but either underperforms MidSteer on source suppression or causes larger distortions",
       "citation": "paper/content/safety-related_results.tex:15",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -255,6 +203,7 @@
       "kind": "ordering",
       "quote": "MidSteer most effectively suppresses the source concept, reducing the violence score from $99.6$ to $6.0$",
       "citation": "paper/content/safety-related_results.tex:15",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -267,6 +216,7 @@
       "kind": "ordering",
       "quote": "LEACE-Switch yields the lowest FID among interventions but is substantially less effective at inducing the target concept.",
       "citation": "paper/content/safety-related_results.tex:15",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -279,6 +229,7 @@
       "kind": "value",
       "quote": "MidSteer-5  & \\textbf{6.0} & \\textbf{94.0}",
       "citation": "paper/artefacts/tables/safety_table.tex:83",
+      "compute_invariance": "low",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": 6.0,
@@ -291,6 +242,7 @@
       "kind": "ordering",
       "quote": "LEACE-Switch yields the lowest FID among interventions",
       "citation": "paper/content/safety-related_results.tex:15",
+      "compute_invariance": "medium",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -303,6 +255,7 @@
       "kind": "ordering",
       "quote": "In contrast, MidSteer keeps ``motorcycle'' intact.",
       "citation": "paper/content/experiments.tex:127",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
@@ -315,30 +268,33 @@
       "kind": "curve",
       "quote": "In each case, we see clear superiority of MidSteer over other steering approaches.",
       "citation": "paper/content/switching_suppl.tex:21",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "curve metric leace_switch.src_cs_on_src blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "curve metric midsteer.c20_min_baseline_src blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C21",
       "kind": "curve",
       "quote": "We see that in each case MidSteer achieves much better balance between level of concept switch between $c_1$ and $c_2$ and preservation of other concepts across different values of $\\beta$.",
       "citation": "paper/content/experiments.tex:121",
+      "compute_invariance": "high",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": null,
       "tolerance": null,
       "spread": "BLOCKED",
-      "detail": "curve metric leace_switch.horse_cs_on_horse blocked in this sandbox (no CUDA / no HF_TOKEN)"
+      "detail": "curve metric midsteer.c21_min_baseline_horse blocked in this sandbox (no CUDA / no HF_TOKEN)"
     },
     {
       "id": "C22",
       "kind": "curve",
       "quote": "Fig.~\\ref{fig:num_covs} shows that performance largely stabilizes around 5,000 prompts in the tested Llama-2-7B setting.",
       "citation": "paper/content/suppl.tex:642",
+      "compute_invariance": "low",
       "verdict": "blocked",
       "measured": "BLOCKED",
       "claimed": [
@@ -352,8 +308,9 @@
     }
   ],
   "summary": {
-    "pass": 3,
-    "fail": 0,
+    "reproduced": 3,
+    "refuted": 0,
+    "untested": 0,
     "blocked": 19
   }
 }

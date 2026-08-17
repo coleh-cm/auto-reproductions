@@ -90,17 +90,27 @@
     },
     {
       "name": "evaluate_claims",
-      "what_it_decides": "The pass/fail/blocked verdict per claim, written to claims_result.json by the WORKFLOW's numbers gate, evaluated against measured.json + results/e1_synth.json per the claims.json evaluation_rule. A blocked metric is never a silent pass; a grader that cannot run (malformed/empty claims or measured) raises rather than emitting a verdict; a metric nothing measures is BLOCKED, not a rounding error. The positive test proves a satisfied ordering passes; the negative tests prove a violated ordering fails, a blocked metric is blocked, an empty claims table raises, an empty measured table raises, and an unmeasured metric is blocked.",
+      "what_it_decides": "The reproduced/refuted/untested/blocked verdict per claim, written to claims_result.json by the WORKFLOW evaluator (generated_by='workflow_subagent'; never the gate's 'produced_by' form), evaluated against measured.json per the claims.json evaluation_rule. invariant claims execute their `predicate` (a boolean expression over measured.<arm>.<metric> residuals) at every seed; curve claims compare per-x SEQUENCES elementwise. A blocked metric is never a silent reproduced; a grader that cannot run (malformed/empty claims or measured, or a predicate referencing a disallowed name) raises or returns blocked rather than emitting a verdict; a metric nothing measures is BLOCKED, not a rounding error. The positive test proves a satisfied ordering is reproduced; the negative tests prove a violated-and-separated ordering is refuted, a within-noise ordering is untested (not falsified), a blocked metric is blocked, an empty claims/measured table raises, an unmeasured metric is blocked, a predicate true at every seed is reproduced and false at one seed is refuted, a predicate referencing a disallowed name (x) is blocked (not a rubber stamp), a curve above/matches comparison is reproduced when it holds and refuted when it fails, a BLOCKED sequence is blocked, and the provenance marker is workflow_subagent (not the gate's produced_by).",
       "positive_test": "tests/test_claims_eval.py::test_ordering_satisfied_passes",
-      "negative_test": "tests/test_claims_eval.py::test_ordering_violated_fails",
+      "negative_test": "tests/test_claims_eval.py::test_ordering_refuted_when_direction_fails_and_separated",
       "additional_tests": [
+        "tests/test_claims_eval.py::test_ordering_untested_when_within_noise",
         "tests/test_claims_eval.py::test_blocked_metric_is_blocked",
         "tests/test_claims_eval.py::test_empty_claims_raises",
         "tests/test_claims_eval.py::test_empty_measured_raises",
         "tests/test_claims_eval.py::test_metric_not_measured_blocked",
+        "tests/test_claims_eval.py::test_value_reproduced",
+        "tests/test_claims_eval.py::test_value_refuted",
         "tests/test_claims_eval.py::test_invariant_passes_when_e1_passes",
         "tests/test_claims_eval.py::test_invariant_fails_when_a_seed_fails",
-        "tests/test_claims_eval.py::test_curve_blocked_sequence_is_blocked"
+        "tests/test_claims_eval.py::test_invariant_blocked_metric_blocked",
+        "tests/test_claims_eval.py::test_invariant_predicate_rejects_disallowed_names",
+        "tests/test_claims_eval.py::test_curve_above_reproduced",
+        "tests/test_claims_eval.py::test_curve_above_refuted",
+        "tests/test_claims_eval.py::test_curve_matches_reproduced",
+        "tests/test_claims_eval.py::test_curve_matches_refuted",
+        "tests/test_claims_eval.py::test_curve_blocked_sequence_is_blocked",
+        "tests/test_claims_eval.py::test_provenance_marker_is_workflow_subagent"
       ],
       "requires_tools": [],
       "produces": "claims_result.json (workflow artifact; the agent's own check writes selfcheck.json, a different filename)"

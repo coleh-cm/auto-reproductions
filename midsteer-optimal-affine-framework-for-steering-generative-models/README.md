@@ -85,9 +85,9 @@ docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN midsteer-repro bash run_all_arm
 | `experiments/run_e{2..5}_*.py` | ❌ BLOCKED | Llama-2-7B-chat / SDXL arms; print `FINAL <arm>=BLOCKED`, write BLOCKED partials (no synthetic fallback) |
 | `run_all_arms.sh` | ✅ | runs E1 real + E2–E5 BLOCKED → `measured.json` + `results/e1_synth.json`; prints one `FINAL <arm>=...` per arm |
 | `smoke.sh` | ✅ | tiny E1 path, one FINAL line (NOT evidence about the paper) |
-| `evaluate_claims.py` → `claims_result.json` | ✅ | verdict table: pass=3 (C1–C3), fail=0, blocked=19 (model arms) |
+| `evaluate_claims.py` → `claims_result.json` | ✅ | verdict table (`generated_by='workflow_subagent'`): reproduced=3 (C1–C3), refuted=0, untested=0, blocked=19 (model arms). C1–C3 predicates are executable threshold expressions over `measured.e1_synth.*` residuals; C20–C22 quantities are plain measured-ref per-x sequences |
 | `selfcheck_claims.py` → `selfcheck.json` | ✅ | the agent's own redundant check (different filename), agrees |
-| `tests/` | ✅ 106 passed | environment import gate, core/degeneracy/invariants, data, eval instruments, claims eval, mutations (5 defects, all caught), instruments.json schema guard |
+| `tests/` | ✅ 117 passed | environment import gate, core/degeneracy/invariants, data, eval instruments, claims eval (positive+negative tests for every verdict path), mutations (5 defects, all caught), instruments.json schema guard |
 | `instruments.json`, `mutations.json` | ✅ | top-level `instruments` array of every output-deciding instrument (data loader, 6 scorers, closed-form invariants, claims evaluator) + positive/negative tests; `not_applicable` is omitted (it would excuse the whole reproduction; this repo has 9 instruments); 5 deliberate defects with `must_fail` nodes |
 | `core/`, `scripts/`, `helpers/`, `exp/`, `notebooks/` | vendored upstream | the authors' own implementation (HEAD `0f3b31e`), unchanged; `midsteer_core/` is the readable closed form beside it |
 
@@ -114,8 +114,8 @@ produced here are the E1 closed-form invariant checks (C1, C2, C3), all PASS. Se
 ## Status
 
 Implementation rung complete. The closed-form core, E1 synthetic invariant checks
-(C1–C3, all PASS), eval instruments, run scripts, claims evaluator, mutation suite,
-`measured.json`, and `claims_result.json` (pass=3, fail=0, blocked=19) are committed
-and pushed. The model arms are BLOCKED (no CUDA / no HF_TOKEN). See `REPRODUCTION.md`
-for the full log, decisions, and blockers; `SPEC.md` §12–14 for constructed truth,
-sweep ranges, and every choice the paper left open.
+(C1–C3, all reproduced), eval instruments, run scripts, claims evaluator, mutation suite,
+`measured.json`, and `claims_result.json` (reproduced=3, refuted=0, untested=0,
+blocked=19) are committed and pushed. The model arms are BLOCKED (no CUDA / no HF_TOKEN).
+See `REPRODUCTION.md` for the full log, decisions, and blockers; `SPEC.md` §12–14 for
+constructed truth, sweep ranges, and every choice the paper left open.

@@ -39,6 +39,11 @@
         4,
         5
       ]
+    },
+    "e1_synth": {
+      "transform": "closed_form_invariant_test",
+      "compute": "cpu",
+      "purpose": "synthetic closed-form correctness for C1-C3 (no model, no CUDA, no HF_TOKEN)"
     }
   },
   "restrictions": {
@@ -57,6 +62,10 @@
     "midsteer": {
       "kind": "narrows_situations",
       "detail": "Eq. 23 arm (paper/main.tex:478-481) with per-head block-diagonal maps (weakest reading G5). Same situation-narrowing as leace_switch (M = 5000 of 50000 with Fig.5/C22 justification, N = 1000 unchanged, seeds 3 of 10, model and pair subsets, beta subset of the paper's grid with default 1 per paper/content/experiments.tex:125, pinv tolerance = host default G7, upstream clipping disabled). No metric, constraint (Cov(f(X),Z1) = Cov(X,Z2)) or success-criterion change: what counts as a correct measurement is identical to the paper; only which situations are evaluated is narrowed. A run at beta or model or pair cells outside the tested subset cannot speak to claims about those cells and does not."
+    },
+    "e1_synth": {
+      "kind": "none",
+      "detail": "Synthetic closed-form invariant arm for C1-C3 (experiment e1_synth). No situation narrowing: the closed forms are tested on synthetic Gaussian data with KNOWN covariance exactly as the claims describe (d=32, 200000 samples, 3 seeds {0,1,2}); the correctness criterion (covariance constraint < 1e-6, minimal disturbance over the constraint-preserving set, vanilla/erasure special case < 1e-8) is the paper's own (Eqs. 5/13/19, paper/main.tex:461). CPU-only; no model, no CUDA, no HF_TOKEN. The per-seed continuous residuals (constraint, minimal_disturbance_gap, special-case error, n_feasible) are written into measured.json under this arm and the claims' executable predicates threshold them, so the verdict is judged from measured evidence, not a precomputed pass bool."
     }
   },
   "seeds": [
@@ -142,7 +151,7 @@
       ]
     }
   },
-  "evaluation_rule": "Every measured.<arm>.<metric> is evaluated per seed in seeds. Ordering claims pass iff the stated direction holds at every seed. Value claims pass iff the per-seed mean lies within claimed +/- tolerance. invariant/existence claims pass iff the predicate holds at every seed. Curve claims: `quantity` yields a sequence sampled at `x`; comparison above/below compares it elementwise to the `against` sequence; comparison matches compares it elementwise to `claimed` (read off the figure) within tolerance; comparison increasing/decreasing requires adjacent differences of the stated sign. All curve comparisons must hold at every x at every seed.",
+  "evaluation_rule": "Verdict vocabulary (matches the numbers gate): reproduced / refuted / untested / blocked. measured.<arm>.<metric> resolves to measured[arm][str(seed)][metric] in measured.json. Every measured.<arm>.<metric> referenced by a claim is evaluated per seed. Ordering claims: reproduced iff the stated direction holds at EVERY seed; refuted if it fails at any seed; UNTESTED if the arms are not separated (the magnitude of the per-seed-mean quantity is no larger than the cross-seed spread max-min, a within-noise ordering that is not established, not falsified); blocked if any referenced metric is the string BLOCKED. Value claims: reproduced iff the per-seed MEAN lies within claimed +/- tolerance; refuted otherwise; blocked if any referenced metric is BLOCKED. invariant claims: the `predicate` is a Python boolean expression over measured.<arm>.<metric> tokens (comparisons, and/or, arithmetic; the gate allows abs/all/any/bool/float/int/len/max/min/round/sorted/sum and `measured`, nothing else) evaluated at every seed; reproduced iff it is true at every seed; refuted if false at any seed; blocked if any referenced metric is BLOCKED/absent. Curve claims: `quantity` (and `against`, where present) are plain measured.<arm>.<metric> refs whose values are PER-X SEQUENCES (one value per x in the claim's `x` order, same shape at every seed); the comparison is elementwise at every x at every seed — `above`/`below` compare quantity to `against` elementwise, `matches` compares quantity to `claimed` within `tolerance`, `increasing`/`decreasing` require adjacent differences of the stated sign; reproduced iff the comparison holds at every x at every seed; blocked if any entry of any referenced sequence is BLOCKED. No success path reports reproduced on an empty or BLOCKED result.",
   "claims": [
     {
       "id": "C1",
@@ -151,7 +160,8 @@
       "quote": "has the following solution, almost surely:\n\\begin{align}\n    \\widehat A\n    &=\n    I - W^+(W\\Sigma_{XZ})(W\\Sigma_{XZ})^+W,",
       "citation": "paper/content/guardedness.tex:73-77",
       "name": "LEACE closed form enforces zero covariance and is minimal-disturbance; vanilla erasure is its standardized special case",
-      "predicate": "For each seed: d=32, draw random PSD Sigma_XX, column vector Sigma_XZ in Im(Sigma_XX), sample 200000 pairs (X,Z) jointly Gaussian with those covariances; compute A_hat,b_hat from Eqs.6-7 (paper/content/guardedness.tex:74-83). (i) covariance constraint: ||Cov(A_hat X + b_hat, Z)||_F < 1e-6. (ii) minimal disturbance: obj(A,b) = E||A X + b - X||^2 at (A_hat,b_hat) is <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I - c W+ (W Sxz)(W Sxz)+ W, b(c) = mu - A(c) mu, c in linspace(0,2,41)} and (b) 16 constraint-preserving perturbations {A_hat + D, b = mu - (A_hat+D) mu} with D = R(I - u u+/(u+ u)), u = Sigma_XZ, R a random d-by-d Gaussian scale 0.1 (so Cov((A_hat+D)X + b', Z) = 0 still holds). (iii) vanilla-erasure special case: with standardized data (E[X]=0, Sigma_XX=I) and the UNIT-NORM steering vector s = (E[X|C=1]-E[X|C=0])/||E[X|C=1]-E[X|C=0]|| (normalization required: paper/main.tex:302 authors' comment '% The theorem is only valid if s is normalized'; matrix-form assumption paper/content/suppl.tex:63), max_x ||f_delete(x,s) - (A_hat x + b_hat)||_inf < 1e-8 over 10000 samples (Corollary 4.1, paper/main.tex:297-315).",
+      "predicate": "measured.e1_synth.c1_n_feasible > 0 and measured.e1_synth.c1_constraint < 1e-6 and measured.e1_synth.c1_minimal_disturbance_gap <= 1e-6 and measured.e1_synth.c1_vanilla_special < 1e-8",
+      "predicate_description": "For each seed: d=32, draw random PSD Sigma_XX, column vector Sigma_XZ in Im(Sigma_XX), sample 200000 pairs (X,Z) jointly Gaussian with those covariances; compute A_hat,b_hat from Eqs.6-7 (paper/content/guardedness.tex:74-83). (i) covariance constraint: ||Cov(A_hat X + b_hat, Z)||_F < 1e-6. (ii) minimal disturbance: obj(A,b) = E||A X + b - X||^2 at (A_hat,b_hat) is <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I - c W+ (W Sxz)(W Sxz)+ W, b(c) = mu - A(c) mu, c in linspace(0,2,41)} and (b) 16 constraint-preserving perturbations {A_hat + D, b = mu - (A_hat+D) mu} with D = R(I - u u+/(u+ u)), u = Sigma_XZ, R a random d-by-d Gaussian scale 0.1 (so Cov((A_hat+D)X + b', Z) = 0 still holds). (iii) vanilla-erasure special case: with standardized data (E[X]=0, Sigma_XX=I) and the UNIT-NORM steering vector s = (E[X|C=1]-E[X|C=0])/||E[X|C=1]-E[X|C=0]|| (normalization required: paper/main.tex:302 authors' comment '% The theorem is only valid if s is normalized'; matrix-form assumption paper/content/suppl.tex:63), max_x ||f_delete(x,s) - (A_hat x + b_hat)||_inf < 1e-8 over 10000 samples (Corollary 4.1, paper/main.tex:297-315). The executable `predicate` thresholds the measured residuals: c1_constraint (i), c1_minimal_disturbance_gap = max(obj_hat - obj_pert) over feasible perturbations (ii, <=0 iff A_hat is the minimiser), c1_n_feasible > 0 (the test is meaningful), c1_vanilla_special (iii).",
       "sensitivity": {
         "fixed_by_paper": true,
         "citation": "paper/content/guardedness.tex:56-85"
@@ -164,7 +174,8 @@
       "quote": "\\widehat{A} &= I - 2W^+(W \\Sigma_{XZ}) (W \\Sigma_{XZ})^+ W",
       "citation": "paper/main.tex:365",
       "name": "LEACE-Switch closed form flips the sign of Cov and is minimal-disturbance; Householder switching is its standardized special case",
-      "predicate": "Setup as C1; compute A_hat,b_hat from Eqs.13-14 (paper/main.tex:363-367). (i) flip constraint: ||Cov(A_hat X + b_hat, Z) + Cov(X, Z)||_F < 1e-6. (ii) minimal disturbance: obj(A_hat,b_hat) <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I - c W+ (W Sxz)(W Sxz)+ W, b(c) = mu - A(c) mu, c in linspace(0,4,81)} and (b) 16 constraint-preserving perturbations {A_hat + D} with D = R(I - u u+/(u+ u)), u = Sigma_XZ, scale 0.1 (so Cov((A_hat+D)X + b', Z) = -Cov(X,Z) still holds). (iii) vanilla-switch special case: with standardized data and the UNIT-NORM s as in C1(iii) (paper/main.tex:381 authors' comment '% The theorem is only valid if s is normalized'), max_x ||f_switch(x,s) - (A_hat x + b_hat)||_inf < 1e-8 (Corollary 4.3, paper/main.tex:377-394).",
+      "predicate": "measured.e1_synth.c2_n_feasible > 0 and measured.e1_synth.c2_flip_constraint < 1e-6 and measured.e1_synth.c2_minimal_disturbance_gap <= 1e-6 and measured.e1_synth.c2_vanilla_special < 1e-8",
+      "predicate_description": "Setup as C1; compute A_hat,b_hat from Eqs.13-14 (paper/main.tex:363-367). (i) flip constraint: ||Cov(A_hat X + b_hat, Z) + Cov(X, Z)||_F < 1e-6. (ii) minimal disturbance: obj(A_hat,b_hat) <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I - c W+ (W Sxz)(W Sxz)+ W, b(c) = mu - A(c) mu, c in linspace(0,4,81)} and (b) 16 constraint-preserving perturbations {A_hat + D} with D = R(I - u u+/(u+ u)), u = Sigma_XZ, scale 0.1 (so Cov((A_hat+D)X + b', Z) = -Cov(X,Z) still holds). (iii) vanilla-switch special case: with standardized data and the UNIT-NORM s as in C1(iii) (paper/main.tex:381 authors' comment '% The theorem is only valid if s is normalized'), max_x ||f_switch(x,s) - (A_hat x + b_hat)||_inf < 1e-8 (Corollary 4.3, paper/main.tex:377-394). The executable `predicate` thresholds c2_flip_constraint (i), c2_minimal_disturbance_gap (ii), c2_n_feasible > 0, c2_vanilla_special (iii).",
       "sensitivity": {
         "fixed_by_paper": true,
         "citation": "paper/main.tex:343-367"
@@ -177,7 +188,8 @@
       "quote": "\\widehat{A} &= I + W^+ (\\Sigma_{WX, Z_2} - \\Sigma_{WX, Z_1})\\Sigma_{WX, Z_1}^+ W",
       "citation": "paper/main.tex:447",
       "name": "MidSteer closed form matches Cov(f(X),Z1) to Cov(X,Z2), is minimal-disturbance, and reduces to LEACE for constant Z2",
-      "predicate": "Setup as C1 with l=1: random columns Sigma_XZ1, Sigma_XZ2 in Im(Sigma_XX), Sigma_XZ1 nonzero; compute A_hat from Eq.19 (paper/main.tex:445-448), b_hat = mu - A_hat mu. (i) matched-covariance constraint: ||Cov(A_hat X + b_hat, Z1) - Cov(X, Z2)||_F < 1e-6. (ii) minimal disturbance: obj(A_hat,b_hat) <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I + c W+ (Swz2 - Swz1)(Swz1)+ W, c in linspace(0,2,41)} and (b) 16 constraint-preserving perturbations {A_hat + D} with D = R(I - u1 u1+/(u1+ u1)), u1 = Sigma_XZ1, scale 0.1 (so Cov((A_hat+D)X + b', Z1) = Cov(X,Z2) still holds). (iii) erasure special case: with Z2 constant (Sigma_XZ2 = 0), ||A_hat_midsteer - A_hat_leace(Sigma_XZ1)||_F < 1e-8 (paper/main.tex:461).",
+      "predicate": "measured.e1_synth.c3_n_feasible > 0 and measured.e1_synth.c3_matched_cov_constraint < 1e-6 and measured.e1_synth.c3_minimal_disturbance_gap <= 1e-6 and measured.e1_synth.c3_erasure_special < 1e-8",
+      "predicate_description": "Setup as C1 with l=1: random columns Sigma_XZ1, Sigma_XZ2 in Im(Sigma_XX), Sigma_XZ1 nonzero; compute A_hat from Eq.19 (paper/main.tex:445-448), b_hat = mu - A_hat mu. (i) matched-covariance constraint: ||Cov(A_hat X + b_hat, Z1) - Cov(X, Z2)||_F < 1e-6. (ii) minimal disturbance: obj(A_hat,b_hat) <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I + c W+ (Swz2 - Swz1)(Swz1)+ W, c in linspace(0,2,41)} and (b) 16 constraint-preserving perturbations {A_hat + D} with D = R(I - u1 u1+/(u1+ u1)), u1 = Sigma_XZ1, scale 0.1 (so Cov((A_hat+D)X + b', Z1) = Cov(X,Z2) still holds). (iii) erasure special case: with Z2 constant (Sigma_XZ2 = 0), ||A_hat_midsteer - A_hat_leace(Sigma_XZ1)||_F < 1e-8 (paper/main.tex:461). The executable `predicate` thresholds c3_matched_cov_constraint (i), c3_minimal_disturbance_gap (ii), c3_n_feasible > 0, c3_erasure_special (iii).",
       "sensitivity": {
         "fixed_by_paper": true,
         "citation": "paper/main.tex:418-448"
@@ -615,7 +627,8 @@
       "quote": "In each case, we see clear superiority of MidSteer over other steering approaches.",
       "citation": "paper/content/switching_suppl.tex:21",
       "name": "LLM source-concept suppression: MidSteer below both baselines across beta (Pareto dominance, source axis)",
-      "quantity": "[min(measured.vanilla.src_cs_on_src(beta, pair), measured.leace_switch.src_cs_on_src(beta, pair)) for beta in x] (computed per pair, then averaged over the 2 pairs horse->motorcycle, dog->cat)",
+      "quantity": "measured.midsteer.c20_min_baseline_src",
+      "quantity_description": "[min(measured.vanilla.src_cs_on_src(beta, pair), measured.leace_switch.src_cs_on_src(beta, pair)) for beta in x] (computed per pair, then averaged over the 2 pairs horse->motorcycle, dog->cat). Stored as the derived per-x sequence measured.midsteer.c20_min_baseline_src (elementwise min of the two baselines' pair-averaged src_cs_on_src sequences), so the gate compares it elementwise to the MidSteer sequence rather than evaluating a list comprehension with x (the gate provides no x in the predicate namespace).",
       "x": [
         3,
         4,
@@ -634,7 +647,8 @@
         ],
         "note": "Pair set restricted to the two pairs with published Llama-3.1-8B-judge per-beta tables (paper/artefacts/tables/llm_flip_tables_noclip.tex); chihuahua->muffin excluded (only GPT-4o-mini tables exist). Backed by figure read: figure_reads/transcript.md Q1/Q2 (dominant method = MiDSteer). quantity is the best (lowest-src-CS) baseline curve, so the claim is the weakest dominance statement the tables support; margins >= 1.2 CS points at every listed beta (paper/artefacts/tables/llm_flip_tables_noclip.tex)."
       },
-      "against": "[measured.midsteer.src_cs_on_src(beta, pair) for beta in x] (computed per pair, then averaged over the same 2 pairs)"
+      "against": "measured.midsteer.src_cs_on_src",
+      "against_description": "[measured.midsteer.src_cs_on_src(beta, pair) for beta in x] (computed per pair, then averaged over the same 2 pairs). Stored as the existing per-x sequence measured.midsteer.src_cs_on_src (pair-averaged over horse->motorcycle, dog->cat)."
     },
     {
       "id": "C21",
@@ -644,7 +658,8 @@
       "quote": "We see that in each case MidSteer achieves much better balance between level of concept switch between $c_1$ and $c_2$ and preservation of other concepts across different values of $\\beta$.",
       "citation": "paper/content/experiments.tex:121",
       "name": "SDXL source-concept suppression: MidSteer below both baselines across beta (Pareto dominance, source axis)",
-      "quantity": "[min(measured.vanilla.horse_cs_on_horse(beta), measured.leace_switch.horse_cs_on_horse(beta)) for beta in x]",
+      "quantity": "measured.midsteer.c21_min_baseline_horse",
+      "quantity_description": "[min(measured.vanilla.horse_cs_on_horse(beta), measured.leace_switch.horse_cs_on_horse(beta)) for beta in x]. Stored as the derived per-x sequence measured.midsteer.c21_min_baseline_horse (elementwise min of the two baselines' horse_cs_on_horse sequences), so the gate compares it elementwise to the MidSteer sequence rather than evaluating a list comprehension with x (the gate provides no x in the predicate namespace).",
       "x": [
         1,
         2,
@@ -665,7 +680,8 @@
         ],
         "note": "Paper margins >= 1.2 CLIP-x100 points at every beta (paper/artefacts/tables/diffusion_flip_tables_noclip.tex, tab:flip_sdxl_noclip_horse_to_motorcycle). Backed by figure reads: figure_reads/transcript.md Q3/Q4 (dominant method = MiDSteer); 2026-08-17 re-verification of the SDXL panel returned empty from the vision endpoint, so the table margins are the primary evidence."
       },
-      "against": "[measured.midsteer.horse_cs_on_horse(beta) for beta in x]"
+      "against": "measured.midsteer.horse_cs_on_horse",
+      "against_description": "[measured.midsteer.horse_cs_on_horse(beta) for beta in x]. Stored as the existing per-x sequence measured.midsteer.horse_cs_on_horse."
     },
     {
       "id": "C22",
@@ -675,7 +691,8 @@
       "quote": "Fig.~\\ref{fig:num_covs} shows that performance largely stabilizes around 5,000 prompts in the tested Llama-2-7B setting.",
       "citation": "paper/content/suppl.tex:642",
       "name": "Sigma_XX estimation with M>=5000 prompts matches the paper's Fig. 5 plateau values within tolerance",
-      "quantity": "[measured.midsteer.bertp_mmlu(beta, M) for M in x] ; each entry is the mean over the ablation beta grid {2.0, 2.5, 3.0} (figure legend); bertp_mmlu = 1 - (1 - BERT-Precision on MMLU) with the Sigma_XX prompt count set to M, Llama-2-7B-chat, horse->motorcycle, MidSteer",
+      "quantity": "measured.midsteer.bertp_mmlu",
+      "quantity_description": "[measured.midsteer.bertp_mmlu(beta, M) for M in x] ; each entry is the mean over the ablation beta grid {2.0, 2.5, 3.0} (figure legend); bertp_mmlu = 1 - (1 - BERT-Precision on MMLU) with the Sigma_XX prompt count set to M, Llama-2-7B-chat, horse->motorcycle, MidSteer. Stored as the existing per-x (M) sequence measured.midsteer.bertp_mmlu (the beta-averaged BERT-Precision at each M in x), so the gate matches it elementwise to the claimed sequence rather than evaluating a list comprehension with x (the gate provides no x in the predicate namespace).",
       "x": [
         5000,
         10000,
