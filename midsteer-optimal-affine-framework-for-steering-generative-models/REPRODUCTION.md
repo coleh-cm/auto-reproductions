@@ -10,13 +10,26 @@ Reproduction of "MidSteer: Optimal Affine Framework for Steering Generative Mode
 
 ## Status
 
-**Phase: implementation rung complete.** The closed-form affine core, the E1 synthetic
-invariant checks, the eval-metric instruments, the run scripts, the claims evaluator,
-the mutation suite, `measured.json`, and `claims_result.json` are all written, tested,
-committed, and pushed. The model arms (E2–E5) are BLOCKED in this sandbox (CPU-only, no
-HF_TOKEN) — a blocked result reported, not a cue to substitute synthetic data. The
-only real numbers this environment produces are the E1 closed-form invariant checks
-(C1, C2, C3), all PASS at every seed.
+**Rung reached: environment.** Every arm ran this session (see "Arms run" below).
+The four **model comparison arms** the paper's claims are about — `base`,
+`vanilla`, `leace_switch`, `midsteer` — are **all BLOCKED** (no CUDA, no
+`HF_TOKEN` in this sandbox), so this run produces no evidence for or against the
+paper's empirical claims (C4–C22). The only real numbers are the E1 closed-form
+invariant checks (C1, C2, C3), all PASS at every seed — but those are measured on
+synthetic Gaussian data, so they verify the *math* of Eqs. 6/13/19/22/23 and say
+nothing about the paper. The build/environment budget was spent
+(`$HOME/.build_attempts` = 7) with the arms gate still failing; an all-BLOCKED
+arms result is the environment rung and a legitimate outcome. `result_check`
+never printed an `AUTHORITATIVE COUNTS` line, so `numbers` was not reached. See
+`VERIFICATION.md` for the full check list and what remains untested.
+
+The closed-form affine core, the E1 synthetic invariant checks, the eval-metric
+instruments, the run scripts, the claims evaluator, the mutation suite,
+`measured.json`, and `claims_result.json` (reproduced=3, refuted=0, untested=0,
+blocked=19) are all written, tested, committed, and pushed. The model arms
+(E2–E5) are BLOCKED in this sandbox (CPU-only, no HF_TOKEN) — a blocked result
+reported, not a cue to substitute synthetic data: `midsteer_core/data` raises
+`BlockedException` and never falls back to a synthetic corpus.
 
 ### Verdict table (claims_result.json, produced by evaluate_claims.py)
 
@@ -41,6 +54,122 @@ only real numbers this environment produces are the E1 closed-form invariant che
   resolves them and returns `blocked` rather than `unevaluable` on a list-comprehension.
 - `selfcheck.json` (the agent's own redundant check, different filename) agrees:
   reproduced=3, refuted=0, untested=0, blocked=19.
+
+### Arms run (2026-08-17): measured numbers beside the paper's claims
+
+Every arm was run this session. The gate's spread was printed in `/tmp/arms.log`;
+the four **model comparison arms** the paper's claims are about — `base`,
+`vanilla`, `leace_switch`, `midsteer` — are **all BLOCKED**. A measurement that
+cannot tell those four arms apart has not tested the paper's comparison, whatever
+else it shows, so this run produces **no evidence for or against** the paper's
+empirical claims (C4–C22). The only real numbers this sandbox produced are the
+E1 closed-form invariant checks, which verify the *math* of Eqs. 6/13/19/22/23 on
+synthetic Gaussian data of known covariance — not the paper's Llama-2-7B / SDXL
+results, and not on the paper's dataset. State that plainly: **the E1 numbers
+below are measured on a synthetic stand-in for the paper's activations, so they
+say nothing about the paper; they only check that the closed-form affine maps are
+built to the equations the paper proves.**
+
+Exact command that produced every number below (run this session, deterministic
+across reruns — the re-run reproduced `FINAL e1_synth=1.655510e-12` byte-for-byte):
+
+```bash
+bash run_all_arms.sh          # E1 real (CPU) + E2–E5 BLOCKED → results/e1_synth.json + measured.json
+.venv/bin/python evaluate_claims.py   # → claims_result.json (verdict table over measured.json)
+```
+
+Final arm lines (`/tmp/arms.log`, this run):
+
+| Arm | FINAL value | Meaning |
+| --- | --- | --- |
+| `base` | `BLOCKED` | Llama-2-7B / SDXL base model — no CUDA / no HF_TOKEN |
+| `vanilla` | `BLOCKED` | vanilla steering arm — no CUDA / no HF_TOKEN |
+| `leace_switch` | `BLOCKED` | LEACE-Switch arm — no CUDA / no HF_TOKEN |
+| `midsteer` | `BLOCKED` | MidSteer arm — no CUDA / no HF_TOKEN |
+| `e1_synth` | `1.655510e-12` | worst (max) C1/C2/C3 covariance-constraint residual across seeds {0,1,2}, synthetic data |
+
+Per-claim measured vs. paper-claimed (from `claims_result.json`, produced by
+`evaluate_claims.py` over `measured.json`). `measured` is verbatim from the
+verdict table; the paper-claimed value is the `claimed` field (`None` for
+ordering / invariant claims, which have no scalar target).
+
+| Claim | Kind | Paper claims | Measured (this run) | Tolerance |
+| --- | --- | --- | --- | --- |
+| C1 | invariant | Eq. 6 closed form holds (constraint=0, minimal disturbance over feasible set, vanilla special case) | `true` at every seed; constraint ≤8.29e-13, min-disturb gap=0, vanilla special ≤2.66e-15 | 1e-6 / 1e-8 |
+| C2 | invariant | Eq. 13 closed form holds (flip constraint, minimal disturbance, vanilla-switch special) | `true` at every seed; flip ≤1.66e-12, gap=0, special ≤2.66e-15 | 1e-6 / 1e-8 |
+| C3 | invariant | Eq. 19 closed form holds (matched-cov constraint, minimal disturbance, erasure special) | `true` at every seed; matched-cov ≤1.48e-12, gap=0, erasure special=0 | 1e-6 / 1e-8 |
+| C4 | ordering | MidSteer keeps "motorcycle" intact (≥ vanilla) | `BLOCKED` (model metric) | — |
+| C5 | ordering | MidSteer keeps "motorcycle" intact (≥ LEACE-Switch) | `BLOCKED` | — |
+| C6 | value | `moto_cs_on_moto` = **70.7** (`flipping_main.tex:46-48`) | `BLOCKED` | ±3.0 |
+| C7 | ordering | min(vanilla, leace_switch) horse→moto ≥ MidSteer | `BLOCKED` | — |
+| C8 | ordering | MidSteer RTP ≤ LEACE-Switch RTP | `BLOCKED` | — |
+| C9 | ordering | MidSteer RTP ≤ base RTP (0.371 → 0.281) | `BLOCKED` | — |
+| C10 | value | `rtp` = **0.281** (`safety_table.tex:71`) | `BLOCKED` | ±0.05 |
+| C11 | ordering | MidSteer helpfulness ≥ vanilla | `BLOCKED` | — |
+| C12 | ordering | MidSteer unrelated-CS > vanilla (8.46 → 3.11) | `BLOCKED` | — |
+| C13 | ordering | LEACE-Switch MMLU BERT-F1 ≥ MidSteer | `BLOCKED` | — |
+| C14 | ordering | MidSteer violence-CS ≤ vanilla | `BLOCKED` | — |
+| C15 | ordering | vanilla violence-CS ≥ base | `BLOCKED` | — |
+| C16 | ordering | MidSteer peace-CS ≥ LEACE-Switch | `BLOCKED` | — |
+| C17 | value | `viol_cs` = **6.0** (`safety_table.tex:83`) | `BLOCKED` | ±5.0 |
+| C18 | ordering | LEACE-Switch FID = min interventions | `BLOCKED` | — |
+| C19 | ordering | MidSteer target-CS ≥ max(vanilla, leace_switch) | `BLOCKED` | — |
+| C20 | curve | MidSteer src-CS below both baselines at β∈{3,4,5} (LLM pairs) | `BLOCKED` (per-x sequence) | — |
+| C21 | curve | MidSteer horse src-CS below both baselines at β∈{1..5} (SDXL) | `BLOCKED` (per-x sequence) | — |
+| C22 | curve | BERT-Precision plateau ≈ **[0.9578, 0.9605, 0.961]** over M∈{5000,10000,20000} (`suppl.tex:642`) | `BLOCKED` (per-x sequence) | ±0.03 |
+
+E1 residuals per seed (`results/e1_synth.json`, produced by
+`experiments/run_e1_synth.py`):
+
+| Seed | C1 constraint | C2 flip | C3 matched-cov | min-disturb gap | special case |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 5.15e-13 | 1.66e-12 | 5.35e-13 | 0 | 2.66e-15 / 0 |
+| 1 | 8.29e-13 | 1.44e-12 | 4.89e-13 | 0 | 2.66e-15 / 0 |
+| 2 | 6.98e-13 | 1.29e-12 | 1.48e-12 | 0 | 2.66e-15 / 0 |
+
+The C1–C3 residuals are ~1e-12 to 1e-15, well inside the claims' 1e-6 / 1e-8
+thresholds, so the closed-form math of the paper's three affine maps is
+reproduced on synthetic data. **None of the paper's scalar targets (70.7, 0.281,
+6.0, the C22 plateau) could be measured**, and **none of the 16 ordering
+comparisons between the four arms could be resolved**, because all four
+comparison arms are BLOCKED by the sandbox (no CUDA GPU, no `HF_TOKEN`). The
+difference between this run and the paper is therefore not a number to report —
+it is the absence of a number, and that absence is the result.
+
+### research-readiness gates
+
+| # | Gate | Verdict | Evidence |
+| --- | --- | --- | --- |
+| 1 | Builds from scratch (Docker) | **partial** | `Dockerfile` (CUDA 12.4 base) written and committed, but `docker` is not installed in this sandbox so `docker build && docker run` was never exercised. A reader with Docker must verify it. |
+| 2 | README is accurate | **partial** | Quickstart (`uv venv ... && uv pip install -r requirements.txt && pytest tests/ -q`) followed verbatim works → 117 passed (README now states 117). Docker quickstart block unverified here (no docker). |
+| 3 | Packages are clear | **pass** | `requirements.txt` pins every dependency with a rationale per group; `tests/test_environment.py` (40-case import gate) imports every dep + every `core` module; install then run does not die on a missing import. |
+| 4 | Entrypoint is obvious | **pass** | One command `bash run_all_arms.sh` runs every arm at the paper config across seeds {0,1,2}; `smoke.sh` is the fast path; no source edits required. |
+| 5 | Fast path | **pass** | `smoke.sh` runs the whole E1 path at smoke scale in ~seconds, writes only to gitignored `results/e1_synth_smoke.json`, prints one `FINAL e1_synth_smoke=<float>` line. |
+| 6 | Deterministic / noise quantified | **partial** | E1 closed-form invariants are deterministic across reruns (re-run reproduced `1.655510e-12` byte-for-byte; `claims_result.json` is byte-identical across reruns after the sorted-`_refs` fix). The model arms are BLOCKED so their run-to-run noise is unmeasured. |
+| 7 | Degeneracy test in repo | **pass** | E1 `run_e1_synth.py` checks the erasure / vanilla special cases (MidSteer≡LEACE when Z2 constant; LEACE special when β→0) — the method's no-op settings reproduce the baseline — as committed tests (`tests/test_midsteer_sign_matches_eq23_beta1`, `tests/test_invariants.py`), runnable by anyone. |
+| 8 | Data provenance stated | **partial** | E1 uses synthetic Gaussian data of known covariance (provenance: generated in-script with seeded RNG, stated in `run_e1_synth.py` docstring). The paper's real datasets (Llama-2-7B-chat concept prompts, SDXL horse/motorcycle) are NOT fetched here — the data loader raises `BlockedException` rather than downloading; a GPU run would obtain them via the vendored upstream `scripts/`. |
+| 9 | Recorded number is reproducible | **partial** | The E1 numbers reproduce exactly on rerun with the recorded command. The paper's recorded numbers (70.7, 0.281, 6.0, C22 plateau) are NOT reproduced — they are BLOCKED, so their reproducibility is untested. |
+| 10 | Nothing depends on hidden local state | **pass** | Fresh-clone recipe in README works; `.venv/`, `__pycache__/`, `.pytest_cache/`, smoke output, hidden states, steering vectors, datasets are all gitignored; no home-dir or manually-fetched wheel dependency. |
+
+### Rung reached
+
+This run reached the **environment** rung, not `numbers`. The build/environment
+budget was spent (`$HOME/.build_attempts` = 7) and the arms gate is still failing
+at publish time: `run_all_arms.sh` prints `FINAL base=BLOCKED / vanilla=BLOCKED /
+leace_switch=BLOCKED / midsteer=BLOCKED` for all four comparison arms — an
+**all-BLOCKED arms result**, which is the environment rung and a legitimate
+outcome. The blocker is the sandbox: `torch.cuda.is_available()` is False, no
+`nvidia-smi`, and no `HF_TOKEN`, so the Llama-2-7B-chat and SDXL model arms
+cannot run and emit no synthetic fallback. The `e1_synth` auxiliary arm (closed
+form on synthetic data) did run real, but it is not one of the paper's
+comparison arms and was measured on a synthetic stand-in, so it does not lift the
+rung. The `result_check` gate never printed an `AUTHORITATIVE COUNTS` line (no
+such line exists in this run's journal), which is consistent with `numbers` not
+being reached. The comprehension (SPEC.md, claims.json), implementation
+(`midsteer_core/`, instruments, run scripts) and an inline correctness review of
+the six fixed claims (C1–C3/C20–C22) were completed, but those rungs cannot be
+promoted past the all-BLOCKED arms gate — a number the environment cannot
+produce is not evidence about the paper.
 
 ### Setup log (completed through implementation rung)
 

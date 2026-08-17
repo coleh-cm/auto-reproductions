@@ -49,7 +49,7 @@ uv pip install --python .venv -r requirements.txt
 
 # 3. Prove the environment resolves (the import gate).
 source .venv/bin/activate
-python -m pytest tests/ -q          # 40 passed
+python -m pytest tests/ -q          # 117 passed
 
 # 4. Smoke-test the closed-form method directly (no network, no weights).
 python - <<'PY'
@@ -70,7 +70,7 @@ PY
 
 ```bash
 docker build -t midsteer-repro .
-docker run --rm midsteer-repro python -m pytest tests/ -q   # 95 passed
+docker run --rm midsteer-repro python -m pytest tests/ -q   # 117 passed
 # GPU + HF_TOKEN required for the model arms (E2-E5); without them those arms BLOCKED:
 docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN midsteer-repro bash run_all_arms.sh
 ```
@@ -113,9 +113,15 @@ produced here are the E1 closed-form invariant checks (C1, C2, C3), all PASS. Se
 
 ## Status
 
-Implementation rung complete. The closed-form core, E1 synthetic invariant checks
-(C1–C3, all reproduced), eval instruments, run scripts, claims evaluator, mutation suite,
-`measured.json`, and `claims_result.json` (reproduced=3, refuted=0, untested=0,
-blocked=19) are committed and pushed. The model arms are BLOCKED (no CUDA / no HF_TOKEN).
-See `REPRODUCTION.md` for the full log, decisions, and blockers; `SPEC.md` §12–14 for
-constructed truth, sweep ranges, and every choice the paper left open.
+Rung reached: **environment**. Every arm ran; the four model comparison arms
+(`base`, `vanilla`, `leace_switch`, `midsteer`) are all BLOCKED (no CUDA / no
+`HF_TOKEN` in this sandbox), so the paper's empirical claims (C4–C22) are
+untested by this run. The closed-form core, E1 synthetic invariant checks
+(C1–C3, all reproduced on synthetic data — verifying the *math* of Eqs. 6/13/19,
+not the paper's Llama-2-7B / SDXL results), eval instruments, run scripts, claims
+evaluator, mutation suite, `measured.json`, and `claims_result.json`
+(reproduced=3, refuted=0, untested=0, blocked=19) are committed and pushed.
+`result_check` never printed an `AUTHORITATIVE COUNTS` line, so `numbers` was
+not reached. See `REPRODUCTION.md` for the full log, decisions, and blockers;
+`VERIFICATION.md` for every check run and what remains untested; `SPEC.md`
+§12–14 for constructed truth, sweep ranges, and every choice the paper left open.
