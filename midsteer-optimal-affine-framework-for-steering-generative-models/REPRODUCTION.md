@@ -157,8 +157,51 @@ only real numbers this environment produces are the E1 closed-form invariant che
   empty). Verified: `bash smoke.sh` → `FINAL e1_synth_smoke=9.12e-14`.
 - **Regression guard:** `tests/test_smoke_no_clobber.py` now asserts the smoke FINAL
   line is a finite non-negative float matching `^FINAL e1_synth_smoke=[0-9.eE+-]+$`,
-  and explicitly that the old `=PASS`/`=FAIL` verdict forms are absent. Full suite:
+  and explicitly that   the old `=PASS`/`=FAIL` verdict forms are absent. Full suite:
   98 passed.
+
+### Review-round fix (2026-08-17, pass 3): instruments.json schema
+
+- **Defect found via feedback `instruments.json declares no instruments and
+  gives no reason`:** `instruments.json` was a **flat object with named keys**
+  (`data_loader`, `judge_cs`, …), each entry carrying `name`/`what_it_decides`/
+  `positive_test`/`negative_test`. The numbers-gate / reviewer expects a
+  **top-level `instruments` array** (the canonical schema used by every
+  sibling reproduction — `confidence-weighted-self-distillation-…`,
+  `explaining-and-harnessing-adversarial-examples`). With neither an
+  `instruments` array nor a `not_applicable`+reason at the top level, the gate
+  read the file as "declares no instruments and gives no reason" — even
+  though every instrument was present under a named key. A reader chasing the
+  verdict table could not find the instrument registry in the shape the gate
+  documents.
+- **Fix:** `instruments.json` is now a top-level `{"instruments": [...],
+  "not_applicable": {"applies": false, "reason": "…"}}` document. All nine
+  instruments are preserved verbatim as array entries (one data loader, six
+  eval-metric scorers `judge_cs`/`clip_cs`/`fid`/`detoxify_score`/`armorm_score`/
+  `bertscore_mmlu`, the `closed_form_invariants` checker, and the
+  `evaluate_claims` verdict writer), each with `name`, `what_it_decides`,
+  `positive_test`, `negative_test`, `additional_tests`, `requires_tools`, and
+  citations. `not_applicable.applies=false` with a reason documents that this
+  reproduction has nine instruments, so the nothing-judges case does not apply
+  (per the task's instruction to say so with `not_applicable` and a reason
+  only when nothing here judges an output).
+- **`requires_tools` is now descriptive** (was a boolean): each instrument
+  lists the external tools it needs (`CUDA GPU`, `HF_TOKEN`,
+  `transformers (Llama-3.1-8B-Instruct)`, `diffusers`, `clean-fid`, `detoxify`,
+  `bert-score`, …) or `[]` for the pure-CPU instruments
+  (`closed_form_invariants`, `evaluate_claims`). A reader can now tell which
+  verdicts are blocked by this CPU sandbox (the six scorers + the data loader)
+  vs measured here (the two CPU instruments).
+- **Regression guard:** `tests/test_instruments.py` (7 tests) validates the
+  schema itself — the top level is an `instruments` array (or a
+  `not_applicable` with a reason), each entry has the four required fields,
+  `not_applicable.applies` is consistent with the instrument count, every
+  `positive_test`/`negative_test`/`additional_tests` node is a real
+  collectible pytest node (or an existing script path) in this repo, a
+  `data_loader` instrument fingerprinting the paper's dataset is present, a
+  degeneracy/equivalence/invariant instrument is present, and
+  `requires_tools` is declared per instrument. This prevents the named-key
+  regression from recurring. Full suite: 105 passed.
 
 ### Blockers (model arms, honestly BLOCKED)
 
@@ -185,10 +228,11 @@ only real numbers this environment produces are the E1 closed-form invariant che
 
 - **Runs (CPU, real):** `smoke.sh` (tiny E1, one FINAL line, not evidence — now writes
   only to the gitignored `results/e1_synth_smoke.json`, never the canonical
-  `results/e1_synth.json`); `run_all_arms.sh` (runs E1 real + E2–E5 BLOCKED →
-  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (98 passed:
+  `results/e1_synth.json`);   `run_all_arms.sh` (runs E1 real + E2–E5 BLOCKED →
+  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (105 passed:
   environment import gate, closed-form core/degeneracy/invariants, data loader,
-  eval-metric instruments, claims evaluator, mutations, smoke no-clobber guard).
+  eval-metric instruments, claims evaluator, mutations, smoke no-clobber guard,
+  instruments.json schema guard).
   `evaluate_claims.py` → `claims_result.json` (pass=3, fail=0, blocked=19).
 - **Does NOT run here (BLOCKED):** Llama-2-7B-chat arms (E2, E3), SDXL arms (E4, E5),
   the GPT-4o-mini judge cross-validation, Qwen/SANA arms (out of scope per SPEC §8).

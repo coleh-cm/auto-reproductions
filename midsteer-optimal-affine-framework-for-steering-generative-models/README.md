@@ -87,8 +87,8 @@ docker run --rm --gpus all -e HF_TOKEN=$HF_TOKEN midsteer-repro bash run_all_arm
 | `smoke.sh` | ✅ | tiny E1 path, one FINAL line (NOT evidence about the paper) |
 | `evaluate_claims.py` → `claims_result.json` | ✅ | verdict table: pass=3 (C1–C3), fail=0, blocked=19 (model arms) |
 | `selfcheck_claims.py` → `selfcheck.json` | ✅ | the agent's own redundant check (different filename), agrees |
-| `tests/` | ✅ 95 passed | environment import gate, core/degeneracy/invariants, data, eval instruments, claims eval, mutations (5 defects, all caught) |
-| `instruments.json`, `mutations.json` | ✅ | every output-deciding instrument + positive/negative tests; 5 deliberate defects with `must_fail` nodes |
+| `tests/` | ✅ 105 passed | environment import gate, core/degeneracy/invariants, data, eval instruments, claims eval, mutations (5 defects, all caught), instruments.json schema guard |
+| `instruments.json`, `mutations.json` | ✅ | top-level `instruments` array of every output-deciding instrument (data loader, 6 scorers, closed-form invariants, claims evaluator) + positive/negative tests + `not_applicable` reason; 5 deliberate defects with `must_fail` nodes |
 | `core/`, `scripts/`, `helpers/`, `exp/`, `notebooks/` | vendored upstream | the authors' own implementation (HEAD `0f3b31e`), unchanged; `midsteer_core/` is the readable closed form beside it |
 
 **Blocker (honest):** this sandbox is CPU-only with no `HF_TOKEN`, so the model arms

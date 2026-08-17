@@ -1,65 +1,113 @@
 {
-  "data_loader": {
-    "name": "load_model_activations (model-arm data loader)",
-    "what_it_decides": "whether the paper's own model+dataset is loaded (vs a synthetic fallback); raises BlockedException when no CUDA and/or no HF_TOKEN so a blocked arm is reported, not silently substituted",
-    "requires_tools": true,
-    "positive_test": "tests/test_data.py::test_synthetic_gaussian_psd_and_im_condition (fingerprint analog: synthetic stats are PSD and Sigma_XZ in Im(Sigma_XX)); real-load fingerprint asserts DATA_FINGERPRINTS[model_id] when CUDA+HF_TOKEN present (path not reachable in this sandbox)",
-    "negative_test": "tests/test_data.py::test_load_model_activations_raises_blocked_here (loader raises BlockedException in this CPU sandbox — proves it does NOT fall back to synthetic data)"
-  },
-  "judge_cs": {
-    "name": "LLM judge concept score (0-10)",
-    "what_it_decides": "per-text concept relevance score 0-10 via argmax over '0'..'10' token probabilities of Llama-3.1-8B-Instruct (paper/content/suppl.tex:423-436,438; experiments.tex:94)",
-    "requires_tools": true,
-    "positive_test": "tests/test_eval_metrics.py::test_judge_cs_argmax_positive (logits peak at '7' => 7.0)",
-    "negative_test": "tests/test_eval_metrics.py::test_judge_cs_argmax_negative (logits peak at '1' => 1.0); tests/test_eval_metrics.py::test_judge_cs_blocked_here (raises BlockedException, never fabricates)"
-  },
-  "clip_cs": {
-    "name": "CLIP score x100 (image concept score)",
-    "what_it_decides": "image concept relevance as cosine similarity x100 (paper/content/experiments.tex:103; backbone gap G11 default openai/clip-vit-base-patch32)",
-    "requires_tools": true,
-    "positive_test": "tests/test_eval_metrics.py::test_clip_cs_scale100_positive (sim 1.0 => 100.0)",
-    "negative_test": "tests/test_eval_metrics.py::test_clip_cs_blocked_here (raises BlockedException)"
-  },
-  "fid": {
-    "name": "Frechet Inception Distance (steered vs vanilla image sets)",
-    "what_it_decides": "distributional distance between steered and vanilla image sets (paper/content/experiments.tex:103; estimator gap G11)",
-    "requires_tools": true,
-    "positive_test": "tests/test_eval_metrics.py::test_fid_identical_is_zero_positive (identical stats => FID ~ 0)",
-    "negative_test": "tests/test_eval_metrics.py::test_fid_disjoint_is_large_negative (disjoint means => FID large); tests/test_eval_metrics.py::test_fid_blocked_here"
-  },
-  "detoxify_score": {
-    "name": "Detoxify RTP toxicity (mean probability)",
-    "what_it_decides": "mean Detoxify 'original' toxicity probability over continuations (paper/content/experiments.tex:96; gap G11/G15)",
-    "requires_tools": true,
-    "positive_test": "tests/test_eval_metrics.py::test_detoxify_mean_positive (mean [0.9,0.8] => 0.85)",
-    "negative_test": "tests/test_eval_metrics.py::test_detoxify_mean_raises_on_empty (no success on empty); tests/test_eval_metrics.py::test_detoxify_blocked_here"
-  },
-  "armorm_score": {
-    "name": "ArmoRM helpfulness",
-    "what_it_decides": "ArmoRM-Llama3-8B helpfulness attribute (paper/content/experiments.tex:96; gap G11)",
-    "requires_tools": true,
-    "positive_test": "tests/test_eval_metrics.py::test_armorm_mean_positive (mean [0.4,0.6] => 0.5)",
-    "negative_test": "tests/test_eval_metrics.py::test_armorm_blocked_here"
-  },
-  "bertscore_mmlu": {
-    "name": "BERTScore Precision/F1 on MMLU",
-    "what_it_decides": "BERTScore P/F1 between MMLU generations and references (paper/content/experiments.tex:98; backbone/subset gap G11)",
-    "requires_tools": true,
-    "positive_test": "tests/test_eval_metrics.py::test_bertscore_aggregate_positive (identical => 1.0)",
-    "negative_test": "tests/test_eval_metrics.py::test_bertscore_aggregate_raises_on_empty; tests/test_eval_metrics.py::test_bertscore_blocked_here"
-  },
-  "closed_form_invariants": {
-    "name": "closed-form affine invariant checker (claims C1-C3)",
-    "what_it_decides": "whether the affine maps satisfy the paper covariance constraints (Eqs.5/13/19) and minimal-disturbance on synthetic Gaussian data, and the erasure special case MidSteer==LEACE (paper/main.tex:461)",
-    "requires_tools": false,
-    "positive_test": "tests/test_invariants.py::test_c1_leace_constraint_zero_cov (||A Sxz||<1e-9); tests/test_invariants.py::test_c3_midsteer_matches_target_cov; experiments/run_e1_synth.py (full predicate incl. minimal-disturbance + vanilla special case)",
-    "negative_test": "tests/test_mutations.py (deliberate defects flip signs / break bias / break Welford and the named tests must fail)"
-  },
-  "evaluate_claims": {
-    "name": "claims evaluator (writes claims_result.json)",
-    "what_it_decides": "pass/fail/blocked verdict per claim against measured.json + results/e1_synth.json per the claims.json evaluation_rule",
-    "requires_tools": false,
-    "positive_test": "tests/test_claims_eval.py::test_ordering_satisfied_passes",
-    "negative_test": "tests/test_claims_eval.py::test_ordering_violated_fails; tests/test_claims_eval.py::test_blocked_metric_is_blocked; tests/test_claims_eval.py::test_empty_claims_raises; tests/test_claims_eval.py::test_metric_not_measured_blocked"
+  "_comment": "Every thing that decides whether an output is correct -- grader, scorer, equivalence check, data loader -- with a name, what_it_decides, a positive_test proving it accepts a known-correct input, and a negative_test proving it rejects a known-wrong one. requires_tools lists anything genuinely external (a closed-book run that fell back to a synthetic corpus passed every gate and meant nothing; the data-loader fingerprint catches that). A grader that cannot run must raise, never return a negative verdict -- the *_blocked_here tests assert the real backbones raise BlockedException in this CPU sandbox rather than fabricating a score. Subprocess invocations inside the tests use sys.executable (never bare python). Schema validated by tests/test_instruments.py. If nothing here judged an output we would say so with not_applicable and a reason; this reproduction has nine instruments, so not_applicable does not apply.",
+  "instruments": [
+    {
+      "name": "data_loader",
+      "what_it_decides": "Whether the paper's own model+dataset is loaded (vs a synthetic fallback) for the model arms. load_model_activations raises BlockedException when there is no CUDA and/or no HF_TOKEN, so a blocked arm is reported rather than silently substituted. A closed-book run that fell back to a synthetic corpus produced seven arms at chance level (perplexity 65 on a 65-token vocabulary) and passed every gate; this loader is the instrument that prevents that -- it must NOT fall back to synthetic data. The positive test is a fingerprint analog on the synthetic Gaussian (PSD Sigma_XX, Sigma_XZ in Im(Sigma_XX)); the real-load path additionally asserts DATA_FINGERPRINTS[model_id] (size/vocab/checksum) when CUDA+HF_TOKEN are present (not reachable in this CPU sandbox).",
+      "positive_test": "tests/test_data.py::test_synthetic_gaussian_psd_and_im_condition",
+      "negative_test": "tests/test_data.py::test_load_model_activations_raises_blocked_here",
+      "additional_tests": [
+        "tests/test_data.py::test_synthetic_gaussian_deterministic",
+        "tests/test_data.py::test_synthetic_gaussian_empirical_cov_matches",
+        "tests/test_data.py::test_synthetic_pair_keys_and_im",
+        "tests/test_data.py::test_is_model_arm_blocked_true_in_sandbox"
+      ],
+      "requires_tools": ["CUDA GPU", "HF_TOKEN", "transformers (Llama-3.1-8B-Instruct)", "diffusers (Stable Diffusion)"],
+      "citations": "paper/content/suppl.tex:423-436,438; paper/content/experiments.tex:94"
+    },
+    {
+      "name": "judge_cs",
+      "what_it_decides": "The per-text concept-relevance score 0-10, computed by argmax over the '0'..'10' token probabilities of Llama-3.1-8B-Instruct. This is the LLM-judge concept score the claims evaluate. The positive test proves the argmax scoring logic maps peaked logits to the right integer (7.0); the negative test proves a different peak yields a different score (1.0), so it is not a constant stub, and the *_blocked_here test proves the real backbone raises BlockedException here rather than fabricating a score.",
+      "positive_test": "tests/test_eval_metrics.py::test_judge_cs_argmax_positive",
+      "negative_test": "tests/test_eval_metrics.py::test_judge_cs_argmax_negative",
+      "additional_tests": [
+        "tests/test_eval_metrics.py::test_judge_cs_blocked_here",
+        "tests/test_eval_metrics.py::test_subprocess_uses_sys_executable_not_bare_python"
+      ],
+      "requires_tools": ["CUDA GPU", "HF_TOKEN", "transformers (Llama-3.1-8B-Instruct)"],
+      "citations": "paper/content/suppl.tex:423-436,438; paper/content/experiments.tex:94"
+    },
+    {
+      "name": "clip_cs",
+      "what_it_decides": "The image concept-relevance score: cosine similarity x100 between a steered image and the concept text under CLIP. The positive test proves the x100 scale (sim 1.0 => 100.0); the negative test proves the real backbone raises BlockedException in this sandbox rather than fabricating a number. Backbone gap G11: the paper does not pin a CLIP backbone; we default to openai/clip-vit-base-patch32.",
+      "positive_test": "tests/test_eval_metrics.py::test_clip_cs_scale100_positive",
+      "negative_test": "tests/test_eval_metrics.py::test_clip_cs_blocked_here",
+      "requires_tools": ["transformers (openai/clip-vit-base-patch32)", "Pillow"],
+      "citations": "paper/content/experiments.tex:103"
+    },
+    {
+      "name": "fid",
+      "what_it_decides": "The Frechet Inception Distance between the steered and vanilla image sets -- a distributional distance, so identical statistics give ~0 and disjoint means give a large value. The positive test asserts identical stats => FID ~ 0; the negative test asserts disjoint means => large FID (discriminating, not a rubber stamp) and the *_blocked_here test asserts the real estimator raises BlockedException here.",
+      "positive_test": "tests/test_eval_metrics.py::test_fid_identical_is_zero_positive",
+      "negative_test": "tests/test_eval_metrics.py::test_fid_disjoint_is_large_negative",
+      "additional_tests": ["tests/test_eval_metrics.py::test_fid_blocked_here"],
+      "requires_tools": ["clean-fid or pytorch-fid (InceptionV3)", "CUDA GPU (recommended)"],
+      "citations": "paper/content/experiments.tex:103"
+    },
+    {
+      "name": "detoxify_score",
+      "what_it_decides": "The mean Detoxify 'original' toxicity probability over generated continuations (RealToxicityPrompts). The positive test proves the mean aggregation ([0.9,0.8] => 0.85); the negative test proves an empty success set raises (a grader that cannot run must raise, never return a negative verdict) and the *_blocked_here test proves the real model raises BlockedException here.",
+      "positive_test": "tests/test_eval_metrics.py::test_detoxify_mean_positive",
+      "negative_test": "tests/test_eval_metrics.py::test_detoxify_mean_raises_on_empty",
+      "additional_tests": ["tests/test_eval_metrics.py::test_detoxify_blocked_here"],
+      "requires_tools": ["detoxify (unit/toxic_bert)"],
+      "citations": "paper/content/experiments.tex:96"
+    },
+    {
+      "name": "armorm_score",
+      "what_it_decides": "The ArmoRM-Llama3-8B helpfulness attribute over continuations. The positive test proves the mean aggregation ([0.4,0.6] => 0.5); the negative test proves the real backbone raises BlockedException here rather than fabricating a score.",
+      "positive_test": "tests/test_eval_metrics.py::test_armorm_mean_positive",
+      "negative_test": "tests/test_eval_metrics.py::test_armorm_blocked_here",
+      "requires_tools": ["CUDA GPU", "HF_TOKEN", "transformers (ArmoRM-Llama3-8B)"],
+      "citations": "paper/content/experiments.tex:96"
+    },
+    {
+      "name": "bertscore_mmlu",
+      "what_it_decides": "BERTScore Precision/F1 between MMLU generations and references. The positive test proves identical strings => 1.0; the negative test proves an empty input raises (no silent 0.0) and the *_blocked_here test proves the real backbone raises BlockedException here.",
+      "positive_test": "tests/test_eval_metrics.py::test_bertscore_aggregate_positive",
+      "negative_test": "tests/test_eval_metrics.py::test_bertscore_aggregate_raises_on_empty",
+      "additional_tests": ["tests/test_eval_metrics.py::test_bertscore_blocked_here"],
+      "requires_tools": ["bert-score", "transformers (roberta-large)"],
+      "citations": "paper/content/experiments.tex:98"
+    },
+    {
+      "name": "closed_form_invariants",
+      "what_it_decides": "Whether the affine maps satisfy the paper's covariance constraints (Eqs. 5/13/19) and minimal-disturbance on synthetic Gaussian data, and the erasure special case MidSteer==LEACE (paper/main.tex:461). This is the closed-form invariant checker for claims C1-C3 -- the CPU-reachable correctness evidence. The positive tests assert ||A Sxz||<1e-9 (C1), the switch flips the sign of the covariance (C2), MidSteer matches the target covariance (C3), and the erasure special case equals LEACE; experiments/run_e1_synth.py runs the full predicate incl. minimal-disturbance over the feasible perturbation family and the vanilla special case. The negative tests are the mutation suite: deliberate defects (sign slip / broken bias / broken Welford) flip these assertions, so the named test nodes must fail.",
+      "positive_test": "tests/test_invariants.py::test_c1_leace_constraint_zero_cov",
+      "negative_test": "tests/test_mutations.py::test_each_mutation_is_caught",
+      "additional_tests": [
+        "tests/test_invariants.py::test_c2_leace_switch_flips_sign_of_cov",
+        "tests/test_invariants.py::test_c3_midsteer_matches_target_cov",
+        "tests/test_invariants.py::test_c3_midsteer_erasure_special_case_equals_leace",
+        "tests/test_core.py::test_erasure_special_case_midsteer_eq_leace",
+        "tests/test_core.py::test_leace_constraint_algebra",
+        "tests/test_core.py::test_midsteer_sign_matches_eq23_beta1",
+        "tests/test_core.py::test_bias_exact_for_nontrivial_A",
+        "experiments/run_e1_synth.py"
+      ],
+      "requires_tools": [],
+      "citations": "paper/main.tex:461; Eqs. 5/13/19"
+    },
+    {
+      "name": "evaluate_claims",
+      "what_it_decides": "The pass/fail/blocked verdict per claim, written to claims_result.json by the WORKFLOW's numbers gate, evaluated against measured.json + results/e1_synth.json per the claims.json evaluation_rule. A blocked metric is never a silent pass; a grader that cannot run (malformed/empty claims or measured) raises rather than emitting a verdict; a metric nothing measures is BLOCKED, not a rounding error. The positive test proves a satisfied ordering passes; the negative tests prove a violated ordering fails, a blocked metric is blocked, an empty claims table raises, an empty measured table raises, and an unmeasured metric is blocked.",
+      "positive_test": "tests/test_claims_eval.py::test_ordering_satisfied_passes",
+      "negative_test": "tests/test_claims_eval.py::test_ordering_violated_fails",
+      "additional_tests": [
+        "tests/test_claims_eval.py::test_blocked_metric_is_blocked",
+        "tests/test_claims_eval.py::test_empty_claims_raises",
+        "tests/test_claims_eval.py::test_empty_measured_raises",
+        "tests/test_claims_eval.py::test_metric_not_measured_blocked",
+        "tests/test_claims_eval.py::test_invariant_passes_when_e1_passes",
+        "tests/test_claims_eval.py::test_invariant_fails_when_a_seed_fails",
+        "tests/test_claims_eval.py::test_curve_blocked_sequence_is_blocked"
+      ],
+      "requires_tools": [],
+      "produces": "claims_result.json (workflow artifact; the agent's own check writes selfcheck.json, a different filename)"
+    }
+  ],
+  "not_applicable": {
+    "applies": false,
+    "reason": "This reproduction has nine output-deciding instruments (one data loader, six eval-metric scorers, one closed-form invariant checker, one claims evaluator), so the not_applicable case (nothing here judges an output) does not apply. not_applicable is reserved for a reproduction where no instrument judges correctness; here every arm's measured number is produced or blocked by one of the listed instruments."
   }
 }
