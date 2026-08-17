@@ -140,6 +140,27 @@ def _check_c1(seed, d, n):
 
     constr = float(torch.linalg.norm((A_hat @ sxz).squeeze()))
 
+    # Empirical covariance check (the predicate's literal (i)): sample (X, Z) jointly
+    # Gaussian with the TRUE sigma_xz, fit A_hat to the TRUE sigma_xz, then evaluate
+    # ||Cov(A_hat X + b_hat, Z)||_F on the sample. A_hat annihilates the population
+    # sigma_xz exactly, but the EMPIRICAL Cov(X,Z) carries O(1/sqrt(n)) sampling noise,
+    # so the empirical residual is ~ ||A_hat|| * ||Cov(X,Z) - sigma_xz|| ~ noise, NOT 1e-6.
+    # Recorded at a noise-appropriate tolerance to exercise the statistical procedure the
+    # predicate names, alongside the exact-algebra check (constr). The literal 1e-6
+    # threshold is unsatisfiable at finite n because A_hat is fit to the TRUE sigma_xz.
+    g_emp = torch.Generator().manual_seed(seed * 1000 + 100)
+    L = torch.linalg.cholesky(sigma_xx)
+    X_emp = torch.randn(n, d, generator=g_emp, dtype=torch.float64) @ L.mT
+    w = torch.linalg.solve(sigma_xx, sigma_xz)                       # = v (sigma_xz = Sigma_XX v)
+    Z_emp = X_emp @ w + torch.randn(n, 1, generator=g_emp, dtype=torch.float64) * 1e-3
+    b_hat = affine.bias(mu, A_hat)
+    AX = X_emp @ A_hat[0].T + b_hat.squeeze(0)                        # A_hat X + b_hat, [n, d]
+    cov_emp_axz = (AX - AX.mean(0)).T @ (Z_emp - Z_emp.mean(0)) / (n - 1)
+    empirical_constr = float(torch.linalg.norm(cov_emp_axz.squeeze()))
+    noise_floor = float(torch.linalg.norm(A_hat[0]) * torch.linalg.norm(sigma_xz) / (n ** 0.5)) * 20.0
+    empirical_tol = max(1e-6, noise_floor)
+    empirical_ok = empirical_constr < empirical_tol
+
     L = torch.linalg.cholesky(sigma_xx)
     X = torch.randn(n, d, generator=g, dtype=torch.float64) @ L.mT
     worst_gap, nfeas = _minimal_disturbance(A_hat, mu, X, W, sxz, constraint='zero')
@@ -158,12 +179,13 @@ def _check_c1(seed, d, n):
     f_leace = Xs @ A_std[0].T + b_std.squeeze(0)
     special = float(torch.max(torch.abs(f_delete - f_leace)))
 
-    passed = (constr < 1e-6) and minimal and (special < 1e-8)
+    passed = (constr < 1e-6) and minimal and (special < 1e-8) and empirical_ok
     return {
         'pass': bool(passed),
-        'detail': f"constr={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e}",
+        'detail': f"constr={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e} empirical_constr={empirical_constr:.2e} (tol {empirical_tol:.1e})",
         'metrics': {'c1_constraint': constr, 'c1_minimal_disturbance_gap': worst_gap,
-                     'c1_n_feasible': nfeas, 'c1_vanilla_special': special},
+                     'c1_n_feasible': nfeas, 'c1_vanilla_special': special,
+                     'c1_empirical_constraint': empirical_constr, 'c1_empirical_tol': empirical_tol},
     }
 
 
@@ -180,6 +202,22 @@ def _check_c2(seed, d, n):
     A_hat = affine.compose_A(affine.leace_update(W, Wp, sxz), 2.0)   # beta=2 switch
 
     constr = float(torch.linalg.norm((A_hat @ sxz + sxz).squeeze()))
+
+    # Empirical check (predicate (i)): ||Cov(A X + b, Z) + Cov(X, Z)||_F on a fresh sample.
+    # A_hat flips the population cross-cov, but empirical Cov carries O(1/sqrt(n)) noise.
+    g_emp = torch.Generator().manual_seed(seed * 1000 + 110)
+    L = torch.linalg.cholesky(sigma_xx)
+    X_emp = torch.randn(n, d, generator=g_emp, dtype=torch.float64) @ L.mT
+    w = torch.linalg.solve(sigma_xx, sigma_xz)
+    Z_emp = X_emp @ w + torch.randn(n, 1, generator=g_emp, dtype=torch.float64) * 1e-3
+    b_hat = affine.bias(mu, A_hat)
+    AX = X_emp @ A_hat[0].T + b_hat.squeeze(0)
+    cov_emp_xz = (X_emp - X_emp.mean(0)).T @ (Z_emp - Z_emp.mean(0)) / (n - 1)
+    cov_emp_axz = (AX - AX.mean(0)).T @ (Z_emp - Z_emp.mean(0)) / (n - 1)
+    empirical_constr = float(torch.linalg.norm((cov_emp_axz + cov_emp_xz).squeeze()))
+    noise_floor = float(torch.linalg.norm(A_hat[0]) * torch.linalg.norm(sigma_xz) / (n ** 0.5)) * 20.0
+    empirical_tol = max(1e-6, noise_floor)
+    empirical_ok = empirical_constr < empirical_tol
 
     L = torch.linalg.cholesky(sigma_xx)
     X = torch.randn(n, d, generator=g, dtype=torch.float64) @ L.mT
@@ -199,12 +237,13 @@ def _check_c2(seed, d, n):
     f_leace = Xs @ A_std[0].T + b_std.squeeze(0)
     special = float(torch.max(torch.abs(f_switch - f_leace)))
 
-    passed = (constr < 1e-6) and minimal and (special < 1e-8)
+    passed = (constr < 1e-6) and minimal and (special < 1e-8) and empirical_ok
     return {
         'pass': bool(passed),
-        'detail': f"flip_constr={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e}",
+        'detail': f"flip_constr={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e} empirical_constr={empirical_constr:.2e} (tol {empirical_tol:.1e})",
         'metrics': {'c2_flip_constraint': constr, 'c2_minimal_disturbance_gap': worst_gap,
-                     'c2_n_feasible': nfeas, 'c2_vanilla_special': special},
+                     'c2_n_feasible': nfeas, 'c2_vanilla_special': special,
+                     'c2_empirical_constraint': empirical_constr, 'c2_empirical_tol': empirical_tol},
     }
 
 
@@ -225,6 +264,23 @@ def _check_c3(seed, d, n):
 
     constr = float(torch.linalg.norm((A_hat @ sxz1 - sxz2).squeeze()))
 
+    # Empirical check (predicate (i)): ||Cov(A X + b, Z1) - Cov(X, Z2)||_F on a fresh sample.
+    g_emp = torch.Generator().manual_seed(seed * 1000 + 120)
+    L = torch.linalg.cholesky(sigma_xx)
+    X_emp = torch.randn(n, d, generator=g_emp, dtype=torch.float64) @ L.mT
+    w1 = torch.linalg.solve(sigma_xx, sigma_xz1)
+    w2 = torch.linalg.solve(sigma_xx, sigma_xz2)
+    Z1_emp = X_emp @ w1 + torch.randn(n, 1, generator=g_emp, dtype=torch.float64) * 1e-3
+    Z2_emp = X_emp @ w2 + torch.randn(n, 1, generator=g_emp, dtype=torch.float64) * 1e-3
+    b_hat = affine.bias(mu, A_hat)
+    AX = X_emp @ A_hat[0].T + b_hat.squeeze(0)
+    cov_emp_xz2 = (X_emp - X_emp.mean(0)).T @ (Z2_emp - Z2_emp.mean(0)) / (n - 1)
+    cov_emp_axz1 = (AX - AX.mean(0)).T @ (Z1_emp - Z1_emp.mean(0)) / (n - 1)
+    empirical_constr = float(torch.linalg.norm((cov_emp_axz1 - cov_emp_xz2).squeeze()))
+    noise_floor = float(torch.linalg.norm(A_hat[0]) * torch.linalg.norm(sigma_xz1) / (n ** 0.5)) * 20.0
+    empirical_tol = max(1e-6, noise_floor)
+    empirical_ok = empirical_constr < empirical_tol
+
     L = torch.linalg.cholesky(sigma_xx)
     X = torch.randn(n, d, generator=g, dtype=torch.float64) @ L.mT
     worst_gap, nfeas = _minimal_disturbance(A_hat, mu, X, W, sxz1, sxz2, constraint='match')
@@ -235,12 +291,13 @@ def _check_c3(seed, d, n):
     A_leace = affine.compose_A(affine.leace_update(W, Wp, sxz1), 1.0)
     special = float(torch.linalg.norm(A_mid - A_leace))
 
-    passed = (constr < 1e-6) and minimal and (special < 1e-8)
+    passed = (constr < 1e-6) and minimal and (special < 1e-8) and empirical_ok
     return {
         'pass': bool(passed),
-        'detail': f"matched_cov={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e}",
+        'detail': f"matched_cov={constr:.2e} min_disturb_gap={worst_gap:.2e} (nfeas={nfeas}) special={special:.2e} empirical_constr={empirical_constr:.2e} (tol {empirical_tol:.1e})",
         'metrics': {'c3_matched_cov_constraint': constr, 'c3_minimal_disturbance_gap': worst_gap,
-                     'c3_n_feasible': nfeas, 'c3_erasure_special': special},
+                     'c3_n_feasible': nfeas, 'c3_erasure_special': special,
+                     'c3_empirical_constraint': empirical_constr, 'c3_empirical_tol': empirical_tol},
     }
 
 

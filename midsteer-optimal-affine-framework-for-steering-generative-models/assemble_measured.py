@@ -154,12 +154,11 @@ def main():
                     raise RuntimeError(f"assemble_measured: {claim} missing from e1_synth.json seed {seed}")
                 cm = e1[seed][claim].get('metrics', {})
                 for mname, mval in cm.items():
-                    if mname not in measured['e1_synth'][seed]:
-                        # an invariant residual metric the predicate references must be in
-                        # the union; if not, the claim cannot be evaluated.
-                        raise RuntimeError(f"assemble_measured: invariant metric {mname} not in metric union")
                     if mval is None:
                         raise RuntimeError(f"assemble_measured: {claim}.{mname} is None (no success on empty)")
+                    # e1_synth residual metrics are real diagnostic measurements for the
+                    # C1-C3 predicates; record them all under the e1_synth arm (claim-
+                    # referenced metrics are validated by the completeness gate below).
                     measured['e1_synth'][seed][mname] = float(mval)
 
     # Derived curve metrics: elementwise min of the two baselines' per-beta sequences,

@@ -1,0 +1,23 @@
+# E1 synthetic closed-form invariant checks (claims C1, C2, C3).
+# CPU-only. REAL in this sandbox. No model, no dataset.
+experiment: e1_synth
+compute: cpu
+purpose: closed-form correctness
+seeds: [0, 1, 2]
+d: 32                       # per-head dim (C1-C3 predicate)
+n_samples: 200000           # joint Gaussian pairs (X,Z)
+n_perturbations: 16         # constraint-preserving perturbations per scale
+perturb_scales: [0.1, 0.5, 1.0, 2.0]
+n_vanilla_special_samples: 10000
+constraint_tol: 1.0e-6
+minimal_disturbance_tol: 1.0e-6
+special_case_tol: 1.0e-8
+# empirical covariance check: ||Cov(A X + b, Z)||_F on a fresh sample at a
+# noise-appropriate tolerance (the literal 1e-6 is unsatisfiable at finite n
+# because A_hat is fit to the TRUE sigma_xz; see REPRODUCTION.md).
+empirical_tol: noise_floor   # = max(1e-6, 20 * ||A_hat|| * ||sigma_xz|| / sqrt(n))
+smoke:
+  d: 8
+  n_samples: 20000
+  seeds: [0]
+claims: [C1, C2, C3]

@@ -9,14 +9,23 @@ from __future__ import annotations
 import torch
 from midsteer_core.data import BlockedException, is_model_arm_blocked
 
+# Prompt VERBATIM from paper/content/suppl.tex:423-436 (the \begin{verbatim}...\end{verbatim}
+# block). Mid-line newlines and trailing spaces are preserved exactly as the paper prints
+# them; the block ends with a trailing blank line before \end{verbatim}.
 JUDGE_PROMPT = (
-    'Score the text on a scale of 0 to 10, where the score reflects the extent to which it '
-    'demonstrates relevance to the concept of {concept}. A score of 0 indicates the text is '
-    'completely irrelevant and shows no connection to {concept}, whereas a score of 10 '
-    'signifies strong and explicit relevance to {concept}. For texts that suggest varying '
-    'degrees of relevance, use the intermediate numbers (1 through 9) to represent the '
-    'gradation of connection to {concept}. Output just a single number.\n\n'
-    'Text to evaluate: ```\n{text}\n```'
+    '\n'
+    'Score the text on a scale of 0 to 10, where the score reflects the extent \n'
+    'to which it demonstrates relevance to the concept of {concept}. A score of 0 \n'
+    'indicates the text is completely irrelevant and shows no connection to {concept}, \n'
+    'whereas a score of 10 signifies strong and explicit relevance to {concept}. For \n'
+    'texts that suggest varying degrees of relevance, use the intermediate numbers \n'
+    '(1 through 9) to represent the gradation of connection to {concept}. \n'
+    'Output just a single number.\n'
+    '\n'
+    'Text to evaluate: ```\n'
+    '{text}\n'
+    '```\n'
+    '\n'
 )
 
 DEFAULT_JUDGE = 'meta-llama/Llama-3.1-8B-Instruct'

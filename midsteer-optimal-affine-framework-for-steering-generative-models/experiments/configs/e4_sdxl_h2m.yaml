@@ -1,0 +1,14 @@
+# E4 SDXL horse->motorcycle (claims C4-C7, C21). MODEL ARM — BLOCKED in this sandbox.
+experiment: e4_sdxl_h2m
+model: stabilityai/stable-diffusion-xl-base-1.0
+compute: gpu
+switch: horse->motorcycle
+prompts: paper/content/suppl.tex:image templates   # 80 image templates G.2
+betas: {vanilla: 2, leace_switch: 2, midsteer: 1}   # paper/content/experiments.tex:125
+seeds: [0, 1, 2]
+metric_keys: [horse_cs_on_horse, moto_cs_on_horse, horse_cs_on_moto, moto_cs_on_moto,
+              cow_cs, cow_fid, pig_cs, pig_fid, dog_cs, dog_fid, legislator_cs, legislator_fid]
+clip_backbone: openai/clip-vit-base-patch32   # G11
+fid: clean-fid defaults                        # G11
+intermediate_clipping: false
+blocked_reason: "No CUDA; SDXL-base-1.0 ~7GB download; CLIP + clean-fid unavailable."

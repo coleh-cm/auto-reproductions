@@ -851,7 +851,13 @@
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
       "unrel_cs": "BLOCKED",
-      "viol_cs": "BLOCKED"
+      "viol_cs": "BLOCKED",
+      "c1_empirical_constraint": 2.1002541924974727,
+      "c1_empirical_tol": 51.78212267677586,
+      "c2_empirical_constraint": 2.3485348359635516,
+      "c2_empirical_tol": 71.55190224345512,
+      "c3_empirical_constraint": 2.667366260167678,
+      "c3_empirical_tol": 48.6997000228328
     },
     "1": {
       "bertp_mmlu": "BLOCKED",
@@ -916,7 +922,13 @@
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
       "unrel_cs": "BLOCKED",
-      "viol_cs": "BLOCKED"
+      "viol_cs": "BLOCKED",
+      "c1_empirical_constraint": 3.4710528760954804,
+      "c1_empirical_tol": 100.95749191939953,
+      "c2_empirical_constraint": 4.166239227827277,
+      "c2_empirical_tol": 68.59258877216386,
+      "c3_empirical_constraint": 1.9212061400543223,
+      "c3_empirical_tol": 68.18524761161078
     },
     "2": {
       "bertp_mmlu": "BLOCKED",
@@ -981,7 +993,13 @@
       "tgt_cs_on_src": "BLOCKED",
       "tgt_cs_on_tgt": "BLOCKED",
       "unrel_cs": "BLOCKED",
-      "viol_cs": "BLOCKED"
+      "viol_cs": "BLOCKED",
+      "c1_empirical_constraint": 2.3508664216053807,
+      "c1_empirical_tol": 45.280862046132995,
+      "c2_empirical_constraint": 4.456128849791892,
+      "c2_empirical_tol": 69.86689641562826,
+      "c3_empirical_constraint": 4.402810423072344,
+      "c3_empirical_tol": 67.19121706360403
     }
   }
 }

@@ -38,5 +38,21 @@
     "replace": "    Q = Wp @ u_pinv @ u @ W                            # [H, d, d]  # MUTANT: pinv arg order flipped",
     "must_fail": "tests/test_core.py::test_leace_constraint_algebra",
     "what": "flips the pinv argument order so Q is no longer the LEACE projector; A no longer annihilates Sigma_XZ"
+  },
+  {
+    "covers": ["core", "degeneracy"],
+    "file": "midsteer_core/affine.py",
+    "find": "    return diff / norms.unsqueeze(-1)                 # [H, d], unit-norm per head",
+    "replace": "    return diff                                      # [H, d]  # MUTANT: skip unit-norm (G8)",
+    "must_fail": "tests/test_core.py::test_vanilla_steering_vector_unit_norm_and_raise",
+    "what": "skips unit-norm post-processing (G8); the matrix forms (I - beta s s^T) assume ||s||=1 (paper/content/suppl.tex:63), so the vanilla-erasure special case (Cor.4.1) breaks"
+  },
+  {
+    "covers": ["core", "degeneracy"],
+    "file": "midsteer_core/affine.py",
+    "find": "    out = torch.einsum('hij,...hj->...hi', A, h)",
+    "replace": "    out = torch.einsum('hij,...hj->...ih', A, h)  # MUTANT: wrong output axis order",
+    "must_fail": "tests/test_core.py::test_affine_shapes",
+    "what": "apply_affine emits [..., d, H] instead of [..., H, d], swapping head and feature axes; the per-head map is applied to the wrong axis"
   }
 ]

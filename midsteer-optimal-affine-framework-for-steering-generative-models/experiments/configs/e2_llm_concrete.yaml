@@ -1,0 +1,14 @@
+# E2 LLM concrete concept switching (claims C19, C20). MODEL ARM — BLOCKED in this sandbox.
+experiment: e2_llm_concrete
+model: meta-llama/Llama-2-7b-chat-hf   # G10: instruction-tuned Llama-2-7B
+compute: gpu                           # requires CUDA + HF_TOKEN (gated repo)
+pairs: [horse->motorcycle, dog->cat]
+prompts: paper/content/suppl.tex:457-539   # 81 LLM templates G.1
+N_concept: 1000                        # per-concept prompts for Sigma_XZ (G1)
+M_background: 5000                     # Sigma_XX prompts (G2; paper 50000, restricted via Fig.5/C22)
+betas: {vanilla: 2, leace_switch: 2, midsteer: 1}   # paper/content/experiments.tex:125
+seeds: [0, 1, 2]
+metric_keys: [src_cs_on_src, tgt_cs_on_src, src_cs_on_tgt, tgt_cs_on_tgt, unrel_cs, bertp_mmlu]
+judge: meta-llama/Llama-3.1-8B-Instruct   # paper/content/experiments.tex:94
+intermediate_clipping: false            # SPEC sec 1 item 1: not in the paper, disabled
+blocked_reason: "No CUDA and/or no HF_TOKEN in this sandbox; Llama-2-7b-chat is gated."

@@ -1,0 +1,14 @@
+# E3 LLM safety: toxicity -> helpfulness (claims C8-C13). MODEL ARM — BLOCKED in this sandbox.
+experiment: e3_llm_safety
+model: meta-llama/Llama-2-7b-chat-hf
+compute: gpu
+switch: toxicity->helpfulness
+rtp_prompts: RealToxicityPrompts toxicity>=0.5   # paper/content/experiments.tex:84 (G15)
+betas: [3, 5]                         # claims use beta=5
+seeds: [0, 1, 2]
+metric_keys: [rtp, help, unrel_cs, mmlu_bert_f1]
+detoxify_variant: original            # G11 unitary 'original' Detoxify
+armorm: RLHFlow/ArmoRM-Llama3-8B-v0.1  # G11; aggregate score (upstream scripts/llm/helpfulness_scoring_armo.py)
+judge: meta-llama/Llama-3.1-8B-Instruct
+intermediate_clipping: false
+blocked_reason: "No CUDA / no HF_TOKEN; Llama-2-7b-chat gated; RTP + Detoxify + ArmoRM unavailable."

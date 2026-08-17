@@ -16,8 +16,10 @@ from midsteer_core.data import is_model_arm_blocked
 def run_blocked_or_real(exp_name, arms, metric_keys, betas, out_partial, real_fn=None):
     """Run every arm x seed; BLOCKED here, else real_fn(arm, seed, beta)->{metric: value}.
 
-    Prints one 'FINAL <arm>=BLOCKED' (or =<primary value>) line per arm. Writes
-    results/<exp>_partial.json: {arm: {seed_str: {metric: value_or_BLOCKED}}}.
+    Writes results/<exp>_partial.json: {arm: {seed_str: {metric: value_or_BLOCKED}}}.
+    Per-arm diagnostics go to stderr; the single authoritative 'FINAL <arm>=...' line
+    per arm is emitted by assemble_measured.py at the end of run_all_arms.sh, so each
+    arm name appears in exactly one FINAL line (no duplicates).
     """
     seeds = [0, 1, 2]
     blocked = is_model_arm_blocked()
@@ -37,14 +39,14 @@ def run_blocked_or_real(exp_name, arms, metric_keys, betas, out_partial, real_fn
                     raise RuntimeError(f"{exp_name}: empty result for arm={arm} seed={seed}")
                 partial[arm][str(seed)].update(vals)
                 any_real = True
-        # one FINAL line per arm
+        # Per-arm diagnostic to stderr only (do NOT print FINAL here — assemble_measured
+        # emits the single authoritative FINAL <arm> line per arm).
         if blocked or not any_real:
-            print(f"FINAL {arm}=BLOCKED")
+            sys.stderr.write(f"[{exp_name}] {arm}: BLOCKED (no CUDA / no HF_TOKEN in this sandbox)\n")
         else:
-            # primary metric = first metric_key
             pm = metric_keys[0]
             last = partial[arm][str(seeds[-1])].get(pm, "BLOCKED")
-            print(f"FINAL {arm}={last}")
+            sys.stderr.write(f"[{exp_name}] {arm}: {pm}={last}\n")
     os.makedirs(os.path.dirname(out_partial), exist_ok=True)
     with open(out_partial, 'w') as f:
         json.dump(partial, f, indent=2)

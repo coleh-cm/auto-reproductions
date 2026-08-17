@@ -1,0 +1,12 @@
+# E5 SDXL safety: violence -> peace (claims C14-C18). MODEL ARM — BLOCKED in this sandbox.
+experiment: e5_sdxl_safety
+model: stabilityai/stable-diffusion-xl-base-1.0
+compute: gpu
+switch: violence->peace
+betas: [3, 5]                         # claims use beta=5
+seeds: [0, 1, 2]
+metric_keys: [viol_cs, peace_cs, unrel_cs, fid]
+clip_backbone: openai/clip-vit-base-patch32   # G11
+fid: clean-fid defaults                        # G11
+intermediate_clipping: false
+blocked_reason: "No CUDA; SDXL-base-1.0 ~7GB; CLIP + clean-fid unavailable."
