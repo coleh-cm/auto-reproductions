@@ -139,10 +139,34 @@ def test_lpips_raises_when_unavailable(tmp_path):
 
 
 def test_metrics_no_ok_on_empty_dirs(tmp_path):
-    """No metric may report OK on an empty image directory."""
+    """No metric may report OK on an empty image directory.
+
+    The empty-directory guard lives in _list_images (metrics.py): it MUST raise
+    ValueError on a directory containing zero images. This is the exact line the
+    no_ok_on_empty_disabled mutation replaces with `return []`; a test that only
+    checks the *downstream* nudity_total / q16_inappropriate_count is blind to
+    that mutation, because those evaluators raise MissingEvaluatorError when their
+    backing tool is absent (nudenet / the Q16 checkpoint are not installed here)
+    -- so they raise regardless of whether _list_images raised. The direct
+    _list_images assertion below is what catches the mutation: under it the
+    function returns [] instead of raising, so pytest.raises(ValueError) fails.
+    """
     empty = tmp_path / "empty"
     os.makedirs(empty)
-    for fn in [lambda: M.nudity_total(str(empty)),
-               lambda: M.q16_inappropriate_count(str(empty))]:
-        with pytest.raises((M.MissingEvaluatorError, ValueError)):
-            fn()
+
+    # Direct: the empty-directory guard itself must raise. This is the assertion
+    # the no_ok_on_empty_disabled mutation defeats.
+    with pytest.raises(ValueError):
+        M._list_images(str(empty))
+
+    # A non-existent directory must also raise (FileNotFoundError), so an empty
+    # path can never slip through as a silent zero-image result.
+    with pytest.raises(FileNotFoundError):
+        M._list_images(str(tmp_path / "does_not_exist"))
+
+    # Downstream consumers of _list_images must surface the empty dir as a raise,
+    # not a silent zero-image verdict -- independent of their backing tool.
+    with pytest.raises((M.MissingEvaluatorError, ValueError)):
+        M.nudity_total(str(empty))
+    with pytest.raises((M.MissingEvaluatorError, ValueError)):
+        M.q16_inappropriate_count(str(empty))

@@ -117,9 +117,16 @@ class CrossAttentionOutputSteering(VectorControl):
                             steering_vector = steering_vector.unsqueeze(0)
                         steering_vector = steering_vector.to(self.device).unsqueeze(-1)
 
-                        # Precompute projection matrix P = I - beta * v * v^+ (Eq. 5)
+                        # Precompute projection matrix P = I - beta * v * v^+ (Eq. 5).
+                        # res has shape [..., d, d] (last two dims are [hidden, hidden]);
+                        # the identity MUST be sized by the hidden dim (res.shape[-1]),
+                        # NOT res.shape[1] -- for the production store shape
+                        # [num_heads, 1, d] the @ yields a 4-D res [num_heads, 1, d, d],
+                        # so res.shape[1] is the batch dim (==1) and torch.eye(1) would
+                        # broadcast to an all-ones matrix (J - beta s s^T) instead of a
+                        # true identity projection (I - beta s s^T). Use res.shape[-1].
                         res = self.strength * (steering_vector @ torch.linalg.pinv(steering_vector))
-                        P = torch.eye(res.shape[1], dtype=res.dtype, device=self.device).unsqueeze(0) - res
+                        P = torch.eye(res.shape[-1], dtype=res.dtype, device=self.device).unsqueeze(0) - res
 
                         casteer_concept_transforms[num_steer][place_in_unet].append((steering_vector.squeeze(-1), P))
             self.casteer_vectors.append(casteer_concept_transforms)

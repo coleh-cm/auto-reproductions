@@ -50,8 +50,21 @@ def test_construction_is_unit_norm():
 
 
 def test_eq6_noclip_matches_matrix_form():
-    """Eq.6 (method_2.tex:126-130), no clipping: on the conditional CFG half,
-    controller output == (I - beta s s^T) c. With beta=2, unit s, ||c|| preserved."""
+    """Eq.6 (method_2.tex:126-130), no clipping: the elementwise no-clip path AND
+    the precomputed matrix form (Eq.5, P = I - beta * s * s^T) BOTH equal
+    (I - beta * s * s^T) c. With beta=2 and a unit s this is the Householder
+    reflection, so ||c|| is preserved.
+
+    This exercises BOTH code paths that consume `strength`:
+      - steer_with_clipping (intermediate_clipping=False) reads self.strength
+        directly, so it catches a wrong strength on the elementwise path;
+      - steer_matrix_form reads the precomputed P = I - beta * s * s^T (controller.py
+        `res = strength * (v @ pinv(v))`), so it catches the half_strength_projection
+        mutation, which scales `res` by 0.5 -> P = I - 1 * s * s^T: the matrix form
+        then yields (I - s s^T) c, which neither matches (I - 2 s s^T) c nor
+        preserves ||c||. A test that only checks the elementwise path is blind to
+        that mutation, because steer_with_clipping never reads P.
+    """
     torch.manual_seed(2)
     d = 320
     s = torch.randn(d)
@@ -63,12 +76,32 @@ def test_eq6_noclip_matches_matrix_form():
         use_first_diffusion_step=True, num_layers=1, steering_mode='dotproduct',
     )
     c = torch.randn(2, 5, 1, d)
+
+    # (1) Elementwise no-clip path (steer_with_clipping via forward, CFG cond half).
     out = ctrl.forward(c.clone(), diffusion_step=0, place_in_unet="down", block_index=0)
     cond_in = c[1, :, 0, :]
     cond_out = out[1, :, 0, :]
-    expected = cond_in - 2.0 * (cond_in @ s).unsqueeze(-1) * s
-    assert torch.allclose(cond_out, expected, atol=1e-5)
+    expected_cond = cond_in - 2.0 * (cond_in @ s).unsqueeze(-1) * s
+    assert torch.allclose(cond_out, expected_cond, atol=1e-5)
     assert torch.allclose(cond_out.norm(dim=-1), cond_in.norm(dim=-1), atol=1e-4)
+
+    # (2) Matrix form (steer_matrix_form) consumes the precomputed P; it must also
+    # equal (I - 2 s s^T) c and preserve ||c|| on EVERY row. The
+    # half_strength_projection mutation changes P to (I - 1 s s^T), which fails
+    # both checks here (output diverges by ~0.2, norm by ~0.03 -- far above the
+    # 1e-4 tolerance).
+    b, P = ctrl.casteer_vectors[0][0]["down"][0]
+    assert P.shape[-1] == d and P.shape[-2] == d, "P must be a d x d projection"
+    m_in = c.clone()
+    m_out = ctrl.steer_matrix_form(m_in, b, P)
+    # (I - 2 s s^T) c broadcast over [B, seq, 1, d]
+    m_expected = m_in - 2.0 * (m_in @ s).unsqueeze(-1) * s
+    assert torch.allclose(m_out, m_expected, atol=1e-4), (
+        f"matrix form must equal (I - 2 s s^T) c; max diff "
+        f"{(m_out - m_expected).abs().max().item()}")
+    assert torch.allclose(m_out.norm(dim=-1), m_in.norm(dim=-1), atol=1e-4), (
+        f"matrix form must preserve ||c|| (Householder); max norm diff "
+        f"{(m_out.norm(dim=-1) - m_in.norm(dim=-1)).abs().max().item()}")
 
 
 def test_eq7_clip_only_positive_projections():
