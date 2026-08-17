@@ -1,0 +1,42 @@
+# Reproduction environment for
+#   LEACE: Perfect linear concept erasure in closed form
+#   Belrose et al., NeurIPS 2023, arXiv:2306.03819
+#
+# Python 3.13. All pins verified to resolve and import on CPython 3.13 (aarch64 + x86_64),
+# CPU-only. The gate rebuilds .venv from this file, so every dependency the method and its
+# experiments need is listed here.
+#
+# Install with:
+#   uv venv --python 3.13 .venv && uv pip install --python .venv -r requirements.txt
+
+# --- Core method: the authors' own implementation (linked from the paper abstract,
+#     paper/main.tex:283). Pinned to upstream commit 9f51753 (main, 2024-10-15), which is
+#     the state audited in SPEC.md §3. Upstream's runtime dependency is just torch; the
+#     experiment-level deps are pinned explicitly below.
+concept-erasure @ git+https://github.com/EleutherAI/concept-erasure@9f51753821316a1edacf78b52b464ab26d40e60a
+
+# --- Numerical core ---
+torch==2.6.0
+numpy==2.1.3
+
+# --- Experiment dependencies ---
+# scikit-learn: logistic-regression gender/profession probes and INLP baselines (SPEC §1.4 E11)
+scikit-learn==1.6.1
+# transformers: bert-base-uncased (bios, amnesic) and EleutherAI/pythia-160m (scrubbing)
+# 4.46.3 is the paper-era release concurrent with the pinned concept-erasure commit; the
+# scrubbing subpackage monkey-patches GPT-NeoX/Llama attention internals and is verified
+# against this version.
+transformers==4.46.3
+# datasets: bias_in_bios (bios arms) and UD English EWT (amnesic arms)
+datasets==3.1.0
+# spacy + POS tagger model: Universal Dependency tags for the scrubbing experiment
+# (paper/main.tex:662). Paper/upstream default is en_core_web_trf, which is CPU-infeasible
+# here; en_core_web_sm is the documented fallback (SPEC §2.7, logged divergence — the POS
+# metric definition is unaffected). The model is published as a wheel (py3-none-any).
+spacy==3.8.15
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+# tqdm: progress bars in the scrubbing/amnesic pipelines
+tqdm==4.70.0
+
+# --- Tests ---
+pytest==8.3.4
