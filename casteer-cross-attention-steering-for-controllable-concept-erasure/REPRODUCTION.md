@@ -10,7 +10,11 @@
 
 ## Status
 
-**In progress — implementation + correctness complete; diffusion-number claims BLOCKED on CPU.**
+**Environment rung — implementation + correctness complete; every diffusion-model arm BLOCKED on this CPU-only host, so the paper's headline comparison was not measured.**
+
+- Reached rung: **`environment`**. The build/arms (numbers) gate ran and every arm × seed returned `BLOCKED` — see § "Arms run (publish step)". An all-BLOCKED arms result is the `environment` rung: the host cannot run the paper's full config, so no number that separates the arms was produced, and the paper's comparison was not tested.
+- Numbers gate (`claims_result.json`, `produced_by: reproduce-paper numbers gate`) settled all 17 claims — **AUTHORITATIVE COUNTS: reproduced=1, refuted=0, untested=0, blocked=16** — but the 16 `blocked` verdicts reflect BLOCKED measurements, not measured refutations, and do not establish the paper's claims one way or the other.
+- The review gate rejected on its last round and the review budget (4 rounds) was spent without the reviewers going quiet; the outstanding objections are listed in § "Review budget" and in `blocked_reason` at `publish_reproduction`. This is not a clean pass.
 
 - [x] Reproduction folder created; branch `repro/casteer-cross-attention-steering-for-controllable-concept-erasure` pushed.
 - [x] arXiv e-print 2503.09630 fetched and unpacked under `paper/` — `.tex`/`.bib` committed, figure images and style files gitignored (no `.bbl` present in the source tarball).
@@ -93,3 +97,92 @@ The two curve claims (`fig_clip_shape`, `fig_fid_shape`) come from the paper's f
   - **Per-model steering-vector store (fixed):** `build_controller` loads vectors from `<vector_dir>/<vector_model>` (sd14 -> `sd14`, sdxl_casteer_clip -> `sdxl-turbo`), so sdxl_casteer_clip cannot silently load SD-1.4's `nudity.pt` (dim-mismatch / wrong-model steering). Tests: `test_build_controller_per_model_vector_dir_isolates_sdxl_from_sd14`, `test_arm_config_vector_model_is_set_for_steered_arms`. Mutation: `vector_dir_not_per_model`.
   - **Sensitivity self-consistency + hygiene (fixed):** `nudity_two_times_fewer.sensitivity.survives` is [1] (at k=2 the count doubles, 2×14−18=10>0 fails), not the self-inconsistent [1,2]; `nudity_beats_all_prior` keeps [1,2]. The LPIPS 256×256-resize comment is corrected (a REAL transform, not a no-op; recorded in the style claim's sensitivity). Duplicate `direction` keys in two claims removed.
   - `measured.json` regenerated: unchanged shape (house values identical; 16 diffusion metrics BLOCKED). The BLOCKED reason text now reflects the corrected full config (I2P=4,703 / snoopy+other=800 / COCO=3,000). `claims_result.json` (the workflow's verdict table) is produced by the numbers gate, not by us.
+
+---
+
+## Arms run (publish step)
+
+Every arm has run; the final lines are in `/tmp/arms.log`. The gate's spread is **all BLOCKED**: every one of the 9 arms × 3 seeds returned `BLOCKED`, so there is no numeric spread between arms to compare. State that plainly first — **a measurement that produced no number for any arm has not tested the paper's comparison, whatever else it shows.** The reason is environmental, not algorithmic: this host is CPU-only, and the paper's full config (50 PNDM steps; I2P = 4,703 prompts; snoopy + 5 other-concepts = 800 images/concept; COCO = 3,000 captions; 3 seeds; 8×V100, `paper/content/supplementary.tex:30`) is infeasible on CPU (weeks of wall time per arm). `measured.json` records `BLOCKED` for every diffusion metric with the reason in `measured_blocked_reasons.json`. **No synthetic stand-in was substituted for any paper dataset**: the COCO-30k FID reference is not vendored and the loader RAISES rather than fabricates; NudeNet/Q16/LPIPS raise `MissingEvaluatorError` rather than score. So the data these numbers would have come from is the paper's own I2P / Snoopy-concept / COCO-30k protocol — they simply were not produced here.
+
+The exact command that produced every diffusion measurement:
+
+```
+bash run_all_arms.sh     # = .venv/bin/python scripts/diffusion/run_all_arms.py
+```
+
+It emits one `FINAL <arm>=BLOCKED` line per arm/seed (27 lines) and writes `measured.json` + `measured_blocked_reasons.json`. `/tmp/arms.log` is the captured stdout of that run.
+
+The one CPU-runnable measurement, the Householder norm-preservation invariant (claim `house`, `experiments.tex:21-22`, pure maths — no generation), is produced by the same `run_all_arms.sh` via `core/invariants.py::compute_house_invariant` under arm `casteer_noclip`:
+
+```
+bash run_all_arms.sh     # fills measured.casteer_noclip.<seed>.{house_pass,house_max_norm_err,house_unit_norm_ok}
+```
+
+A separate CPU smoke run exercises the full estimate→steer→generate→score path on real SD-1.4 at a tiny config (NOT evidence about the paper — 4 steps / 256² / 1 image / seed 42, vs the paper's 50 steps / 512² / thousands of images):
+
+```
+bash smoke.sh            # -> FINAL casteer_clip=0.526408  (snoopy_cs on 1 steered image; reproducible, ~41 s cached)
+```
+
+### Measured vs paper-claimed, per claim
+
+The table records, for each of the 17 claims, the value the paper reports (with its `.tex` citation) beside what this run measured, and the command. "BLOCKED" means no number was produced on this host. The difference is not interpretable as agreement or disagreement with the paper — a BLOCKED value is the absence of a measurement, not a measurement near or far from the claim. Tolerance is not ours to decide and is not stated.
+
+| Claim | Paper-claimed value (citation) | This run measured | Command | Difference |
+| --- | --- | --- | --- | --- |
+| `house` | β=2 ⇒ `(I−2ssᵀ)c` preserves `‖c‖₂` (`experiments.tex:21-22`) | `house_pass=1`, `house_max_norm_err=3.55e-14` (seed 42/1234), `2.84e-14` (seed 2024) — held at 3/3 seeds | `bash run_all_arms.sh` | `‖c‖` preserved to ~1e-14 (float64); consistent with the claim |
+| `nudity_beats_all_prior` | CASteer(clip) nudity Total **7** < SAeUron **18** (second-best) (`sd14_tables/nudity.tex:30`, `experiments.tex:49`) | `casteer_clip.nudity_total` = BLOCKED (all seeds) | `bash run_all_arms.sh` | not measured |
+| `nudity_two_times_fewer` | CASteer(clip) Total **7** is >2× fewer than second-best **18** (`experiments.tex:49`) | `casteer_clip.nudity_total` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `nudity_total_value` | CASteer(clip) nudity Total = **7** (`nudity.tex:30`) | `casteer_clip.nudity_total` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `i2p_overall_beats_receler` | CASteer(clip) I2P Overall **25.58** < Receler **27.0** by 1.42 pp (`sd14_tables/i2p.tex`, `experiments.tex:49`) | `casteer_clip.i2p_overall_pct` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `coco_fid_vs_vanilla` | CASteer(clip) COCO FID-30k **13.02** vs SD-1.4 **14.04** (`sd14_tables/merge.tex`, `experiments.tex:55`) | `casteer_clip.coco_fid30k` = BLOCKED; `sd14.coco_fid30k` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `coco_fid_beats_prior_art_value` | CASteer(clip) COCO FID-30k = **13.02** (best) (`merge.tex`) | `casteer_clip.coco_fid30k` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `snoopy_erasure_ordering` | CASteer(w/o clip) norm Snoopy CS left of SPM norm-CS **0.6968** (`experiments.tex:85`; fig) | `casteer_noclip.norm_snoopy_cs` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `snoopy_erasure_vs_doco` | CASteer(w/o clip) norm Snoopy CS left of DoCo norm-CS **0.6255** (`experiments.tex:77`) | `casteer_noclip.norm_snoopy_cs` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `snoopy_preservation_vs_esd_receler` | CASteer(clip) mean norm other-concept CS > max(ESD **0.9041**, Receler **0.9252**) (`experiments.tex:83`) | `casteer_clip.mean_norm_others_cs` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `snoopy_fid_preservation_vs_esd_receler` | CASteer(clip) mean other-concept FID < min(Receler **78.88**, ESD **77.5**) (`experiments.tex:83`) | `casteer_clip.mean_others_fid` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `fig_clip_shape` | Ours left of SPM/SAFREE/DoCo on norm-Snoopy-CS vs mean-other-CS scatter (`experiments.tex:77`; `figure_transcript.md`) | `casteer_noclip.norm_snoopy_cs` = BLOCKED → figure not regenerated | `bash run_all_arms.sh` | not measured |
+| `fig_fid_shape` | Ours below ESD and both Recelers on norm-Snoopy-CS vs mean-other-FID scatter (`experiments.tex:78`) | `casteer_clip.mean_others_fid` = BLOCKED → figure not regenerated | `bash run_all_arms.sh` | not measured |
+| `dotprod_weighting_matters_snoopy` | constant-α (a=2) snoopy_cs differs from dot-product CASteer (`supplementary.tex:544`) | `const_a2_clip.snoopy_cs`, `casteer_clip.snoopy_cs` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `dotprod_weighting_matters_fid` | constant-α (a=2) COCO FID differs from dot-product CASteer (`supplementary.tex:544`) | `const_a2_clip.coco_fid30k`, `casteer_clip.coco_fid30k` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `style_vangogh_lpips_ordering` | CASteer(w/o clip) Van Gogh LPIPS_e **0.46** > SAFREE **0.42** (`sd14_tables/artists.tex`, `experiments.tex:130`) | `casteer_noclip.vangogh_lpips_e` = BLOCKED | `bash run_all_arms.sh` | not measured |
+| `sdxl_distilled_transfer_nudity` | CASteer on SDXL-distilled nudity_total < vanilla SDXL nudity_total (`method_2.tex:191`) | `sdxl_casteer_clip.nudity_total`, `sdxl.nudity_total` = BLOCKED | `bash run_all_arms.sh` | not measured |
+
+The numbers gate (`claims_result.json`) settled these as: `house` → `reproduced` (1); the other 16 → `blocked` (every referenced value BLOCKED). **AUTHORITATIVE COUNTS: reproduced=1, refuted=0, untested=0, blocked=16.** No claim was `refuted` and no claim was `untested`/`unevaluable`. The 16 `blocked` verdicts are the gate correctly propagating BLOCKED measurements; they are not evidence for or against the paper.
+
+### Where the data came from
+
+- `house`: synthetic unit vectors and random `c` in dims {320,640,1280}, float64 (`core/invariants.py`) — a pure-maths check of the Householder operator, **not** the paper's dataset. It certifies the operator, not the empirical claims.
+- All diffusion metrics: would come from the paper's own I2P (4,703 prompts, `AIML-TUDA/i2p`), Snoopy + 5 other concepts (800 images/concept, 80 CLIP templates), COCO-30k captions, and SD-1.4 / SDXL generations — **none were produced here** (CPU-only). No synthetic dataset was substituted for any of them.
+
+## Research-readiness gates
+
+Walked at publish. `partial` is used where a gate was satisfied in this CPU sandbox but not proven end-to-end on the target (GPU) host.
+
+| # | Gate | Verdict | Evidence |
+| --- | --- | --- | --- |
+| 1 | Builds from scratch | **partial** | `Dockerfile` (CUDA 12.4 base, installs Python 3.13 + `uv` + `requirements.txt`) exists and is well-formed; `docker` is not available in this sandbox so `docker build` was not run. The CPU environment was built with `uv pip install -r requirements.txt` and the import gate (`tests/test_environment.py`) passes, so dependencies resolve from the pinned spec, but the image build itself is unverified. |
+| 2 | README is accurate | **partial** | Quickstart steps 1–6 followed verbatim in this checkout: `uv venv` + `uv pip install -r requirements.txt` resolves; `python -m pytest tests/ -q` → 65 passed; `bash smoke.sh` → `FINAL casteer_clip=0.526408`; `bash run_all_arms.sh` → 27 BLOCKED lines + `measured.json`; `python selfcheck_claims.py` writes `selfcheck.json`. The Docker block (step "Reproduce with Docker") was not run (no `docker`). The GPU block ("Running the method") was not run (no GPU). |
+| 3 | Packages are clear | **partial** | Every dependency is pinned to an exact version in `requirements.txt` (torch/diffusers/transformers/clip-anytorch/clean-fid/...). Install succeeds and `tests/test_environment.py::test_third_party_dependencies_import` passes — no missing-import death after install. **Gap (review finding 2):** `nudenet` and `lpips` are NOT in `requirements.txt`, so `nudity_total` / `vangogh_lpips_e` raise `MissingEvaluatorError` on every host; the Q16 checkpoint is not vendored/pinned; the COCO-30k FID reference is not vendored. The paper's headline evaluators are therefore unreachable as shipped even on a GPU host. |
+| 4 | Entry point is obvious | **pass** | One documented command per task: `bash run_all_arms.sh` (full arm sweep, writes `measured.json`), `bash smoke.sh` (CPU smoke), `python selfcheck_claims.py` (self-eval). No source edits required; per-arm config lives in `claims.json` and `core/runner.py`. |
+| 5 | Fast path | **pass** | `smoke.sh` exercises load → estimate (Algorithm 1) → steer (Eq.7) → generate → score (`snoopy_cs`) on real SD-1.4 in ~41 s (cached) on CPU, printing one `FINAL` line. |
+| 6 | Deterministic, or noise quantified | **partial** | The CPU-runnable numbers are deterministic: `house_max_norm_err` is bit-identical across re-runs (3.55e-14 at seeds 42/1234, 2.84e-14 at seed 2024); `smoke.sh` reproduced `FINAL casteer_clip=0.526408` on re-run. The diffusion arms produced no number, so their run-to-run noise is not quantified (and cannot be on this host). |
+| 7 | Degeneracy test in the repo | **pass** | `tests/test_degeneracy.py` asserts β=0 is bit-exact baseline on both `dotproduct` and `constant` modes, plus a negative test rejecting a `+0.001` offset. `python -m pytest tests/test_degeneracy.py -q` passes. |
+| 8 | Data provenance is stated | **partial** | `core/data.py` fingerprints every source (ImageNet 50/`tench`, 80 CLIP templates, 30,000 COCO captions, 4,703 I2P via `AIML-TUDA/i2p`) with tests in `tests/test_data.py`; the COCO-30k FID reference loader RAISES when not vendored. Provenance is stated, but the COCO-30k reference and the Q16 checkpoint are not vendored or fetched by a script, so a reader must supply them by hand to settle the FID / I2P-overall claims. |
+| 9 | Recorded number is reproducible | **partial** | The one recorded CPU number (`house`: 3.55e-14 / 2.84e-14) reproduces on re-run of `bash run_all_arms.sh`. The smoke number (`0.526408`) reproduces but is explicitly NOT a paper result. None of the 16 diffusion numbers were recorded, so there is nothing to reproduce for them. |
+| 10 | Nothing depends on hidden local state | **partial** | The CPU path runs in a fresh clone: `git clone` → `uv venv` → `uv pip install` → `pytest`/`smoke.sh`/`run_all_arms.sh` all work without hand-fetched wheels or home-directory state (SD-1.4 is fetched by diffusers into the HF cache on first run). The GPU path additionally needs `HF_TOKEN` and the un-vendored COCO-30k reference / Q16 checkpoint (review finding 2), so the *full* reproduction is not yet free of hand-supplied state. |
+
+## Review budget
+
+The review budget was **4 rounds and was spent**; the reviewers did **not** go quiet. The last review round (recorded in the workflow journal, session `ses_feec86635…`) returned `outcome: rejected` with four non-cosmetic findings, each verified firsthand against the repo and the paper's LaTeX rather than taken on the reviewers' word. **A run that ran out of review rounds is not a clean pass**, and this one is not reported as one. The outstanding objections (paraphrased from the review's structured feedback; the full text is in the run journal):
+
+1. **Style-evaluation prompt leak + protocol divergence.** The Van Gogh style-evaluation generation prompts (`f"{c}, Van Gogh style"` for the first 50 ImageNet classes × 4, `scripts/diffusion/run_all_arms.py`) are byte-identical to the *positive* halves of the prompts used to *estimate* the Van Gogh steering vector (`core/construct_prompts.py`, consumed by `estimate_steering_vectors.py`). LPIPS_e is thus measured on the prompts the direction was fitted on, which favours the method. It also diverges from the SAFREE evaluation procedure the paper explicitly defers to (`experiments.tex:127-128`; SAFREE's `scripts/run_artist.sh` uses `datasets/big_artist_prompts.csv`, a different 20-prompt set, fetched live to confirm). Not registered as an unknown in SPEC/claims sensitivities. **Fix:** evaluate on SAFREE's `big_artist_prompts.csv` (or a set disjoint from the estimation family) and record it.
+2. **Headline-claim evaluators unreachable as shipped, even on GPU.** `nudenet` and `lpips` are absent from `requirements.txt`, so `nudity_total` and `vangogh_lpips_e` raise `MissingEvaluatorError` on every host; `q16_inappropriate_count` raises by construction although the paper names "the NudeNet with the Q16 detector" (`experiments.tex:47-49`); the real COCO-30k FID reference is not vendored. **Fix:** add `nudenet`+`lpips` to `requirements.txt`, pin a documented Q16 checkpoint as a disclosed unknown with a sensitivity sweep, and vendor or deterministically fetch the COCO-30k reference.
+3. **Others-concept aggregation silently degrades to a subset mean.** Per-concept scoring failures are silently passed and the mean taken over whatever survives, rather than the paper's mean-over-five; a partial failure would ship a wrong quantity. **Fix:** fail loud on any per-concept failure (or record the denominator).
+4. **The single `reproduced` claim is disconnected from the implementation it certifies.** `house` is a synthetic-vector arithmetic check of the Householder operator; it passes regardless of whether the production steering/generation/eval path is correct, so "1 reproduced" overstates what was shown.
+
+Two earlier review rounds (1 and 2) produced fix commits (`790d081`, `91011ce`) that resolved F1/F2/F3, A1/A3, the unevaluable-claims SyntaxErrors, the surviving mutations, and the driver/eval-path corrections documented in the Log below. Rounds 3–4 (the last) produced the four findings above, which were **not** fixed before the review budget ran out. The `orchestrate` tool was unavailable in this sandbox (Internal Server Error on every call, including trivial probes), so review was run by the workflow's `workflow-step-review` agent against the repo and the paper's `.tex`; that is recorded here for provenance.
+
+## Verdict
+
+Rung reached: **`environment`**. The build/arms gate (the numbers gate) is still failing: its last output is 27 lines of `FINAL <arm>=BLOCKED` (`/tmp/arms.log`) and a `measured.json` whose every diffusion metric is `BLOCKED`, because this CPU-only host cannot run the paper's full config (8×V100, `supplementary.tex:30`). The review gate is also still failing (rejected, 4 outstanding findings above; review budget spent). The one CPU-runnable claim (`house`) is reproduced; it is a maths invariant, not an empirical result, and does not by itself reproduce the paper.
