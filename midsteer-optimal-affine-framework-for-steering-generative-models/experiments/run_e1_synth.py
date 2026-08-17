@@ -27,7 +27,15 @@ set, verified by a strong family of feasible perturbations A_hat + D with D Sxz 
 transversal. The constraint (i) and special-case (iii) sub-checks are unchanged.
 
 Writes results/e1_synth.json: {seed: {C1: {pass, detail, metrics}, C2: ..., C3: ...}}.
-Prints one 'FINAL e1_<claim>=PASS/FAIL' line per seed/claim.
+The FULL (non-smoke) run prints one 'FINAL e1_<claim>=PASS/FAIL' line per seed/claim —
+PASS/FAIL here is the MEASURED value of an invariant claim (it is what flows into
+claims_result.json), so it is a result and it is evidence.
+The SMOKE run prints exactly one line `FINAL e1_synth_smoke=<float>` whose value is the
+worst (max) covariance-constraint residual across C1/C2/C3 at smoke scale. This is a
+MEASURED NUMBER, not a verdict: smoke only proves the code path runs and is NOT
+evidence about the paper, so it must never print a PASS/FAIL verdict word (that belongs
+to claims_result.json). A tiny residual (~1e-13) shows the closed-form affine maps were
+built and their constraints evaluated; it is a diagnostic, not a result.
 
 NO success path reports PASS on an empty result: n==0 or A_hat is None -> raise.
 
@@ -246,8 +254,18 @@ def main():
             'C3': _check_c3(seed, d, n),
         }
         if SMOKE:
-            all_pass = all(results[str(seed)][c]['pass'] for c in ('C1', 'C2', 'C3'))
-            print(f"FINAL e1_synth_smoke={'PASS' if all_pass else 'FAIL'}")
+            # Smoke prints a MEASURED NUMBER (worst constraint residual across C1/C2/C3),
+            # NOT a PASS/FAIL verdict. Smoke is not evidence about the paper; a verdict
+            # word (PASS) belongs only to claims_result.json. The number proves the path
+            # ran: the closed-form affine maps were built and their covariance
+            # constraints were evaluated. Empty result is caught below (raises).
+            res = results[str(seed)]
+            worst = max(
+                res['C1']['metrics']['constraint'],
+                res['C2']['metrics']['flip_constraint'],
+                res['C3']['metrics']['matched_cov_constraint'],
+            )
+            print(f"FINAL e1_synth_smoke={worst:.6e}")
         else:
             for claim in ('C1', 'C2', 'C3'):
                 print(f"FINAL e1_{claim}={'PASS' if results[str(seed)][claim]['pass'] else 'FAIL'}")

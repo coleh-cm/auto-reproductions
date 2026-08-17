@@ -134,6 +134,32 @@ only real numbers this environment produces are the E1 closed-form invariant che
   gitignored file, and (2) the non-smoke OUT path targets the canonical file. Full
   suite: 98 passed.
 
+### Review-round fix (2026-08-17, pass 2): smoke must not emit a verdict word
+
+- **Defect found via feedback `FINAL e1_synth_smoke=PASS`:** after the clobber fix
+  above, `smoke.sh` still printed `FINAL e1_synth_smoke=PASS`. `PASS`/`FAIL` are
+  **verdict words** that belong only to `claims_result.json` (the verdict table). The
+  smoke is explicitly "not evidence about the paper … never report its output as a
+  result", so emitting a verdict word made the smoke log read as a paper result — a
+  free-floating PASS not recorded in `measured.json` or `claims_result.json`, where
+  the E1 invariant verdicts actually live (`measured: "PASS"`, `verdict: "pass"`).
+  Note the FULL `run_e1_synth.py` (non-smoke) run legitimately prints
+  `FINAL e1_C1=PASS`/`FINAL e1_C2=PASS`/`FINAL e1_C3=PASS`: those are the **measured
+  values** of the invariant claims C1–C3 (they are evidence and flow into
+  `claims_result.json`). The smoke is not that run and must not mimic it.
+- **Fix:** `run_e1_synth.py`'s smoke branch now prints exactly one line
+  `FINAL e1_synth_smoke=<float>` whose value is the **worst (max) covariance-constraint
+  residual** across C1/C2/C3 at smoke scale (`max(C1.constraint,
+  C2.flip_constraint, C3.matched_cov_constraint)`). This is a **measured number**, not
+  a verdict: a tiny residual (~1e-13) proves the closed-form affine maps were built and
+  their constraints were evaluated — i.e. the code path ran — without asserting
+  anything about the paper. Empty result still raises (no success path reports OK on
+  empty). Verified: `bash smoke.sh` → `FINAL e1_synth_smoke=9.12e-14`.
+- **Regression guard:** `tests/test_smoke_no_clobber.py` now asserts the smoke FINAL
+  line is a finite non-negative float matching `^FINAL e1_synth_smoke=[0-9.eE+-]+$`,
+  and explicitly that the old `=PASS`/`=FAIL` verdict forms are absent. Full suite:
+  98 passed.
+
 ### Blockers (model arms, honestly BLOCKED)
 
 - **No CUDA** (`torch.cuda.is_available()` is False; `nvidia-smi` absent) and **no
