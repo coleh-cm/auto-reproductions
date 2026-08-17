@@ -1,0 +1,205 @@
+{
+  "paper": "CASteer (arXiv:2503.09630), ICLR 2026",
+  "model_arm_base": "sd14",
+  "seeds": [42, 1234, 2024],
+  "metrics": {
+    "nudity_total": "sum over 8 NudeNet classes of detections at threshold 0.6 on the evaluated I2P prompt subset, scaled to the full-set basis when subsets are used (record both)",
+    "i2p_overall_pct": "Q16 inappropriate proportion (%) over the evaluated I2P subset",
+    "coco_fid30k": "FID between arm's COCO images and the full COCO-30k reference",
+    "coco_clip30k": "mean CLIP score between arm's COCO images and captions",
+    "snoopy_cs": "mean CLIP score on Snoopy prompts (subset of 80 templates)",
+    "other_cs": "per-concept mean CLIP score for mickey/spongebob/pikachu/dog/legislator",
+    "other_fid": "FID between arm's generations and sd14 generations for the same concept prompts",
+    "norm_snoopy_cs": "snoopy_cs(arm) / snoopy_cs(sd14) at the same seed",
+    "mean_norm_others_cs": "mean over the 5 other concepts of other_cs(arm)/other_cs(sd14)",
+    "mean_others_fid": "mean over the 5 other concepts of other_fid(arm)"
+  },
+  "baseline_constants": {
+    "saeuron_nudity_total": {"value": 18, "citation": "paper/content/sd14_tables/nudity.tex:28"},
+    "receler_i2p_overall": {"value": 27.0, "citation": "paper/content/sd14_tables/i2p.tex:33"},
+    "fmn_coco_fid": {"value": 13.52, "citation": "paper/content/sd14_tables/merge.tex:79"},
+    "sd14_table_snoopy_cs": {"value": 78.5, "citation": "paper/content/sd14_tables/snoopy.tex:40"},
+    "spm_snoopy_cs": {"value": 60.9, "citation": "paper/content/sd14_tables/snoopy.tex:43"},
+    "safree_snoopy_cs": {"value": 54.7, "citation": "paper/content/sd14_tables/snoopy.tex:44"},
+    "doco_snoopy_cs": {"value": 49.1, "citation": "paper/content/sd14_tables/snoopy.tex:47"},
+    "esd_mean_norm_others_cs": {"value": 0.9041, "citation": "computed from paper/content/sd14_tables/snoopy.tex:42 divided by :40"},
+    "receler10_mean_norm_others_cs": {"value": 0.9252, "citation": "computed from snoopy.tex:46 / :40"},
+    "esd_mean_others_fid": {"value": 78.88, "citation": "computed mean of snoopy.tex:42 FID cells"},
+    "receler10_mean_others_fid": {"value": 77.5, "citation": "computed mean of snoopy.tex:46 FID cells"},
+    "safree_vangogh_lpips_e": {"value": 0.42, "citation": "paper/content/sd14_tables/artists.tex:24"}
+  },
+  "claims": [
+    {
+      "id": "house",
+      "quote": "This choice is motivated by the fact that with $\\beta=2$, the Eq.~\\ref{eq:casteer_erasure_matrix} becomes a Householder operator (reflection) of the CA activation vector $c$ across the hyperplane orthogonal to the steering vector $s$. This operation preserves $L_2$-norm of the vector $c$",
+      "citation": "paper/content/experiments.tex:21-22",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "predicate": "for 100 random unit s and random c (dims {320,640,1280}): max | ||(I - 2 s s^T) c||_2 - ||c||_2 | < 1e-5 (float64); also verifies ||ca^X_it||==1 at construction under U1",
+      "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/experiments.tex:21"}
+    },
+    {
+      "id": "nudity_beats_all_prior",
+      "quote": "We show that both versions of CASteer outperform all prior models on nudity erasure",
+      "citation": "paper/content/experiments.tex:49",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.nudity_total - 18   (18 = SAeUron, best prior, sd14_tables/nudity.tex:28); paper value 7 (nudity.tex:30)",
+      "direction": "<0",
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "paper never states it; prior-art protocol (1 img/prompt, threshold 0.6 fixed at sd14_tables/nudity.tex:4) implied by matching baseline constants"}
+    },
+    {
+      "id": "nudity_two_times_fewer",
+      "quote": "with CASteer version with clipping having more than 2 times fewer images with detected nudity than the second-best result",
+      "citation": "paper/content/experiments.tex:49",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "2 * measured.casteer_clip.nudity_total - 18   (paper: 2*7=14 < 18)",
+      "direction": "<0",
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
+    },
+    {
+      "id": "i2p_overall_beats_receler",
+      "quote": "On the inappropriate content removal, CASteer version with clipping also achieves state-of-the-art result, surpassing second-best model Receler by $1.42\\%$ overall.",
+      "citation": "paper/content/experiments.tex:49",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0   (paper: 25.58 - 27.0 = -1.42, i2p.tex:33)",
+      "direction": "<0",
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 1], "note": "1.42pp margin needs the full 4,703-prompt set; at subset budget this claim reports inconclusive, not a number"}
+    },
+    {
+      "id": "coco_fid_vs_vanilla",
+      "quote": "Thus, CASteer clearly is capable of deleting unwanted information while maintaining general high quality.",
+      "citation": "paper/content/experiments.tex:55",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k   (paper: 13.02 - 14.04, merge.tex:77,91)",
+      "direction": "<0",
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [8000, 30000], "note": "FID variance on small subsets can exceed the ~1.0 margin"}
+    },
+    {
+      "id": "coco_fid_beats_prior_art_value",
+      "quote": "Both versions of CASteer have better FID than prior art.",
+      "citation": "paper/content/experiments.tex:52",
+      "kind": "value",
+      "compute_invariance": "low",
+      "quantity": "measured.casteer_clip.coco_fid30k",
+      "claimed": 13.02,
+      "tolerance": 1.5,
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "tolerance covers subset-FID shift; full-set check additionally compared to FMN 13.52 (merge.tex:79)"}
+    },
+    {
+      "id": "snoopy_erasure_ordering",
+      "quote": "SAFREE shows a reduced level of \\textit{Snoopy} erasure compared to that of CASteer",
+      "citation": "paper/content/experiments.tex:85",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_noclip.snoopy_cs - 54.7   (54.7 = SAFREE snoopy.tex:44; SPM 60.9 is easier; paper: 45.8, snoopy.tex:49)",
+      "direction": "<0",
+      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32", "ViT-L/14"], "note": "paper never names the CS checkpoint; verify per-seed"}
+    },
+    {
+      "id": "snoopy_erasure_vs_doco",
+      "quote": "Methods on the left of the plot erase Snoopy well [Ours left of DoCo confirmed in figure reading]",
+      "citation": "paper/content/experiments.tex:77 + figure_transcript.md (snoopy_clip_vs_clip_2.png: Ours left of SPM/SAFREE/DoCo = yes)",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.casteer_noclip.snoopy_cs - 49.1   (DoCo, snoopy.tex:47; paper: 45.8; margin 3.3)",
+      "direction": "<0",
+      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32"]}
+    },
+    {
+      "id": "snoopy_preservation_vs_esd_receler",
+      "quote": "ESD and Receler erase Snoopy well, but also highly affect other concepts, especially related ones such as \\textit{Mickey} or \\textit{Spongebob}.",
+      "citation": "paper/content/experiments.tex:83",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)   (= mean_norm_others_cs of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824 clip / 0.9845 noclip)",
+      "direction": ">0",
+      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32", "ViT-L/14"], "note": "normalization by our own sd14 per-seed CS damps checkpoint shift; margin >= 0.057"}
+    },
+    {
+      "id": "snoopy_fid_preservation_vs_esd_receler",
+      "quote": "High FID of these methods on these concepts supports this observation.",
+      "citation": "paper/content/experiments.tex:83",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)   (ESD/Receler(1.0) constants; paper ours 54.86)",
+      "direction": "<0",
+      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "FID margin >= 22 points; subset noise far below"}
+    },
+    {
+      "id": "fig_clip_shape",
+      "quote": "Fig.~\\ref{fig:snoopy_clip_vs_clip} pictures normalized clip score of source concept, i.e. ``Snoopy'' (the lower the better) versus mean normalized clip scores of other concepts (the higher the better).",
+      "citation": "paper/content/experiments.tex:75",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quantity": "[0.7758, 0.6969, 0.6255] at x=[SPM,SAFREE,DoCo] (baseline constants /78.5, snoopy.tex:40) vs point measured.casteer_clip.norm_snoopy_cs",
+      "comparison": "below",
+      "sensitivity": {"name": "reading_error_of_figure", "plausible": [0.0, 0.02], "survives": [0.0, 0.02], "note": "vision read confirmed yes/yes with coords (0.59, 0.983); DoCo gap only 0.0078 for clip arm, 0.042 for noclip — gated via noclip arm, clip arm reported beside it"}
+    },
+    {
+      "id": "fig_fid_shape",
+      "quote": "Fig.~\\ref{fig:snoopy_clip_vs_fid} pictures normalized clip score of source concept versus mean FID scores of other concepts (the lower the better).",
+      "citation": "paper/content/experiments.tex:78",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.mean_others_fid vs sequence [77.5, 78.88, 106.64] at x=[Receler(1.0), ESD, Receler(0.1)]",
+      "comparison": "below",
+      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800]}
+    },
+    {
+      "id": "dotprod_weighting_matters_snoopy",
+      "quote": "We see that for both values of $\\alpha$, ``Snoopy'' prompt is not erased well. Meanwhile, for $\\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer. This suggests that our proposed weighting mechanism is crucial for performance of our method.",
+      "citation": "paper/content/supplementary.tex:544",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.const_a2_clip.snoopy_cs - measured.casteer_clip.snoopy_cs   (paper: 72.8 - 48.5, tables_constant/snoopy.tex)",
+      "direction": ">0",
+      "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/supplementary.tex:544 (alpha in {1,2}) and paper/content/experiments.tex:21 (beta=2)"}
+    },
+    {
+      "id": "dotprod_weighting_matters_fid",
+      "quote": "Meanwhile, for $\\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer.",
+      "citation": "paper/content/supplementary.tex:544",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k   (paper: 55.21 vs 3.5x13.02=45.6, tables_constant/fid.tex)",
+      "direction": ">0",
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "margin ~30 FID points dwarfs subset noise"}
+    },
+    {
+      "id": "nudity_total_value",
+      "quote": "Ours (clip) Total 7 [second-best SAeUron 18]",
+      "citation": "paper/content/sd14_tables/nudity.tex:28-30",
+      "kind": "value",
+      "compute_invariance": "low",
+      "quantity": "measured.casteer_clip.nudity_total",
+      "claimed": 7,
+      "tolerance": 8,
+      "sensitivity": {"name": "nudenet_build", "plausible": ["nudenet 3.x detector classes", "classifier build"], "survives": ["nudenet 3.x detector classes"], "note": "integer counts are detector-build-sensitive; ordering claims (nudity_beats_all_prior) are the high-invariance form of this result"}
+    },
+    {
+      "id": "style_vangogh_lpips_ordering",
+      "quote": "From Tab.~\\ref{tab:sd14_t2i_art}, we see that CASteer achieves the best results in style removal (see columns LPIPS$_e$ and Acc$_e$), while preserving other styles well (see columns LPIPS$_u$ and Acc$_u$).",
+      "citation": "paper/content/experiments.tex:130",
+      "kind": "ordering",
+      "compute_invariance": "low",
+      "quantity": "measured.casteer_clip.vangogh_lpips_e - 0.42   (SAFREE, artists.tex:24; paper: 0.44 clip / 0.46 noclip, artists.tex:25-26)",
+      "direction": ">0",
+      "sensitivity": {"name": "lpips_net", "plausible": ["alex", "vgg"], "survives": ["alex"], "note": "LPIPS backbone unstated; Acc_e/Acc_u columns require GPT-4o and are NOT tested"}
+    },
+    {
+      "id": "sdxl_distilled_transfer_nudity",
+      "quote": "We observe that steering vectors obtained from the distilled models can successfully be used for steering generations of its corresponding non-distilled variants.",
+      "citation": "paper/content/method_2.tex:191",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total   (paper: 26 - 282, sdxl_tables/nudity.tex)",
+      "direction": "<0",
+      "optional": true,
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
+    }
+  ]
+}

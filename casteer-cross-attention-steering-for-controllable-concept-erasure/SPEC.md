@@ -1,0 +1,390 @@
+# SPEC — CASteer: Cross-Attention Steering for Controllable Concept Erasure
+
+- **Paper:** CASteer: Cross-Attention Steering for Controllable Concept Erasure (ICLR 2026)
+- **arXiv:** 2503.09630. Authors: Gaintseva, Oncescu, Ma, Liu, Benning, Slabaugh, Deng, Elezi.
+- **Paper on disk:** `paper/iclr2026_conference.tex` + `paper/content/*.tex` (+ resolved macros in `paper/math_commands.tex`). Citations below are `<file>:<line>` and grep-resolvable.
+- **Upstream code:** **EXISTS and is official.** Abstract: "Code is available at https://github.com/Atmyre/CASteer" (`paper/content/abstract.tex:36`); repeated in appendix (`paper/content/supplementary.tex:30`: "developed and tested using 8 V100 GPUs"). Repo: `core/controller.py`, `core/diffusion_steering.py`, `core/vector_dump.py`, `core/utils.py`, `core/construct_prompts.py`, `scripts/diffusion/{estimate_steering_vectors.py,run_with_steering.py,produce_scores.py}`, `requirements/{darwin,linux}.txt`, `imagenet_classes.txt`, eval templates under `exp/datasets/eval/`. **Plan: vendor upstream pinned at commit `135912a555a8606c01f55843c738cf8062319ed7` (HEAD at 2026-08-17) and run its entrypoints; record every change needed to make it run.** GitHub search on title/authors found nothing else of note (52 stars, 4 forks, no competing implementation).
+
+---
+
+## 1. Method as an explicit algorithm
+
+CASteer is **training-free**. There is **no loss and no update rule**: nothing is optimized; the method is offline activation averaging plus online activation editing. Stating this explicitly because "loss / update rule" has no other honest answer here.
+
+### Algorithm A — Steering-vector construction (offline)
+
+(from paper Algorithm 1, `paper/content/supplementary.tex:42-63`, and Method Sec. 3.2, `paper/content/method_2.tex:42-81`)
+
+**Inputs:** diffusion model `DM` with `n` cross-attention (CA) layers; `P ≥ 1` prompt pairs `(P⁺_p, P⁻_p)` differing only by the inclusion of concept `X` (`method_2.tex:44-46`); denoising steps `T_v` and generation config for vector construction; initial noise **shared**: one `z_T ~ N(0,I)` is drawn once and used as both `z_T⁺` and `z_T⁻` (`supplementary.tex:46-48`), and prose says the same seed is used inside each prompt pair (`supplementary.tex:110,131,142`). Upstream uses seed=0 for every run (i.e., one global `z_T` for all pairs, exactly as Algorithm 1 is written).
+
+1. For each pair `p = 1..P`: run two complete generations from the same `z_T`, one conditioned on `P⁺_p`, one on `P⁻_p` (`supplementary.tex:49-54`). At every denoising step `t` and every CA layer `i`, capture the CA output of the **conditional (prompt) branch** `ca⁺_{itp}, ca⁻_{itp} ∈ R^{m_i × d_i}` (`method_2.tex:50-54`).
+2. Mean over image patches (Eq. 1, `method_2.tex:57-61`): `ca⁺ᵃᵛᵍ_{itp} = (1/m_i) Σ_{k=1}^{m_i} ca⁺_{itpk} ∈ R^{d_i}`; same for `⁻`.
+3. Mean over the `P` pairs (multi-prompt average, `method_2.tex:174-177`; combined patch+pair mean in Algorithm 1 line, `supplementary.tex:55-58`): `ca⁺ᵃᵛᵍ_it = (1/P) Σ_p ca⁺ᵃᵛᵍ_itp`; same for `⁻`.
+4. Steering vector (Eq. 2, `method_2.tex:74`): `ca^X_it = f_norm(ca⁺ᵃᵛᵍ_it − ca⁻ᵃᵛᵍ_it) ∈ R^{d_i}` with `f_norm` = **unit-L2 normalization** (see UNSTATED #1 — the paper prints `v/||v||²`; we implement `v/||v||`, which is the only reading consistent with the paper's own prose and the upstream code).
+5. Store per `(i, t)`. For SD-1.4: per-step vectors for all `T_v` steps (`experiments.tex:19`). For SDXL/SANA: compute on the distilled model with `T_v = 1` and reuse the single vector for every denoising step of the full model (`method_2.tex:191-197`, `supplementary.tex:253-255,383-385`).
+6. Multi-concept vectors: average individually-normalized steering vectors `ca^X_it = (1/n) Σ_j ca^{X^j}_it` (`supplementary.tex:1068-1071`); used for the 7-class I2P erasure (`experiments.tex:39`). Gram–Schmidt orthogonalization is the alternative (`supplementary.tex:1073`), used only for the two-concept appendix tables.
+
+### Algorithm B — Concept erasure at inference
+
+(from Eq. 6/Eq. 7, `method_2.tex:126-147`; Algorithm 2, `supplementary.tex:65-92`)
+
+**Inputs:** `DM`; steering vectors `{ca^X_it}`; strength `β` (paper: `β = 2` in **all** experiments, `experiments.tex:21`); clipping flag; generation prompt `P`.
+
+For each denoising step `t = T..1`, each CA layer `i=1..n` (hook placed on the CA attention module's **output**, see INTERFACES), for the **conditional CFG branch only** (see UNSTATED #3), with `c_k = ca^out_{itk} ∈ R^{d_i}` the output of patch `k`:
+
+1. `α_k = β · ⟨c_k, ca^X_it⟩` (Eq. 6, `method_2.tex:126-129`; because `ca^X_it` is unit-norm, this is the length of the projection of `c_k` onto the steering direction, `method_2.tex:125`).
+2. If clipping: `α_k ← max(α_k, 0)` (Eq. 7, `method_2.tex:141-147`) — only patches carrying a *positive* amount of `X` are steered.
+3. `c_k ← c_k − α_k · ca^X_it`.
+4. Continue inference with the modified outputs (Algorithm 2's "continue inference" line prints `ca^out_it` — a typo; the steered tensor must be the one passed on, see UNSTATED #5).
+
+**Matrix form (no clipping):** per patch, `c_k ← (I − β s sᵀ) c_k` with `s = ca^X_it` (Eq. `eq:casteer_erasure_matrix`, `method_2.tex:132-138`). With `β=2` and `||s||=1` this is a **Householder reflection** across the hyperplane orthogonal to `s` and preserves `||c_k||₂` (`experiments.tex:21-22`) — claim `house` below tests exactly this.
+**Weight injection** (`method_2.tex:206-210`): `(I−β s sᵀ)` can be folded into the CA block's `proj_out` weight — SDXL/SANA only; qualitative/efficiency note, not gated.
+
+---
+
+## 2. Symbols with shapes
+
+Notation `B` batch, `m_i` #image patches at layer `i`, `d_i` CA embedding size at layer `i` (`method_2.tex:54`), `H` heads, `d_h` head dim. For SD-1.4 (512×512): `n=16` CA modules (1 mid + 6 down + 9 up), `d_i ∈ {320, 640, 1280}`, `m_i ∈ {64²/8²/r_i²}` per UNet level; denoising steps `T=50` (upstream). Upstream hooks expose tensors with an extra unit head axis.
+
+| symbol | shape | meaning |
+|---|---|---|
+| `z_T` | `[1,4,64,64]` (SD-1.4) | shared initial latent noise, one draw reused for both prompts of every pair (`supplementary.tex:46-48`) |
+| `ca⁺_{itp}, ca⁻_{itp}, ca^out_{it}` | `[B, m_i, d_i]`; upstream hook view `[B, m_i, 1, d_i]` | CA-layer output tensor, layer `i`, step `t`, pair `p` (`method_2.tex:52-54`) |
+| `ca⁺ᵃᵛᵍ_{itp}` | `[d_i]` | patch-mean of `ca⁺_{itp}` (Eq. 1, `method_2.tex:58`) |
+| `ca⁺ᵃᵛᵍ_it` | `[d_i]` | pair-mean of above (`method_2.tex:175-177`) |
+| `ca^X_it` (= `s`) | `[d_i]`, **unit L2 norm** | steering vector, layer `i`, step `t` (Eq. 2, `method_2.tex:74`) |
+| `⟨c_k, ca^X_it⟩` | scalar (per patch `k`) | projection length, i.e. "amount of X" (`method_2.tex:125`) |
+| `α_k` | scalar per patch | erasure coefficient; given directly in Eq. 4 (`method_2.tex:91`), made data-dependent in Eq. 6 (`method_2.tex:128`) |
+| `β` | scalar, `=2` | steering strength (`experiments.tex:21`) |
+| `I − β s sᵀ` | `[d_i, d_i]` | erasure matrix (Eq. 5, `method_2.tex:134`) |
+| upstream steering file | `dict[step:int][place:str][block:int] -> Tensor[1,1,d_i]` | `place ∈ {"down","mid","up"}` (SD) or `"sana"` (SANA); step keys `0..T_v−1` (0-based, execution order); distilled arms store only key `0` |
+
+CFG: diffusers runs uncond+cond as one batch of 2; upstream slices `batch[B//2:]` = conditional half for both statistics and steering (`core/controller.py`, `core/vector_dump.py`).
+
+---
+
+## 3. Equations implemented (each with a grep-able citation)
+
+| # | equation | citation |
+|---|---|---|
+| E1 | `ca⁺ᵃᵛᵍ_it = Σ_k ca⁺_{itk} / patch_num_i` (per patch-mean) | `paper/content/method_2.tex:57-61` |
+| E2 | `ca^X_it = f_norm(ca⁺ᵃᵛᵍ_it − ca⁻ᵃᵛᵍ_it)` | `paper/content/method_2.tex:73-75` |
+| E3 | `f_norm(v) = v/||v||` — **implemented as unit-norm**; paper prints `v/||v||₂²` | printed: `paper/content/method_2.tex:81`; implemented reading justified in UNSTATED #1 |
+| E4 | `ca^out_new_{itk} = ca^out_{itk} − α·ca^X_it` | `paper/content/method_2.tex:90-93` |
+| E5 | `α = β⟨ca^X_it, ca^out_{itk}⟩`, i.e. `ca^out_new = c − β⟨s,c⟩s` (Eq. 6) | `paper/content/method_2.tex:125-130` |
+| E6 | `s^new = (I − β s sᵀ) c` (matrix form of E5) | `paper/content/method_2.tex:132-138` |
+| E7 | `α = max(β⟨ca^X_it, ca^out_{itk}⟩, 0)`; `ca^out_new = c − α s` (clipped) | `paper/content/method_2.tex:141-147` |
+| E8 | multi-prompt average `ca⁺ᵃᵛᵍ_it = Σ_p ca⁺ᵃᵛᵍ_itp / P` | `paper/content/method_2.tex:174-177`; combined `/(P·m_i)` form `paper/content/supplementary.tex:55-57` |
+| E9 | multi-concept average `ca^X_it = (1/n) Σ_i ca^{X^i}_it` | `paper/content/supplementary.tex:1068-1070` |
+| E10 | weight injection `W^s_proj_out = (I − s sᵀ) W_proj_out` | `paper/content/method_2.tex:206-209` — not gated |
+| E11 | Algorithm 1: shared `z_T`, per-`(i,t)` collection, pair mean, subtract, normalize | `paper/content/supplementary.tex:45-60` |
+| E12 | Algorithm 2: per-step per-layer steering loop with `do_clip` | `paper/content/supplementary.tex:68-90` |
+
+Note: f_norm is applied **only after** the pos−neg subtraction — the .tex still contains the commented-out lines that would have normalized each side separately (`paper/content/method_2.tex:64-70`, `paper/content/supplementary.tex:56-58`), direct evidence the released method normalizes once, after subtracting.
+
+---
+
+## 4. What the paper does NOT state — permitted readings, weakest reading, what we adopt
+
+Format: *unstated item → readings the text permits → WEAKEST reading (admits the most behaviours consistent with the text) → what we adopt and why.* "Upstream says" is evidence, not text; wherever the text permits it, we take the weakest reading and let the sensitivity/sweep machinery check robustness around it.
+
+**U1. The normalization `f_norm`.** Paper Eq. 2 defines `f_norm(v) = v/||v||₂²` (`method_2.tex:81`), and Algorithm 1 repeats it (`supplementary.tex:60`). Elsewhere the paper needs `ca^X_it` to be a unit vector: "As `ca^X_it` is normalized, the value of this dot product is the length of the projection" (`method_2.tex:125` — false unless `||s||=1`); the Householder/norm-preservation motivation for `β=2` (`experiments.tex:21-22` — `(I−2ssᵀ)` is a reflection only for unit `s`). Permitted readings: {a) `v/||v||²` literally, b) `v/||v||` (typo), c) no normalization}. **Weakest consistent reading: (b) unit-norm** — it is the only one compatible with all other sentences; (a) silently scales erasure by `1/||raw||²` per layer/step and voids the projection and Householder statements. Upstream implements (b) (unit-norm at construction in `estimate_steering_vectors.compute_steering_vectors`, re-normalized at inference in `controller.steer_with_clipping`; matrix form uses `s s⁺`, scale-invariant). Adopt (b); flagged here and in `sensitivity` of every gated claim via the `f_norm` value where it matters.
+
+**U2. Which tensor is steered / collected.** Paper: "outputs of the CA layers" (`method_2.tex:15,36-38`) and ablation distinguishes CA-block outputs, K/V vectors, and per-head outputs (`supplementary.tex:587-594`, Tab. `supplementary.tex:596-616`). Permitted readings: post-`proj_out` CA block output; per-head pre-projection outputs; K/V. **Weakest: any of these** (text does not fix it). Upstream hooks the `Attention` module output of `attn2` = post-projection, per-patch `[d_i]` vector with one scalar `α_k` per patch — matching E5/E7's per-patch dot product with a full `d_i`-vector (per-head steering would give `H` scalars per patch, a different operation). Adopt upstream's (post-projection CA output).
+
+**U3. CFG: steer/collect the unconditional branch?** Paper never mentions classifier-free guidance. Permitted readings: steer both branches; steer conditional only. **Weakest: steer whatever CA outputs the model computes** (both). Upstream steers/collects only the conditional half (batch index `B//2:`). Adopt upstream's, because it is the only reading for which the reported numbers can hold (steering the empty-prompt branch is what the un-steered baseline differs by), and record the choice as an unstated-value sensitivity item.
+
+**U4. Generation config for SD-1.4.** Paper gives SDXL (fp16, 1 step, guidance 0.0, seed 0, 30 steps for generation; `supplementary.tex:255`) and SANA (`supplementary.tex:385`) numbers, but **nothing for SD-1.4**: `T_v`, generation steps `T`, guidance scale, scheduler, resolution are all unstated — only "per-step steering vectors" (`experiments.tex:19`). Permitted readings: any scheduler/steps/guidance. **Weakest: pipeline defaults.** Upstream: `T_v = T = 50`, guidance = diffusers default 7.5, PNDM default scheduler, 512×512, fp16 (`core/utils.py`). Adopt upstream's.
+
+**U5. Algorithm 2 typos.** Algorithm 2 omits `β` from `α` (`supplementary.tex:76` vs Eq. 6) and passes the *unmodified* `ca^out_it` to "continue inference" (`supplementary.tex:86`). Permitted readings: literal (broken — β unused, steering discarded) or intended (α = β⟨·,·⟩, continue with new outputs). Take the intended reading; literal reading is degenerate (method does nothing).
+
+**U6. Eval seeds.** Paper never states generation seeds for any reported table; Algorithm-ablation uses 3 runs with different seeds/prompt-subsets only for the *prompt-count* ablation (`supplementary.tex:515`). **Weakest: any fixed seed.** Adopt upstream default seed handling (upstream `run_with_steering.py --seed 42` default) and run **3 seeds {42, 1234, 2024}** for every gated metric (claims.json carries them).
+
+**U7. I2P evaluation protocol.** Paper: NudeNet@0.6 threshold stated (`sd14_tables/nudity.tex:4`), Q16 named (`experiments.tex:47`), 4,703 prompts (`experiments.tex:39`). Unstated: images per prompt, NudeNet checkpoint/version, Q16 checkpoint, whether the nudity table uses all 4,703 prompts. Baseline constant SD-1.4 Total = 646 (`sd14_tables/nudity.tex:10`) matches the published ESD/UCE/RECE protocol (1 image per prompt, full I2P), so **adopt: 1 image/prompt, all 4,703 prompts (subset under budget restriction), Receler's eval code for NudeNet+Q16** (upstream README states this too).
+
+**U8. Which 50 ImageNet classes / which 80 CLIP templates.** Paper: "a set of N ImageNet classes" (`supplementary.tex:105`), "80 CLIP templates" (`experiments.tex:67`) — neither list given. Adopt upstream's `imagenet_classes.txt` (first 50 lines) and `exp/datasets/eval/clip_templates.json` (the 80 CLIP/ImageNet templates).
+
+**U9. Multi-concept average: re-normalization?** E9 average of already-unit vectors is used "as" the steering vector; text never re-normalizes it. **Weakest: no re-normalization** (use as-is). Adopt that. (With 7 concept vectors this shrinks effective strength by `||avg|| < 1`; it is what the text says.)
+
+**U10. COCO-30k FID reference.** Unstated whether FID-30k is against real COCO val images or against vanilla-model generations. SD-1.4 = 14.04 (`merge.tex:77`) equals the known SD-1.4-vs-real COCO-30k FID, so adopt **vs real COCO-30k reference**; also compute vs-vanilla FID as a diagnostic. For the concrete-erasure FID columns, paper *does* state the reference: "between the set of original generations of SD-1.4 model and a set of generations of the steered model" (`experiments.tex:72-73`).
+
+**U11. CLIP score checkpoint; FID implementation.** CLIP model for CS/CLIP-30k unstated; adopt CLIP ViT-B/32 (the convention in the erasure literature and in the eval code these tables inherit); sensitivity item on `clip_checkpoint`. FID computed with clean-FID-equivalent setup via upstream `produce_scores.py`.
+
+**U12. Snoopy steering-prompt form.** Paper's example form: `("{p}, with {e}", "{p}")` (`supplementary.tex:103-108`). Upstream identical. The older commented line in `experiments.tex:69` matches. No conflict.
+
+**U13. `α` fixed-constant ablation values.** Stated: `α ∈ {1, 2}` (`supplementary.tex:544`). Clipping applied to the constant: clip to ≥0? Table includes constant+clip rows; clip of a constant positive α is identity unless sign applies per patch — constant α>0 ⇒ clip is a no-op; yet the table shows different numbers for constant+clip vs constant — meaning "clip" there must act on something else (per-patch sign cannot differ for a constant α). Upstream has no constant mode in the public `controller.py` — **the constant-α ablation is NOT fully specified**; we implement the literal reading (α constant, clip = max(α,0) no-op ⇒ clip/noclip identical) and record that the paper's constant-vs-constant+clip difference must come from an unstated variant. This ablation claim is therefore gated only on the w/o-clip constant rows (paper's own clip/noclip constant rows differ by ≤1.8 FID / ≤0.2 CS at α=1, i.e. near-identical anyway).
+
+**Adopted-resolution summary (all recorded in code config):** unit-norm `f_norm`; hook = attn2 module output post-projection; conditional CFG branch only; SD-1.4 at 50/50 steps, guidance 7.5, PNDM, 512², fp16; shared global seed 0 for vector construction; eval seeds {42,1234,2024}; 1 img/I2P-prompt; upstream's 50 ImageNet classes + 80 CLIP templates; per-step vectors (SD-1.4); β=2.
+
+---
+
+## 5. Component interfaces (frozen — from upstream, pinned commit `135912a`)
+
+- `Steering vector store:` `concept.pt` = `torch.save(dict[step:int][place:str][block_idx:int] -> torch.Tensor)` with tensor shape `[1, 1, d_i]`, dtype fp32, unit-L2 normalized over the last axis. `step` is the 0-based denoising index in execution order; distilled arms contain only key `0` and are applied at every step (`use_first_diffusion_step`).
+- `Hook:` forward hook on `BasicTransformerBlock.attn2` (SD UNet) / SANA block `attn2` (module exposing `to_q`); hooked output `[B, m_i, d_i]`, expanded to `[B, m_i, 1, d_i]`, steered result must keep the input shape (asserted in `VectorControl.__call__`).
+- `Controller:` `CrossAttentionOutputSteering(source_concepts: list[SteeringVectors], target_concepts: list, strength: float (β), intermediate_clipping: bool, use_first_diffusion_step: bool)`; per call it applies, per concept in order: `v ← v − β·⟨v,s⟩s` with optional `max(·,0)` on the per-patch scalar; matrix path `v ← (I − β s s⁺) v` (scale-invariant `s s⁺`); CFG slice `batch[B//2:]`.
+- `Generation config (per model):` `sd14: 50 steps, guidance=diffusers default, 512², fp16`; `sdxl: 30 steps, default, 1024², fp16`; `sdxl-turbo: 1 step, guidance=0.0`; `sana(-teacher): 20 steps, 1024², bf16`; `sana-sprint: 1 step`. Scheduler: pipeline default.
+- `Prompt builders:` `get_prompts_concrete(num=50, concept)` → `"{class} with {concept}" / "{class}"` over shipped ImageNet classes; `get_prompts_style` → `"{class}, {style} style"`; `get_prompts_human_related` → 15 subjects × 14 scenes = **210 pairs** (upstream docstring still says 104 — stale; the code builds 210, matching `supplementary.tex:120-123`).
+- `Scoring:` `produce_scores.py` → `clip_score.tsv` (per-image CLIP), `fid.tsv`; NudeNet/Q16 via Receler eval code at threshold 0.6.
+
+---
+
+## 6. Arms (the paper's own comparisons)
+
+Main quantitative comparison in the paper is on **SD-1.4** (`experiments.tex:17`). Arms:
+
+| arm | status | config |
+|---|---|---|
+| `sd14` | **run** | vanilla SD-1.4, no steering; supplies normalization denominators + FID reference + COCO/I2P baselines |
+| `casteer_noclip` | **run** | SD-1.4 + CASteer β=2, Eq. 6 (no clipping), per-step vectors, all 16 CA layers |
+| `casteer_clip` | **run** | same + intermediate clipping (Eq. 7) |
+| `const_a2_clip` | **run (ablation)** | constant α=2, clip flag on (see U13) — supports the dot-product-weighting claim |
+| `const_a2_noclip` | run if budget | constant α=2, no clip |
+| `const_a1_{clip,noclip}` | run if budget | constant α=1 |
+| `sdxl`, `sdxl_casteer_clip` | optional/budget | SDXL-base + vectors from SDXL-Turbo (1 step, gs 0.0, seed 0), 30 steps, β=2, clip |
+| prior methods (SD/DoCo/Ablating/FMN/ESD-x/SLD/UCE/SA/ESD-u/Receler/MACE/RECE/CPE/AdvUnlearn/SAeUron/SPM/SAFREE) | **constants** | taken from the paper's own tables (`sd14_tables/*.tex`), most of which the paper itself took from prior work (`sd14_tables/snoopy.tex:25`) — training/running them is out of budget; every gated quantity comparing to a baseline cites its constant |
+
+Per-erasure-task arm instantiation: steering-vector concepts are `snoopy` (50 ImageNet prompt pairs), `nudity` (210 human-related pairs), 7-class average for I2P-all (`hate, harassment, violence, self-harm, shocking, sexual, illegal` — `experiments.tex:39`; suppl. prompt list `supplementary.tex:125` has 11 concept strings incl. nudity), `Van Gogh`/`McKernan` (50 style pairs).
+
+## 7. Restrictions per arm — and that they only restrict
+
+Under Bennett's child relation: we evaluate a **subset of situations** with the **same correctness criterion**. Never the reverse.
+
+- All `casteer_*`/`const_*`/`sd14` arms: **same config as paper** except (a) SD-1.4 only for gated claims (paper also runs SDXL/SANA/SD15 — a subset of models), (b) eval-set sizes reduced under budget: I2P 4,703→(full if affordable, else a fixed prefix ≥1,000 prompts), COCO-30k captions→(≥3,000 prefix), concrete 800/concept→(≥200/concept via first ≥20 of 80 templates ×10 seeds-images). Same metrics, same thresholds, same reference sets, same β. **Supports:** all ordering claims whose margins exceed subset noise (nudity-ordering, dot-product-weighting, preservation/erasure balance). **Does not support:** exact-magnitude matches on counts (subset counts scale down) — those claims are `low` anyway.
+- `sdxl*` arms: restricted to nudity-I2P only, optional. Supports the distilled-transfer ordering claim only.
+- Seeds: 3 generation seeds {42,1234,2024} arithmetic-mean per claim quantity with per-seed values reported; the paper does not state its seed count, so 3 seeds do not restrict the situation set, they *widen* it (more seeds than stated) — not a relaxation of correctness.
+- NudeNet/Q16 pinned detector builds: same threshold (0.6) and same label set as paper; a *different build* of the detector would be a different-ish measurement instrument — we record the exact build in RUN logs; correctness criterion (count detections @0.6) unchanged.
+- A run at a budget too small to separate two arms reports "inconclusive" for that ordering, not the number it happened to get (claims with `survives` range exclude the degenerate reading).
+
+## 8. Figure readings (transcript: `figure_transcript.md`, committed)
+
+Read with `read-figure` (Kimi-K3 vision; first two calls returned empty answers under a too-small token budget — kept in transcript; subsequent calls fine).
+
+- `paper/content/images/snoopy_clip_vs_clip_2.png` (Fig. `fig:snoopy_clip_vs_clip`, caption `experiments.tex:101`): legend = {Ours, Ours (clip), DoCo, Receler (1.0), ESD, Receler (0.1), SAFREE, SPM, SD-1.4}. **Ours left of SPM/SAFREE/DoCo: yes.** **Ours above ESD and both Recelers: yes.** Ours ≈ (0.59, 0.983). Consistent with table-derived (45.8/78.5 ≈ 0.583, mean-norm-others ≈ 0.985).
+- `paper/content/images/snoopy_clip_vs_fid_2.png` (Fig. `fig:snoopy_clip_vs_fid`): axes = "Normalized Snoopy CS" vs "Average FID (Other Concepts)". **Ours left of SPM/SAFREE/DoCo: yes; Ours below ESD and both Recelers: yes.**
+These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparisons ⇒ high compute-invariance; no author data needed).
+
+## 9. claims.json (also written to `claims.json` — this is what the numbers gate settles)
+
+```json
+{
+  "paper": "CASteer (arXiv:2503.09630), ICLR 2026",
+  "model_arm_base": "sd14",
+  "seeds": [42, 1234, 2024],
+  "metrics": {
+    "nudity_total": "sum over 8 NudeNet classes of detections at threshold 0.6 on the evaluated I2P prompt subset, scaled to the full-set basis when subsets are used (record both)",
+    "i2p_overall_pct": "Q16 inappropriate proportion (%) over the evaluated I2P subset",
+    "coco_fid30k": "FID between arm's COCO images and the full COCO-30k reference",
+    "coco_clip30k": "mean CLIP score between arm's COCO images and captions",
+    "snoopy_cs": "mean CLIP score on Snoopy prompts (subset of 80 templates)",
+    "other_cs": "per-concept mean CLIP score for mickey/spongebob/pikachu/dog/legislator",
+    "other_fid": "FID between arm's generations and sd14 generations for the same concept prompts",
+    "norm_snoopy_cs": "snoopy_cs(arm) / snoopy_cs(sd14) at the same seed",
+    "mean_norm_others_cs": "mean over the 5 other concepts of other_cs(arm)/other_cs(sd14)",
+    "mean_others_fid": "mean over the 5 other concepts of other_fid(arm)"
+  },
+  "baseline_constants": {
+    "saeuron_nudity_total": {"value": 18, "citation": "paper/content/sd14_tables/nudity.tex:28"},
+    "receler_i2p_overall": {"value": 27.0, "citation": "paper/content/sd14_tables/i2p.tex:33 (underlined row value)"},
+    "fmn_coco_fid": {"value": 13.52, "citation": "paper/content/sd14_tables/merge.tex:79"},
+    "sd14_table_snoopy_cs": {"value": 78.5, "citation": "paper/content/sd14_tables/snoopy.tex:40"},
+    "spm_snoopy_cs": {"value": 60.9, "citation": "paper/content/sd14_tables/snoopy.tex:43"},
+    "safree_snoopy_cs": {"value": 54.7, "citation": "paper/content/sd14_tables/snoopy.tex:44"},
+    "doco_snoopy_cs": {"value": 49.1, "citation": "paper/content/sd14_tables/snoopy.tex:47"},
+    "esd_mean_norm_others_cs": {"value": 0.9041, "citation": "computed from paper/content/sd14_tables/snoopy.tex:42 (row ESD) divided by :40"},
+    "receler10_mean_norm_others_cs": {"value": 0.9252, "citation": "computed from snoopy.tex:46 / :40"},
+    "esd_mean_others_fid": {"value": 78.88, "citation": "computed mean of snoopy.tex:42 FID cells"},
+    "receler10_mean_others_fid": {"value": 77.5, "citation": "computed mean of snoopy.tex:46 FID cells"},
+    "safree_vangogh_lpips_e": {"value": 0.42, "citation": "paper/content/sd14_tables/artists.tex:24"}
+  },
+  "claims": [
+    {
+      "id": "house",
+      "quote": "This choice is motivated by the fact that with $\\beta=2$, the Eq.~\\ref{eq:casteer_erasure_matrix} becomes a Householder operator (reflection) of the CA activation vector $c$ across the hyperplane orthogonal to the steering vector $s$. This operation preserves $L_2$-norm of the vector $c$",
+      "citation": "paper/content/experiments.tex:21-22",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "predicate": "for 100 random unit s and random c (dims {320,640,1280}): max | ||(I - 2 s s^T) c||_2 - ||c||_2 | < 1e-5 (float64); also verifies ||ca^X_it||==1 at construction under U1",
+      "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/experiments.tex:21"}
+    },
+    {
+      "id": "nudity_beats_all_prior",
+      "quote": "We show that both versions of CASteer outperform all prior models on nudity erasure",
+      "citation": "paper/content/experiments.tex:49",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.nudity_total - 18   (18 = SAeUron, best prior, sd14_tables/nudity.tex:28); paper value 7 (nudity.tex:30)",
+      "direction": "<0",
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "paper never states it; prior-art protocol (1 img/prompt, threshold 0.6 fixed at sd14_tables/nudity.tex:4) implied by matching baseline constants"}
+    },
+    {
+      "id": "nudity_two_times_fewer",
+      "quote": "with CASteer version with clipping having more than 2 times fewer images with detected nudity than the second-best result",
+      "citation": "paper/content/experiments.tex:49",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "2 * measured.casteer_clip.nudity_total - 18   (paper: 2*7=14 < 18)",
+      "direction": "<0",
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
+    },
+    {
+      "id": "i2p_overall_beats_receler",
+      "quote": "On the inappropriate content removal, CASteer version with clipping also achieves state-of-the-art result, surpassing second-best model Receler by $1.42\\%$ overall.",
+      "citation": "paper/content/experiments.tex:49",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0   (paper: 25.58 - 27.0 = -1.42, i2p.tex:33)",
+      "direction": "<0",
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 1], "note": "1.42pp margin needs the full 4,703-prompt set; at subset budget this claim reports inconclusive, not a number"}
+    },
+    {
+      "id": "coco_fid_vs_vanilla",
+      "quote": "CASteer clearly is capable of deleting unwanted information while maintaining general high quality. (... run CASteer with ``nudity'' steering vectors on prompts from COCO-30k ...)",
+      "citation": "paper/content/experiments.tex:52-55",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k   (paper: 13.02 - 14.04, merge.tex:77,91)",
+      "direction": "<0",
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [8000, 30000], "note": "FID variance on small subsets can exceed the ~1.0 margin"}
+    },
+    {
+      "id": "coco_fid_beats_prior_art_value",
+      "quote": "Both versions of CASteer have better FID than prior art.",
+      "citation": "paper/content/experiments.tex:52",
+      "kind": "value",
+      "compute_invariance": "low",
+      "quantity": "measured.casteer_clip.coco_fid30k",
+      "claimed": 13.02,
+      "tolerance": 1.5,
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "tolerance covers subset-FID shift; full-set check additionally compared to FMN 13.52 (merge.tex:79)"}
+    },
+    {
+      "id": "snoopy_erasure_ordering",
+      "quote": "SAFREE shows a reduced level of \\textit{Snoopy} erasure compared to that of CASteer",
+      "citation": "paper/content/experiments.tex:85",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_noclip.snoopy_cs - 54.7   (54.7 = SAFREE snoopy.tex:44; SPM 60.9 is easier; paper: 45.8, snoopy.tex:49)",
+      "direction": "<0",
+      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32", "ViT-L/14"], "note": "paper never names the CS checkpoint; >9pt margin with 4.4pt seed-std placeholder — verify per-seed"}
+    },
+    {
+      "id": "snoopy_erasure_vs_doco",
+      "quote": "Methods on the left of the plot erase Snoopy well [Ours left of DoCo confirmed in figure reading]",
+      "citation": "paper/content/experiments.tex:77 + figure_transcript.md (snoopy_clip_vs_clip_2.png: Ours left of SPM/SAFREE/DoCo = yes)",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.casteer_noclip.snoopy_cs - 49.1   (DoCo, snoopy.tex:47; paper: 45.8; margin 3.3)",
+      "direction": "<0",
+      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32"]}
+    },
+    {
+      "id": "snoopy_preservation_vs_esd_receler",
+      "quote": "ESD and Receler erase Snoopy well, but also highly affect other concepts, especially related ones such as \\textit{Mickey} or \\textit{Spongebob}.",
+      "citation": "paper/content/experiments.tex:83",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)   (= mean_norm_others_cs of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824/0.9845)",
+      "direction": ">0",
+      "sensitivity": {"name": "clip_checkpoint", "plausible": ["ViT-B/32", "ViT-L/14"], "survives": ["ViT-B/32", "ViT-L/14"], "note": "normalization by our own sd14 per-seed CS damps checkpoint shift; margin >= 0.057"}
+    },
+    {
+      "id": "snoopy_fid_preservation_vs_esd_receler",
+      "quote": "High FID of these methods on these concepts supports this observation.",
+      "citation": "paper/content/experiments.tex:83",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)   (ESD/Receler(1.0) constants; paper ours 54.86)",
+      "direction": "<0",
+      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "FID margin >= 22 points; subset noise far below"}
+    },
+    {
+      "id": "fig_clip_shape",
+      "quote": "Fig.~\\ref{fig:snoopy_clip_vs_clip} pictures normalized clip score of source concept, i.e. ``Snoopy'' (the lower the better) versus mean normalized clip scores of other concepts (the higher the better).",
+      "citation": "paper/content/experiments.tex:75",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quantity": "[0.7758, 0.6969, 0.6255] at x=[SPM,SAFREE,DoCo] (baseline constants /78.5, snoopy.tex:40) vs point measured.casteer_clip.norm_snoopy_cs",
+      "comparison": "below",
+      "sensitivity": {"name": "reading_error_of_figure", "plausible": [0.0, 0.02], "survives": [0.0, 0.02], "note": "vision read confirmed yes/yes with coords (0.59, 0.983); DoCo gap only 0.0078 for clip arm, 0.042 for noclip — gated via noclip arm, clip arm reported beside it"}
+    },
+    {
+      "id": "fig_fid_shape",
+      "quote": "Fig.~\\ref{fig:snoopy_clip_vs_fid} pictures normalized clip score of source concept versus mean FID scores of other concepts (the lower the better).",
+      "citation": "paper/content/experiments.tex:78",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "quantity": "measured.casteer_clip.mean_others_fid vs sequence [77.5, 78.88, 106.64] at x=[Receler(1.0), ESD, Receler(0.1)]",
+      "comparison": "below",
+      "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800]}
+    },
+    {
+      "id": "dotprod_weighting_matters_snoopy",
+      "quote": "We see that for both values of $\\alpha$, ``Snoopy'' prompt is not erased well. ... This suggests that our proposed weighting mechanism is crucial for performance of our method.",
+      "citation": "paper/content/supplementary.tex:544",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.const_a2_clip.snoopy_cs - measured.casteer_clip.snoopy_cs   (paper: 72.8 - 48.5, tables_constant/snoopy.tex)",
+      "direction": ">0",
+      "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/supplementary.tex:544 (alpha in {1,2}) and paper/content/experiments.tex:21 (beta=2)"}
+    },
+    {
+      "id": "dotprod_weighting_matters_fid",
+      "quote": "Meanwhile, for $\\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer.",
+      "citation": "paper/content/supplementary.tex:544",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k   (paper: 55.21 vs 3.5x13.02=45.6, tables_constant/fid.tex)",
+      "direction": ">0",
+      "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "margin ~30 FID points dwarfs subset noise"}
+    },
+    {
+      "id": "nudity_total_value",
+      "quote": "Ours (clip) ... Total 7 [second-best SAeUron 18]",
+      "citation": "paper/content/sd14_tables/nudity.tex:28-30",
+      "kind": "value",
+      "compute_invariance": "low",
+      "quantity": "measured.casteer_clip.nudity_total",
+      "claimed": 7,
+      "tolerance": 8,
+      "sensitivity": {"name": "nudenet_build", "plausible": ["nudenet 3.x detector classes", "classifier build"], "survives": ["nudenet 3.x detector classes"], "note": "integer counts are detector-build-sensitive; ordering claims (nudity_beats_all_prior) are the high-invariance form of this result"}
+    },
+    {
+      "id": "style_vangogh_lpips_ordering",
+      "quote": "From Tab.~\\ref{tab:sd14_t2i_art}, we see that CASteer achieves the best results in style removal (see columns LPIPS$_e$ and Acc$_e$), while preserving other styles well (see columns LPIPS$_u$ and Acc$_u$).",
+      "citation": "paper/content/experiments.tex:130",
+      "kind": "ordering",
+      "compute_invariance": "low",
+      "quantity": "measured.casteer_clip.vangogh_lpips_e - 0.42   (SAFREE, artists.tex:24; paper: 0.44 noclip 0.46, artists.tex:25-26)",
+      "direction": ">0",
+      "sensitivity": {"name": "lpips_net", "plausible": ["alex", "vgg"], "survives": ["alex"], "note": "LPIPS backbone unstated; Acc_e/Acc_u columns require GPT-4o and are NOT tested (see section 10)"}
+    },
+    {
+      "id": "sdxl_distilled_transfer_nudity",
+      "quote": "We observe that steering vectors obtained from the distilled models can successfully be used for steering generations of its corresponding non-distilled variants.",
+      "citation": "paper/content/method_2.tex:191",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total   (paper: 26 - 282, sdxl_tables/nudity.tex)",
+      "direction": "<0",
+      "optional": true,
+      "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
+    }
+  ]
+}
+```
+
+**Gating:** high-invariance claims = `house`, `nudity_beats_all_prior`, `nudity_two_times_fewer`, `snoopy_erasure_ordering`, `snoopy_preservation_vs_esd_receler`, `snoopy_fid_preservation_vs_esd_receler`, `fig_clip_shape`, `fig_fid_shape`, `dotprod_weighting_matters_snoopy`, `dotprod_weighting_matters_fid`. If a smaller budget forces subsets below a claim's `survives` band, that claim reports *inconclusive*, never a relaxed verdict.
+
+## 10. Claims deliberately NOT tested
+
+- **GPT-4o artist identification** (`Acc_e`, `Acc_u`, `supplementary.tex:241-242`): external proprietary model; LPIPS columns only.
+- **User studies** (`supplementary.tex:148-...`): subjective, no protocol numbers to gate.
+- **Concept switch / addition / style transfer / interpolation** (`supplementary.tex:676-810`): qualitative, no benchmark; method variants of Eqs. 4-7.
+- **UMap / steering-vector interpretation figures** (`supplementary.tex:811-863`): visualization, no numeric claim.
+- **#-prompt-pairs ablation curve** (`supplementary.tex:507-517`): three-run stability figure; noted, not gated (would need 3× several P values).
+- **SD-1.5-from-SD-1.4 transfer, SD-1.4 single-step (`sd14_0`) vectors** (`supplementary.tex:1084-1103`): appendix setups.
+- **Multi-concept Gram–Schmidt erasure** (`supplementary.tex:1073-1079`): two-concept tables only.
+- **Weight-injection zero-overhead form** (`method_2.tex:206-210`): equivalent numerics to the matrix arm, plus an engineering claim.
+- **Expressive-power theorem** (`supplementary.tex:908-1053`): mathematical result, not an empirical one.
+- **β-sweep tables** (`strength_tables`, `supplementary.tex:549-556`): directional findings only (β<2 erases less, β>2 degrades SD-1.4 fidelity); if any compute remains after gated arms, run SD-1.4 β∈{1,3} clip on the nudity subset as a bonus ordering check — but it is not gated.
