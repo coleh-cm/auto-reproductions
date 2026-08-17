@@ -1,0 +1,643 @@
+{
+  "paper": {
+    "paper_ref": "2d009c8a-c609-4bbc-ac9c-81a5e7bf7e80",
+    "project_id": "06910d54-1d99-4864-8bff-ab3007a0c70e",
+    "arxiv_id": "2306.03819",
+    "title": "LEACE: Perfect linear concept erasure in closed form",
+    "source_dir": "paper/"
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "seed_role": "The paper fixes no RNG seeds anywhere in its text. These three seeds drive (a) dataset subsampling, (b) random-projection subspace draws, (c) MLM mask sampling. LEACE/SAL/INLP fits are closed-form or deterministic probes given the data, so seed variance measures data/mask/random-baseline variance only.",
+  "metrics": {
+    "gender_acc": "Test accuracy of a multinomial LogisticRegression gender probe fit on each arm's erased [CLS] embeddings (bert-base-uncased, last hidden layer), same split protocol in every arm.",
+    "majority_acc": "Majority-class frequency of the probe's test labels (the 'random accuracy' reference; the paper's dashed line is at 0.52, read off paper/figures/acc-vs-mse.pdf).",
+    "mse": "Mean over test examples of ||r(x) - x||_2^2, the mean squared edit distance (Euclidean; the paper's objective with M = I).",
+    "prof_acc": "Test accuracy of the logistic-regression profession classifier.",
+    "tpr_gap_rms": "RMS over professions y of GAP_female,y^TPR = P(Yhat=y | Y=y, female) - P(Yhat=y | Y=y, male), per paper formula at paper/main.tex:573-575.",
+    "tpr_corr": "Pearson correlation over professions between GAP_female,y^TPR and the fraction of women in profession y (fraction computed once from the full bios train split, seed-independent).",
+    "mlm_acc": "Sequence over 12 layers: top-1 accuracy over masked positions of bert-base-uncased MLM after a single-layer intervention at that layer (15% masking, 80/10/10, mask drawn per seed).",
+    "mlm_loss": "Sequence over 12 layers: mean cross-entropy over masked positions, same protocol.",
+    "mlm_drop": "Elementwise mlm_acc of amnesic_none minus mlm_acc of the arm (positive = damage).",
+    "bpb": "Language-modeling cross-entropy converted to bits per UTF-8 byte: mean nats per token x (tokens / bytes) / ln(2), the paper's Table 1 unit (paper/main.tex:656 text; conversion-ratio comment at paper/main.tex:637-639).",
+    "sig_after": "Max absolute entry of the empirical cross-covariance between erased features and one-hot labels on held-out synthetic data."
+  },
+  "arms": {
+    "synth_none": {
+      "description": "Synthetic Gaussian 3-class data (n=20000, d=32, class centers spread so a linear probe reaches >90% accuracy), no erasure. Restricts the population theory of paper Sec. 3-4 (paper/main.tex:330-531) to finite Gaussian samples; metric definitions unchanged.",
+      "config": {
+        "n": 20000,
+        "d": 32,
+        "k": 3,
+        "fit_fraction": 0.5
+      }
+    },
+    "synth_leace": {
+      "description": "LEACE eraser fit on synth train split: affine, plain sample covariance (Bessel 1/(n-1)), numerical-rank pseudoinverse, trace constraint on. Core method arm.",
+      "config": {
+        "method": "leace",
+        "affine": true,
+        "shrinkage": false,
+        "svd_tol": 0.0,
+        "constrain_trace": true
+      }
+    },
+    "synth_oracle": {
+      "description": "Oracle LEACE (OLS-residual eraser, paper/main.tex:1001-1003) on the same synthetic data.",
+      "config": {
+        "method": "oracle",
+        "shrinkage": false,
+        "svd_tol": 0.0
+      }
+    },
+    "synth_sal": {
+      "description": "Full-rank SAL: Q_SAL = I - U U^T, U = left singular vectors of Sigma_XZ at numerical rank (paper/main.tex:851). No bias term (paper/main.tex:664).",
+      "config": {
+        "method": "sal_full_rank",
+        "affine": false
+      }
+    },
+    "synth_leace_toy": {
+      "description": "LEACE on the exact 4-point distribution of the paper's oblique-optimality example (paper/main.tex:932-945). Deterministic; seeds nominal.",
+      "config": {
+        "method": "leace",
+        "affine": true,
+        "shrinkage": false,
+        "svd_tol": 0.0
+      }
+    },
+    "synth_sal_toy": {
+      "description": "Full-rank SAL on the same 4-point toy distribution (equals P_ortho of paper/main.tex:935-939).",
+      "config": {
+        "method": "sal_full_rank",
+        "affine": false
+      }
+    },
+    "bios_none": {
+      "description": "bias_in_bios biographies embedded as [CLS] of the last hidden layer of frozen bert-base-uncased; no erasure. Restricts the paper's bios experiment (paper/main.tex:541-542) only in sample size: per-seed subsample 60000 train / 20000 test bios (of 257540/99392). Metric definitions unchanged.",
+      "config": {
+        "model": "bert-base-uncased",
+        "layer": "last",
+        "pool": "cls",
+        "n_train": 60000,
+        "n_test": 20000
+      }
+    },
+    "bios_leace": {
+      "description": "LEACE (affine, plain covariance) erasing binary gender from the [CLS] embeddings. Rank 1 concept, matching rebuttal.tex:18 ('Our method is rank 1').",
+      "config": {
+        "method": "leace",
+        "affine": true,
+        "shrinkage": false,
+        "svd_tol": 0.0,
+        "constrain_trace": true,
+        "k": 2
+      }
+    },
+    "bios_inlp_r1": {
+      "description": "INLP, 1 iteration (one binary logistic-regression nullspace direction). Corresponds to the leftmost INLP point of paper/figures/acc-vs-mse.pdf (rank grid from rebuttal.tex:18).",
+      "config": {
+        "method": "inlp",
+        "iterations": 1,
+        "probe": "multinomial_logreg"
+      }
+    },
+    "bios_inlp_r50": {
+      "description": "INLP, 50 iterations (restriction of the paper's rank grid 1,4,8,16,32,50,64,100 from rebuttal.tex:18 to {1,50,100}).",
+      "config": {
+        "method": "inlp",
+        "iterations": 50,
+        "probe": "multinomial_logreg"
+      }
+    },
+    "bios_inlp_r100": {
+      "description": "INLP, 100 iterations; the paper's most aggressive INLP setting on this dataset.",
+      "config": {
+        "method": "inlp",
+        "iterations": 100,
+        "probe": "multinomial_logreg"
+      }
+    },
+    "bios_leace_refit": {
+      "description": "Same LEACE erasure as bios_leace, but the profession classifier is RE-FIT on the projected embeddings (paper/main.tex:578).",
+      "config": {
+        "method": "leace",
+        "affine": true,
+        "shrinkage": false,
+        "svd_tol": 0.0,
+        "refit_main_classifier": true
+      }
+    },
+    "amnesic_none": {
+      "description": "bert-base-uncased MLM on UD English EWT sentences, no intervention. Restricts the amnesic-probing setup (paper/main.tex:597-599) only in corpus size: per-seed subsample 4096 sentences for fitting statistics, 1024 for evaluation. All 12 layers, 18-way coarse POS concept, metrics unchanged.",
+      "config": {
+        "model": "bert-base-uncased",
+        "n_fit": 4096,
+        "n_eval": 1024,
+        "mask_rate": 0.15,
+        "mask_scheme": "80/10/10"
+      }
+    },
+    "amnesic_random": {
+      "description": "Random orthogonal projection whose null space has the same rank as the label space (18 directions), fresh per eval batch (paper/main.tex:599; fresh-per-minibatch sampling per paper/main.tex:668).",
+      "config": {
+        "method": "random_projection",
+        "rank": 18,
+        "fresh_per_batch": true
+      }
+    },
+    "amnesic_leace": {
+      "description": "LEACE erasing the 18-way POS concept from a single layer, swept over all 12 layers. Removes rank(Sigma_XZ) <= k-1 = 17 dimensions (paper/main.tex:599).",
+      "config": {
+        "method": "leace",
+        "affine": true,
+        "shrinkage": false,
+        "svd_tol": 0.0,
+        "constrain_trace": true,
+        "k": 18
+      }
+    },
+    "amnesic_inlp": {
+      "description": "INLP, 20 iterations with an 18-class probe per iteration; removes 20 x 18 = 360 dimensions (paper/main.tex:599).",
+      "config": {
+        "method": "inlp",
+        "iterations": 20,
+        "probe": "multinomial_logreg",
+        "k": 18
+      }
+    },
+    "scrub_none": {
+      "description": "Pythia-160m (GPT-NeoX) language modeling on a Pile-validation slice with POS tags, no intervention. Restricts the concept-scrubbing experiment (paper/main.tex:660-670) to 1 of 7 models and 2^20 fit + 2^20 eval tokens (paper used 2^22 + 2^22); hook point, unit (bpb), arms and metrics unchanged.",
+      "config": {
+        "model": "EleutherAI/pythia-160m",
+        "fit_tokens_exp": 20,
+        "eval_tokens_exp": 20,
+        "tagger": "en_core_web_trf"
+      }
+    },
+    "scrub_random": {
+      "description": "Random orthogonal projection erasing a random linear subspace of the same rank as the cross-covariance matrix, fresh subspace each minibatch, loss averaged over subspaces (paper/main.tex:668).",
+      "config": {
+        "method": "random_projection",
+        "rank": "rank(sigma_xz) per layer in {k-1, k}; paper admits both",
+        "fresh_per_batch": true
+      }
+    },
+    "scrub_leace": {
+      "description": "Concept scrubbing with LEACE at the input of each transformer block immediately after normalization (paper/main.tex:666), fit sequentially per Algorithm 1 (paper/main.tex:609-626), both sublayer norms scrubbed (upstream default).",
+      "config": {
+        "method": "leace",
+        "affine": true,
+        "shrinkage": false,
+        "svd_tol": 0.0,
+        "constrain_trace": true,
+        "sublayers": true
+      }
+    },
+    "scrub_sal": {
+      "description": "Concept scrubbing with full-rank SAL: no bias term, no whitening adjustment for feature correlations (paper/main.tex:664).",
+      "config": {
+        "method": "sal_full_rank",
+        "affine": false,
+        "sublayers": true
+      }
+    }
+  },
+  "claims": [
+    {
+      "id": "C1",
+      "quote": "Then given some affine function $r(\\xx) = \\mathbf{P}\\xx + \\mathbf{b}$, the modified random vector $r(\\rv X)$ linearly guards $\\rv Z$ if and only if the columns of the cross-covariance matrix $\\sxz$ are contained in the null space of $\\mathbf{P}$.",
+      "citation": "paper/main.tex:458",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "arm_role": "sanity (synthetic)",
+      "predicate": "all_seeds: (synth_leace.sig_after <= 0.01) and ((synth_none.probe_acc - synth_leace.probe_acc) > 0.5) and (abs(synth_leace.probe_acc - synth_none.majority_acc) <= 0.02)",
+      "settlement": "After LEACE, empirical cross-covariance is numerically zero and a linear probe falls from >90% to majority accuracy, on every seed.",
+      "sensitivity": {
+        "unstated": "svd_tol (rank truncation in the pseudoinverse/SVD steps)",
+        "plausible": [
+          0.0,
+          0.01
+        ],
+        "survives": [
+          0.0,
+          0.01
+        ],
+        "note": "Paper never truncates beyond the pseudoinverse; upstream default is 0.01. Verdict expected to hold across the whole interval; check at both endpoints."
+      }
+    },
+    {
+      "id": "C2",
+      "quote": "\\E \\|\\mathbf{P}_\\text{ortho}\\rv X - \\rv X\\|^2 = 2,\\quad\n\\E \\|\\mathbf{P}_\\text{oblique}\\rv X - \\rv X\\|^2 = 1",
+      "citation": "paper/main.tex:948-949",
+      "kind": "value",
+      "compute_invariance": "high",
+      "arm_role": "sanity (paper's own toy distribution, App. E)",
+      "quantity": "measured.synth_leace_toy.mse - measured.synth_sal_toy.mse",
+      "claimed": -1.0,
+      "tolerance": 0.01,
+      "settlement": "On the paper's 4-point example, LEACE reproduces the oblique edit MSE 1 and full-rank SAL (= P_ortho) gives 2, so the difference is exactly -1.",
+      "sensitivity": {
+        "fixed_by_paper": true,
+        "citation": "paper/main.tex:932-949"
+      }
+    },
+    {
+      "id": "C3",
+      "quote": "our method is the only to achieve random accuracy (perfect erasure) with a small edit",
+      "citation": "paper/main.tex:544",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "arm_role": "bios intrinsic",
+      "predicate": "all_seeds: abs(bios_leace.gender_acc - bios_none.majority_acc) <= 0.03",
+      "settlement": "Gender probe sits at majority accuracy after LEACE at every seed; 'random accuracy' is measured as our data's majority frequency (paper's dashed line read off the figure: 0.52).",
+      "sensitivity": {
+        "unstated": "svd_tol",
+        "plausible": [
+          0.0,
+          0.01
+        ],
+        "survives": [
+          0.0,
+          0.01
+        ],
+        "note": "Gender is rank 1; the dominant singular value of W Sigma_XZ is orders above both endpoints, so truncation choice cannot matter."
+      }
+    },
+    {
+      "id": "C4",
+      "quote": "our method is the only to achieve random accuracy (perfect erasure) with a small edit, although RLACE (but not INLP) comes close",
+      "citation": "paper/main.tex:544",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "arm_role": "bios intrinsic",
+      "quantity": "measured.bios_inlp_r1.gender_acc - measured.bios_none.majority_acc",
+      "direction": ">0",
+      "tolerance": 0.03,
+      "settlement": "At an edit size comparable to or smaller than LEACE's (INLP rank-1 MSE read off the figure as ~1.6 vs LEACE ~2.2), INLP still fails to erase: its residual probe accuracy exceeds majority by more than 0.03 at every seed.",
+      "sensitivity": {
+        "unstated": "inlp probe regularization C (sklearn default 1.0; paper silent)",
+        "plausible": [
+          0.1,
+          10.0
+        ],
+        "survives": [
+          0.5,
+          10.0
+        ],
+        "note": "INLP's nullspace direction depends on the probe, and the paper never states its settings; the verdict leans on this choice."
+      }
+    },
+    {
+      "id": "C5",
+      "quote": "At the same time, the TPR gap drops significantly from 0.198 to 0.084",
+      "citation": "paper/main.tex:578",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_leace.tpr_gap_rms - measured.bios_none.tpr_gap_rms",
+      "direction": "<0",
+      "settlement": "TPR-gap RMS of the gender-unaware (unrefit) profession classifier strictly decreases after LEACE erasure, at every seed.",
+      "sensitivity": {
+        "unstated": "train/test protocol of the profession classifier (paper never states splits; we use the dataset's own train/test)",
+        "plausible": [
+          0.5,
+          0.9
+        ],
+        "survives": [
+          0.5,
+          0.9
+        ],
+        "note": "Expressed as the train fraction a reader could have assumed; the direction is robust to any held-out protocol because both arms share it."
+      }
+    },
+    {
+      "id": "C6",
+      "quote": "this correlation plummets from 0.867 to 0.392 after erasure",
+      "citation": "paper/main.tex:578",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_leace.tpr_corr - measured.bios_none.tpr_corr",
+      "direction": "<0",
+      "settlement": "Pearson correlation between per-profession TPR gap and per-profession % women decreases after erasure at every seed. Medium: the statistic pools only 28 profession-level points, so subsampling noise is larger than for C5.",
+      "sensitivity": {
+        "unstated": "profession roster passed to the RMS/correlation (paper cites the bios dataset without listing professions)",
+        "plausible": [
+          28,
+          28
+        ],
+        "survives": [
+          28,
+          28
+        ],
+        "note": "All 28 professions of bias_in_bios kept; no restriction."
+      }
+    },
+    {
+      "id": "C7",
+      "quote": "The main-task classifier achieves profession-prediction accuracy of 77.3\\% on the projected embeddings (compared with 79.3\\% over the original embeddings)",
+      "citation": "paper/main.tex:578",
+      "kind": "value",
+      "compute_invariance": "low",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_none.prof_acc",
+      "claimed": 0.793,
+      "tolerance": 0.02,
+      "settlement": "Profession accuracy of the original classifier on original embeddings.",
+      "note": "Low: requires the paper's (unstated) exact split/classifier settings and full-data statistics."
+    },
+    {
+      "id": "C8",
+      "quote": "The main-task classifier achieves profession-prediction accuracy of 77.3\\% on the projected embeddings (compared with 79.3\\% over the original embeddings)",
+      "citation": "paper/main.tex:578",
+      "kind": "value",
+      "compute_invariance": "low",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_leace.prof_acc",
+      "claimed": 0.773,
+      "tolerance": 0.02,
+      "settlement": "Profession accuracy of the original (unrefit) classifier applied to projected embeddings."
+    },
+    {
+      "id": "C9",
+      "quote": "yields a slightly higher main-task accuracy of 78.1\\%, at the price of significantly increasing the TPR gap to 0.158.",
+      "citation": "paper/main.tex:578",
+      "kind": "value",
+      "compute_invariance": "low",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_leace_refit.prof_acc",
+      "claimed": 0.781,
+      "tolerance": 0.02,
+      "settlement": "Profession accuracy after refitting the classifier on projected embeddings."
+    },
+    {
+      "id": "C10",
+      "quote": "At the same time, the TPR gap drops significantly from 0.198 to 0.084",
+      "citation": "paper/main.tex:578",
+      "kind": "value",
+      "compute_invariance": "low",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_none.tpr_gap_rms",
+      "claimed": 0.198,
+      "tolerance": 0.05,
+      "settlement": "TPR-gap RMS before erasure (magnitude claim; pairs with C5 which carries the direction)."
+    },
+    {
+      "id": "C11",
+      "quote": "At the same time, the TPR gap drops significantly from 0.198 to 0.084",
+      "citation": "paper/main.tex:578",
+      "kind": "value",
+      "compute_invariance": "low",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_leace.tpr_gap_rms",
+      "claimed": 0.084,
+      "tolerance": 0.05,
+      "settlement": "TPR-gap RMS after LEACE (magnitude claim)."
+    },
+    {
+      "id": "C12",
+      "quote": "yields a slightly higher main-task accuracy of 78.1\\%, at the price of significantly increasing the TPR gap to 0.158.",
+      "citation": "paper/main.tex:578",
+      "kind": "ordering",
+      "compute_invariance": "medium",
+      "arm_role": "bios fairness",
+      "quantity": "measured.bios_leace_refit.tpr_gap_rms - measured.bios_leace.tpr_gap_rms",
+      "direction": ">0",
+      "settlement": "Refitting the main classifier on the projected embeddings re-inflates the TPR gap relative to the unrefit classifier, at every seed. Medium: depends on the unstated probe regularization.",
+      "sensitivity": {
+        "unstated": "profession classifier regularization C",
+        "plausible": [
+          0.1,
+          10.0
+        ],
+        "survives": [
+          0.5,
+          2.0
+        ]
+      }
+    },
+    {
+      "id": "C13",
+      "quote": "Our intervention only mildly changes BERT LM accuracy and loss until layer 8, with the highest drop recorded in layer 11. INLP, in contrast, shows maximum effect at layer 6.",
+      "citation": "paper/main.tex:601",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "arm_role": "amnesic probing",
+      "predicate": "all_seeds: argmax_l(amnesic_none.mlm_acc[l] - amnesic_leace.mlm_acc[l]) == 11",
+      "settlement": "The LEACE single-layer intervention does its maximal MLM damage at layer 11 at every seed. (Figure on disk agrees: 'Ours' bottom is at layer 11 - figure-transcript.md.)",
+      "sensitivity": {
+        "unstated": "MLM masking protocol (rate/scheme; paper states only 'masked language modeling')",
+        "plausible": [
+          0.15,
+          0.15
+        ],
+        "survives": [
+          0.12,
+          0.3
+        ],
+        "note": "Only 0.15 (80/10/10) is a defensible reading of standard BERT MLM; survives estimated on wider rates."
+      }
+    },
+    {
+      "id": "C14",
+      "quote": "Our intervention only mildly changes BERT LM accuracy and loss until layer 8, with the highest drop recorded in layer 11. INLP, in contrast, shows maximum effect at layer 6.",
+      "citation": "paper/main.tex:601",
+      "kind": "invariant",
+      "compute_invariance": "high",
+      "arm_role": "amnesic probing",
+      "predicate": "all_seeds: argmax_l(amnesic_none.mlm_loss[l] - amnesic_inlp.mlm_loss[l]) == 6",
+      "settlement": "The INLP-20 intervention does its maximal MLM damage at layer 6 at every seed. (Figure on disk agrees: green INLP curve spikes at layer 6 - figure-transcript.md.)",
+      "sensitivity": {
+        "unstated": "MLM masking protocol",
+        "plausible": [
+          0.15,
+          0.15
+        ],
+        "survives": [
+          0.12,
+          0.3
+        ]
+      }
+    },
+    {
+      "id": "C15",
+      "quote": "We compare with a baseline intervention of a random orthogonal projection whose null space has the same rank as the label space (18).",
+      "citation": "paper/main.tex:599",
+      "kind": "curve",
+      "compute_invariance": "high",
+      "arm_role": "amnesic probing (figure-derived; paper/figures/bios_frozen_bert_layer_vs_drop_in_acc.pdf shows 'Random' flat near 'No Intervention' with 'Ours' below it)",
+      "quantity": "measured.amnesic_leace.mlm_drop - measured.amnesic_random.mlm_drop",
+      "x": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "comparison": "above",
+      "tolerance": 0.01,
+      "settlement": "The LEACE accuracy-drop curve stays above the random-projection drop curve at every layer (within 0.01), at every seed; i.e. the damage is attributable to the erased concept, not to deleting 17-18 dimensions.",
+      "sensitivity": {
+        "unstated": "random null-space rank (18 = k per main.tex:599 vs 17 = rank(Sigma_XZ) <= k-1; paper's amnesic text says 18)",
+        "plausible": [
+          17,
+          18
+        ],
+        "survives": [
+          17,
+          18
+        ]
+      }
+    },
+    {
+      "id": "C16",
+      "quote": "The specific numbers, however, depend on the erasure method used: SAL induces significantly larger increases in perplexity for all models we tested.",
+      "citation": "paper/main.tex:676",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "arm_role": "concept scrubbing",
+      "quantity": "measured.scrub_sal.bpb - measured.scrub_leace.bpb",
+      "direction": ">0",
+      "settlement": "On Pythia-160m, SAL concept-scrubbing perplexity strictly exceeds LEACE concept-scrubbing perplexity at every seed. Restriction: 1 of the paper's 7 models; the claim states 'for all models', so this arm supports one member of the universal.",
+      "sensitivity": {
+        "unstated": "covariance estimator (plain sample vs RMT-shrinkage; paper silent, upstream defaults to shrinkage)",
+        "plausible": [
+          0,
+          1
+        ],
+        "survives": [
+          0,
+          1
+        ],
+        "note": "0 = plain sample covariance, 1 = optimal linear shrinkage; gap (~0.7 bpb in the paper) is large enough that either estimator preserves the ordering. Also checked across sublayers in {block-input-only, both-norms}."
+      }
+    },
+    {
+      "id": "C17",
+      "quote": "While erasing a randomly selected subspace has little to no effect on language modeling performance, scrubbing away part-of-speech information induces a large increase in perplexity across all models",
+      "citation": "paper/main.tex:674",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "arm_role": "concept scrubbing",
+      "quantity": "measured.scrub_leace.bpb - measured.scrub_none.bpb",
+      "direction": ">0",
+      "settlement": "LEACE scrubbing increases perplexity over no intervention at every seed (positive = POS damage).",
+      "sensitivity": {
+        "unstated": "random/null-space rank (k-1 = rank(Sigma_XZ) per main.tex:668 'same rank as the cross-covariance matrix' vs k = 18 upstream)",
+        "plausible": [
+          17,
+          18
+        ],
+        "survives": [
+          17,
+          18
+        ]
+      }
+    },
+    {
+      "id": "C18",
+      "quote": "While erasing a randomly selected subspace has little to no effect on language modeling performance, scrubbing away part-of-speech information induces a large increase in perplexity across all models",
+      "citation": "paper/main.tex:674",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "arm_role": "concept scrubbing",
+      "quantity": "(measured.scrub_leace.bpb - measured.scrub_none.bpb) - (measured.scrub_random.bpb - measured.scrub_none.bpb)",
+      "direction": ">0",
+      "settlement": "The LEACE perplexity increase strictly exceeds the random-subspace increase at every seed: the effect belongs to the POS concept, not to the rank of the edit. (Paper's Pythia-160M gap: 1.89 vs 0.09 bpb.)",
+      "sensitivity": {
+        "unstated": "random/null-space rank (k-1 vs k)",
+        "plausible": [
+          17,
+          18
+        ],
+        "survives": [
+          17,
+          18
+        ]
+      }
+    },
+    {
+      "id": "C19",
+      "quote": "No intervention & 0.69           & 0.66       & 0.62          & 0.90          & 0.70            & 0.64          & 0.62           \\\\\nRandom erasure  & 0.69           & 0.66       & 0.62          & 0.99          & 0.72            & 0.66          & 0.63           \\\\\n\\midrule\nLEACE & 1.73           & 1.84       & 1.96          & 2.79          & 2.25            & 3.57          & 3.20              \\\\\nSAL   & 3.24           & 3.26       & 3.16          & 3.53          & 3.44            & 4.17          & 4.69             \\\\",
+      "citation": "paper/main.tex:647-651",
+      "kind": "value",
+      "compute_invariance": "low",
+      "arm_role": "concept scrubbing",
+      "quantity": "measured.scrub_leace.bpb",
+      "claimed": 2.79,
+      "tolerance": 0.8,
+      "settlement": "Pythia-160M LEACE-scrubbed perplexity in bits per byte. Low: restricted token budget (2^20 vs 2^22), fp32 vs unstated precision, and the unstated SpaCy tagger all move this magnitude; tolerance set wide enough to reflect that.",
+      "note": "Companion magnitudes: scrub_none 0.90, scrub_random 0.99, scrub_sal 3.53 (same table cells); evaluated at the same tolerance 0.8 (0.15 for scrub_none)."
+    },
+    {
+      "id": "C20",
+      "quote": "\\rv X'_{\\mathrm{LEACE}} = \\rv X - \\sxz \\szz^+ \\big( \\rv Z - \\E[\\rv Z] \\big).",
+      "citation": "paper/main.tex:1002",
+      "kind": "ordering",
+      "compute_invariance": "high",
+      "arm_role": "sanity (synthetic)",
+      "quantity": "measured.synth_oracle.mse - measured.synth_leace.mse",
+      "direction": "<0",
+      "settlement": "Oracle LEACE, which sees the labels at erasure time, makes a strictly smaller edit than label-blind LEACE on synthetic Gaussian data ('we can achieve an even more surgical edit', paper/main.tex:988), at every seed.",
+      "sensitivity": {
+        "unstated": "svd_tol",
+        "plausible": [
+          0.0,
+          0.01
+        ],
+        "survives": [
+          0.0,
+          0.01
+        ]
+      }
+    }
+  ],
+  "not_tested": [
+    {
+      "claim": "RLACE 'comes close' to random accuracy on bios (figure-only; min RLACE accuracy read as 0.54)",
+      "citation": "paper/main.tex:544",
+      "reason": "RLACE requires reimplementing Ravfogel et al.'s gradient-based adversarial game, whose hyperparameters the paper does not restate; the claims this reproduction tests rest on LEACE vs INLP/SAL/random, not on RLACE. Deliberately excluded."
+    },
+    {
+      "claim": "'our method is around 2 orders of magnitude faster, and does not require gradient-based optimization'",
+      "citation": "paper/main.tex:544",
+      "reason": "Wall-clock claim; environment-dependent, no stated protocol. Untestable as a reproduction verdict here."
+    },
+    {
+      "claim": "LLaMA 7B/13B/30B and Pythia 1.4B/6.9B/12B scrubbing magnitudes and trends",
+      "citation": "paper/main.tex:645-653",
+      "reason": "No GPU in this environment and LLaMA weights are license-gated; restricted to Pythia-160m as documented per-arm."
+    },
+    {
+      "claim": "Sequential fitting (Algorithm 1) vs naive independent per-layer fitting: naive 'may fail to fully erase'",
+      "citation": "paper/main.tex:633",
+      "reason": "Hedged ('may'); no quantitative statement to settle."
+    },
+    {
+      "claim": "Stacked-classifier leak footnote (softmax probabilities of the refit classifier leak the concept to a second stacked classifier)",
+      "citation": "paper/main.tex:578",
+      "reason": "Footnote aside citing ravfogel2022linear; nonlinear stacking is outside the linear-guardedness scope and not part of the paper's main comparisons."
+    },
+    {
+      "claim": "Unigram-entropy baseline rows (2.90 / 2.66 bpb)",
+      "citation": "paper/main.tex:653",
+      "reason": "Contextual baseline, not a property of the method; not gated."
+    },
+    {
+      "claim": "Norm-growth divergence observation ('we find this solves the divergence issue in practice')",
+      "citation": "paper/main.tex:972",
+      "reason": "No NaN events expected at Pythia-160m scale in 2^20-token eval; the trace-constraint branch may never fire. If it fires we log it; we do not gate on divergence."
+    }
+  ]
+}
