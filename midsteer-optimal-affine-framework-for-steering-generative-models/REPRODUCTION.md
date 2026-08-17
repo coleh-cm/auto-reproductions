@@ -45,9 +45,18 @@ code** as the base implementation. No running code yet.
   G3 sharpened with the balanced-prior precision note; figure re-verification pass appended to
   `figure_reads/transcript.md` (Fig 2a re-confirmed "MiDSteer"; SDXL panel endpoint returned
   empty twice, C21 margins rest on the appendix table).
-- [ ] Vendor/clone upstream into the repo; get the smallest end-to-end case running
-  (E1 synthetic closed-form checks first — CPU-only, then E2 smallest model arm) and produce a
-  parsed number.
+- [x] Environment rung (2026-08-17): vendored upstream `https://github.com/Atmyre/MidSteer`
+  (HEAD `0f3b31e`) at the repo root; wrote `requirements.txt` (pinned, Python 3.13),
+  `Dockerfile` (CUDA 12.4 base), `README.md` quickstart, and `tests/test_environment.py`
+  (40-test import gate). Clean rebuild `uv venv --python 3.13 .venv && uv pip install
+  --python .venv -r requirements.txt` then `pytest tests/ -q` -> 40 passed. Committed as
+  `567249c` on the repro branch. Key choice: `clip` is provided by `clip-anytorch`
+  (OpenAI-CLIP fork with relaxed torch pins), not the PyPI `clip` clipboard tool — guarded
+  by `test_clip_is_openai_clip_not_clipboard`; `setuptools` pinned because clip-anytorch
+  imports `pkg_resources`. `SanaSprintPipeline` warning on `core.utils` import is benign
+  (SANA arms out of scope per §8).
+- [ ] Get the smallest end-to-end case running (E1 synthetic closed-form checks first —
+  CPU-only, then E2 smallest model arm) and produce a parsed number.
 - [ ] Adversarial review rounds against the paper until clean.
 - [ ] Readiness gates; publish.
 
