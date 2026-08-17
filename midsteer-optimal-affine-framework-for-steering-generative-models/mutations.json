@@ -1,0 +1,42 @@
+[
+  {
+    "covers": ["core", "sign"],
+    "file": "midsteer_core/affine.py",
+    "find": "Q2 = Wp @ (u1 - u2) @ u1_pinv @ W                  # [H, d, d]",
+    "replace": "Q2 = Wp @ (u2 - u1) @ u1_pinv @ W                  # [H, d, d]  (MUTANT: sign flipped)",
+    "must_fail": "tests/test_core.py::test_midsteer_sign_matches_eq23_beta1",
+    "what": "flips the MidSteer update direction so compose_A(midsteer_update(...),1) no longer equals I + Wp (u2-u1) pinv(u1) W (Eq.23, beta=1)"
+  },
+  {
+    "covers": ["degeneracy", "core"],
+    "file": "midsteer_core/affine.py",
+    "find": "    return I - beta * update\n",
+    "replace": "    return I - (beta + 0.5) * update  # MUTANT: degeneracy broken\n",
+    "must_fail": "tests/test_degeneracy.py::test_beta_zero_affine_is_identity_exactly",
+    "what": "breaks the no-op: beta=0 no longer gives identity (A = I - 0.5*update)"
+  },
+  {
+    "covers": ["core", "stats"],
+    "file": "midsteer_core/stats.py",
+    "find": "    cov = S_sym / (state.n - 1)",
+    "replace": "    cov = S_sym / state.n  # MUTANT: biased (population) estimator",
+    "must_fail": "tests/test_core.py::test_welford_matches_torch_cov",
+    "what": "uses the biased (n) denominator instead of the unbiased (n-1) the paper specifies (paper/content/suppl.tex:48)"
+  },
+  {
+    "covers": ["core", "bias"],
+    "file": "midsteer_core/affine.py",
+    "find": "    return mu - (A @ mu.unsqueeze(-1)).squeeze(-1)   # [H, d]",
+    "replace": "    return mu - (A @ mu.unsqueeze(-1)).squeeze(-1) + 0.001  # MUTANT: bias shifted",
+    "must_fail": "tests/test_core.py::test_bias_exact_for_nontrivial_A",
+    "what": "shifts b_hat by a constant so b_hat != mu - A mu (paper/main.tex:366-367)"
+  },
+  {
+    "covers": ["core", "leace"],
+    "file": "midsteer_core/affine.py",
+    "find": "    Q = Wp @ u @ u_pinv @ W                            # [H, d, d]",
+    "replace": "    Q = Wp @ u_pinv @ u @ W                            # [H, d, d]  # MUTANT: pinv arg order flipped",
+    "must_fail": "tests/test_core.py::test_leace_constraint_algebra",
+    "what": "flips the pinv argument order so Q is no longer the LEACE projector; A no longer annihilates Sigma_XZ"
+  }
+]

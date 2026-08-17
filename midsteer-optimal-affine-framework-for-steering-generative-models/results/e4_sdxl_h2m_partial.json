@@ -1,0 +1,178 @@
+{
+  "base": {
+    "0": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "1": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "2": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    }
+  },
+  "vanilla": {
+    "0": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "1": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "2": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    }
+  },
+  "leace_switch": {
+    "0": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "1": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "2": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    }
+  },
+  "midsteer": {
+    "0": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "1": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    },
+    "2": {
+      "horse_cs_on_horse": "BLOCKED",
+      "moto_cs_on_horse": "BLOCKED",
+      "horse_cs_on_moto": "BLOCKED",
+      "moto_cs_on_moto": "BLOCKED",
+      "cow_cs": "BLOCKED",
+      "cow_fid": "BLOCKED",
+      "pig_cs": "BLOCKED",
+      "pig_fid": "BLOCKED",
+      "dog_cs": "BLOCKED",
+      "dog_fid": "BLOCKED",
+      "legislator_cs": "BLOCKED",
+      "legislator_fid": "BLOCKED"
+    }
+  }
+}

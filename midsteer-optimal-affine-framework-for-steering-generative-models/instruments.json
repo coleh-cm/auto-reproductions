@@ -1,0 +1,65 @@
+{
+  "data_loader": {
+    "name": "load_model_activations (model-arm data loader)",
+    "what_it_decides": "whether the paper's own model+dataset is loaded (vs a synthetic fallback); raises BlockedException when no CUDA and/or no HF_TOKEN so a blocked arm is reported, not silently substituted",
+    "requires_tools": true,
+    "positive_test": "tests/test_data.py::test_synthetic_gaussian_psd_and_im_condition (fingerprint analog: synthetic stats are PSD and Sigma_XZ in Im(Sigma_XX)); real-load fingerprint asserts DATA_FINGERPRINTS[model_id] when CUDA+HF_TOKEN present (path not reachable in this sandbox)",
+    "negative_test": "tests/test_data.py::test_load_model_activations_raises_blocked_here (loader raises BlockedException in this CPU sandbox — proves it does NOT fall back to synthetic data)"
+  },
+  "judge_cs": {
+    "name": "LLM judge concept score (0-10)",
+    "what_it_decides": "per-text concept relevance score 0-10 via argmax over '0'..'10' token probabilities of Llama-3.1-8B-Instruct (paper/content/suppl.tex:423-436,438; experiments.tex:94)",
+    "requires_tools": true,
+    "positive_test": "tests/test_eval_metrics.py::test_judge_cs_argmax_positive (logits peak at '7' => 7.0)",
+    "negative_test": "tests/test_eval_metrics.py::test_judge_cs_argmax_negative (logits peak at '1' => 1.0); tests/test_eval_metrics.py::test_judge_cs_blocked_here (raises BlockedException, never fabricates)"
+  },
+  "clip_cs": {
+    "name": "CLIP score x100 (image concept score)",
+    "what_it_decides": "image concept relevance as cosine similarity x100 (paper/content/experiments.tex:103; backbone gap G11 default openai/clip-vit-base-patch32)",
+    "requires_tools": true,
+    "positive_test": "tests/test_eval_metrics.py::test_clip_cs_scale100_positive (sim 1.0 => 100.0)",
+    "negative_test": "tests/test_eval_metrics.py::test_clip_cs_blocked_here (raises BlockedException)"
+  },
+  "fid": {
+    "name": "Frechet Inception Distance (steered vs vanilla image sets)",
+    "what_it_decides": "distributional distance between steered and vanilla image sets (paper/content/experiments.tex:103; estimator gap G11)",
+    "requires_tools": true,
+    "positive_test": "tests/test_eval_metrics.py::test_fid_identical_is_zero_positive (identical stats => FID ~ 0)",
+    "negative_test": "tests/test_eval_metrics.py::test_fid_disjoint_is_large_negative (disjoint means => FID large); tests/test_eval_metrics.py::test_fid_blocked_here"
+  },
+  "detoxify_score": {
+    "name": "Detoxify RTP toxicity (mean probability)",
+    "what_it_decides": "mean Detoxify 'original' toxicity probability over continuations (paper/content/experiments.tex:96; gap G11/G15)",
+    "requires_tools": true,
+    "positive_test": "tests/test_eval_metrics.py::test_detoxify_mean_positive (mean [0.9,0.8] => 0.85)",
+    "negative_test": "tests/test_eval_metrics.py::test_detoxify_mean_raises_on_empty (no success on empty); tests/test_eval_metrics.py::test_detoxify_blocked_here"
+  },
+  "armorm_score": {
+    "name": "ArmoRM helpfulness",
+    "what_it_decides": "ArmoRM-Llama3-8B helpfulness attribute (paper/content/experiments.tex:96; gap G11)",
+    "requires_tools": true,
+    "positive_test": "tests/test_eval_metrics.py::test_armorm_mean_positive (mean [0.4,0.6] => 0.5)",
+    "negative_test": "tests/test_eval_metrics.py::test_armorm_blocked_here"
+  },
+  "bertscore_mmlu": {
+    "name": "BERTScore Precision/F1 on MMLU",
+    "what_it_decides": "BERTScore P/F1 between MMLU generations and references (paper/content/experiments.tex:98; backbone/subset gap G11)",
+    "requires_tools": true,
+    "positive_test": "tests/test_eval_metrics.py::test_bertscore_aggregate_positive (identical => 1.0)",
+    "negative_test": "tests/test_eval_metrics.py::test_bertscore_aggregate_raises_on_empty; tests/test_eval_metrics.py::test_bertscore_blocked_here"
+  },
+  "closed_form_invariants": {
+    "name": "closed-form affine invariant checker (claims C1-C3)",
+    "what_it_decides": "whether the affine maps satisfy the paper covariance constraints (Eqs.5/13/19) and minimal-disturbance on synthetic Gaussian data, and the erasure special case MidSteer==LEACE (paper/main.tex:461)",
+    "requires_tools": false,
+    "positive_test": "tests/test_invariants.py::test_c1_leace_constraint_zero_cov (||A Sxz||<1e-9); tests/test_invariants.py::test_c3_midsteer_matches_target_cov; experiments/run_e1_synth.py (full predicate incl. minimal-disturbance + vanilla special case)",
+    "negative_test": "tests/test_mutations.py (deliberate defects flip signs / break bias / break Welford and the named tests must fail)"
+  },
+  "evaluate_claims": {
+    "name": "claims evaluator (writes claims_result.json)",
+    "what_it_decides": "pass/fail/blocked verdict per claim against measured.json + results/e1_synth.json per the claims.json evaluation_rule",
+    "requires_tools": false,
+    "positive_test": "tests/test_claims_eval.py::test_ordering_satisfied_passes",
+    "negative_test": "tests/test_claims_eval.py::test_ordering_violated_fails; tests/test_claims_eval.py::test_blocked_metric_is_blocked; tests/test_claims_eval.py::test_empty_claims_raises; tests/test_claims_eval.py::test_metric_not_measured_blocked"
+  }
+}

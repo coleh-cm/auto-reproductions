@@ -149,3 +149,13 @@ def test_leace_constraint_algebra():
     # Cov(A X + b, Z) = A Cov(X, Z) = A sigma_xz  (population; mu=0, b constant)
     cov_after = (A @ sxz).squeeze(-1)
     assert torch.linalg.norm(cov_after) < 1e-8
+
+
+def test_bias_exact_for_nontrivial_A():
+    """b_hat = mu - A mu exactly (paper/main.tex:366-367 / :448) for a non-identity A."""
+    H, d = 2, 5
+    g = torch.Generator().manual_seed(31)
+    A = torch.randn(H, d, d, generator=g, dtype=torch.float64)
+    mu = torch.randn(H, d, generator=g, dtype=torch.float64)
+    b = affine.bias(mu, A)
+    assert torch.allclose(b, mu - (A @ mu.unsqueeze(-1)).squeeze(-1), atol=1e-12)

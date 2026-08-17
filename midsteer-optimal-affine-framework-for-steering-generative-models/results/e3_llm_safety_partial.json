@@ -1,0 +1,82 @@
+{
+  "base": {
+    "0": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "1": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "2": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    }
+  },
+  "vanilla": {
+    "0": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "1": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "2": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    }
+  },
+  "leace_switch": {
+    "0": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "1": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "2": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    }
+  },
+  "midsteer": {
+    "0": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "1": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    },
+    "2": {
+      "rtp": "BLOCKED",
+      "help": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "mmlu_bert_f1": "BLOCKED"
+    }
+  }
+}

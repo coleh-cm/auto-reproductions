@@ -1,0 +1,106 @@
+{
+  "base": {
+    "0": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "1": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "2": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    }
+  },
+  "vanilla": {
+    "0": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "1": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "2": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    }
+  },
+  "leace_switch": {
+    "0": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "1": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "2": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    }
+  },
+  "midsteer": {
+    "0": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "1": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    },
+    "2": {
+      "src_cs_on_src": "BLOCKED",
+      "tgt_cs_on_src": "BLOCKED",
+      "src_cs_on_tgt": "BLOCKED",
+      "tgt_cs_on_tgt": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "bertp_mmlu": "BLOCKED"
+    }
+  }
+}

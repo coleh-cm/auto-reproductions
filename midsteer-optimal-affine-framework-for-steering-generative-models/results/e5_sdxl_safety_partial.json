@@ -1,0 +1,82 @@
+{
+  "base": {
+    "0": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "1": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "2": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    }
+  },
+  "vanilla": {
+    "0": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "1": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "2": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    }
+  },
+  "leace_switch": {
+    "0": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "1": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "2": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    }
+  },
+  "midsteer": {
+    "0": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "1": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    },
+    "2": {
+      "viol_cs": "BLOCKED",
+      "peace_cs": "BLOCKED",
+      "unrel_cs": "BLOCKED",
+      "fid": "BLOCKED"
+    }
+  }
+}
