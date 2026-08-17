@@ -1,0 +1,28 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{caption}
+
+\begin{document}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/leace-plot.pdf}
+    \caption{LEACE projection on a toy dataset in 3 steps. First the data is whitened using the linear transformation $\mathrm{W} = (\Sigma_{\mathrm{XX}})^{-1/2}$, ensuring equal variance in all directions. It is then orthogonally projected onto $\mathrm{colsp}(\mathbf W \Sigma_{\mathrm{XZ}})^\perp$, guaranteeing linear guardedness. Finally, we unwhiten the data with the pseudoinverse $\mathrm{W}^{+}$ so that its covariance structure mimics the original.}
+    \label{fig:leace-viz}
+\end{figure}
+
+\begin{figure}[h!]
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/acc-vs-mse.pdf}
+    \caption{Gender prediction accuracy after debiasing against the mean squared distance of the debiased embedding from the original. Ours is the only method to achieve \emph{perfect} erasure on this dataset (dashed line), and does so with low MSE. For INLP and RLACE, each point corresponds to a different setting of the rank hyperparameter; from left to right the ranks are 1, 4, 8, 16, 32, 50, 64, and 100. Our method is rank 1.}
+  \end{minipage}\hfill
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/bios_frozen_bert_layer_vs_drop_in_acc.pdf}
+    \caption{Corrected version of Figure 3 in our submission, which had erroneously reported that BERT exhibited \emph{better} masked language modeling accuracy after a random subspace of its activations was ablated. One of our authors had accidentally transposed a digit in the ``No Intervention'' MLM accuracy, typing 0.892 in lieu of 0.928.}
+    \label{fig:enter-label}
+  \end{minipage}
+\end{figure}
+
+\end{document}

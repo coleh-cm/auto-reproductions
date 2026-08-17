@@ -1,0 +1,6 @@
+# Unpacked arXiv e-print (2306.03819): commit only the .tex/.bbl/.bib sources
+# and the rendered paper.html. Binaries/figures stay out of git history.
+eprint.tar.gz
+*.pdf
+*.sty
+figures/

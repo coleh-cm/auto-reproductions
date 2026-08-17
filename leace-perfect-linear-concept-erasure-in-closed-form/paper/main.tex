@@ -1,0 +1,1062 @@
+\documentclass{article}
+
+
+% if you need to pass options to natbib, use, e.g.:
+    \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2022
+
+
+% ready for submission
+% \usepackage{neurips_2022}
+
+
+% to compile a preprint version, e.g. for submission to arXiv, add add the
+% [preprint] option:
+% \usepackage[preprint]{neurips_2022}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{neurips_2023}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2022}
+
+\usepackage{todonotes}
+
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{thm-restate}
+\usepackage{cancel}
+\usepackage{graphicx} 
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables\textbf{}
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{relsize}
+\usepackage{wrapfig}
+\usepackage{xcolor}         % colors
+
+\usepackage[capitalize,nameinlink,noabbrev]{cleveref} % to emulate \autoref style
+
+\newcommand{\algorithmautorefname}{Algorithm}
+\usepackage{scrlfile}
+\PreventPackageFromLoading[]{algorithmic}
+\usepackage{algorithm}
+
+\newcommand{\bigO}{\ensuremath\mathcal{O}}
+
+\usepackage[noend]{algpseudocode}
+\algrenewcommand\algorithmicindent{0.5em}%
+% \renewcommand{\algorithmiccomment}[1]{\bgroup\hfill\textcolor{ForestGreen}{~#1}\egroup}
+% \newcommand\LONGCOMMENT[1]{%
+%   \hfill\#\ \begin{minipage}[t]{\eqboxwidth{COMMENT}}#1\strut\end{minipage}%
+% }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS\textbf{}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+%\newcommand{\propositionautorefname}{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+%\newcommand{\lemmaautorefname}{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+%\newcommand{\corollaryautorefname}{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+%\newcommand{\definitionautorefname}{Definition}
+
+
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+
+% MACROS
+
+\newcommand{\vbeta}{\boldsymbol \beta}
+\newcommand{\vtheta}{{ \boldsymbol \theta}}
+\newcommand{\vx}{\boldsymbol x}
+\newcommand{\vy}{\boldsymbol y}
+\newcommand{\vp}{\boldsymbol p}
+\newcommand{\vv}{\boldsymbol v}
+\newcommand{\ve}{\boldsymbol e}
+\newcommand{\q}{q_{\vtheta}}
+\newcommand{\majz}{\text{Maj}(\Z)}
+\newcommand{\f}{f_{\vtheta}}
+% Cross covariance matrix between X and Z
+\newcommand{\sxx}{\mathbf \Sigma_{\rv X \rv X}}
+\newcommand{\sxz}{\mathbf \Sigma_{\rv X \rv Z}}
+\newcommand{\swxz}{\mathbf \Sigma_{\mathbf{W} \rv X, \rv Z}}
+\newcommand{\swxwx}{\mathbf \Sigma_{\mathbf{W} \rv X, \mathbf{W} \rv X}}
+\newcommand{\szz}{\mathbf \Sigma_{\rv Z \rv Z}}
+\newcommand{\pwxz}{\mathbf P_{\mathbf{W}\sxz}}
+
+\newcommand{\optproblem}{
+    \begin{align*}
+        \mathop{\mathrm{argmin\:}}_{\substack{\mathbf{P} \in \mathbb{R}^{d \times d}}} \E \Big [ \big\| \mathbf{P}\rv X - \rv X \big\|^2_{\mathbf M} \Big ]\quad \mathrm{subject\:to}\:\: \mathrm{Cov}(\mathbf{P}\rv X, \rv Z) = \mathbf{0}
+    \end{align*}}
+
+\newcommand{\E}{\mathbb E}
+\newcommand{\Ltriv}{L_\tau}
+\newcommand{\Ltrivfull}{L_\tau^{(\rv Z, \loss)}}
+
+\newcommand{\range}{ \textsf{range}}
+\newcommand{\nullspace}{\textsf{null}}
+\newcommand{\fantope}{\mathcal{F}_k}
+\DeclareMathOperator*{\Pw}{\mathop{P_\W}}
+\newcommand{\spanmat}{\textsf{span}}
+\newcommand{\bertadv}{\textsf{BERT-adv}}
+\newcommand{\bertafinetuned}{\textsf{BERT-finetuned}}
+\newcommand{\bertafreezed}{\textsf{BERT-freezed}}
+\newcommand{\CLS}{\textsf{[CLS]}}
+
+\newcommand{\method}{R-LACE}
+\newcommand{\defeq}[0]{\mathrel{\stackrel{\textnormal{\tiny def}}{=}}}
+
+\usepackage[capitalize,noabbrev]{cleveref}
+\crefname{section}{\S}{\S\S}
+\Crefname{section}{\S}{\S\S}
+\crefname{table}{Tab.}{}
+\crefname{figure}{Fig.}{}
+\crefname{algorithm}{Alg.}{}
+\crefname{appendix}{App.}{}
+\crefname{lemma}{Lemma}{}
+\Crefname{theorem}{Theorem}{}
+\crefname{prop}{Proposition}{}
+\crefname{cor}{Corollary}{}
+\crefname{myexample}{Example}{}
+\crefname{align}{}{}
+\crefname{equation}{}{}
+\newcommand{\xmark}{\sffamily X}
+
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\xx}{\boldsymbol{x}}
+\newcommand{\aalpha}{\boldsymbol{\alpha}}
+\newcommand{\bbeta}{\boldsymbol{\beta}}
+
+\newcommand{\ttheta}{\boldsymbol{\theta}}
+
+\newcommand{\yy}{\boldsymbol{y}}
+\newcommand{\zz}{\boldsymbol{z}}
+\newcommand{\calY}{\mathcal{Y}}
+\newcommand{\xxn}{\xx_n}
+
+\newcommand{\inv}[1]{#1^{{-1}{}}}
+\newcommand{\link}[1]{\inv{g}\!\left(#1\right)}
+\newcommand{\rem}[1]{r(#1)}
+
+\newcommand{\entropy}{\mathcal{H}}
+\newcommand{\entropyy}{\mathcal{H}_{\yy}}
+
+\newcommand{\defn}[1]{\textbf{#1}}
+\newcommand{\yhat}{\widehat{y}}
+\newcommand{\projBComp}{{ {\footnotesize \textsf{proj}}_{ B_{\perp}}}}
+\newcommand{\lanullspace}{{ {\footnotesize \textsf{null}}}}
+\newcommand{\larange}{{ {\footnotesize \textsf{range}}}}
+\newcommand{\laconv}{{{\footnotesize \textsf{conv}}}}
+\newcommand{\yn}{y_n}
+\newcommand{\yyn}{y_n}
+\newcommand{\zn}{z_n}
+\newcommand{\zzn}{z_n}
+\newcommand{\Pbeta}{P_{\vbeta}}
+\newcommand{\qq}{q_{\vtheta}}
+
+\newcommand{\valpha}{\boldsymbol{\valpha}}
+\newcommand{\projk}{\mathcal{P}_k}
+\newcommand{\ynhat}{\widehat{y}_n}
+\let\iff\leftrightarrow
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{subfig}
+
+
+\newtheorem{prop}[theorem]{Proposition}
+
+    \theoremstyle{plain}
+    \newtheoremstyle{TheoremNum}
+        {\topsep}{\topsep}              %%% space between body and thm
+        {\itshape}                      %%% Thm body font
+        {}                              %%% Indent amount (empty = no indent)
+        {\bfseries}                     %%% Thm head font
+        {.}                             %%% Punctuation after thm head
+        { }                             %%% Space after thm head
+        {\thmname{#1}\thmnote{ \bfseries #3}}%%% Thm head spec
+    \theoremstyle{TheoremNum}
+    \newtheorem{reflemma}{Lemma}
+    
+\newtheorem{myexample}{Example}
+\newtheorem{myhypothesis}{Hypothesis}
+\newtheorem{myassumption}{Assumption}
+\newcommand{\rank}{\mathrm{rank}}
+\newcommand\BibTeX{B\textsc{ib}\TeX}
+
+\newcommand{\rv}[1]{{\mathrm{#1}}}
+\renewcommand{\R}{{\color{black} \mathbb{R}}}
+\newcommand{\X}{{\boldsymbol{ \rv{X}}}}
+\newcommand{\Y}{{\boldsymbol{\rv{Y}}}}
+\newcommand{\Z}{{\boldsymbol{\rv{Z}}}}
+\newcommand{\ZHAT}{{\boldsymbol{\rv{\widehat{Z}}}}}
+\newcommand{\mi}{{\color{black} \mathrm{I}}}
+\newcommand{\indj}{{\color{black} \mathcal{I}_j}}
+\newcommand{\indk}{{\color{black} \mathcal{I}_k}}
+\newcommand{\gapind}{{\color{black} \text{GAP}_{\text{ind}}}}
+
+
+\newcommand{\indji}{{\color{black} \indj[i]}}
+\newcommand{\indki}{{\color{black} \indk[i]}}
+
+\newcommand{\Vfam}{\color{black} \mathcal{V}}
+
+\newcommand{\YHAT}{{ \boldsymbol{ \rv{\widehat{Y}}}}}
+
+\newcommand{\sizey}{ \color{black} |\mathcal{Y}|}
+
+%\newcommand{\MIv}{{\color{black} \mathrm{I}_{\mathcal{V}}}}
+\newcommand{\MIv}[2]{{\color{black} \mi_{\mathcal{V}}\left(#1 \rightarrow #2\right)}}
+\newcommand{\CHvdelta}[2]{{\color{black} \mathrm{H}_{\mathcal{V}^{\delta}}\left(#1 \mid #2\right)}}
+\newcommand{\CHv}[2]{{\color{black} \mathrm{H}_{\mathcal{V}}\left(#1 \mid #2\right)}}
+
+\newcommand{\CHvuncond}[1]{{\color{black} \mathrm{H}_{\mathcal{V}}\left(#1\right)}}
+
+\newcommand{\Ivxz}{\color{black} \mi_{\mathcal{V}}(\X \to \Z)}
+\newcommand{\Ivxzdelta}{\color{black} \mi_{\mathcal{V}^{\delta}}(\X \to \Z)}
+\newcommand{\Ivyz}{\color{black}
+\mi_{\mathcal{V}^{\delta}}( \boldsymbol{\widehat{Y}} \to \Z)}
+
+\newcommand{\IYhatZ}{\color{black}
+\mi(\widehat{Y},\Z))}
+
+\newcommand{\dataset}{\color{black} {\mathcal{D}}}
+\newcommand{\datasetzero}{\color{black} \dataset_{Y=0}}
+\newcommand{\datasetone}{\color{black} \dataset_{Y=1}}
+\newcommand{\yset}{\boldsymbol{ \mathcal{Y}}}
+
+\newcommand{\Yhatprof}{\boldsymbol{ \widehat{Y}^{\text{prof}}}}
+\newcommand{\Yhatadv}{\boldsymbol{ \widehat{Y}^{\text{adv}}}}
+
+\newcommand{\Ivyzadv}{\color{black} I_{\mathcal{V}^{\delta}{}}(\color{black} \Yhatadv \to \Z)}
+\newcommand{\Ivyzprof}{\color{black} I_{\mathcal{V}^{\delta}{}}( \Yhatprof \to \Z)}
+\newcommand{\Iv}{\color{black} I_{\mathcal{V}^{\delta}}{}}
+\newcommand{\loss}{\color{black} \mathcal{L}}
+\newcommand{\entropyz}{\color{black} \mathcal{H}_{\Z}}
+\newcommand{\Vdelta}{\color{black} \Vfam^{\delta}}
+\newcommand{\softmax}{\color{black} \mathrm{Softmax}}
+
+\newcommand{\shauli}[1]{\textcolor{blue}{[Shauli: #1]}}
+\newcommand{\nora}[1]{\textcolor{purple}{[Nora: #1]}}
+\newcommand{\david}[1]{\textcolor{red}{[David: #1]}}
+\newcommand{\stella}[1]{\textcolor{purple}{[Stella: #1]}}
+
+
+\title{LEACE: Perfect linear concept erasure in closed form}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+\author{%
+Nora Belrose$^1$ \quad David Schneider-Joseph$^1$ \quad Shauli Ravfogel$^2$ \quad Ryan Cotterell$^3$ \\ \textbf{Edward Raff}$^4$\quad \textbf{Stella Biderman}$^{1,4}$ \\
+$^1$EleutherAI \quad $^2$Bar-Ilan University \quad $^3$ETH Zürich \quad $^4$Booz Allen Hamilton\\
+\texttt{\{nora,stella\}@eleuther.ai} \quad \texttt{david@davidsj.com}
+}
+
+\begin{document}
+
+
+\maketitle
+
+
+\begin{abstract}
+Concept erasure aims to remove specified features from an embedding. It can improve fairness (e.g. preventing a classifier from using gender or race) and interpretability (e.g. removing a concept to observe changes in model behavior). We introduce LEAst-squares Concept Erasure (LEACE), a closed-form method which provably prevents all linear classifiers from detecting a concept while changing the embedding as little as possible, as measured by a broad class of norms. We apply LEACE to large language models with a novel procedure called concept scrubbing, which erases target concept information from \emph{every} layer in the network. We demonstrate our method on two tasks: measuring the reliance of language models on part-of-speech information, and reducing gender bias in BERT embeddings. Our code is available at \url{https://github.com/EleutherAI/concept-erasure}.
+\end{abstract}
+
+\section{Introduction}
+
+The ability to prevent a machine learning system from using a specified concept is important for fairness and interpretability. 
+Popular notions of fairness require that protected attributes should not causally affect predictions \cite{kusner2017counterfactual, nilforoshan2022causal}, and interpretability research often estimates the causal effect of a concept by attempting to remove it from a model's internal activations \cite{elazar2021amnesic, ravfogel2021counterfactual, nikoulina2021rediscovery, dankers2022can, hernandez2021low}.
+
+What it means for a model $\mathcal M$ to ``use'' a concept $\rv Z$ is often vague and application-specific, but a necessary condition is that its outputs---and therefore its inputs and hidden states---should have significant \emph{mutual information} with $\rv Z$.\footnote{This follows from the fact that causal dependence is a special kind of statistical dependence \cite{pearl09causality}. By the data processing inequality, $\mathcal M$'s output can't have any more information about $\rv Z$ than its input or hidden states.} \textbf{Concept erasure} leverages this fact to limit $\mathcal M$'s use of $\rv Z$ \emph{without} finetuning or inspecting its parameters. Instead, we edit the input or hidden states $\rv X$ used by $\mathcal M$ to minimize the predictive $\mathcal V$-information $I_{\mathcal V}(\rv X \rightarrow \rv Z)$ \cite{xu2020theory}, a tractable lower bound on the mutual information $I(\rv X; \rv Z)$ which measures the degree to which classifiers from the family $\mathcal V$ can predict $\rv Z$. Intuitively, if no classifier in $\mathcal V$ can outperform a constant function at predicting $\rv Z$---a condition known as \textbf{guardedness}---then $\mathcal M$ can't use $\rv Z$ either, at least if $\mathcal V$ is expressive enough relative to $\mathcal M$.\looseness=-1
+
+In this work, we improve upon existing concept erasure techniques using a theory-driven approach. We focus on the case where $\mathcal V$ is the set of linear classifiers, and prove a previously unnoticed equivalence: a classification task is linearly guarded \emph{if and only if} every class has exactly the same mean feature vector (\cref{sec:theorems}). Leveraging this equivalence, we derive a simple necessary and sufficient condition for an affine transformation to produce linearly guarded features. We then identify the unique \emph{surgical} transformation in this family---the one that minimizes the mean squared distance from the original features with respect to \emph{all} norms induced by inner products, including the popular Euclidean and Mahalanobis norms. We name it \textbf{LEAst-squares Concept Erasure (LEACE)} (\cref{sec:leace}).
+
+While prior work has focused on preventing linear models from leveraging $\rv Z$, we aim to erase concepts from deep neural networks as well. Interpretability research has shown that networks can be usefully described as encoding features in linear subspaces \cite{elhage2021mathematical, nanda_othello_2023, wu2023interpretability}, suggesting that fundamentally nonlinear methods may not be necessary for successful erasure in DNNs. In light of this, we introduce a simple procedure called \textbf{concept scrubbing} (\cref{sec:concept-scrubbing}), which sequentially applies LEACE to the activations at each layer of a deep network.
+
+We empirically validate our proposals, demonstrating the superiority of LEACE for erasing gender bias from BERT embeddings (\cref{sec:fairness}), and using concept scrubbing to measure the extent to which large language models use part-of-speech information (\cref{sec:concept-scrubbing}).
+
+\section{Preliminaries}\label{sec:preliminaries}
+
+Consider a $k$-class classification task over jointly defined random vectors $\rv X$ (the input data) and $\rv Z$ (the one-hot labels), with $\rv X$ of finite first moment and taking values in $\mathbb R^d$, and $\rv Z$ taking values in $\mathcal Z = \{\mathbf z \in \mathbb \{0, 1\}^k\ \big|\ \|\mathbf z\|_1 = 1\}$\footnote{We frequently use the integer $j \le k$ to refer to the element of $\mathcal Z$ which is $1$ at the $j^\text{th}$ index and $0$ elsewhere.} with each $\mathbb P(\rv Z = j) > 0$. Let $\eta(\cdot; \vtheta): \mathbb R^d \to \mathbb R^k$ be a predictor chosen from a function class $\mathcal V = \{\eta(\cdot; \vtheta)\ |\ \vtheta \in \Theta\}$ (presumed to contain all constant functions) so as to minimize the expectation $\E \big[ \loss(\eta(\rv X), \rv Z) \big]$ of some $\loss: \mathbb R^k \times \mathcal Z \to [0, \infty)$ in a class $\mathfrak L$ of loss functions.
+
+We borrow the concept of \textbf{guardedness} from \citet{ravfogel2022linear}, who define it in terms of $\mathcal V$-information \citep{xu2020theory}. We opt for a slightly more general definition here, which is equivalent to theirs in the case of cross-entropy loss (see \autoref{guard-eqv-def}).
+
+\begin{definition}[Guardedness]\label{def:guardedness}
+Let $\rv X$, $\rv Z$, $\mathcal V$, and $\mathfrak L$ be as defined above, and let $\chi$ be the set of all random vectors of finite first moment taking values in $\mathbb R^d$, jointly defined with $\rv Z$.
+
+We say $\rv X$ $(\mathcal V, \mathfrak L)-$\textbf{guards} $\rv Z$ if, for all losses $\loss \in \mathfrak L$, it maximizes the minimum expected loss:
+\begin{equation*}
+    \rv X \in \mathop{\mathrm{argmax\:}}_{\substack{\rv X' \in \chi}} \inf_{\vtheta \in \Theta}\: \E \Big [ \loss(\eta(\rv X'; \vtheta), \rv Z) \Big ].
+\end{equation*}
+In other words, its conditional distribution $\mathbb P(\rv X \mid \rv Z = \cdot)$ is among the worst possible distributions for predicting $\rv Z$ from $\rv X$ using a predictor of the form $\eta(\cdot; \vtheta) \in \mathcal V$ and a loss function in $\mathfrak L$.
+\end{definition}
+
+\begin{definition}[Trivially Attainable Loss]\label{def:trivial_loss}
+The \textbf{trivially attainable loss} for labels $\rv Z$ and loss $\loss$ is the lowest possible expected loss available to a constant predictor $\eta(\mathbf{x}) = \mathbf {b}$:
+\begin{equation*}
+    \Ltriv = \inf_{\mathbf{b} \in \mathbb R^k} \E [\loss(\mathbf b, \rv Z)]
+\end{equation*}
+We will sometimes write it $\Ltrivfull$ in cases of possible ambiguity. If there is a specific constant predictor actually achieving this loss, we call it the \textbf{trivial predictor} $\eta_\tau = \eta_\tau^{(\rv Z, \mathcal L)}$.
+\end{definition}
+
+We examine this problem in the important case of loss functions $\loss: \mathbb{R}^k \times \mathcal{Z} \to [0, \infty)$ which are convex in the prediction $\eta(\mathbf{x})$, and linear predictors that take the functional form $\eta(\mathbf{x}; \mathbf b, \mathbf W) = \mathbf b + \mathbf{W}\mathbf{x}$, for some bias $\mathbf b \in \mathbb{R}^{k}$ and weight matrix $\mathbf W \in \mathbb{R}^{k \times d}$.
+
+\begin{definition}[Linear Guardedness]\label{def:linear-guardedness}
+
+If $\rv X$ $(\mathcal V, \mathfrak L)$-guards $\rv Z$, where $\mathfrak L$ is the class of nonnegative loss functions which are convex in their first argument, and $\mathcal V$ is the class of linear predictors $\eta(\mathbf{x}) = \mathbf b + \mathbf{W}\mathbf{x}$, we say that $\rv X$ \textbf{linearly guards} $\rv Z$.
+\end{definition}
+
+\section{Theoretical Results}
+\label{sec:theorems}
+
+Our primary theoretical result is that the following conditions are all equivalent:
+\begin{enumerate}
+    \item \label{cond:lin-guarded} The data $\rv X$ linearly guards the labels $\rv Z$. (\cref{def:linear-guardedness})
+    \item \label{cond:optimal-is-trivial} For all convex losses $\loss$, the trivially attainable loss is optimal on $(\rv X, \rv Z)$. (\cref{def:trivial_loss})
+    \item \label{cond:class-means-equal} The class-conditional mean vectors $\E[\rv X \mid \rv Z = i]$ are equal to the unconditional mean $\E[\rv X]$.
+    \item \label{cond:zero-cross-covar} Every component of $\rv X$ has zero covariance with every component of $\rv Z$.
+    \item \label{cond:statistical-parity} Every linear classifier evaluated on $\rv X$ exhibits statistical parity w.r.t. $\rv Z$. (\cref{statistical-parity})
+\end{enumerate}
+The equivalence of conditions \ref{cond:lin-guarded}, \ref{cond:optimal-is-trivial}, and \ref{cond:statistical-parity} is relatively straightforward to show, and the relevant theorems can be found in Appendices~\ref{app:guarded-to-trivial} and \ref{statistical-parity}. The other equivalences are proven below (cond. \ref{cond:class-means-equal} $\iff$ cond. \ref{cond:optimal-is-trivial} in \cref{sec:equality-sufficient} and \cref{sec:necessity}); cond. \ref{cond:class-means-equal} $\iff$ \ref{cond:zero-cross-covar} in \cref{sec:zero-covariance}).
+
+\subsection{Equality of Class Centroids Implies Linear Guardedness}\label{sec:equality-sufficient}
+
+The following result establishes the implication from condition \ref{cond:class-means-equal} to condition \ref{cond:optimal-is-trivial}.
+
+\begin{theorem}\label{equality-sufficient}
+    Suppose $\loss$ is convex in the linear prediction $\eta$. Then if each class-conditional mean $\E\big[\rv X\mid \rv Z = i\big]$ is equal to $\E\big[\rv X\big]$, the trivially attainable loss cannot be improved upon.
+\end{theorem}
+
+\begin{proof}
+Let $\eta(\mathbf{x}) = \mathbf{b} + \mathbf{Wx}$ be any linear predictor. By Jensen's inequality,\footnote{Specifically, its generalization to convex functions over $\mathbb R^k$. See \citep{ferguson1967statistics} p. 76.} the loss with $\eta$ evaluated on $\rv X$ is lower bounded by the loss with $\eta$ evaluated on the unconditional mean of the data $\E\big[\rv X\big]$:
+\begin{align*}
+    \E \Big[\loss(\eta, \rv Z)\Big]
+    = \mathbb E_{\rv Z} & \Big[ \E \Big[\loss(\eta, \rv Z) \big| \rv Z \Big] \Big] \\
+    \ge \mathbb E_{\rv Z} & \Big[ \loss\Big( \E \big[ \eta \big| \rv Z \big], \rv Z \Big) \Big] \tag{Jensen's inequality} \\
+    = \mathbb E_{\rv Z} & \Big[ \loss\Big( \mathbf b + \mathbf W \E \big[ \rv X \big| \rv Z \big], \rv Z \Big) \Big] \tag{linearity of $\eta$} \\
+    = \mathbb E_{\rv Z} & \Big[ \loss\Big( \mathbf b + \mathbf W \E \big[ \rv X \big], \rv Z \Big) \Big]. \tag{by assumption}
+\end{align*}
+
+This in turn is the loss of the constant predictor $\eta'(\mathbf{x}) = \mathbf b + \mathbf W \E \big[ \rv X \big]$. Since the trivially attainable loss is the best that can be achieved by a constant predictor, and \textit{every} predictor's loss is lower bounded by that of some constant predictor, we cannot improve upon the trivially attainable loss.
+\end{proof}
+
+Intuitively, this shows that the classifier's expected loss is lower-bounded by the loss it would receive if each data point were replaced with the centroid of its class. But, if these centroids are all equal, the loss can't be any lower than what we'd get if every data point were replaced with the \emph{global} mean $\E[\rv X]$. In that case, the data points are indistinguishable and we can't do better than $\mathbf W = \mathbf 0$.
+
+\subsection{Linear Guardedness Implies Equality of Class Centroids}\label{sec:necessity}
+
+We now prove the implication from condition \ref{cond:optimal-is-trivial} to condition \ref{cond:class-means-equal}. Condition \ref{cond:optimal-is-trivial} applies when the trivially attainable loss is optimal for \textit{all} convex losses, including cross-entropy loss in particular. And if it holds for cross-entropy loss, we now show that condition \ref{cond:class-means-equal}---the class centroids are equal---must follow. First a more general lemma:
+
+\begin{restatable}{lemma}{lemmanecessity}\label{necessity-lemma}
+    Suppose $\loss$ has bounded partial derivatives, which when off-category never vanish and do not depend on the category, i.e.
+        ${\partial \loss(\eta, z_1)}/{\partial \eta_i} = {\partial \loss(\eta, z_2)}/{\partial \eta_i} \neq 0$
+    for all categories $z_1, z_2 \neq i$. If $\E \big[\loss(\eta, \rv Z)\big]$ is minimized among linear predictors by the constant predictor $\eta(\mathbf{x}) = \mathbf{b^*} + \mathbf{W^*x}$ with $\mathbf W^* = \mathbf{0}$, then each class-conditional mean $\E\big[\rv X|\rv Z = i\big]$ is equal to $\E\big[\rv X\big]$.
+\end{restatable}
+
+\begin{proof}
+\label{app:necessity-proof}
+    The first-order optimality condition on the $i^\text{th}$ component of our parameters $\mathbf b$ and $\mathbf W$ yields the equations:
+    \begin{equation}\label{opt}
+        \E \Bigg[ \frac {\partial \loss(\eta, \rv Z)} {\partial \eta_i} \cdot \frac {\partial \eta_i} {\partial b_i} \Bigg] = 0 \quad \text{and} \quad \E \Bigg[ \frac {\partial \loss(\eta, \rv Z)} {\partial \eta_i} \cdot \frac {\partial \eta_i} {\partial \mathbf{W_i}} \Bigg] = \mathbf{0},
+    \end{equation}
+    where we have used the boundedness of $\loss$'s partial derivative and the finite first moment of $\frac {\partial \eta_i} {\partial b_i} = 1$ and $\frac {\partial \eta_i} {\partial \mathbf{W_i}} = \rv X$ to justify (via the Dominated Convergence Theorem) interchanging the derivative with the expectation.
+
+    Since $\eta$ is constant over all values of $\rv X$, and $\frac {\partial \eta_i} {\partial b_i} = 1$, the first equation in (\ref{opt}) reduces to:    
+    \begin{equation} \label{optBreduced}
+        \mathbb P(\rv Z=i) \frac {\partial \loss(\eta, i)} {\partial \eta_i} +
+            \mathbb P(\rv Z \neq i) \frac {\partial \loss(\eta, \neq i)} {\partial \eta_i} = 0,
+    \end{equation}
+    where $\frac {\partial \loss(\eta, \neq i)} {\partial \eta_i}$ is an abuse of notation denoting the off-category partial derivative, emphasizing its independence of the category $\rv Z$.
+
+    Similarly, the constancy of $\eta$ and the fact that $\frac {\partial \eta_i} {\partial \mathbf{W_i}} = \rv X$ reduces the second equation in (\ref{opt}) to:
+    \begin{equation} \label{optWreduced}
+        \mathbb P(\rv Z=i) \frac {\partial \loss(\eta, i)} {\partial \eta_i} \cdot \E \big[ \rv X \big| \rv Z = i \big] + \\
+        \mathbb P(\rv Z \neq i) \frac {\partial \loss(\eta, \neq i)} {\partial \eta_i} \cdot \E \big[ \rv X \big| \rv Z \neq i \big]
+        = \mathbf{0}.
+    \end{equation}
+    Solving for $\mathbb P(\rv Z = i) \frac {\partial \loss(\eta, i)} {\partial \eta_i}$ in (\ref{optBreduced}) and substituting in (\ref{optWreduced}) gives us:
+    \begin{equation*}
+        \mathbb P(\rv Z \neq i) \frac {\partial \loss(\eta, \neq i)} {\partial \eta_i} \cdot \Bigg(
+                    \E \big[ \rv X \big| \rv Z \neq i \big] -
+                    \E \big[ \rv X \big| \rv Z = i \big]
+        \Bigg) = \mathbf{0}.
+    \end{equation*}
+    If $\mathbb P(\rv Z \neq i) = 0$, then $\E[\rv X] = \E[\rv X|\rv Z = i]$ is trivially true. Otherwise, using the non-vanishingness of the off-category partial derivative $\frac {\partial \loss(\eta, \neq i)} {\partial \eta_i}$, division yields the equivalence of $\E \big[ \rv X \big| \rv Z = i \big]$ to $\E \big[ \rv X \big| \rv Z \neq i \big]$, and hence to the unconditional mean $\E \big[ \rv X \big]$.
+\end{proof}
+
+We now show that Lemma~\ref{necessity-lemma} applies to the widely used cross entropy loss:
+
+\begin{restatable}{theorem}{celosstheorem}\label{ce-loss-theorem}
+    If the class probabilities $\mathbb P(\rv Z = j)$ are all nonzero, and the trivially obtainable loss is optimal when $\loss(\eta, z) = - \log \frac {\exp(\eta_z)} {\sum_{i=1}^k \exp(\eta_i)}$, then each class has the same mean $\E\big[\rv X \big| \rv Z = z\big]$.
+\end{restatable}
+
+\begin{proof}
+    In this case, the trivial predictor ${\eta_\tau(\rv Z)}_j = \log(\mathbb P(\rv Z = j))$ exists, achieving the trivially obtainable loss, which we have assumed optimal. Furthermore, $\loss$ has on-category partial derivative ${\partial \loss(\eta, i)}/{\partial \eta_i} = {\exp(\eta_i)}/{\sum_{j=1}^k \exp(\eta_j)} - 1 \in (-1, 0]$, and nonvanishing off-category partial derivative ${\partial \loss(\eta, \neq i)}/{\partial \eta_i} = {\exp(\eta_i)}/{\sum_{j=1}^k \exp(\eta_j)} \in (0, 1)$, both bounded, so the conditions of Lemma \ref{necessity-lemma} apply.
+\end{proof}
+
+% For proofs, see Appendix~\ref{app:necessity-proof}.
+
+\subsection{Linearly Guarded Labels Have Zero Covariance with the Features}\label{sec:zero-covariance}
+
+The next theorem establishes the equivalence of conditions \ref{cond:class-means-equal} and \ref{cond:zero-cross-covar}.
+
+\begin{theorem}\label{zero-covariance}
+    Let $\rv X$ be a random vector taking values in $\mathbb R^d$ with finite first moment, and $\rv Z$ a random vector taking values in $\{0, 1\}^k$ with one-hot encoding, with each class probability $\mathbb P(\rv Z = j)$ being nonzero. Then the class-conditional means $\E[\rv X | \rv Z = j]$ are all equal to the unconditional mean $\E[\rv X]$ if and only if every component of $\rv X$ has zero covariance with every component of $\rv Z$, i.e. the cross-covariance matrix $\sxz$, whose $(i, j)^\text{th}$ entry is $\mathrm{Cov}(\rv X_i, \rv Z_j)$, is the zero matrix.
+\end{theorem}
+
+\begin{proof}
+    Since $\rv Z$ is one-hot, we can rewrite the $(i, j)^\text{th}$ entry of $\sxz$ as:
+    \begin{align*}
+        \E[\rv X_i \rv Z_j] - \E[\rv X_i] \E[\rv Z_j]
+        = \mathbb P(\rv Z = j) \Big( \E[\rv X_i | \rv Z = j] - \E[\rv X_i] \Big).
+    \end{align*}
+    As $\mathbb P(\rv Z = j) > 0$, it follows that $\E[\rv X_i | \rv Z = j] = \E[\rv X_i]$ if and only if $\mathrm{Cov}(\rv X_i, \rv Z_j) = 0$.
+\end{proof}
+
+We have thus established the equivalence of the first four conditions stated earlier. See Appendix~\ref{statistical-parity} for the last one, on statistical parity.
+
+% The following corollary is of some independent interest.
+
+%We can now derive the causal assumptions under which the linear guardedness of $(\rv X, \rv Z)$ implies that \emph{any} main-task linear classifier on $\rv X$ will be on-average fair with respect to $\rv Z$. We first prove a simple lemma:
+% If the main-task labels are imbalanced across different values of $\mathcal{Z}$, the above definition may be undesirable since classification error rates would be imbalanced.
+
+
+
+%\begin{corollary}\label{onehot-affine-corollary}
+%    The above theorem holds as long as $\rv Z$ uses some invertible affine transformation of the one-hot scheme for encoding categorical variables in real-valued vectors. For example $\{-1, 1\}$ may be used in place of $\{0, 1\}$.
+%\end{corollary}
+%
+%\begin{proof}
+%    By the linearity and mean translation invariance of cross-covariance with respect to each term, we have $\mathrm{Cov}(\mathbf{A} \rv X + \mathbf{a}, \mathbf{B} \rv Z + \mathbf{b}) = \mathbf{A}\mathrm{Cov}(\rv X, \rv Z)\mathbf{B}^T$. It immediately follows that $\sxz = \mathbf{0}$ is true in the one-hot encoding scheme if and only if it is true in any invertible affine transformation of the one-hot scheme, such as $\{-1, 1\}$.
+%\end{proof}
+
+\section{Least-Squares Concept Erasure}
+\label{sec:leace}
+In Section~\ref{sec:theorems} we saw that $\rv X$ linearly guards $\rv Z$ if and only if each component of $\rv X$ has zero covariance with each component of $\rv Z$. We will now characterize the set of affine transformations $r(\mathbf{x}) = \mathbf{P}\xx + \mathbf{b}$ such that $r(\rv X)$ linearly guards $\rv Z$.
+
+\begin{theorem}\label{erasure-family}
+    Let $\rv X$ and $\rv Z$ be random vectors taking values in $\mathbb R^d$ and $\mathbb R^k$ respectively, with $\rv X$ of finite first moment. Then given some affine function $r(\xx) = \mathbf{P}\xx + \mathbf{b}$, the modified random vector $r(\rv X)$ linearly guards $\rv Z$ if and only if the columns of the cross-covariance matrix $\sxz$ are contained in the null space of $\mathbf{P}$.
+\end{theorem}
+
+\begin{proof}
+    From Theorem~\ref{zero-covariance} we know that $r(\rv X)$ linearly guards $\rv Z$ if and only if $\mathrm{Cov}(r(\rv X), \rv Z)$ is the zero matrix. By the linearity property of cross-covariance, we have:
+    \begin{align*}
+        \mathrm{Cov}(r(\rv X), \rv Z) = \mathrm{Cov}(\mathbf{P}\rv X + \mathbf{b}, \rv Z) = \mathbf{P}\mathrm{Cov}(\rv X, \rv Z) = \mathbf{P}\sxz.
+    \end{align*}
+    Therefore, $r(\rv X)$ linearly guards $\rv Z$ if and only if $\ker(\mathbf{P}) \supseteq \mathrm{colsp}(\sxz)$.
+\end{proof}
+
+\textbf{Implications for prior work.}
+Notably, the above theorems imply that three previously proposed methods in the literature, Spectral Attribute Removal (SAL) \cite{shao-etal-2023-gold}, Mean Projection \cite{haghighatkhah2022better}, and Fair PCA \cite{kleindessner2023efficient}, are guaranteed to achieve linear guardedness given suitable hyperparameters. See Appendix~\ref{app:prior-work-optimality} for further discussion.
+
+\subsection{Derivation of LEACE}\label{sec:least-squares-soln}
+
+Theorem~\ref{erasure-family} is a very weak condition, which is far from identifying unique values for $\mathbf{P}$ and $\mathbf{b}$. In most applications, however, we'd like to make a ``small'' edit to $\rv X$ so that useful information contained in $\rv X$ is maximally preserved. We operationalize the notion of a small edit in terms of the mean squared norm $\E \| r(\rv X) - \rv X \|^2_{\mathbf M}$ defined by some positive-definite inner product $\mathbf M$,\footnote{Our proofs also include degenerate ``inner products'' where $\mathbf{M}$ is singular, and the associated seminorms.} which can be thought of as a local quadratic approximation to \textit{any} measure of divergence between $\rv X$ and $r(\rv X)$ (such as Kullback–Leibler divergence, for example). While we are primarily interested in the Euclidean ($\mathbf{M} = \mathbf{I}$) and Mahalanobis ($\mathbf{M} = \sxx^+$) norms, it will turn out that there is a \emph{single} erasure function that minimizes \emph{all} such norms simultaneously. We will see in Section~\ref{sec:concept-scrubbing} that ensuring edits are small in this sense provides substantial benefit to downstream task performance as compared to other methods which also guard the labels $\rv Z$.
+
+Below, we derive the optimal eraser under the assumption that $\rv X$ and $\rv Z$ are centered.
+
+\begin{restatable}{theorem}{thmltwooptimality}
+    \label{l2-optimality}
+    Let $\rv X$ and $\rv Z$ be centered random vectors taking values in $\mathbb R^d$ and $\mathbb R^k$ respectively, each of finite second moment. Let $\mathbf M \in \R^{d \times d}$ be a p.s.d. matrix defining a (possibly degenerate) inner product on $\mathbb R^d$: $\langle \mathbf{x}, \mathbf{y} \rangle_\mathbf{M} = \mathbf{x}^T\mathbf{My}$. Let $\sxx \in \mathbb R^{d \times d}$ be $\rv X$'s covariance matrix, and $\sxz \in \mathbb R^{d \times k}$ be the cross-covariance matrix of $\rv X$ and $\rv Z$. Let $\mathbf A^+$ denote the Moore-Penrose pseudoinverse of a matrix $\mathbf A$, and let $\mathbf A^{1/2}$ be the p.s.d. square root of a p.s.d. matrix $\mathbf A$. Then the objective
+    \optproblem
+    has the following solution:
+    \begin{align*}
+        \mathbf{P^*} = \mathbf{I} - \mathbf{W}^+ \pwxz\mathbf{W},
+    \end{align*}
+    where $\mathbf{W}$ is the whitening transformation $(\sxx^{1/2})^+$ and $\pwxz = (\mathbf{W}\sxz)(\mathbf{W}\sxz)^+$ is the orthogonal projection matrix onto $\mathrm{colsp}(\mathbf{W}\sxz)$.
+\end{restatable}
+
+\begin{proof}
+    See Appendices \ref{oct-10-proof} and \ref{covector-proof} for two independent proofs of Theorem~\ref{l2-optimality}.
+\end{proof}
+
+The above theorem assumes that the random vectors $\rv X$ and $\rv Z$ are centered, and does not include a bias term. Below we extend our results to the uncentered case, and derive the optimal bias $\mathbf{b^*}$.
+
+\begin{restatable}{theorem}{thmbiasterm}\label{bias-term}
+    Let $\rv X$ and $\rv Z$ be random vectors taking values in $\mathbb R^d$ and $\mathbb R^k$ respectively, each of finite second moment. Define $\mathbf{M}$ and $\mathbf{P^*}$ as in \autoref{l2-optimality} and $\mathbf{b^*} = \E[\rv X] - \mathbf{P^*}\E[\rv X]$. Then $(\mathbf{P^*}, \mathbf{b^*})$ minimizes $\E \big\|\mathbf{P}\rv X + \mathbf{b} - \rv X \big\|^2$, subject to $\mathrm{Cov}(\mathbf{P}\rv X + \mathbf{b}, \rv Z) = \mathbf{0}$.
+\end{restatable}
+
+\begin{proof}\label{app:bias-term}
+Let $\mathbf{P} \in \mathbb R^{d \times d}$ and define $\Tilde{\rv X} = \rv X - \E[\rv X]$ and $\mathbf{c} = \mathbf{P}\E[\rv X] + \mathbf{b} - \E[\rv X]$. Then,
+    \begin{align*}
+        \E \big\|\mathbf{P}\rv X + \mathbf{b} - \rv X \big\|^2_\mathbf{M}
+        &= \E \big\|(\mathbf{P}\Tilde{\rv X} - \Tilde{\rv X}) + \mathbf{c} \big\|^2_\mathbf{M} \\
+        & = \E \big\|\mathbf{P}\Tilde{\rv X} - \Tilde{\rv X} \big\|^2_\mathbf{M}
+          + 2\E \big[ \mathbf{P}\Tilde{\rv X} - \Tilde{\rv X} \big]^T \mathbf{M} \mathbf{c}
+          + \mathbf{c}^T \mathbf{M} \mathbf{c} \\
+        & = \E \big\|\mathbf{P}\Tilde{\rv X} - \Tilde{\rv X} \big\|^2_\mathbf{M}
+          + \mathbf{c}^T \mathbf{M} \mathbf{c},
+    \end{align*}
+    where we have eliminated the middle term because $\mathbf{P}$ is linear and $\E[\Tilde{\rv X}] = 0$.
+    Since $\mathbf{M}$ is p.s.d., our objective is minimized for $\mathbf{c} = \mathbf{0}$, i.e. $\mathbf{b} = \E[\rv X] - \mathbf{P}\E[\rv X]$. The problem thus reduces to choosing $\mathbf{P}$ so as to minimize $\E \big\|\mathbf{P}\Tilde{\rv X} - \Tilde{\rv X} \big\|^2_\mathbf{M}$ subject to $\mathrm{Cov}(\mathbf{P}\rv X + \mathbf{b}, \rv Z) = \mathrm{Cov}(\mathbf{P}\Tilde{\rv X}, \rv Z) = \mathbf{0}$, which \autoref{l2-optimality} shows occurs when $\mathbf{P} = \mathbf{P^*}$.
+\end{proof}
+
+Putting together Theorems \ref{l2-optimality} and \ref{bias-term} and rearranging, we arrive at the LEACE formula:
+\begin{align*}
+    r_{\mathrm{LEACE}}(\xx) &= \xx - \mathbf{W}^+ \pwxz\mathbf{W}\big (\xx - \E[\rv X] \big ) \tag{1} \label{eq:1}
+\end{align*}
+Intuitively, LEACE de-means and whitens $\xx$, projects onto the subspace responsible for correlations between $\rv X$ and $\rv Z$, then unwhitens the result. Finally, it subtracts this value from $\xx$, thereby surgically removing the linearly available information about $\rv Z$.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/leace-plot.pdf}
+    \caption{LEACE projection in 3 steps. First the data is whitened, ensuring equal variance in all directions. It is then orthogonally projected onto $\mathrm{colsp}(\mathbf W \sxz)^\perp$, guaranteeing linear guardedness. Finally, we unwhiten the data so that its covariance structure mimics the original.}
+    \label{fig:leace-proj}
+\end{figure}
+
+\subsection{Oblique Projections are Least-Squares Optimal}
+\label{sec:oblique}
+Prior work on linear concept erasure has assumed that erasure functions should be orthogonal projections \cite{ravfogel-etal-2020-null, ravfogel2022adversarial, shao-etal-2023-gold}, appealing to the well-known fact that an orthogonal projection of a point $\xx$ onto a subspace $U$ yields the nearest point in $U$ to $\xx$. But even in the case where $\rv X$ is centered, $r_{\mathrm{LEACE}}$ is \emph{not} an orthogonal projection in general. Orthogonal projection matrices are symmetric, and $\mathbf I - \mathbf{W}^+ \pwxz\mathbf{W}$ is only symmetric in the special case where $\pwxz$ and $\mathbf{W}$ commute. It is an \emph{oblique} projection however, since applying $\mathbf P^*$ twice yields the same result as applying it once: $(\mathbf P^*)^2 = \mathbf I - 2\mathbf W \pwxz \mathbf W^+ + \mathbf{W}^+ \pwxz\cancel{\mathbf{W}\mathbf{W}^+} \pwxz\mathbf{W} = \mathbf P^*$.
+
+Orthogonal projections are generally not least-squares optimal for concept erasure because the necessary and sufficient condition for linear guardedness, $\mathbf P \sxz = \mathbf{0}$, is a constraint on the \emph{nullspace} of $\mathbf{P}$, and not on its range. We may freely choose the range of the projection to minimize the mean squared distance, as long as we zero out $\mathrm{colsp}(\sxz)$. In Figure~\ref{fig:leace-proj}, an orthogonal projection would map all points onto the the dashed line, thereby preserving less of the variance of the original data than LEACE does (green line). See Appendix~\ref{app:oblique-optimality} for a concrete example.% and further discussion.
+
+\subsection{Extension to Continuous $\rv Z$}
+
+While not a focus of this work, it's worth noting that LEACE can also be applied to the setting where $\rv Z$ takes arbitrary values in $\mathbb R^k$, as long as we restrict ourselves to the ordinary least squares regression loss $\loss(\eta, \mathbf{z}) = \|\eta - \mathbf{z}\|^2_2$. In particular, the proofs of equivalence between conditions \ref{cond:lin-guarded} and \ref{cond:optimal-is-trivial} given in Appendix~\ref{app:guarded-to-trivial} make no categorical assumption on $\rv Z$, and the equivalence between the optimality of a zero weight matrix (condition \ref{cond:optimal-is-trivial}) and zero cross-covariance (condition \ref{cond:zero-cross-covar}) is well known in the OLS setting. We can then apply Theorems \ref{l2-optimality} and \ref{bias-term}, which also make no categorical assumption, to derive the same optimal affine eraser as in the categorical case.
+
+\section{Evaluation}\label{sec:evaluation}
+
+\subsection{Intrinsic Evaluation}
+
+Following \citet{ravfogel2022rlace} we evaluate the ability of our method to remove gender information from the last hidden layer of a frozen BERT model. We use the biographies dataset of \citet{DBLP:journals/corr/abs-1901-09451}, composed of short biographies annotated by both binary gender and profession. 
+We embed each biography with the \CLS\ embedding in the last layer of BERT, enforce the same-conditional-mean constraint to remove gender information from the \CLS\,, and then evaluate the performance of the model, after the intervention, on the main task of profession prediction. We compare our intervention with RLACE \cite{ravfogel2022rlace}, which uses gradient-based optimization to solve a linear concept-erasure adversarial game.
+
+\paragraph{Concept erasure results.} First, we evaluate the ability of logistic regression classifiers to recover the removed information. The results, presented in \cref{fig:bios-bert}, show that our method is the only to achieve random accuracy (perfect erasure) with a small edit, although RLACE (but not INLP) comes close.  At the same time, our method is around 2 orders of magnitude faster, and does not require gradient-based optimization. 
+
+\begin{wrapfigure}{r}{0.35\textwidth}
+    \centering
+    \includegraphics[scale=0.35, clip]{figures/acc-vs-mse.pdf}
+    \caption{Gender prediction accuracy after bias-removal projection versus the mean squared distance from the original embedding for INLP, RLACE, and LEACE on BERT embeddings.}
+    \label{fig:bios-bert}
+\end{wrapfigure}
+
+% \paragraph{Converged solution.} Inspecting the cosine similarity between the first eigenvector of our projection matrix and the RLACE projections of different rank, we observe that they are essentially identical, with cosine similarity greater than 0.999. This suggests that the adversarial game proposed in \citet{ravfogel2022rlace} converges to our linearly optimal solution, modulo multiplicative terms. Note however that our approach is many times faster due to a closed-form solution. In addition, their approach does not limit the magnitude of destructive perturbations to the original embedding.
+
+\subsection{Downstream Fairness}
+\label{sec:fairness}
+
+\begin{figure}[t!]
+\centering
+\subfloat{
+\includegraphics[width=0.5\columnwidth]{figures/tpr_vs_bias_original_bert.pdf}
+}
+\subfloat{
+\includegraphics[width=0.5\columnwidth]{figures/tpr_vs_bias_projected_bert.pdf}
+}
+\caption{The correlation between $GAP_{female,y}^{TPR}$ and the relative proportion of women in profession $y$, for BERT embedding, before (left; R=0.867) and after (right; R=0.392) the projection.}
+\end{figure}
+
+How does our intervention affect the behavior of the model on the main classification task of profession prediction? We fit a logistic regression profession-prediction classifier over the projected \CLS\ embeddings.  
+
+To measure the bias in a classifier, we follow \citet{DBLP:journals/corr/abs-1901-09451} and use the TPR-GAP measure, which quantifies the bias in a classifier by considering the difference (GAP) in the true positive rate (TPR) between individuals with different protected attributes (e.g. race or gender). 
+We use the notation $\mathrm{GAP}_{z,y}^{\mathrm{TPR}}$ to denote the TPR-gap in some main-class label $y$ (e.g. ``nurse'' prediction) for some protected group $z$ (e.g. ``female''), we also consider $\mathrm{GAP}_{z}^{\mathrm{TPR}, \mathrm{RMS}}$, the RMS of the TPR-gap across all professions for a protected group $z$:
+\begin{align*}
+    \mathrm{GAP}_{z}^{\mathrm{TPR}, \mathrm{RMS}} = \sqrt{\frac{1}{|C|} \sum_{y \in C} (\mathrm{GAP}_{z,y}^{\mathrm{TPR}})^2}
+\end{align*}
+To calculate the relation between the bias the model exhibits and the bias in the data, we also calculate $\sigma_{(\mathrm{GAP}^{\mathrm{TPR}}, \%\text{Women})}$, the correlation between the TPR gap in a given profession and the percentage of women in that profession. 
+
+\paragraph{Results.} The main-task classifier achieves profession-prediction accuracy of 77.3\% on the projected embeddings (compared with 79.3\% over the original embeddings), indicating that the intervention minimally affects the ability to predict the profession of a person from the embedding of their biography. At the same time, the TPR gap drops significantly from 0.198 to 0.084, indicating a sharp drop in the biased behavior of the profession classifier. Indeed, inspecting the correlation $\sigma_{(\mathrm{GAP}^{\mathrm{TPR}}, \%\text{Women})}$ between the gap (per profession) and the embedding of women in this profession, we see that this correlation plummets from 0.867 to 0.392 after erasure. Re-fitting the main-task logistic regression classifier over the projected embeddings yields a slightly higher main-task accuracy of 78.1\%, at the price of significantly increasing the TPR gap to 0.158.\footnote{The softmax probabilities of a multiclass logistic regression classifier can leak the removed information if \textit{another} classifier is stacked on top of it \cite{ravfogel2022linear}, though this setup is not linear.}
+
+\subsection{Revisiting Amnesic Probing}
+\label{sec:amnesic}
+
+\begin{figure}[t!]
+\centering
+\subfloat{
+\includegraphics[width=0.5\columnwidth]{figures/bios_frozen_bert_layer_vs_drop_in_acc.pdf}
+}
+% \vspace{-3mm}
+% \centering
+\subfloat{
+\includegraphics[width=0.5\columnwidth]{figures/bios_frozen_bert_layer_vs_loss_inlp.pdf}
+\label{fig:amnesic-bert}
+}
+\caption{Amnesic probing results on \texttt{bert-base-uncased}.}
+\end{figure}
+
+\citet{elazar2021amnesic} have introduced the idea of \emph{amnesic probing} as a causal intervention that aims to test the importance of a given concept (e.g. part-of-speech tag) to some main task (e.g. language modeling). They applied Iterative Nullspace Projection (INLP) to remove different concepts from the activations of the model, and assessed the degree to which its behavior changed when performing masked language modeling. Since INLP often requires dozens of iterations to completely erase the concept, its usage in this context raises concerns of collateral damage due to magnitude of the intervention and the non-exhaustive nature of INLP removal. Here, we replicate their experiments on the \texttt{bert-base-uncased} model with our interventions.
+
+\paragraph{Experimental setup.} We use part-of-speech (POS) tags as our concept of interest. We collect sentences and their coarse POS tags (``Noun'', ``Verb'' etc.; 18 in total) from the English Universal Dependencies dataset \citep{nivre2020universal}. We tokenize the sentences with the \texttt{BERT} tokenizer and map each word-piece to the POS tag of the word to which it belongs. We collect the unmasked \texttt{BERT} embeddings for each layer, intervene to linearly erase the POS concept from that layer, and continue the forward pass until the last layer, from which we compute the distribution of the MLM over the vocabulary. Note that in each experiment we intervene on a single layer. We quantify the decrease in accuracy following the intervention, as well as the increase in the loss. We compare with a baseline intervention of a random orthogonal projection whose null space has the same rank as the label space (18). For INLP, we perform 20 iterations. This is needed because INLP does not effectively remove the concept; even after 20 iterations, classification accuracy is above majority accuracy. As a result, INLP reduces the rank of the embedding by 360. By contrast, our method decreases the rank just by 17.
+
+\paragraph{Results.} The results are shown in \cref{fig:amnesic-bert}. Our intervention only mildly changes BERT LM accuracy and loss until layer 8, with the highest drop recorded in layer 11. INLP, in contrast, shows maximum effect at layer 6. Since it removes hundreds of dimensions, it is difficult to attribute this effect to the erasure of the concept. These results suggest that the \emph{causal} effect of the POS concept on the language model is concentrated in layer 11. Interestingly, this stands in contrast with POS linear probing results, which are optimal at earlier layers \citep{tenney2019bert}. As \citet{elazar2021amnesic} have noted, probing does not generally correlate with intervention-based analysis techniques.
+
+\newpage
+\section{Concept Scrubbing}\label{sec:concept-scrubbing}
+
+\begin{wrapfigure}[13]{r}{0.5\textwidth}
+\vspace{-40pt}
+\begin{minipage}{0.5\textwidth}
+\begin{algorithm}[H]
+    \caption{Concept scrubbing}
+    \begin{algorithmic}[1]
+    \Require Model with $\ell$ layers $f = f_\ell \circ \ldots \circ f_1 $
+    \Require Design matrix $\mathbf{X} \in \mathbb R^{n \times d}$
+    \Require Label matrix $\mathbf{Z} \in \mathbb R^{n \times k}$
+    \Ensure LEACE parameters for each layer in $f$
+    \State $\mathbf{H}_1 \gets \mathrm{Embed}(\mathbf{X})$
+    \State $L \gets $\texttt{list()}
+    \For{$l \in 1\ldots\ell$}
+        %\State Initialize LEACE model $M$
+        \State Fit $(\mathbf{P}, \mathbf{b})$ on $\mathbf{H}_{l}$ and $\mathbf{Z}$
+        \State Append $(\mathbf{P}, \mathbf{b})$ to $L$
+        \State $\mathbf{H}_{l} \gets \mathbf{P}(\mathbf{H}_{l} - \mu_{\mathbf{H}_{l}}) + \mu_{\mathbf{H}_{l}}$\quad(Eq.~\ref{eq:1})
+        \State $\mathbf{H}_{l + 1} \gets f_l(\mathbf{H}_{l})$
+    \EndFor\\
+    \Return $L$
+    \end{algorithmic}\label{alg:concept-scrubbing}
+\end{algorithm}
+\end{minipage}
+\end{wrapfigure}
+
+Unfortunately, \citet{elazar2021amnesic} were forced to limit their interventions to a single layer due to the limitations of INLP. INLP often requires the deletion of several dozen dimensions before linear guarding is achieved---as demonstrated in Figure~\ref{fig:bios-bert}. \citet{kumar2022probing} show empirically and theoretically that INLP causes needless ``collateral damage'' to useful parts of the embedding that are orthogonal to the concept being erased. Because of this collateral damage, it's impossible to apply INLP to multiple layers of a transformer without causing its outputs to collapse into gibberish.
+
+Instead, we would like to erase all linear information about a concept in the activations at \emph{every} layer, which we term \textbf{concept scrubbing}. LEACE makes concept scrubbing possible and eminently practical. It causes minimal collateral damage, induces little computational overhead, and the covariance statistics it relies on can be computed in a \emph{streaming} fashion, without ever storing all the hidden states in memory or on disk.
+
+\textbf{Algorithm.} Any intervention on the model at layer $\ell$ changes the distribution of hidden states at layers $\ell' > \ell$. Because of this, the naive approach of independently fitting LEACE parameters $(\mathbf{P}, \mathbf{b})$ for all layers of the clean model, then applying them all at once, may fail to fully erase the target concept. Instead, we fit LEACE parameters \emph{sequentially}, starting from the first layer and proceeding to the final layer. After we compute $(\mathbf{P}, \mathbf{b})$ for a layer, we immediately use them to scrub the hidden states for that layer, then feed these scrubbed embeddings to the next layer (Algorithm~\ref{alg:concept-scrubbing}).
+
+% Nats per token to bits per byte ratios:
+% LLaMA: 0.38511430072768005
+% Pythia: 0.3366084909549386
+\begin{table*}[ht]
+\centering
+\begin{tabular}{lcccc cccc}
+\toprule
+& \multicolumn{3}{c}{LLaMA} & \multicolumn{4}{c}{Pythia}\\ \cmidrule(lr){2-4} \cmidrule(lr){5-8}
+Condition       & 7B             & 13B        & 30B           & 160M          & 1.4B            & 6.9B          & 12B            \\
+\midrule
+No intervention & 0.69           & 0.66       & 0.62          & 0.90          & 0.70            & 0.64          & 0.62           \\
+Random erasure  & 0.69           & 0.66       & 0.62          & 0.99          & 0.72            & 0.66          & 0.63           \\
+\midrule
+LEACE & 1.73           & 1.84       & 1.96          & 2.79          & 2.25            & 3.57          & 3.20              \\
+SAL   & 3.24           & 3.26       & 3.16          & 3.53          & 3.44            & 4.17          & 4.69             \\
+\midrule
+unigram entropy & 2.90           & 2.90       & 2.90          & 2.66          & 2.66            & 2.66          & 2.66           \\
+\bottomrule
+\end{tabular}
+\caption{Perplexity in autoregressive language models when removing linearly available part-of-speech information from the input to each transformer layer. Units are bits per UTF-8 byte. The unigram baseline assigns probabilities to tokens based only on their frequency and not on the context.}
+\label{table:scrubbing-perplexity}
+\end{table*}
+
+\subsection{Experimental Details}
+
+\textbf{Dataset.} For each model family, we use a sample from the respective pretraining distribution: the validation split of the Pile \cite{gao2020pile} for the Pythia models \cite{biderman2023pythia}, and the RedPajama replication of the LLaMA pretraining corpus for the LLaMA family \cite{touvron2023llama}. sampling a slice of $2^{22}$ tokens for fitting the LEACE parameters and another slice of $2^{22}$ tokens for evaluation. Since neither corpus comes with part-of-speech tags, we use the  model from the SpaCy library \cite{honnibal2020spacy} to automatically generate Universal Dependency tags \cite{mcdonald2013universal}.
+
+\textbf{Baseline method.} We also run concept scrubbing using full-rank SAL \cite{shao-etal-2023-gold}, which is similar to our method but lacks a bias term and does not adjust for correlations between features (Appendix~\ref{app:prior-work-optimality}).
+
+\textbf{Architecture.} We focus on autoregressive language models. We evaluate our method on EleutherAI's Pythia 160M, 1.4B, 6.9B, and 12B models \cite{biderman2023pythia}, and Meta's LLaMA 7B, 13B, and 30B \cite{touvron2023llama}. We apply concept erasure to the input of each transformer block, immediately after normalization is applied (LayerNorm or RMSNorm). 
+
+\textbf{Randomized erasure.} Almost any intervention on a neural network will cause its performance to degrade to some extent. Following \citet{elazar2021amnesic}, we isolate the effect of the concept erasure by comparing it to a control condition in which we orthogonally project onto a \emph{random} linear subspace of the same rank as the cross-covariance matrix. To reduce the variance of our results, we sample a fresh subspace for each minibatch, and erase that subspace at each layer, reporting the cross-entropy loss averaged over subspaces.
+
+\textbf{Training efficiency.} Algorithm~\ref{alg:concept-scrubbing} avoids redundant computation by caching the layer $i$ hidden states for \emph{every} data point, then using them to run layer $i + 1$. This approach has the downside of requiring a large amount of memory or disk space during training (up to 500GB in our experiments). It's possible to avoid caching any hidden states and instead recompute them as needed, at the expense of increasing the total compute cost from $O(\ell)$ to $O(\ell^2)$.
+
+\subsection{Results}
+
+We find strong evidence that autoregressive language models heavily rely on linearly encoded part-of-speech information. While erasing a randomly selected subspace has little to no effect on language modeling performance, scrubbing away part-of-speech information induces a large increase in perplexity across all models (Table~\ref{table:scrubbing-perplexity}).
+
+The specific numbers, however, depend on the erasure method used: SAL induces significantly larger increases in perplexity for all models we tested. We take this to mean that SAL inflicts more collateral damage on other useful features in the embedding than LEACE does. In other words, interventions made with LEACE are more \emph{surgical} than those made with prior work; they more closely approximate the ideal of a perfect intervention which only erases the target concept and keeps everything else fixed \cite{woodward2005making, grimsley2020attention}. If this experiment were conducted with SAL alone, we would have \emph{overestimated} the causal effect of part-of-speech. 
+
+% TODO: Maybe move this to the appendix
+
+
+%\textbf{Memory efficiency.} Naively storing the full $d \times d$ projection matrix for each layer of a transformer can incur a significant memory overhead, especially for models with large hidden state sizes. Luckily, it can be shown that every projection matrix with null space of dimension $k$ is a rank $k$ perturbation of the identity matrix \cite{brust2020computationally}. After running Algorithm~\ref{alg:training} for a layer, we ``compress'' $\mathbf{P}$ by storing the nonzero singular values of $\mathbf{P} - \mathbf{I}$ and their associated singular vectors. We also discard the $d \times d$ covariance matrix, reducing the inference time memory cost from $O(\ell d^2)$ to $O(\ell dk)$, where $\ell$ is the number of layers.
+
+\section{Limitations and Future Work}
+Much work remains to be done to validate concept scrubbing. Specifically, we'd like to see experiments that target concepts much narrower than part-of-speech, and use behavioral metrics to determine whether scrubbing changes the network in the ways we'd intuitively expect. If these experiments succeed, an exciting next step would be the incorporation of concept scrubbing into the pretraining and/or finetuning process. This may make it possible to train deep neural networks subject to \emph{conceptual constraints}. It remains to be seen if gradient-based optimizers will be able to ``circumvent'' such constraints by encoding protected attributes in completely nonlinear ways.
+
+In this work, we focused exclusively on \emph{linear} concept erasure due to its simplicity and tractability. Some authors have proposed nonlinear concept erasure techniques based on kernel methods, but have found that erasure functions fit using one kernel do not generalize well to other kernels \cite{ravfogel2022adversarial, shao-etal-2023-gold}. We conjecture that it is intractable to nondestructively edit $\rv X$ so as to prevent a general nonlinear adversary from recovering $\rv Z$, unless the data generating process for $\rv X$ is known in detail.\footnote{We suspect erasing a concept is at least as hard as extracting it from the original embedding. But in the worst case, information about $\rv Z$ could be encoded \emph{cryptographically} in $\rv X$, which would be intractable to decode given standard computational complexity assumptions. If the data is generated by a known algorithm, however, it may be possible to efficiently eliminate mutual information between $\rv Z$ and $\rv X$ by simply breaking the links in the causal graph that connect them.}
+
+A major motivation of concept erasure is that it promises to prevent models from using a concept in a \emph{post hoc}, model-agnostic fashion. But if our concept scrubbing procedure turns out to yield unsatisfactory results in practical use cases, the most promising research direction might then be to improve model-\emph{specific} techniques, such as those that modify the training procedure \cite{edwards2015censoring, elazar-goldberg-2018-adversarial, geiger2022inducing}.
+
+\section{Acknowledgements}
+
+We are grateful to CoreWeave for providing the compute resources used in Section~\ref{sec:concept-scrubbing}. Shauli Ravfogel is grateful to be supported by the Bloomberg Data Science PhD Fellowship.
+
+%%% References %%%
+\bibliography{citations}
+\bibliographystyle{plainnat}
+
+\appendix
+\clearpage
+\section{Additional Related Work}
+The problem of linear concept erasure is an instance of the general problem of information removal. Information removal methods generally divide into adversarial methods, which are applied during training, and the post-hoc linear methods considered in this paper. Adversarial methods \citep{edwards2015censoring,xie2017controllable, chen2018adversarial,elazar-goldberg-2018-adversarial, zhang2018mitigating} use a gradient-reversal layer during training to induce embeddings that do not encode the protected attribute. However, \citet{elazar-goldberg-2018-adversarial} have shown that these methods fail in exhaustively removing all the information associated with the protected attribute: it is often possible to train new adversaries that successfully recover the removed information. Linear methods have been proposed as a tractable alternative, where one identifies a linear subspace that captures the concept of interest, and neutralizes it using algebraic techniques. Different methods have been proposed for the identification of the subspace, e.g. PCA and variants thereof \citep{bolukbasi2016man, kleindessner2023efficient}, orthogonal-rotation \citep{dev2020oscar}, classification-based \citep{ravfogel-etal-2020-null}, spectral \citep{shao-etal-2023-gold, shao2023erasure} and adversarial approaches \citep{ravfogel2022rlace}. 
+
+Few works theoretically characterize the condition of linear guardedness. \citet{haghighatkhah2021obstructing} extensively analyzed the problem of preventing linear classification, with the focus on decreasing accuracy. They provide a constructive proof of an optimal intervention for an SVM classifier. \citet{ravfogel2022linear} have proposed a formal definition of linear guardedness based on $\mathcal{V}$ information, and characterized the fairness implications of guardedness; we show the relations with our definition above. \citet{ravfogel2022rlace} provide an adversarial formulation of the problem, derive a closed-formed solution to certain cases, and propose an SGD-based optimization for others. While they seek an \emph{orthogonal} projection, we empirically showed that their solution is very close to ours. \citet{sadeghi2019global} and \citet{sadeghi2021fundamental} both study an adversarial formulation of concept erasure for linear regression, and they trade-off with main-task performance. In contrast to \citet{ravfogel2022rlace}, they consider a general linear adversary, i.e. not necessarily a projection matrix.  Closest to our work are \citet{kleindessner2023efficient, haghighatkhah2022better, shao-etal-2023-gold}. As we showed above (\cref{sec:leace}), those methods do achieve the goal of linear guardedness though they are unable to prove this fact. At the same time, they are not optimal in terms of damage to the original embedding space.
+
+\section{Equivalence of Guardedness with the Optimality of Constant Predictors}\label{sec:eqv-guardedness-with-optimality-of-constant-predictors}
+
+The following two theorems establish the equivalence of conditions \ref{cond:lin-guarded} and \ref{cond:optimal-is-trivial} (indeed, they do so in the general setting, with no assumption of convex loss or linear predictors).
+
+\begin{theorem}\label{thm:guarded-to-trivial}
+    Suppose $\rv X$ $(\mathcal V, \mathfrak L)$-guards $\rv Z$. Then for every loss $\loss \in \mathfrak L$, the corresponding trivially attainable loss $\Ltrivfull$ cannot be improved upon by any predictor $\eta(\cdot; \vtheta) \in \mathcal V$, i.e. $\Ltriv = \inf_\vtheta \E[\loss(\eta(\rv X; \vtheta), \rv Z)]$.
+\end{theorem}
+
+\begin{proof}
+    \label{app:guarded-to-trivial}
+    Consider the null random vector $\rv X'(\omega) = \mathbf 0$. Since all predictors are constant on $\rv X'$, and the trivially attainable loss gives the \textit{best} available expected loss among constant predictors, we must have:
+    \begin{equation}\label{trivial-best-constant}
+        \Ltriv = \inf_\vtheta \E[\loss(\eta(\rv X'; \vtheta), \rv Z)]
+    \end{equation}
+    The right side of equation (\ref{trivial-best-constant}) is the best possible loss achievable by a function $\eta(\cdot; \vtheta)$ on the joint distribution of $(\rv X', \rv Z)$, which by the definition of guardedness is upper bounded by the best possible loss achievable on the joint distribution of $(\rv X, \rv Z)$:
+    \begin{equation}\label{xprime-easier-than-x}
+        \inf_\vtheta \E[\loss(\eta(\rv X'; \vtheta), \rv Z)]
+        \le \inf_\vtheta \E[\loss(\eta(\rv X; \vtheta), \rv Z)]
+    \end{equation}
+    Combining equations (\ref{trivial-best-constant}) and (\ref{xprime-easier-than-x}), and the fact that all constant functions exist in our function class $\mathcal V = \{\eta(\cdot; \vtheta)\}$, we arrive at our desired result:
+    \begin{equation*}
+        \Ltriv = \inf_\vtheta \E[\loss(\eta(\rv X; \vtheta), \rv Z)]
+    \end{equation*}
+\end{proof}
+
+\begin{theorem}\label{thm:trivial-to-guarded}
+    Suppose that for every loss $\loss \in \mathfrak L$, the corresponding trivially attainable loss $\Ltrivfull$ cannot be improved upon by any predictor $\eta(\cdot; \vtheta) \in \mathcal V$, i.e. $\Ltriv = \inf_\vtheta \E[\loss(\eta(\rv X; \vtheta), \rv Z)]$. Then $\rv X$ $(\mathcal V, \mathfrak L)$-guards $\rv Z$.
+\end{theorem}
+
+\begin{proof}
+    \label{app:trivial-to-guarded}
+    Let $\rv X': \Omega \to \mathbb R^d$ be any other random data vector with finite first moment.
+    
+    Since all constant predictors exist in our predictor class $\mathcal V = \{\eta(\cdot; \vtheta)\}$, the best loss achievable on $(\rv X', \rv Z)$ by functions in $\mathcal V$ must be at least as good as the trivially attainable loss (the best loss available by such constant predictors):
+    \begin{equation*}
+        \inf_\vtheta \E[\loss(\eta(\rv X'; \vtheta), \rv Z)]
+        \le \Ltriv
+    \end{equation*}
+    By assumption, the trivially attainable loss cannot be improved upon over $(\rv X, \rv Z)$ by predictors in $\mathcal V$:
+    \begin{equation*}
+        \Ltriv
+        = \inf_\vtheta \E[\loss(\eta(\rv X; \vtheta), \rv Z)]
+    \end{equation*}
+    Since our choice of $\rv X'$ was arbitrary, this shows that $\rv X$ maximizes the minimal achievable loss, so $\rv X$ $(\mathcal V, \mathfrak L)$-guards $\rv Z$.
+\end{proof}
+
+\section{Linear Guardedness is Equivalent to Linear Statistical Parity}\label{statistical-parity}
+
+To measure the effect of linear guardedness on main-task classifiers, we use the following minimal definition of ``fairness'' with respect to an attribute, adapted from \citet{edwards2015censoring}.
+\begin{definition}[Statistical Parity]\label{def:statistical-parity}
+    Let $\rv X$ and $\rv Z$ be defined as above, and let $f$ be a function with domain $\mathbb R^d$. Then $f$ exhibits \textbf{statistical parity} with respect to $\rv Z$ when evaluated on $\rv X$ if
+    \begin{equation*}
+        \forall z \in \mathcal Z : \E[f(\rv X)|\rv Z = z] = \E[f(\rv X)].
+    \end{equation*}
+\end{definition}
+
+We now prove the equivalence of conditions \ref{cond:class-means-equal} and \ref{cond:statistical-parity}.
+
+\begin{theorem}\label{thm:main-task}
+    Let $\rv X$ and $\rv Z$ be defined as above. Then every linear predictor $f(\mathbf{x}) = \mathbf{b} + \mathbf{Wx}$ exhibits statistical parity w.r.t. $\rv Z$ when evaluated on $\rv X$ if and only if each class-conditional mean $\E\big[\rv X|\rv Z = z\big]$ is equal to $\E\big[\rv X\big]$.
+\end{theorem}
+\begin{proof}
+    Suppose each class-conditional mean $\E\big[\rv X|\rv Z = z\big]$ is equal to $\E\big[\rv X\big]$. Then by the linearity of expectation, we have for all $z \in \mathcal{Z}$:
+    \begin{align*}
+        \E[f(\rv X)| \rv Z = z] = \E[\mathbf{W}\rv X + \mathbf{b}| \rv Z = z] = \mathbf{W}\E[\rv X| \rv Z = z] + \mathbf{b} = \mathbf{W}\E[\rv X] + \mathbf{b} = \E[f(\rv X)].
+    \end{align*}
+    This matches the definition of statistical parity provided in \cref{def:statistical-parity}.
+
+    Conversely, suppose every linear predictor $f(\mathbf{x}) = \mathbf{b} + \mathbf{Wx}$ exhibits statistical parity w.r.t. $\rv Z$ when evaluated on $\rv X$. Then this holds for the identity function $\mathrm{id}(\mathbf{x}) = \mathbf{x}$, and thus for all $z \in \mathcal{Z}$:
+    \begin{align*}
+        \E[\rv X | \rv Z = z] = \E[\mathrm{id}(\rv X) | \rv Z = z] = \E[\mathrm{id}(\rv X)] = \E[\rv X].
+    \end{align*}
+\end{proof}
+
+%\section{What Does It Mean to ``Use'' a Concept?}
+%\label{app:main-task}
+%
+%Authors in the fair machine learning literature have put a lot of thought into what it means to ``use'' a concept. Most relevant for our purposes is the \emph{anti-classification} conception of fairness, which states that ``protected attributes—like race, gender, and their proxies—are not explicitly used to make decisions'' \cite{corbett2018measure}. Formally, \citet{corbett2018measure} define anti-classification as the condition that
+%\begin{equation}
+%    f(\xx) = f(\xx')\quad \forall \xx, \xx' : \xx_u = \xx_u',
+%    \label{eq:anti-classification}
+%\end{equation}
+%where $\xx \in \R^d$ is a vector of features and $\xx_u$ is the ``component'' of $\xx$ encoding information about the unprotected features $u$. However, this condition can only be applied in practice if $\xx$ can be partitioned into protected features $\xx_p$ and unprotected features $\xx_u$. This assumption will hold if each component of $\xx$ is a hand-engineered feature derived from e.g. census or survey data, but not if $\xx$ is a hidden state extracted from a deep neural network. Furthermore, the naive anti-classification condition may not be adequate when $\xx_u$ contains proxy features which are correlated with $\xx_p$ \cite{bonchi2017exposing, grgic2016case}.
+
+%\subsection{Counterfactual Fairness is Too Strong}
+%
+%Concerns about proxies have led many in the fair machine learning community to adopt \emph{causal} conceptions of fairness, which define fairness in terms of the counterfactual relationship between the protected attribute and the output of an algorithm \cite{nilforoshan2022causal}. For example, \citet{kusner2017counterfactual} introduce \emph{counterfactual fairness} and define it as follows:
+%\begin{quote}
+%Given a predictive problem with fairness considerations, where $A$, $X$ and $Y$
+%represent the protected attributes, remaining attributes, and output of interest respectively,
+%let us assume that we are given a causal model $(U, V, F)$, where $V \equiv A \cup X$.
+%We postulate the following criterion for predictors of $Y$.
+%\begin{definition}[Counterfactual fairness]
+%Predictor $\hat Y$ is {\bf counterfactually fair}
+%if under any context $X = x$ and $A = a$,
+%  \label{eq:cf_definition}
+%\begin{align}
+%  P(\hat Y_{A \leftarrow a\ }(U) = y\ |\ X = x, A = a)  =%\nonumber\\ 
+%  P(\hat Y_{A \leftarrow a'}(U) = y\ |\ X = x, A = a), 
+%\end{align}
+%for all $y$ and for any value $a'$ attainable by $A$.
+%\end{definition}
+%\end{quote}
+%They emphasize that this is an \emph{individual-level} definition: for each possible value of the protected and unprotected attributes, the prediction should be the same in all counterfactual worlds where the protected attributes are different.
+%
+%\citet{nilforoshan2022causal} prove, however, that this definition requires the algorithm to \emph{completely ignore the input data} in most cases. Intuitively, this is because protected attributes are usually assumed to causally affect all other attributes, which implies that \emph{all} of an individual's attributes will be different, at least to some degree, in counterfactual worlds where their protected attributes are different. The only way for an algorithm to be counterfactually fair, then, is to ignore all attributes and make decisions independently of them.
+
+%\subsection{Path-Specific Concept Usage}
+%\textbf{Path-specific fairness} seeks to prevent protected attributes from influencing the predictor along certain \emph{causal paths}, while allowing influence to flow along other paths. While path-specific fairness doesn't generally require predictors to ignore all features,
+% \begin{figure}
+%   \begin{center}
+%     \begin{tikzpicture}[xscale = 1.75, yscale = 2, align = center]
+%       \node at (0,0) (gender) {\(G\)\\{\scriptsize Gender}};
+%       \node at (1,0) (prof) {\(P\)\\{\scriptsize Profession}};
+%       \node at (2,0) (bio) {\(B\)\\{\scriptsize Biography}};
+%       \node at (3,0) (feats) {\(X\)\\{\scriptsize Features}};
+%       \node at (4, 0) (pred) {\(f(X)\)\\{\scriptsize Prediction}};
+% 
+%       \draw[->, line width=0.25mm] (gender) to (prof);
+%       \draw[->, color = red, bend left = 30, line width=0.25mm] (gender) to (bio);
+%       \draw[->, line width=0.25mm] (prof) to (bio);
+%       \draw[->, color = red, line width=0.25mm] (bio) to (feats);
+%       \draw[->, color = red, line width=0.25mm] (feats) to (pred);
+%     \end{tikzpicture}
+%   \end{center}
+%   \caption{%
+%     Simplified causal DAG illustrating the generating process for biographies in \citet{DBLP:journals/corr/abs-1901-09451}. Path-specific fairness would require that gender not affect predictions along the ``direct'' path highlighted in red, while allowing it to have an indirect influence through its effect on profession. Counterfactual fairness, which allows for no such indirect effects, is simply inapplicable here since profession is the target label in the classification task (Section~\ref{sec:fairness}).
+%   }
+% \label{fig:dag}
+% \end{figure}
+
+%\subsection{Sigmoid Link Functions}
+%Note that the above theorem only applies to the raw linear output of $f$. If we are interested in the probabilistic output of $f$ after a sigmoid $\sigma(\cdot)$ or softmax link function has been applied, for example, we lose this guarantee \cite{ravfogel2022linear}. That said, we can use a semi-analytic approximation to $\E[\sigma(f(\rv X))]$ to get a sense of what will happen in the case of binary main-task classifiers with sigmoid link functions. \citet{daunizeau2017semi} shows empirically that the following formula is an excellent approximation for the expected value of $\sigma(f(\rv X))$, when $f(\rv X)$ is Gaussian:
+%\begin{equation}
+%    \E[\sigma(f(\rv X))] \approx \frac{\E[f(\rv X)]}{\sqrt{1 + 0.368\:\mathrm{Var}[f(\rv X)]}}.
+%    \label{eq:semi-analytic}
+%\end{equation}
+%Since the approximation error of $s$ is under 2\% in the range $\mu \in [-10, 10]$ and $\Sigma \in [2^{-4}, 2^8]$, we expect the main source of error from this approximation in real-world settings would stem from violations of the Gaussianity assumption. Since $f$ is linear, $f(\rv X)$ is Gaussian if and only if $\rv X$ is.
+%
+%In the regime where Equation~\ref{eq:semi-analytic} is a good approximation, the only way for the post-sigmoid means to differ substantially is if the \emph{variances} of the linear predictions differ, thereby changing the denominator. This is because $\E[f(\rv X)| \rv Z = 0] = \E[f(\rv X)| \rv Z = 1]$ by Theorem~\ref{thm:main-task}.
+
+\section{Implications for Prior Work}
+\label{app:prior-work-optimality}
+
+In this section we discuss the implications of Theorem~\ref{erasure-family}, which characterizes the necessary and sufficient conditions for an affine erasure function to yield a perfectly linearly guarded dataset, for methods proposed in prior work.
+
+Spectral Attribute RemovaL (SAL) \cite{shao-etal-2023-gold} uses the top $n$ left singular vectors of $\sxz$ to construct an orthogonal projection matrix $\mathbf{Q}_{\mathrm{SAL}} = \mathbf{I} - \mathbf{U}_{:n}\mathbf{U}_{:n}^T$ which is then applied to $\rv X$. Notably, while $n$ is presented as a free parameter in their method, all of their experiments involve binary classification problems where $\rv Z$ is a one-hot vector, and $n$ is set to a value no greater than 2. We'll call the version of SAL where $n = \rank(\sxz)$, ``full-rank SAL.'' Since these left singular vectors are an orthonormal basis for $\sxz$'s column space, Theorem~\ref{erasure-family} implies that full-rank SAL guarantees linear guardedness.%\footnote{In the full rank case, SVD is not actually necessary to construct $\mathbf{Q}_{\mathrm{SAL}}$, so it may not be appropriate to call it a ``spectral'' method. Faster algorithms like QR decomposition can be used to obtain an orthonormal basis for $\mathrm{colsp}(\sxz)$, or $\mathbf{Q}_{\mathrm{SAL}}$ can be constructed directly with the formula $\mathbf{I} - \sxz(\sxz^T \sxz)^{-1}\sxz^T.$}
+
+Mean Projection (MP) \cite{haghighatkhah2022better} orthogonally projects $\rv X$ onto the orthogonal complement of the span of the difference in class centroids $\E[\rv X | \rv Z = 1] - \E[\rv X | \rv Z = 0]$, where $\rv Z$ is assumed to be binary. Since the centroids are equal after the projection, this method guarantees linear guardedness by Theorem~\ref{equality-sufficient}. In fact, by Theorem~\ref{zero-covariance}, MP is mathematically equivalent to SAL when $\rv Z$ is a one-dimensional random vector taking one of two possible values.
+
+\newpage % To prevent page break right after the section title.
+
+%Fair PCA \cite{kleindessner2023efficient}, like regular PCA, seeks a low-dimensional projection matrix $\mathbf{U} \in \mathbb R^{n \times d}, \mathbf{UU}^T = \mathbf{I}_{n \times n}$ maximizing the variance $\E \| \mathbf{U} \rv X \|^2$ (in a sense, preserving as much information as possible subject to that dimensionality reduction). It adds to regular PCA the restriction that any affine image $\mathbf{w}^T\mathbf{U}\rv X + \mathbf{b}$ of the transformed data have zero cross-covariance with the labels $\rv Z$, which implies our condition \ref{cond:zero-cross-covar}, and thus ensures $\mathbf{U}\rv X$ linearly guards $\rv Z$. However, while Fair PCA aims to preserve the \textit{information} in $\mathbf{U} \rv X$, it does not minimize the \textit{representational distance} $\E \|\mathbf{U}\rv X - \rv X\|^2$. Indeed, given that the projection $\mathbf{U}\rv X$ is in a lower-dimensional space than $\rv X$, this representational distance isn't even meaningful in this context. So it is not a method which can be used to erase concepts in a neural network while keeping most of that network's functionality still intact.
+
+\section{Derivation of LEACE}
+\thmltwooptimality*
+
+Below are two independent proofs of Theorem~\ref{l2-optimality}.
+
+\subsection{Algebraic Proof}\label{oct-10-proof}
+
+\begin{proof}
+    We shall first show that, in any orthonormal basis,\footnote{Throughout this proof, we abuse the notations $\rv X_i, \mathbf{P_i}$, etc. to refer to the $i^\text{th}$ component in the specified basis, not necessarily the standard one.} each row $\mathbf{P_i}$ constitutes an independent optimization problem, and then select a basis in which we can easily show that the corresponding component $\rv X_i$ of $\rv X$ can be almost surely decomposed into a linear combination of mutually uncorrelated components in the whitened random vector $\mathbf W \rv X$, some of which correlate with $\rv Z$ and some of which do not. The solution $(\mathbf P \rv X)_i$ is then that same linear combination, restricted to those components which do not correlate with $\rv Z$.
+
+    Consider first an orthonormal basis diagonalizing the inner product $\mathbf{M}$, so that $\langle \mathbf{x}, \mathbf{y} \rangle_\mathbf{M} = \sum_{i=1}^d \alpha_{i}x_iy_i$ for fixed $\alpha_1, \ldots, \alpha_d \ge 0$. This allows us to treat each row $\mathbf{P_i} \in \mathbb R^d$ of $\mathbf{P}$ as a separate optimization problem,
+    \begin{equation*}
+    \mathop{\mathrm{argmin\:}}_{\substack{\mathbf{P_i} \in \mathbb{R}^d}} \E \Big [ \alpha_i \big( \mathbf{P_i}^T\rv X - \rv X_i \big)^2 \Big ]\quad \mathrm{subject\:to}\:\: \mathrm{Cov}(\mathbf{P_i}^T\rv X, \rv Z) = \mathbf{0},
+    \end{equation*}
+    at which point the weights $\alpha_i$ of each subproblem become irrelevant, and our objective may as well be Euclidean, allowing us to view each row as an independent optimization problem not just in this basis, but from any convenient one.
+
+    So now let $\ell = \rank(\sxz) = \rank(\swxz)$ and $m = \rank(\sxx) = \rank(\swxwx)$, and consider a (new) orthonormal basis whose first $m$ coordinates span the column (and row) space of $\mathbf W$ (i.e. the subspace of $\mathbb R^d$ in which $\rv X$ and $\mathbf{W} \rv X$ have nonzero variance), and whose first $\ell \le m$ coordinates span the column space of $\swxz$ (i.e. the subspace of $\mathbb R^d$ in which $\mathbf{W} \rv X$ has nonzero covariance with $\rv Z$).
+
+    Any component of $\rv X$ can be (almost surely) written as a fixed linear combination of the nontrivial components of its whitening $\mathbf{W}\rv X$:
+    \begin{align*}
+        \rv X_i = (\mathbf{W}^+\mathbf{W}\rv X)_i = \sum_{j=1}^m W_{ij}^+ (\mathbf{W}\rv X)_j.\tag{almost surely}
+    \end{align*}
+    Meanwhile, any component of $\mathbf{P}\rv X$ can be (always) written as a fixed linear combination of the nontrivial components of $\mathbf{W}\rv X$ and the almost surely zero components of $\rv X$:
+    \begin{align*}
+        (\mathbf{P} \rv X)_i = \sum_{j=1}^m A_{ij} (\mathbf{W}\rv X)_j + \sum_{j=m+1}^d B_{ij} \rv X_j,
+    \end{align*}
+    i.e. $\mathbf{P} = \mathbf {AW} + \mathbf {BV}$, where $\mathbf{V} = \mathbf{I} - \mathbf{W}^+\mathbf{W}$ is the orthogonal projection onto $\rv X$'s almost surely zero components.
+
+    The $i^\text{th}$ sub-objective is then:
+    \begin{align*}
+        \E \big( \mathbf{P_i}^T\rv X - \rv X_i \big)^2 = \E \Bigg[ \sum_{j=1}^m (A_{ij} - W_{ij}^+) (\mathbf{W}\rv X)_j \Bigg]^2
+        = \sum_{j=1}^m (A_{ij} - W_{ij}^+)^2,
+    \end{align*}
+    where we have safely ignored the almost surely zero terms $B_{ij} \rv X_j$ ($j > m$), and used the fact that the first $m$ components of $\mathbf{W}\rv X$ have identity covariance matrix.
+
+    $\mathbf P \rv X$ is almost surely equal to $\bf {AW} \rv X$, so our constraint $\mathrm{Cov}(\mathbf{P}\rv X, \rv Z) = \mathbf{0}$ is equivalent to $\mathbf{A}\swxz = \mathrm{Cov}(\mathbf{AW}\rv X, \rv Z) = \mathbf 0$, i.e. $A_{ij} = 0$ when $j \le \ell$, since the first $\ell$ components are those for which $\mathbf W \rv X$ correlates with $\rv Z$. Subject to this, the objective is minimized for $A_{ij} = W_{ij}^+$ when $j > \ell$, i.e. $\mathbf A = \mathbf{W}^+ (\mathbf I - \pwxz)$.
+        
+    The particular choice $\mathbf{B} = \mathbf{I}$ gives our solution $\mathbf{P^*} = \mathbf{I} - \mathbf{W}^+ \pwxz\mathbf{W}$, leaving the non-varying components of $\rv X$ intact (see Fig.~\ref{fig:leace-proj} for a visualization).
+\end{proof}
+
+The solution is unique except for columns corresponding to the components of $\rv X$ with zero variance, and rows corresponding to the zero-weighted components of the (pseudo) inner product $\mathbf{M}$.
+
+\subsection{Covector Proof}\label{covector-proof}
+%\thmltwooptimality*
+
+\begin{proof}
+     We assume without loss of generality that vectors in $\mathbb R^d$ are represented in a basis diagonalizing the inner product $\mathbf{M}$, so that $\langle \mathbf{x}, \mathbf{y} \rangle_\mathbf{M} = \sum_{i=1}^d m_{i}x_iy_i$ for fixed $m_1, \ldots, m_d \ge 0$. This allows us to treat each row $\mathbf{P_i} \in \mathbb R^d$ of $\mathbf{P}$ as a separate optimization problem,
+    \begin{equation*}
+    \mathop{\mathrm{argmin\:}}_{\substack{\mathbf{P_i} \in \mathbb{R}^d}} \E \Big [ m_i \big( \mathbf{P_i}^T\rv X - \rv X_i \big)^2 \Big ]\quad \mathrm{subject\:to}\:\: \mathrm{Cov}(\mathbf{P_i}^T\rv X, \rv Z) = \mathbf{0}.
+    \end{equation*}
+    Our objective only depends on $\mathbf{P_i}$ through its effect on the scalar random variable $\xi = \mathbf{P_i}^T\rv X$. All random variables\footnote{Strictly speaking, equivalence classes of almost surely equal random variables.} of the form $\zeta = \mathbf{u}_{\zeta}^T \rv X$ for some covector $\mathbf{u}_{\zeta}^T \in \R^d$ form a vector space $U$, which we equip with the covariance inner product $\langle \xi, \zeta\rangle_\mathrm{Cov} = \mathrm{Cov}(\xi, \zeta) = \E[\xi \zeta] = \mathbf{u}_\xi^T \sxx \mathbf{u}_\zeta$.
+
+    By the linearity of covariance, the elements of $U$ uncorrelated with $\rv Z$ form a subspace $Z^\perp \subseteq U$. Note also that $\xi \in Z^\perp$ if and only if $\xi$'s covector $\mathbf{u}_\xi^T$ satisfies $\mathrm{Cov}(\mathbf{u}_\xi^T \rv X, \rv Z) = \mathbf{u}_\xi^T \sxz = \mathbf{0}_k$, and that these covectors themselves form the subspace $\mathrm{colsp}(\sxz)^\perp$ of $\R^d$.
+    
+    Our objective now reduces to finding a covector $\mathbf{P}_i^T$ that defines the orthogonal projection of $\rv X_i$ onto $Z^\perp$. The difficulty is that orthogonality of elements in $U$ is not equivalent to orthogonality of the corresponding covectors. We can fix this by changing the basis in which covectors are represented. Since $\rv X \in \mathrm{colsp}(\mathbf{W})$ a.s., we can write any element of $U$ as a linear form in $\mathbf{W}\rv X$ rather than $\rv X$ by applying the change-of-basis $\mathbf{u}_{\xi}' = \mathbf{W}^+ \mathbf{u}_{\xi}$ to every covector: $\xi = (\mathbf{u}_{\xi}')^T \mathbf{W}\rv X = \mathbf{u}_{\xi}^T \cancel{\mathbf{W}^+ \mathbf{W}} \rv X$ a.s.
+    
+    In this new basis, which is orthonormal under our covariance inner product, each component of $\rv X$ is written $\rv X_i = (\mathbf{W}^+)_i^T \mathbf{W}\rv X$ and the inner product of any two elements of $U$ is simply the Euclidean inner product of the corresponding covectors:\footnote{If $\sxx$ is full rank, there is a one-to-one correspondence between random variables in $U$ and covectors. In the singular case, we may choose the component of the covector inside $\ker(\sxx)$ arbitrarily, since it will make no difference to the inner product.}
+    \begin{equation*}\label{inner-prod-equiv}
+        \langle \xi, \zeta\rangle_\mathrm{Cov} = \mathrm{Cov}(\mathbf{u}_{\xi}'^T \mathbf{W} \rv X, \mathbf{u}_{\zeta}'^T \mathbf{W} \rv X) = \mathbf{u}_{\xi}'^T \cancel{\mathbf{W} \sxx \mathbf{W}} \mathbf{u}_{\zeta}' = \mathbf{u}_{\xi}'^T \mathbf{u}_{\zeta}'.
+    \end{equation*}
+    Since the two inner products are now equivalent, and $Z^\perp$ is precisely those random variables with covector $\mathbf{u}' \in \mathrm{colsp}(\mathbf{W}\sxz)^\perp$, the orthogonal projection of $\rv X_i$ onto $Z^\perp$ is also an orthogonal projection of its covector $(\mathbf{W}^+)_i^T$ onto $\mathrm{colsp}(\mathbf{W}\sxz)^\perp$:
+    \begin{equation}\label{eq:equiv-ortho-projections}
+        \hat{\rv X}_i = (\mathbf{W}^+)_i^T (\mathbf{I} - \pwxz) (\mathbf{W}\rv X)
+    \end{equation}
+    Putting all the components of $\rv X$ together, we have our final solution,
+    \begin{equation*}
+        \hat{\rv X} = (\mathbf{I} - \mathbf{W}^+ \pwxz \mathbf{W})\rv X,
+    \end{equation*}
+    which is almost surely equivalent to Eq.~\ref{eq:equiv-ortho-projections}, but keeps the non-varying components of $\rv X$ intact.
+\end{proof}
+
+\section{The Optimality of Oblique Projections}\label{app:oblique-optimality}
+
+As noted in \autoref{sec:oblique}, the optimal affine erasure function $r(\mathbf{x}) = \mathbf{b} + \mathbf{Px}$ does \textit{not} in general use an orthogonal projection for the matrix $\mathbf{P}$. A simple example illustrates why. Let $d = 2, k = 1$ so that $\rv X$ takes values in $\mathbb R^2$ and $\rv Z$ takes values in $\mathbb R$, with the first feature $\rv X_1$ and the label $\rv Z$ each independently and uniformly distributed in $\{-1, +1\}$, and the second feature $\rv X_2$ simply equal to the sum $\rv X_2 = \rv X_1 + \rv Z$. A dataset reflecting such a distribution has four $(\mathbf x, \mathbf y)$ pairs:
+$$([1, 2]^T, 1),\quad([1, 0]^T, -1),\quad([-1, 0]^T, 1),\quad([-1, -2]^T, -1)$$
+In this case, \textit{all} of the information $\rv X$ has about $\rv Z$ resides in $\rv X_2$, so the minimally disruptive orthogonal projection which guards $\rv Z$ will nullify that component:
+$$\mathbf{P}_\text{ortho} =
+\begin{bmatrix}
+    1 & 0 \\
+    0 & 0
+\end{bmatrix}$$
+On the other hand, $\rv X_1$ contains some information about $\rv X_2$ (despite having no information about $\rv Z$), allowing a partial reconstruction of $\rv X_2$ while preserving full concept erasure:
+$$\mathbf{P}_\text{oblique} =
+\begin{bmatrix}
+    1 & 0 \\
+    1 & 0
+\end{bmatrix}$$
+Both methods fully erase the ability to predict $\rv Z$ from the data, however a simple calculation shows the second, oblique method to perform better as measured by mean squared edit distance:
+\begin{align*}
+\E \|\mathbf{P}_\text{ortho}\rv X - \rv X\|^2 = 2,\quad
+\E \|\mathbf{P}_\text{oblique}\rv X - \rv X\|^2 = 1
+\end{align*}
+
+\section{Equivalence of Guardedness Definitions}\label{guard-eqv-def}
+
+\citet{xu2020theory} define the \textbf{conditional $\mathcal V$-entropy} of $\rv Z$ given $\rv X$ as the lowest achievable cross-entropy loss predicting $\rv Z$ with a function of $\rv X$ in the predictor class $\mathcal V$. In our notation:
+\begin{equation*}
+    H_{\mathcal V}(\rv Z\ |\ \rv X) = \inf_{\theta \in \Theta} \E[\loss(\eta(\rv X; \vtheta), \rv Z)],
+\end{equation*}
+where $\loss(\eta, z) = - \log \frac {\exp(\eta_z)} {\sum_{i=1}^k \exp(\eta_i)}$ is the cross-entropy loss function.
+
+They then define the (unconditional) \textbf{$\mathcal V$-entropy} $H_{\mathcal V}(\rv Z) = H_{\mathcal V}(\rv Z\ |\ \mathbf{0})$ to be the lowest achievable cross-entropy loss in the case of a constantly null random data variable. This is exactly our trivially attainable loss $\Ltriv$ (\cref{def:trivial_loss}).
+
+Finally, they define the \textbf{$\mathcal V$-information} from $\rv X$ to $\rv Z$ as the reduction in $\mathcal V$-entropy as compared to using such a null random data variable:
+\begin{equation*}
+    I_{\mathcal V}(\rv X \to \rv Z) = H_{\mathcal V}(\rv Z) - H_{\mathcal V}(\rv Z\ |\ \rv X).
+\end{equation*}
+Using these notions, \citet{ravfogel2022linear} say that $\rv X$ is \textbf{$\epsilon$-guarded} with respect to $\mathcal V$ if $I_{\mathcal V}(\rv X~\to~\rv Z) < \epsilon$.
+
+In \autoref{sec:eqv-guardedness-with-optimality-of-constant-predictors}, we showed the equivalence of guardedness (as we have defined it in \cref{def:guardedness}) to the optimality of the trivially attainable loss. That is, $\rv X$ $(\mathcal V, \mathfrak L)$-guards $\rv Z$ when $H_{\mathcal V}(\rv Z\ |\ \rv X) = \Ltriv = H_{\mathcal V}(\rv Z)$, in the case where $\mathfrak L$ is the singleton class consisting solely of the cross-entropy loss function. In the language of \cite{ravfogel2022linear}, $\rv X$ is $\epsilon$-guarded with respect to $\mathcal V$ for all $\epsilon > 0$.
+
+\section{Constraining Norm Growth}\label{norm-growth}
+
+In early concept scrubbing experiments (Sec.~\ref{sec:concept-scrubbing}), we found that at specific layers in some models, concept scrubbing with LEACE would cause the norm of the embedding to diverge, leading to NaN outputs. By contrast, SAL never caused divergence, even though it causes a larger disruption to model performance on average (Table~\ref{table:scrubbing-perplexity}). This is because SAL uses an orthogonal projection $\mathbf{Q}$, whose eigenvalues are thus all in $\{0, 1\}$, so the norm of the hidden state can never increase after erasure, while LEACE's oblique projection matrix $\mathbf P$ does generally have singular values greater than 1. To combine the superior average-case MSE of LEACE with the stability of SAL, we adopt a simple regularization heuristic. After constructing $\mathbf P$, we analytically compute the trace of the covariance matrix of the hidden states after applying $\mathbf P$. If $\mathrm{tr}(\mathbf{P \sxx P^T}) > \mathrm{tr}(\sxx)$, we solve a quadratic equation to find the convex combination $\mathbf{P}' = \alpha \mathbf{P} + (1 - \alpha) \mathbf{Q}$ such that $\mathrm{tr}(\sxx) = \mathrm{tr}(\mathbf{P' \sxx (P')^T})$. By Theorem~\ref{erasure-family}, the set of matrices which ensure linear guardedness is convex,\footnote{In fact, it is a subspace of $\R^{d \times d}$. For any matrices $\mathbf{A}, \mathbf{B} \in \R^{d \times d}$ such that $\mathbf{A}\sxz = \mathbf{0}$ and $\mathbf{B}\sxz = \mathbf{0}$, we have by linearity $(\alpha \mathbf{A} + \beta \mathbf{B})\sxz = \alpha \mathbf{A}\sxz + \beta \mathbf{B}\sxz = \alpha \mathbf{0} + \beta \mathbf{0} = \mathbf{0}$ for any scalars $\alpha$ and $\beta$.} so $\mathbf{P}'$ is guaranteed to be in the feasible set. Furthermore, since our mean squared error objective is convex, $\mathbf{P}'$ is guaranteed to have no worse MSE than $\mathbf{Q}$. We find this solves the divergence issue in practice.
+
+\section{Oracle LEACE}
+\label{app:oracle-leace}
+
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+    \vspace{-3.5em}
+    \centering
+    \includegraphics[width=0.5\textwidth, clip]{oleace.pdf}
+    \caption{Orthogonal projection of $i$\textsuperscript{th} component of $\rv X$, itself a vector in the random variable Hilbert space $\mathcal H$, onto the span of the components of $\rv Z$. The residual $\rv X_i - \mathrm{proj}_{\mathcal Z} \rv X_i$ is the closest vector to $\rv X_i$ orthogonal to, and hence uncorrelated with, $\mathcal Z = \mathrm{span}(\{ \rv Z_1, \rv Z_2 \})$.
+    }
+    \vspace{-1.5em}
+    \label{fig:hilbert}
+\end{wrapfigure}
+
+The concept erasure method derived in Section~\ref{sec:leace} does not require access to concept labels at inference time. That is, we can fit an erasure function on a labeled training dataset, then apply the function to unlabeled datapoints. If we have oracle access to the label $\zz$ for each $\xx$, we can achieve an even more surgical edit. In Theorem~\ref{thm:oleace} below, we derive \textbf{Oracle LEACE}, a closed-form formula for the the nearest $\rv X'$ to any $\rv X$ such that $\mathrm{Cov}(\rv X', \rv Z) = \textbf{0}$.
+
+Like in Sec.~\ref{sec:leace}, the resulting $\rv X'_{\mathrm{LEACE}}$ is ``nearest'' to $\rv X$ with respect to all p.s.d. inner products $\mathbf a^T \mathbf{Mb}$ defined on $\R^d$ simultaneously. This is because, by expressing $\rv X$ in a basis that diagonalizes $\mathbf M$, we can decompose the problem into $d$ independent subproblems, one for each component of $\rv X_i$. Each subproblem can then be viewed as an orthogonal projection, not in $\R^d$, but in an abstract vector space of real-valued random variables. For geometric intuition, see Figure~\ref{fig:hilbert}.
+
+Prior work has noted that computing an orthogonal projection in a random variable Hilbert space is equivalent to solving an ordinary least squares regression problem \cite{berkeley2018hilbert}. Our theorem is a natural extension of this work: we find that $\rv X'_{\mathrm{LEACE}}$ is equal to the OLS residual from regressing $\rv X$ on $\rv Z$, plus a constant shift needed to ensure that erasing $\rv Z$ does not change the mean of $\rv X$.
+
+%\newpage % To prevent wrapping just after theorem statement.
+\begin{theorem}[Oracle Concept Erasure]\label{thm:oleace}
+    Let $\mathcal H$ be the Hilbert space of square-integrable real-valued random variables equipped with the inner product $\langle \xi, \zeta \rangle_{\mathcal H} := \E[\xi \zeta]$. Let $(\rv X, \rv Z)$ be random vectors in $\mathcal H^d$ and $\mathcal H^k$ respectively. Then for every p.s.d. inner product $\langle \mathbf a, \mathbf b \rangle_{\mathbf M} = \mathbf a^T \mathbf M \mathbf b$ on $\R^d$, the objective
+    \begin{align*}
+        \mathop{\mathrm{argmin\:}}_{\substack{\rv X' \in \mathcal H^d}} \E \big\| \rv X' - \rv X \big\|^2_{\mathbf M} \quad \mathrm{subject\:to}\:\: \mathrm{Cov}(\rv X', \rv Z) = \mathbf{0}
+    \end{align*}
+    is minimized by the (appropriately shifted) ordinary least squares residuals from regressing $\rv X$ on $\rv Z$:
+    \begin{align*}
+        \rv X'_{\mathrm{LEACE}} = \rv X - \sxz \szz^+ \big( \rv Z - \E[\rv Z] \big).
+    \end{align*}
+\end{theorem}
+\begin{proof}
+    Assume w.l.o.g. that $\rv X$ and $\rv X'$ are represented in a basis diagonalizing $\mathbf{M}$, so we may write
+    \begin{align*}
+        \E \big\| \rv X' - \rv X \big\|^2_{\mathbf M} = \sum_{i=1}^d m_i \: \E \big[ (\rv X'_i - \rv X_i)^2 \big],
+    \end{align*}
+    where $m_1, \ldots, m_d \ge 0$ are eigenvalues of $\mathbf{M}$. Crucially, each term in this sum is independent from the others, allowing us to decompose the primal problem into $d$ separate subproblems of the form $\| \rv X_i' - \rv X_i \|^2_{\mathcal H}$, one for each component $i$ of $(\rv X, \rv X')$.
+
+    \paragraph{Factoring out constants.} Now consider the subspace $\mathcal C = \mathrm{span}(1) \subset \mathcal H$ consisting of all constant (i.e. zero variance) random variables. Orthogonally decomposing $\rv X_i$ along $\mathcal C$ yields $\rv X_i = \Tilde{\rv X}_i + \mu_i$, where $\mu_i = \E[\rv X_i] \in \mathcal C$ and $\Tilde{\rv X}_i = \rv X - \E[\rv X]_i \in \mathcal C^\perp$, and likewise for $\rv X_i'$. Our objective is now
+\begin{equation}\label{eq:decomposed}
+        \big \| \rv X_i' - \rv X_i \big \|^2_{\mathcal H} =
+        %\big \| \Tilde{\rv X}_i' + \mu_{\rv X_i}' - \Tilde{\rv X}_i - \mu_i \big \|^2_{\mathcal H} =
+        \big \| \mu_i' - \mu_i \big \|^2_{\mathcal H} + \big \| \Tilde{\rv X}_i' - \Tilde{\rv X}_i \big \|^2_{\mathcal H}.
+    \end{equation}
+    Since $\mu_i'$ and $\mu_i$ are orthogonal to $\Tilde{\rv X}_i'$ and $\Tilde{\rv X}_i$, and the constraint $\mathrm{Cov}(\rv X', \rv Z) = \mathbf{0}$ is invariant to constant shifts, we can optimize the two terms in Eq.~\ref{eq:decomposed} independently. The first term is trivial: it is minimized when $\mu_i' = \mu_i$, and hence $\rv X_i' = \Tilde{\rv X}_i' + \E[\rv X_i]$.
+    \paragraph{Orthogonal projection.} We can now rewrite the zero covariance condition as an orthogonality constraint on $\Tilde{\rv X}_i$. Specifically, for every $i \in \{1\ldots d\}$ we have
+\begin{equation}\label{eq:dual-problem}
+    \mathop{\mathrm{argmin\:}}_{\substack{\Tilde{\rv X}_i' \in \mathcal H}} \big \| \Tilde{\rv X}_i' - \Tilde{\rv X}_i \big \|^2_{\mathcal H} \quad \mathrm{s.t.}\:\: \forall j \in \{1\ldots k\} : \langle \Tilde{\rv X}_i', \Tilde{\rv Z}_j \rangle_{\mathcal H} = 0,
+    \end{equation}
+    where $\Tilde{\rv Z} = \rv Z - \E[\rv Z]$. In other words, we seek the nearest $\Tilde{\rv X}_i'$ to $\Tilde{\rv X}_i$ orthogonal to $\mathcal Z = \mathrm{span}(\{ \Tilde{\rv Z}_1, \ldots, \Tilde{\rv Z}_k \})$, which is simply the orthogonal projection of $\Tilde{\rv X}_i$ onto $\mathcal Z^\perp$. This in turn is equal to the ordinary least squares residual from regressing $\Tilde{\rv X}$ on $\Tilde{\rv Z}$:
+\begin{equation}\label{eq:centered}
+        \Tilde{\rv X}_i' = \Tilde{\rv X}_i - \mathrm{proj} \big(\Tilde{\rv X}_i, \mathcal Z \big) = \rv X_i - (\sxz)_i \szz^+ (\rv Z - \E[\rv Z]) - \E[\rv X_i].
+    \end{equation}
+    \paragraph{Putting it all together.} Plugging Eq.~\ref{eq:centered} into $\rv X_i' = \Tilde{\rv X}_i' + \E[\rv X_i]$ and combining all components into vector form yields
+    \begin{equation}
+        \rv X'_{\mathrm{LEACE}} = \rv X - \sxz \szz^+ (\rv Z - \E[\rv Z]),
+    \end{equation}
+    which completes the proof.
+\end{proof}
+
+\section{Notation Key}
+
+\begin{tabular}{r l}
+    $\mathcal Z$ & The space of one-hot labels $\{(z_1, \ldots z_k) \in \mathbb \{0, 1\}^k\ \big|\ \sum_{j=1}^k z_j = 1\}\}$ \\
+    & (treated interchangeably with the integers $\{1, \ldots, k\}$ when convenient).\\
+    $\rv X, \rv Z$ & Integrable (i.e. finite first moment) random vectors taking values in $\mathbb R^d$ and $\mathbb R^k$\\ & respectively (or their realized values inside an expectation, e.g. in $\E[f(\rv X)]$).\\
+    & $\rv Z$ is sometimes restricted to the one-hot labels $\mathcal Z$, in which case we assume\\
+    & each $\mathbb P(\rv Z = j) > 0$. \\
+    $\rv X_i, \rv Z_j$ & The $i^\text{th}$ and $j^\text{th}$ components thereof, themselves scalar random variables (or\\
+    & their realized values inside an expectation). \\
+
+    $\xi, \zeta$ & Scalar random variables taking values in $\mathbb R$.\\
+    $\eta$ & A predictor function $\mathbb R^d \to \mathcal Z$ (or its value $\eta(\rv X)$ when inside an expectation). \\
+
+    $\mathcal V$ & A space of predictor functions $\{\eta(\cdot; \vtheta): \mathbb R^d \to \mathbb R^k\ |\ \vtheta \in \Theta\}$, parameterized\\
+    & by $\vtheta$ and containing all constant functions. \\
+    $\mathfrak L$ & A space of loss functions $\{\loss: \mathbb R^k \times \mathcal Z \to [0, \infty)\}$. \\
+
+    $r$ & An erasure function $\mathbb R^d \to \mathbb R^d$, hopefully making a minimal edit to $\rv X$ that\\
+    &eliminates the ability to predict labels $\rv Z$ with predictors in $\mathcal V$.\\
+
+    $\mathbf{A}$ & A matrix with entries in $\mathbb R$. \\
+    $A_{ij}$ & The entry thereof at the $i^\text{th}$ row and $j^\text{th}$ column. \\
+    $\mathbf{A}^+$ & The Moore-Penrose pseudoinverse of $\mathbf{A}$.\\
+    $\mathbf{v}$ & A column vector with entries in $\mathbb R$. \\
+    $v_i$ & The $i^\text{th}$ component thereof. \\
+\end{tabular}
+
+\end{document}

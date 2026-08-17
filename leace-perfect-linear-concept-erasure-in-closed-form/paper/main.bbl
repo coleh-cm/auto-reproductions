@@ -1,0 +1,376 @@
+\begin{thebibliography}{44}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Berkeley(2018)]{berkeley2018hilbert}
+UC~Berkeley.
+\newblock The {Hilbert} space of random variables.
+\newblock Lecture Notes Electrical Engineering 126, 2018.
+\newblock URL \url{https://inst.eecs.berkeley.edu/~ee126/sp18/projection.pdf}.
+
+\bibitem[Biderman et~al.(2023)Biderman, Schoelkopf, Anthony, Bradley, O'Brien,
+  Hallahan, Khan, Purohit, Prashanth, Raff, et~al.]{biderman2023pythia}
+Stella Biderman, Hailey Schoelkopf, Quentin Anthony, Herbie Bradley, Kyle
+  O'Brien, Eric Hallahan, Mohammad~Aflah Khan, Shivanshu Purohit, USVSN~Sai
+  Prashanth, Edward Raff, et~al.
+\newblock Pythia: A suite for analyzing large language models across training
+  and scaling.
+\newblock \emph{arXiv preprint arXiv:2304.01373}, 2023.
+
+\bibitem[Bolukbasi et~al.(2016)Bolukbasi, Chang, Zou, Saligrama, and
+  Kalai]{bolukbasi2016man}
+Tolga Bolukbasi, Kai-Wei Chang, James~Y. Zou, Venkatesh Saligrama, and Adam~T.
+  Kalai.
+\newblock Man is to computer programmer as woman is to homemaker? {D}ebiasing
+  word embeddings.
+\newblock \emph{Advances in {N}eural {I}nformation {P}rocessing {S}ystems},
+  29:\penalty0 4349--4357, 2016.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper/2016/file/a486cd07e4ac3d270571622f4f316ec5-Paper.pdf}.
+
+\bibitem[Chen et~al.(2018)Chen, Sun, Athiwaratkun, Cardie, and
+  Weinberger]{chen2018adversarial}
+Xilun Chen, Yu~Sun, Ben Athiwaratkun, Claire Cardie, and Kilian Weinberger.
+\newblock Adversarial deep averaging networks for cross-lingual sentiment
+  classification.
+\newblock \emph{Transactions of the Association for Computational Linguistics},
+  6:\penalty0 557--570, 2018.
+\newblock URL \url{https://aclanthology.org/Q18-1039}.
+
+\bibitem[Dankers et~al.(2022)Dankers, Lucas, and Titov]{dankers2022can}
+Verna Dankers, Christopher Lucas, and Ivan Titov.
+\newblock Can transformer be too compositional? {A}nalysing idiom processing in
+  neural machine translation.
+\newblock In \emph{Proceedings of the 60th Annual Meeting of the Association
+  for Computational Linguistics (Volume 1: Long Papers)}, pages 3608--3626,
+  2022.
+
+\bibitem[De-Arteaga et~al.(2019)De-Arteaga, Romanov, Wallach, Chayes, Borgs,
+  Chouldechova, Geyik, Kenthapadi, and
+  Kalai]{DBLP:journals/corr/abs-1901-09451}
+Maria De-Arteaga, Alexey Romanov, Hanna Wallach, Jennifer Chayes, Christian
+  Borgs, Alexandra Chouldechova, Sahin Geyik, Krishnaram Kenthapadi, and
+  Adam~Tauman Kalai.
+\newblock Bias in bios: A case study of semantic representation bias in a
+  high-stakes setting.
+\newblock In \emph{Proceedings of the Conference on Fairness, Accountability,
+  and Transparency}, FAT* '19, page 120–128, New York, NY, USA, 2019.
+  Association for Computing Machinery.
+\newblock ISBN 9781450361255.
+\newblock \doi{10.1145/3287560.3287572}.
+\newblock URL \url{https://doi.org/10.1145/3287560.3287572}.
+
+\bibitem[Dev et~al.(2021)Dev, Li, Phillips, and Srikumar]{dev2020oscar}
+Sunipa Dev, Tao Li, Jeff~M. Phillips, and Vivek Srikumar.
+\newblock {OSC}a{R}: Orthogonal subspace correction and rectification of biases
+  in word embeddings.
+\newblock In \emph{Proceedings of the 2021 Conference on Empirical Methods in
+  Natural Language Processing}, pages 5034--5050, Online and Punta Cana,
+  Dominican Republic, November 2021. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2021.emnlp-main.411}.
+\newblock URL \url{https://aclanthology.org/2021.emnlp-main.411}.
+
+\bibitem[Edwards and Storkey(2016)]{edwards2015censoring}
+Harrison Edwards and Amos Storkey.
+\newblock Censoring representations with an adversary.
+\newblock In \emph{International Conference in Learning Representations}, pages
+  1--14, May 2016.
+\newblock URL \url{https://arxiv.org/abs/1511.05897}.
+
+\bibitem[Elazar and Goldberg(2018)]{elazar-goldberg-2018-adversarial}
+Yanai Elazar and Yoav Goldberg.
+\newblock Adversarial removal of demographic attributes from text data.
+\newblock In \emph{Proceedings of the 2018 Conference on Empirical Methods in
+  Natural Language Processing}, pages 11--21, Brussels, Belgium,
+  October-November 2018. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/D18-1002}.
+\newblock URL \url{https://aclanthology.org/D18-1002}.
+
+\bibitem[Elazar et~al.(2021)Elazar, Ravfogel, Jacovi, and
+  Goldberg]{elazar2021amnesic}
+Yanai Elazar, Shauli Ravfogel, Alon Jacovi, and Yoav Goldberg.
+\newblock Amnesic probing: Behavioral explanation with amnesic counterfactuals.
+\newblock \emph{Transactions of the Association for Computational Linguistics},
+  9:\penalty0 160--175, 2021.
+\newblock \doi{10.1162/tacl_a_00359}.
+\newblock URL \url{https://aclanthology.org/2021.tacl-1.10}.
+
+\bibitem[Elhage et~al.(2021)Elhage, Nanda, Olsson, Henighan, Joseph, Mann,
+  Askell, Bai, Chen, Conerly, DasSarma, Drain, Ganguli, Zac~Dodds, Hernandez,
+  Jones, Kernion, Lovitt, Ndousse, Amodei, Brown, Clark, Kaplan, McCandlish,
+  and Olah]{elhage2021mathematical}
+Nelson Elhage, Neel Nanda, Catherine Olsson, Tom Henighan, Nicholas Joseph, Ben
+  Mann, Amanda Askell, Yuntao Bai, Anna Chen, Tom Conerly, Nova DasSarma, Dawn
+  Drain, Deep Ganguli, Hatfield Zac~Dodds, Danny Hernandez, Andy Jones, Jackson
+  Kernion, Liane Lovitt, Kamal Ndousse, Dario Amodei, Tom Brown, Jack Clark,
+  Jared Kaplan, Sam McCandlish, and Chris Olah.
+\newblock A mathematical framework for transformer circuits.
+\newblock \emph{Transformer Circuits Thread}, 2021.
+
+\bibitem[Ferguson(1967)]{ferguson1967statistics}
+Thomas~S. Ferguson.
+\newblock \emph{Mathematical Statistics}.
+\newblock Academic Press, Cambridge, MA, 1967.
+
+\bibitem[Gao et~al.(2020)Gao, Biderman, Black, Golding, Hoppe, Foster, Phang,
+  He, Thite, Nabeshima, Presser, and Leahy]{gao2020pile}
+Leo Gao, Stella Biderman, Sid Black, Laurence Golding, Travis Hoppe, Charles
+  Foster, Jason Phang, Horace He, Anish Thite, Noa Nabeshima, Shawn Presser,
+  and Connor Leahy.
+\newblock The {P}ile: An {800GB} dataset of diverse text for language modeling.
+\newblock \emph{arXiv preprint arXiv:2101.00027}, 2020.
+
+\bibitem[Geiger et~al.(2022)Geiger, Wu, Lu, Rozner, Kreiss, Icard, Goodman, and
+  Potts]{geiger2022inducing}
+Atticus Geiger, Zhengxuan Wu, Hanson Lu, Josh Rozner, Elisa Kreiss, Thomas
+  Icard, Noah Goodman, and Christopher Potts.
+\newblock Inducing causal structure for interpretable neural networks.
+\newblock In \emph{International Conference on Machine Learning}, pages
+  7324--7338. PMLR, 2022.
+
+\bibitem[Grimsley et~al.(2020)Grimsley, Mayfield, and
+  R.S.~Bursten]{grimsley2020attention}
+Christopher Grimsley, Elijah Mayfield, and Julia R.S.~Bursten.
+\newblock Why attention is not explanation: Surgical intervention and causal
+  reasoning about neural models.
+\newblock In \emph{Proceedings of the Twelfth Language Resources and Evaluation
+  Conference}, pages 1780--1790, Marseille, France, May 2020. European Language
+  Resources Association.
+\newblock URL \url{https://aclanthology.org/2020.lrec-1.220}.
+
+\bibitem[Haghighatkhah et~al.(2021)Haghighatkhah, Meulemans, Speckmann,
+  Urhausen, and Verbeek]{haghighatkhah2021obstructing}
+Pantea Haghighatkhah, Wouter Meulemans, Bettina Speckmann, J{\'e}r{\^o}me
+  Urhausen, and Kevin Verbeek.
+\newblock Obstructing classification via projection.
+\newblock In Filippo Bonchi and {Simon J.} Puglisi, editors, \emph{46th
+  International Symposium on Mathematical Foundations of Computer Science},
+  Leibniz International Proceedings in Informatics, LIPIcs. Schloss Dagstuhl -
+  Leibniz-Zentrum f{\"u}r Informatik, 2021.
+
+\bibitem[Haghighatkhah et~al.(2022)Haghighatkhah, Fokkens, Sommerauer,
+  Speckmann, and Verbeek]{haghighatkhah2022better}
+Pantea Haghighatkhah, Antske Fokkens, Pia Sommerauer, Bettina Speckmann, and
+  Kevin Verbeek.
+\newblock Better hit the nail on the head than beat around the bush: Removing
+  protected attributes with a single projection.
+\newblock pages 8395--8416, December 2022.
+\newblock \doi{10.18653/v1/2022.emnlp-main.575}.
+\newblock URL \url{https://aclanthology.org/2022.emnlp-main.575}.
+
+\bibitem[Hernandez and Andreas(2021)]{hernandez2021low}
+Evan Hernandez and Jacob Andreas.
+\newblock The low-dimensional linear geometry of contextualized word
+  representations.
+\newblock In \emph{Proceedings of the 25th Conference on Computational Natural
+  Language Learning}, pages 82--93, 2021.
+
+\bibitem[Honnibal et~al.(2020)Honnibal, Montani, Van~Landeghem, and
+  Boyd]{honnibal2020spacy}
+Matthew Honnibal, Ines Montani, Sofie Van~Landeghem, and Adriane Boyd.
+\newblock {spaCy: Industrial-strength Natural Language Processing in Python},
+  2020.
+
+\bibitem[Kleindessner et~al.(2023)Kleindessner, Donini, Russell, and
+  Zafar]{kleindessner2023efficient}
+Matth{\"a}us Kleindessner, Michele Donini, Chris Russell, and Muhammad~Bilal
+  Zafar.
+\newblock Efficient fair {PCA} for fair representation learning.
+\newblock In \emph{International Conference on Artificial Intelligence and
+  Statistics}, pages 5250--5270. PMLR, 2023.
+
+\bibitem[Kumar et~al.(2022)Kumar, Tan, and Sharma]{kumar2022probing}
+Abhinav Kumar, Chenhao Tan, and Amit Sharma.
+\newblock Probing classifiers are unreliable for concept removal and detection.
+\newblock In S.~Koyejo, S.~Mohamed, A.~Agarwal, D.~Belgrave, K.~Cho, and A.~Oh,
+  editors, \emph{Advances in Neural Information Processing Systems}, volume~35,
+  pages 17994--18008. Curran Associates, Inc., 2022.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2022/file/725f5e8036cc08adeba4a7c3bcbc6f2c-Paper-Conference.pdf}.
+
+\bibitem[Kusner et~al.(2017)Kusner, Loftus, Russell, and
+  Silva]{kusner2017counterfactual}
+Matt~J. Kusner, Joshua Loftus, Chris Russell, and Ricardo Silva.
+\newblock Counterfactual fairness.
+\newblock \emph{Advances in Neural Information Processing Systems}, 30, 2017.
+
+\bibitem[McDonald et~al.(2013)McDonald, Nivre, Quirmbach-Brundage, Goldberg,
+  Das, Ganchev, Hall, Petrov, Zhang, T{\"a}ckstr{\"o}m,
+  et~al.]{mcdonald2013universal}
+Ryan McDonald, Joakim Nivre, Yvonne Quirmbach-Brundage, Yoav Goldberg, Dipanjan
+  Das, Kuzman Ganchev, Keith Hall, Slav Petrov, Hao Zhang, Oscar
+  T{\"a}ckstr{\"o}m, et~al.
+\newblock Universal dependency annotation for multilingual parsing.
+\newblock In \emph{Proceedings of the 51st Annual Meeting of the Association
+  for Computational Linguistics (Volume 2: Short Papers)}, pages 92--97, 2013.
+
+\bibitem[Nanda(2023)]{nanda_othello_2023}
+Neel Nanda.
+\newblock Actually, {Othello-GPT} has a linear emergent world model, Mar 2023.
+\newblock URL
+  \url{<https://neelnanda.io/mechanistic-interpretability/othello>}.
+
+\bibitem[Nikoulina et~al.(2021)Nikoulina, Tezekbayev, Kozhakhmet, Babazhanova,
+  Gall{\'e}, and Assylbekov]{nikoulina2021rediscovery}
+Vassilina Nikoulina, Maxat Tezekbayev, Nuradil Kozhakhmet, Madina Babazhanova,
+  Matthias Gall{\'e}, and Zhenisbek Assylbekov.
+\newblock The rediscovery hypothesis: Language models need to meet linguistics.
+\newblock \emph{Journal of Artificial Intelligence Research}, 72:\penalty0
+  1343--1384, 2021.
+
+\bibitem[Nilforoshan et~al.(2022)Nilforoshan, Gaebler, Shroff, and
+  Goel]{nilforoshan2022causal}
+Hamed Nilforoshan, Johann~D. Gaebler, Ravi Shroff, and Sharad Goel.
+\newblock Causal conceptions of fairness and their consequences.
+\newblock In \emph{International Conference on Machine Learning}, pages
+  16848--16887. PMLR, 2022.
+
+\bibitem[Nivre et~al.(2020)Nivre, de~Marneffe, Ginter, Hajic, Manning, Pyysalo,
+  Schuster, Tyers, and Zeman]{nivre2020universal}
+Joakim Nivre, Marie-Catherine de~Marneffe, Filip Ginter, Jan Hajic,
+  Christopher~D. Manning, Sampo Pyysalo, Sebastian Schuster, Francis Tyers, and
+  Daniel Zeman.
+\newblock Universal {D}ependencies v2: An evergrowing multilingual treebank
+  collection.
+\newblock In \emph{Proceedings of the 12th Language Resources and Evaluation
+  Conference}, pages 4034--4043, 2020.
+
+\bibitem[Pearl(2009)]{pearl09causality}
+Judea Pearl.
+\newblock \emph{Causality}.
+\newblock Cambridge University Press, Cambridge, UK, 2 edition, 2009.
+\newblock ISBN 978-0-521-89560-6.
+\newblock \doi{10.1017/CBO9780511803161}.
+
+\bibitem[Ravfogel et~al.(2020)Ravfogel, Elazar, Gonen, Twiton, and
+  Goldberg]{ravfogel-etal-2020-null}
+Shauli Ravfogel, Yanai Elazar, Hila Gonen, Michael Twiton, and Yoav Goldberg.
+\newblock Null it out: Guarding protected attributes by iterative nullspace
+  projection.
+\newblock In \emph{Proceedings of the 58th Annual Meeting of the Association
+  for Computational Linguistics}, pages 7237--7256, Online, July 2020.
+  Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2020.acl-main.647}.
+\newblock URL \url{https://aclanthology.org/2020.acl-main.647}.
+
+\bibitem[Ravfogel et~al.(2021)Ravfogel, Prasad, Linzen, and
+  Goldberg]{ravfogel2021counterfactual}
+Shauli Ravfogel, Grusha Prasad, Tal Linzen, and Yoav Goldberg.
+\newblock Counterfactual interventions reveal the causal effect of relative
+  clause representations on agreement prediction.
+\newblock In \emph{Proceedings of the 25th Conference on Computational Natural
+  Language Learning}, pages 194--209, 2021.
+
+\bibitem[Ravfogel et~al.(2022{\natexlab{a}})Ravfogel, Twiton, Goldberg, and
+  Cotterell]{ravfogel2022rlace}
+Shauli Ravfogel, Michael Twiton, Yoav Goldberg, and Ryan~D Cotterell.
+\newblock Linear adversarial concept erasure.
+\newblock In \emph{International Conference on Machine Learning}, pages
+  18400--18421. PMLR, 2022{\natexlab{a}}.
+
+\bibitem[Ravfogel et~al.(2022{\natexlab{b}})Ravfogel, Vargas, Goldberg, and
+  Cotterell]{ravfogel2022adversarial}
+Shauli Ravfogel, Francisco Vargas, Yoav Goldberg, and Ryan Cotterell.
+\newblock Adversarial concept erasure in kernel space.
+\newblock In \emph{Proceedings of the 2022 Conference on Empirical Methods in
+  Natural Language Processing}, pages 6034--6055, 2022{\natexlab{b}}.
+
+\bibitem[Ravfogel et~al.(2023)Ravfogel, Goldberg, and
+  Cotterell]{ravfogel2022linear}
+Shauli Ravfogel, Yoav Goldberg, and Ryan Cotterell.
+\newblock Log-linear guardedness and its implications.
+\newblock In \emph{Proceedings of the 61st Annual Meeting of the Association
+  for Computational Linguistics (Volume 1: Long Papers)}, pages 9413--9431,
+  Toronto, Canada, July 2023. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2023.acl-long.523}.
+\newblock URL \url{https://aclanthology.org/2023.acl-long.523}.
+
+\bibitem[Sadeghi and Boddeti(2021)]{sadeghi2021fundamental}
+Bashir Sadeghi and Vishnu Boddeti.
+\newblock On the fundamental trade-offs in learning invariant representations.
+\newblock \emph{arXiv preprint arXiv:2109.03386}, 2021.
+\newblock URL \url{https://openreview.net/pdf?id=KOk7mUGspN9}.
+
+\bibitem[Sadeghi et~al.(2019)Sadeghi, Yu, and Boddeti]{sadeghi2019global}
+Bashir Sadeghi, Runyi Yu, and Vishnu Boddeti.
+\newblock On the global optima of kernelized adversarial representation
+  learning.
+\newblock In \emph{2019 IEEE/CVF International Conference on Computer Vision},
+  pages 7970--7978. IEEE, 2019.
+\newblock URL
+  \url{http://hal.cse.msu.edu/assets/pdfs/papers/2019-iccv-kernel-adversarial-representation-learning.pdf}.
+
+\bibitem[Shao et~al.(2023{\natexlab{a}})Shao, Ziser, and
+  Cohen]{shao-etal-2023-gold}
+Shun Shao, Yftah Ziser, and Shay~B. Cohen.
+\newblock Gold doesn{'}t always glitter: Spectral removal of linear and
+  nonlinear guarded attribute information.
+\newblock In \emph{Proceedings of the 17th Conference of the European Chapter
+  of the Association for Computational Linguistics}, pages 1611--1622,
+  Dubrovnik, Croatia, May 2023{\natexlab{a}}. Association for Computational
+  Linguistics.
+\newblock URL \url{https://aclanthology.org/2023.eacl-main.118}.
+
+\bibitem[Shao et~al.(2023{\natexlab{b}})Shao, Ziser, and
+  Cohen]{shao2023erasure}
+Shun Shao, Yftah Ziser, and Shay~B. Cohen.
+\newblock Erasure of unaligned attributes from neural representations.
+\newblock \emph{Transactions of the Association for Computational Linguistics},
+  11:\penalty0 488--510, 2023{\natexlab{b}}.
+\newblock \doi{10.1162/tacl_a_00558}.
+\newblock URL \url{https://aclanthology.org/2023.tacl-1.29}.
+
+\bibitem[Tenney et~al.(2019)Tenney, Das, and Pavlick]{tenney2019bert}
+Ian Tenney, Dipanjan Das, and Ellie Pavlick.
+\newblock {BERT} rediscovers the classical {NLP} pipeline.
+\newblock In \emph{Proceedings of the 57th Annual Meeting of the Association
+  for Computational Linguistics}, pages 4593--4601, 2019.
+
+\bibitem[Touvron et~al.(2023)Touvron, Lavril, Izacard, Martinet, Lachaux,
+  Lacroix, Rozière, Goyal, Hambro, Azhar, Rodriguez, Joulin, Grave, and
+  Lample]{touvron2023llama}
+Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne
+  Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro,
+  Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, and Guillaume
+  Lample.
+\newblock {LLaMA}: Open and efficient foundation language models, 2023.
+\newblock URL \url{http://arxiv.org/abs/2302.13971}.
+
+\bibitem[Woodward(2005)]{woodward2005making}
+James~Francis Woodward.
+\newblock \emph{Making Things Happen: A Theory of Causal Explanation
+  explanation}.
+\newblock Oxford University Press, 2005.
+
+\bibitem[Wu et~al.(2023)Wu, Geiger, Potts, and Goodman]{wu2023interpretability}
+Zhengxuan Wu, Atticus Geiger, Christopher Potts, and Noah Goodman.
+\newblock Interpretability at scale: Identifying causal mechanisms in {A}lpaca.
+\newblock 2023.
+
+\bibitem[Xie et~al.(2017)Xie, Dai, Du, Hovy, and Neubig]{xie2017controllable}
+Qizhe Xie, Zihang Dai, Yulun Du, Eduard Hovy, and Graham Neubig.
+\newblock Controllable invariance through adversarial feature learning.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~30, pages 585--596, 2017.
+\newblock URL \url{https://dl.acm.org/doi/10.5555/3294771.3294827}.
+
+\bibitem[Xu et~al.(2020)Xu, Zhao, Song, Stewart, and Ermon]{xu2020theory}
+Yilun Xu, Shengjia Zhao, Jiaming Song, Russell Stewart, and Stefano Ermon.
+\newblock A theory of usable information under computational constraints.
+\newblock In \emph{8th International Conference on Learning Representations},
+  2020.
+\newblock URL \url{https://openreview.net/forum?id=r1eBeyHFDH}.
+
+\bibitem[Zhang et~al.(2018)Zhang, Lemoine, and Mitchell]{zhang2018mitigating}
+Brian~Hu Zhang, Blake Lemoine, and Margaret Mitchell.
+\newblock Mitigating unwanted biases with adversarial learning.
+\newblock In \emph{Proceedings of the 2018 AAAI/ACM Conference on AI, Ethics,
+  and Society}, page 335–340, New York, NY, USA, 2018. Association for
+  Computing Machinery.
+\newblock ISBN 9781450360128.
+\newblock URL \url{https://doi.org/10.1145/3278721.3278779}.
+
+\end{thebibliography}
