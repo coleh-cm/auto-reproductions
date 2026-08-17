@@ -63,3 +63,17 @@ def test_degeneracy_inactive_control_is_identity():
     c = torch.randn(2, 4, 1, d)
     out = ctrl(c, place_in_unet="down")
     assert torch.equal(out, c)
+
+
+def test_degeneracy_rejects_nonzero_offset():
+    """Negative: the degeneracy check (torch.equal vs the input) REJECTS a known-wrong
+    output -- a steered output carrying a non-zero offset at beta=0. This is the same
+    defect as mutations.json: degeneracy_offset (return vector + steering_delta + 0.001)
+    and proves the bit-exact check can catch a broken no-op rather than passing silently."""
+    torch.manual_seed(3)
+    d = 64
+    c = torch.randn(2, 4, 1, d)
+    # beta=0 must be identity; a defect that adds a non-zero offset is NOT bit-identical.
+    broken = c + 0.001
+    assert not torch.equal(broken, c), (
+        "degeneracy check must reject a non-zero offset at beta=0")

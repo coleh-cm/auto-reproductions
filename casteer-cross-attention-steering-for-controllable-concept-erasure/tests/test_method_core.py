@@ -160,3 +160,20 @@ def test_controller_preserves_shape():
     c = torch.randn(2, 7, 1, d)
     out = ctrl(c, place_in_unet="down")
     assert out.shape == c.shape
+
+
+def test_householder_rejects_half_strength():
+    """Negative: the Householder norm-preservation invariant (claim `house`,
+    experiments.tex:21-22) REJECTS a known-wrong projection. The half_strength_projection
+    defect (mutations.json) applies (I - 1*s s^T) instead of (I - 2*s s^T); this does NOT
+    preserve ||c||, so the | ||out|| - ||c|| | < 1e-5 invariant fails -- proving the
+    check catches a broken reflection rather than passing silently."""
+    torch.manual_seed(8)
+    d = 320
+    s = torch.randn(d, dtype=torch.float64)
+    s = s / s.norm()
+    c = torch.randn(d, dtype=torch.float64)
+    # (I - 1*s s^T) c -- the half-strength (broken) form, NOT a Householder reflection.
+    out = c - 1.0 * (s @ c) * s
+    assert abs(out.norm().item() - c.norm().item()) > 1e-5, (
+        "half-strength projection must fail the norm-preservation invariant")

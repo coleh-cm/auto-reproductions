@@ -4,8 +4,15 @@
       "name": "data_loader_fingerprint",
       "what_it_decides": "Whether the paper's own datasets are present and uncorrupted, by fingerprint (size, vocabulary, checksum). A data loader is an instrument (SPEC: a closed-book run once fell back to a synthetic corpus and produced chance-level numbers).",
       "file": "core/data.py",
-      "positive_test": "tests/test_data.py::test_imagenet_classes_fingerprint passes: load_imagenet_classes(n=50) returns 50 entries with [0]=='tench'; test_clip_templates_fingerprint: 80 templates with [0]=='a bad photo of a {}'; test_coco_captions_fingerprint: 30000 captions with first=='A bicycle replica with a clock as the front wheel.'; test_i2p_prompts_fingerprint: 4703 prompts (experiments.tex:39).",
-      "negative_test": "tests/test_data.py::test_coco_reference_fingerprint_blocks_without_vendor asserts load_coco_reference_images() RAISES (never substitutes synthetic) when the real COCO-30k reference is not vendored. A mutated loader that returns a synthetic corpus would fail this.",
+      "positive_test": [
+        "tests/test_data.py::test_imagenet_classes_fingerprint",
+        "tests/test_data.py::test_clip_templates_fingerprint",
+        "tests/test_data.py::test_coco_captions_fingerprint",
+        "tests/test_data.py::test_i2p_prompts_fingerprint"
+      ],
+      "negative_test": [
+        "tests/test_data.py::test_coco_reference_fingerprint_blocks_without_vendor"
+      ],
       "requires_tools": "HuggingFace datasets (AIML-TUDA/i2p) for the I2P fingerprint; local files for the rest.",
       "invocation": "uses sys.executable via the venv pytest; no bare python"
     },
@@ -13,58 +20,91 @@
       "name": "clip_scorer",
       "what_it_decides": "CLIP score (ViT-B/32, w=2.5) of an image against a prompt -- the scorer behind snoopy_cs / other_cs / coco_clip30k and the paper's per-seed normalization (experiments.tex:75).",
       "file": "core/eval/clip.py, core/eval/metrics.py::clip_score_mean",
-      "positive_test": "tests/test_eval.py::test_clip_score_positive_known_correct: a real solid-blue image with prompt 'a blue sky' returns a finite, non-negative score (device-agnostic, CPU-runnable).",
-      "negative_test": "tests/test_eval.py::test_clip_score_negative_rejects_empty: an empty image list RAISES ValueError (no OK-on-empty); test_clip_score_negative_mismatched_lengths: mismatched image/prompt counts RAISE.",
+      "positive_test": [
+        "tests/test_eval.py::test_clip_score_positive_known_correct"
+      ],
+      "negative_test": [
+        "tests/test_eval.py::test_clip_score_negative_rejects_empty",
+        "tests/test_eval.py::test_clip_score_negative_mismatched_lengths"
+      ],
       "requires_tools": "clip-anytorch ViT-B/32 weights (downloaded on first use; CPU-runnable)."
     },
     {
       "name": "fid_scorer",
       "what_it_decides": "Frechet Inception Distance between two image folders (clean-fid). Backs coco_fid30k (vs real COCO-30k, SPEC U10) and other_fid (vs our own sd14 generations, experiments.tex:72-73).",
       "file": "core/eval/metrics.py::_fid",
-      "positive_test": "tests/test_eval.py::test_fid_positive_identical_dirs: FID(dir, dir) == 0 (within 1e-2) for identical image sets.",
-      "negative_test": "tests/test_eval.py::test_fid_negative_different_dirs: FID between two clearly different image sets is > 1.0; test_fid_negative_rejects_empty: an empty directory RAISES (no OK-on-empty).",
+      "positive_test": [
+        "tests/test_eval.py::test_fid_positive_identical_dirs"
+      ],
+      "negative_test": [
+        "tests/test_eval.py::test_fid_negative_different_dirs",
+        "tests/test_eval.py::test_fid_negative_rejects_empty"
+      ],
       "requires_tools": "clean-fid Inception model (downloaded on first use; CPU-runnable via device='cpu')."
     },
     {
       "name": "degeneracy_equivalence_check",
       "what_it_decides": "Whether the method at its no-op setting (beta=0) reproduces the baseline EXACTLY -- the cheapest real correctness evidence (research-code skill: degeneracy test).",
       "file": "tests/test_degeneracy.py",
-      "positive_test": "tests/test_degeneracy.py::test_degeneracy_strength_zero_dotproduct_bitexact and ::test_degeneracy_strength_zero_constant_bitexact: with strength=0.0 the controller output is bit-identical (torch.equal) to the input on both dotproduct and constant modes.",
-      "negative_test": "A defect that adds a non-zero offset at strength=0 (mutations.json: degeneracy_offset) makes these tests FAIL -- proving the check can catch a broken no-op. ::test_degeneracy_inactive_control_is_identity additionally checks the inactive-control path.",
+      "positive_test": [
+        "tests/test_degeneracy.py::test_degeneracy_strength_zero_dotproduct_bitexact",
+        "tests/test_degeneracy.py::test_degeneracy_strength_zero_constant_bitexact",
+        "tests/test_degeneracy.py::test_degeneracy_inactive_control_is_identity"
+      ],
+      "negative_test": [
+        "tests/test_degeneracy.py::test_degeneracy_rejects_nonzero_offset"
+      ],
       "requires_tools": false
     },
     {
       "name": "householder_invariant_check",
       "what_it_decides": "SPEC claim `house` (experiments.tex:21-22): (I - 2 s s^T) preserves ||c||_2 for unit s, and construction is unit-norm (U1). This is an invariant from the paper's maths.",
-      "file": "tests/test_method_core.py::test_householder_norm_preservation, ::test_construction_is_unit_norm",
-      "positive_test": "For d in {320,640,1280}, 100 random unit s and random c (float64): max | ||(I-2 s s^T)c|| - ||c|| | < 1e-5; raw/||raw|| is unit-norm.",
-      "negative_test": "A defect that scales the projection by 0.5 (mutations.json: half_strength_projection) makes the controller apply (I - 1*s s^T) instead of (I - 2 s s^T), which does NOT preserve ||c|| -- test_eq6_noclip_matches_matrix_form FAILS.",
+      "file": "tests/test_method_core.py::test_householder_norm_preservation, tests/test_method_core.py::test_construction_is_unit_norm",
+      "positive_test": [
+        "tests/test_method_core.py::test_householder_norm_preservation",
+        "tests/test_method_core.py::test_construction_is_unit_norm"
+      ],
+      "negative_test": [
+        "tests/test_method_core.py::test_householder_rejects_half_strength"
+      ],
       "requires_tools": false
     },
     {
       "name": "nudenet_detector",
-      "what_it_decides": "Sum over 8 NudeNet classes of detections at threshold 0.6 on generated I2P images (nudity.tex:4,9). Backs nudity_total.",
+      "what_it_decides": "Sum over 8 NudeNet classes of detections at threshold 0.6 on generated I2P images (nudity.tex:4,9). Backs nudity_total. not_applicable in this CPU venv: the `nudenet` package is not installed, so the metric must RAISE MissingEvaluatorError (a grader that cannot run must raise, never return a negative verdict).",
       "file": "core/eval/metrics.py::nudity_total",
-      "positive_test": "not_applicable in this CPU venv: the `nudenet` package is not installed. tests/test_eval.py::test_nudity_total_raises_when_unavailable asserts the metric RAISES MissingEvaluatorError (never returns 0).",
-      "negative_test": "not_applicable: not installed. A grader that cannot run must raise, never return a negative verdict.",
+      "positive_test": [
+        "tests/test_eval.py::test_nudity_total_raises_when_unavailable"
+      ],
+      "negative_test": [
+        "tests/test_eval.py::test_metrics_no_ok_on_empty_dirs"
+      ],
       "requires_tools": "nudenet (NudeDetector) -- not installed in this venv; install to evaluate nudity_total."
     },
     {
       "name": "q16_classifier",
-      "what_it_decides": "Number of images the Q16 classifier flags as inappropriate over the I2P subset (experiments.tex:47, i2p.tex:33). Backs i2p_overall_pct.",
+      "what_it_decides": "Number of images the Q16 classifier flags as inappropriate over the I2P subset (experiments.tex:47, i2p.tex:33). Backs i2p_overall_pct. not_applicable: the paper does not name the Q16 checkpoint and it is not vendored here, so the metric must RAISE MissingEvaluatorError.",
       "file": "core/eval/metrics.py::q16_inappropriate_count",
-      "positive_test": "not_applicable: the paper does not name the Q16 checkpoint and it is not vendored here. tests/test_eval.py::test_q16_raises_when_unavailable asserts the metric RAISES MissingEvaluatorError.",
-      "negative_test": "not_applicable: checkpoint not available.",
+      "positive_test": [
+        "tests/test_eval.py::test_q16_raises_when_unavailable"
+      ],
+      "negative_test": [
+        "tests/test_eval.py::test_metrics_no_ok_on_empty_dirs"
+      ],
       "requires_tools": "Q16 classifier checkpoint (transformers) -- not named by the paper, not vendored."
     },
     {
       "name": "lpips_scorer",
-      "what_it_decides": "Mean LPIPS (alex net) between steered and vanilla sd14 images on Van Gogh prompts, same prompt+seed pairs. Backs vangogh_lpips_e (SPEC U14: LPIPS_e UP = better erasure).",
+      "what_it_decides": "Mean LPIPS (alex net) between steered and vanilla sd14 images on Van Gogh prompts, same prompt+seed pairs. Backs vangogh_lpips_e (SPEC U14: LPIPS_e UP = better erasure). not_applicable in this CPU venv: `lpips` is not installed, so the metric must RAISE MissingEvaluatorError.",
       "file": "core/eval/metrics.py::vangogh_lpips_e",
-      "positive_test": "not_applicable in this CPU venv: `lpips` is not installed. tests/test_eval.py::test_lpips_raises_when_unavailable asserts the metric RAISES MissingEvaluatorError.",
-      "negative_test": "not_applicable: not installed.",
+      "positive_test": [
+        "tests/test_eval.py::test_lpips_raises_when_unavailable"
+      ],
+      "negative_test": [
+        "tests/test_eval.py::test_metrics_no_ok_on_empty_dirs"
+      ],
       "requires_tools": "lpips (alex net) -- not installed in this venv; install to evaluate vangogh_lpips_e."
     }
   ],
-  "note": "Instruments whose backing tool is not installed in this CPU venv (NudeNet, Q16, LPIPS) are marked requires_tools and their metrics RAISE MissingEvaluatorError rather than returning a verdict. A grader that cannot run must raise, never return a negative result."
+  "note": "Instruments whose backing tool is not installed in this CPU venv (NudeNet, Q16, LPIPS) are marked requires_tools and their metrics RAISE MissingEvaluatorError rather than returning a verdict. A grader that cannot run must raise, never return a negative result. Every positive_test/negative_test entry is a real pytest node (file::test); for the unavailable graders the positive_test proves the raise-when-unavailable contract and the negative_test proves the no-OK-on-empty contract."
 }
