@@ -19,13 +19,22 @@ authoritative for maths. All citations below are `<file>:<line>` into the on-dis
 - **Decision: adopt upstream code** as the base implementation (the paper's own code ships the
   method), running its entrypoints; record every change made to make it run.
 - Divergences between upstream code and the paper's literal text found on first inspection
-  (to be verified, not assumed, during adoption):
+  (to be verified, not assumed, during adoption; verified against HEAD 0f3b31e on 2026-08-17):
   1. `core/controller.py` applies `intermediate_clipping=True` (projection scores clipped to ≥ 0,
-     lines 216–217 and 260–261) in all steer paths. **Not in the paper.** Default ON. This is a
+     lines 216–217 and 260–261; constructor default `True` at line 99) in all steer paths.
+     **Not in the paper.** Default ON in the class. The CLI opt-in help text reads
+     "Apply intermediate clipping like CASteer for leace and midsteer"
+     (`scripts/diffusion/run_with_steering.py:160`, `scripts/llm/run_with_steering.py:191`) —
+     upstream's own description attributes the convention to CASteer, not to this paper. This is a
      candidate cause of a paper-vs-code mismatch; the paper's affine map is linear in (X−μ).
   2. `core/controller.py:157-176` uses class-conditional *mean differences* relative to a neutral
      mean (`mu_neutral`) instead of the literal `Cov(X, Z_i)` (which includes the class-prior
-     factor `P(Z_i=1)`; see gap G3).
+     factor `P(Z_i=1)`; see gap G3). Verified: `source_vector -= m_neutral`,
+     `target_vector -= m_neutral`, then whitening by `sigma_minus_half`; the `leace` arm builds
+     its update direction from the whitened **source − target** difference
+     (`steering_vector = source_vector - target_vector`, `pinv(steering_vector)`), which is
+     exactly the G3 pair reading with a balanced prior; the `midsteer` arm uses
+     `pinv(source_vector)` as Eq. 23 prescribes.
   3. `core/math.py:13` pseudoinverse/square-root eigen-tolerance `τ = λ_max·d·ε` (torch.pinverse
      convention). Not stated in the paper (gap G7).
   4. Statistics are per attention head (`core/vector_dump.py`, `Welford` per head) — consistent
@@ -233,10 +242,22 @@ the text. Readings below are the ones the implementation will take EXCEPT where 
   hyperparameter. *Permitted:* (a) literal empirical Cov over a pooled sample with arbitrary
   mix; (b) class-conditional mean differences μ_i − μ_bg with any scalar prior absorbed into β.
   *Weakest:* (b) — it adds no commitment about class priors beyond what β already absorbs, and it
-  is what the upstream code does (`core/controller.py:157-176`). The same reading fixes the
-  LEACE-Switch experiments' Z as the source-class indicator within the {source prompts ∪ target
-  prompts} sample (the theorem's dataset partition), and the vanilla pair vector as
-  s = μ_s − μ_t.
+  is what the upstream code does (`core/controller.py:157-176`, verified §1 item 2). The same
+  reading fixes the LEACE-Switch experiments' Z as the source-class indicator within the
+  {source prompts ∪ target prompts} sample (the theorem's dataset partition), and the vanilla
+  pair vector as s = μ_s − μ_t.
+  *Precision on what (b) commits to.* With class priors c_i = P(Z_i=1), the literal
+  Σ_XZi = c_i(μ_i − μ), so the Eq. 23 update direction is (c_2 Wμ̂_2 − c_1 Wμ̂_1)(Wμ̂_1)^+ =
+  ((c_2/c_1) Wμ̂_2 − Wμ̂_1)(Wμ̂_1)^+ : unequal priors change the update DIRECTION, so a prior
+  ratio cannot in general be absorbed into the printed Eq. 23 β (which scales the whole
+  correction (Σ_WX,Z2 − Σ_WX,Z1)). Reading (b) corresponds exactly to the literal formula
+  specialised to balanced priors c_1 = c_2, which is also what "class-conditional covariances
+  based on a sample of size N = 1000" per concept (`paper/content/experiments.tex:63`) most
+  directly admits. Note the paper's commented-out alternative (β = c_2/c_1 multiplying only the
+  target term, `paper/main.tex:494-504`) is a DIFFERENT parametrisation from printed Eq. 23; we
+  implement the printed equation with reading (b), and record the unbalanced-mix case as an
+  untested reading (§10). At β = 1 (the MidSteer default used in claims) reading (b) and the
+  balanced literal reading coincide exactly.
 
 - **G4 · Reference class for E[h|C=0] in s_c (Eq. 1).** "absence of concept c" data is never
   specified. *Permitted:* broad background, or near neighbours (e.g., other animals). *Weakest:*
@@ -441,7 +462,7 @@ arXiv:2301.12987: situation set ⊆, correctness criterion =).
 | Template prompts | 80(–81) (`paper/content/suppl.tex:457-631`) | full listed set | none | — |
 | M (Σ_XX prompts) | 50 000 | 5 000 (may raise if budget allows) | yes — subset; justified by the paper's own ablation (`paper/content/suppl.tex:640-642`) + our Fig-5 read | E2–E5; bound: paper states metrics stabilise by 5 000 |
 | N (Σ_XZ prompts) | 1 000 per concept | 1 000 per concept | none (G1 weakest reading) | — |
-| β grid | {1,2,3,4,5} | {2,2,1} defaults for Table-1 claims; {3,5} for safety/curve claims | yes — subset of the grid | no claim references untested β |
+| β grid | {1,2,3,4,5} safety; {1.0,1.5,...,5.0} in the Llama concrete tables (`paper/artefacts/tables/llm_flip_tables_noclip.tex`) | {2,2,1} defaults for Table-1 claims; {3,5} safety; {3,4,5}/{1..5} integer curve grids | yes — subset of the grid | no claim references untested β |
 | Models | Llama-2-7B-chat, Qwen2.5-7B/14B, SDXL, SANA | Llama-2-7B-chat, SDXL | yes — subset of architectures | Qwen/SANA-specific claims are not made (§10) |
 | Concept pairs | 3 concrete pairs + 2 safety pairs | LLM concrete: horse→motorcycle, dog→cat (chihuahua→muffin excluded — no Llama-judge per-β table published); SDXL concrete: horse→motorcycle; both safety pairs kept | yes — subset | curve claim C20 covers 2 of 3 LLM pairs; magnitude claims scoped to the tested cells |
 | Eval items per condition | 80×10 = 800 | 80(–81)×3 = 240–243 | yes — subset | bundled into sensitivities |
@@ -622,9 +643,9 @@ See ./claims.json — kept byte-identical with the block below.
       "kind": "invariant",
       "compute_invariance": "high",
       "quote": "has the following solution, almost surely:\n\\begin{align}\n    \\widehat A\n    &=\n    I - W^+(W\\Sigma_{XZ})(W\\Sigma_{XZ})^+W,",
-      "citation": "paper/content/guardedness.tex:73",
+      "citation": "paper/content/guardedness.tex:73-77",
       "name": "LEACE closed form enforces zero covariance and is minimal-disturbance; vanilla erasure is its standardized special case",
-      "predicate": "For each seed: draw random PSD Sigma_XX (d=32), column vector Sigma_XZ in Im(Sigma_XX), sample 200000 pairs (X,Z) jointly Gaussian with those covariances. (i) ||Cov(A_hat X + b_hat, Z)||_F < 1e-6 with A_hat,b_hat from Eqs.6-7 (paper/content/guardedness.tex:74-83); (ii) E||A_hat X + b_hat - X||^2 <= min over comparator affine maps {I - c W+ (W Sxz)(W Sxz)+ W, c in linspace(0,2,41)} + 1e-6; (iii) under standardized data (E[X]=0, Sigma_XX=I): max_x ||f_delete(x,s) - (A_hat x + b_hat)||_inf < 1e-8 over 10000 samples with s from Eq.1 (Corollary 4.1, paper/main.tex:297-315).",
+      "predicate": "For each seed: d=32, draw random PSD Sigma_XX, column vector Sigma_XZ in Im(Sigma_XX), sample 200000 pairs (X,Z) jointly Gaussian with those covariances; compute A_hat,b_hat from Eqs.6-7 (paper/content/guardedness.tex:74-83). (i) covariance constraint: ||Cov(A_hat X + b_hat, Z)||_F < 1e-6. (ii) minimal disturbance: obj(A,b) = E||A X + b - X||^2 at (A_hat,b_hat) is <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I - c W+ (W Sxz)(W Sxz)+ W, b(c) = mu - A(c) mu, c in linspace(0,2,41)} and (b) 16 constraint-preserving perturbations {A_hat + D, b = mu - (A_hat+D) mu} with D = R(I - u u+/(u+ u)), u = Sigma_XZ, R a random d-by-d Gaussian scale 0.1 (so Cov((A_hat+D)X + b', Z) = 0 still holds). (iii) vanilla-erasure special case: with standardized data (E[X]=0, Sigma_XX=I) and the UNIT-NORM steering vector s = (E[X|C=1]-E[X|C=0])/||E[X|C=1]-E[X|C=0]|| (normalization required: paper/main.tex:302 authors' comment '% The theorem is only valid if s is normalized'; matrix-form assumption paper/content/suppl.tex:63), max_x ||f_delete(x,s) - (A_hat x + b_hat)||_inf < 1e-8 over 10000 samples (Corollary 4.1, paper/main.tex:297-315).",
       "sensitivity": {
         "fixed_by_paper": true,
         "citation": "paper/content/guardedness.tex:56-85"
@@ -637,7 +658,7 @@ See ./claims.json — kept byte-identical with the block below.
       "quote": "\\widehat{A} &= I - 2W^+(W \\Sigma_{XZ}) (W \\Sigma_{XZ})^+ W",
       "citation": "paper/main.tex:365",
       "name": "LEACE-Switch closed form flips the sign of Cov and is minimal-disturbance; Householder switching is its standardized special case",
-      "predicate": "Setup as C1. (i) ||Cov(A_hat X + b_hat, Z) + Cov(X, Z)||_F < 1e-6 with A_hat from Eq.13 (paper/main.tex:363-367); (ii) E||A_hat X + b_hat - X||^2 <= min over comparator affine maps {I - c W+ (W Sxz)(W Sxz)+ W, c in linspace(0,4,81)} + 1e-6; (iii) under standardized data: max_x ||f_switch(x,s) - (A_hat x + b_hat)||_inf < 1e-8 (Corollary 4.3, paper/main.tex:377-394).",
+      "predicate": "Setup as C1; compute A_hat,b_hat from Eqs.13-14 (paper/main.tex:363-367). (i) flip constraint: ||Cov(A_hat X + b_hat, Z) + Cov(X, Z)||_F < 1e-6. (ii) minimal disturbance: obj(A_hat,b_hat) <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I - c W+ (W Sxz)(W Sxz)+ W, b(c) = mu - A(c) mu, c in linspace(0,4,81)} and (b) 16 constraint-preserving perturbations {A_hat + D} with D = R(I - u u+/(u+ u)), u = Sigma_XZ, scale 0.1 (so Cov((A_hat+D)X + b', Z) = -Cov(X,Z) still holds). (iii) vanilla-switch special case: with standardized data and the UNIT-NORM s as in C1(iii) (paper/main.tex:381 authors' comment '% The theorem is only valid if s is normalized'), max_x ||f_switch(x,s) - (A_hat x + b_hat)||_inf < 1e-8 (Corollary 4.3, paper/main.tex:377-394).",
       "sensitivity": {
         "fixed_by_paper": true,
         "citation": "paper/main.tex:343-367"
@@ -650,7 +671,7 @@ See ./claims.json — kept byte-identical with the block below.
       "quote": "\\widehat{A} &= I + W^+ (\\Sigma_{WX, Z_2} - \\Sigma_{WX, Z_1})\\Sigma_{WX, Z_1}^+ W",
       "citation": "paper/main.tex:447",
       "name": "MidSteer closed form matches Cov(f(X),Z1) to Cov(X,Z2), is minimal-disturbance, and reduces to LEACE for constant Z2",
-      "predicate": "Setup as C1 with l=1, Sigma_XZ1, Sigma_XZ2 random columns in Im(Sigma_XX), Sigma_XZ1 nonzero. (i) ||Cov(A_hat X + b_hat, Z1) - Cov(X, Z2)||_F < 1e-6 with A_hat from Eq.19 (paper/main.tex:445-448); (ii) E||A_hat X + b_hat - X||^2 <= min over comparator affine maps {I + c W+ (Swz2 - Swz1)(Swz1)+ W, c in linspace(0,2,41), W-completed to satisfy the constraint} + 1e-6; (iii) with Z2 constant (Sigma_XZ2 = 0): ||A_hat_midsteer - A_hat_leace||_F < 1e-8 (paper/main.tex:461).",
+      "predicate": "Setup as C1 with l=1: random columns Sigma_XZ1, Sigma_XZ2 in Im(Sigma_XX), Sigma_XZ1 nonzero; compute A_hat from Eq.19 (paper/main.tex:445-448), b_hat = mu - A_hat mu. (i) matched-covariance constraint: ||Cov(A_hat X + b_hat, Z1) - Cov(X, Z2)||_F < 1e-6. (ii) minimal disturbance: obj(A_hat,b_hat) <= obj + 1e-6 at every comparator in (a) the transversal family {A(c) = I + c W+ (Swz2 - Swz1)(Swz1)+ W, c in linspace(0,2,41)} and (b) 16 constraint-preserving perturbations {A_hat + D} with D = R(I - u1 u1+/(u1+ u1)), u1 = Sigma_XZ1, scale 0.1 (so Cov((A_hat+D)X + b', Z1) = Cov(X,Z2) still holds). (iii) erasure special case: with Z2 constant (Sigma_XZ2 = 0), ||A_hat_midsteer - A_hat_leace(Sigma_XZ1)||_F < 1e-8 (paper/main.tex:461).",
       "sensitivity": {
         "fixed_by_paper": true,
         "citation": "paper/main.tex:418-448"
@@ -744,11 +765,12 @@ See ./claims.json — kept byte-identical with the block below.
       "experiment": "e4_sdxl_h2m",
       "quote": "vanilla steering (CASteer) and LEACE fail when presented with prompt for the target concept (\"motorcycle\"), unable to distinguish between forward and reverse steering.",
       "citation": "paper/content/experiments.tex:108",
-      "name": "Vanilla/LEACE-Switch re-induce the source concept on target prompts; MidSteer does not",
-      "quantity": "measured.vanilla.horse_cs_on_moto - measured.midsteer.horse_cs_on_moto",
+      "name": "Vanilla and LEACE-Switch re-induce the source concept on target prompts; MidSteer does not",
+      "quantity": "min(measured.vanilla.horse_cs_on_moto, measured.leace_switch.horse_cs_on_moto) - measured.midsteer.horse_cs_on_moto",
       "direction": ">0",
       "config": {
         "vanilla_beta": 2,
+        "leace_switch_beta": 2,
         "midsteer_beta": 1
       },
       "sensitivity": {
@@ -761,7 +783,7 @@ See ./claims.json — kept byte-identical with the block below.
           240,
           800
         ],
-        "note": "Paper gap 68.3 vs 51.9 (base 51.8): ~16 CLIP-x100 points; robust."
+        "note": "Paper gap min(68.3 vanilla, 67.6 LEACE) vs 51.9 MidSteer (base 51.8): ~15.7 CLIP-x100 points; robust. Quantity takes the better of the two baselines, so it is the weakest dominance statement the quote supports."
       }
     },
     {
@@ -1085,7 +1107,7 @@ See ./claims.json — kept byte-identical with the block below.
       "compute_invariance": "high",
       "experiment": "e2_llm_concrete",
       "quote": "In each case, we see clear superiority of MidSteer over other steering approaches.",
-      "citation": "paper/content/switching_suppl.tex:23",
+      "citation": "paper/content/switching_suppl.tex:21",
       "name": "LLM source-concept suppression: MidSteer below both baselines across beta (Pareto dominance, source axis)",
       "quantity": "[min(measured.vanilla.src_cs_on_src(beta, pair), measured.leace_switch.src_cs_on_src(beta, pair)) for beta in x] (computed per pair, then averaged over the 2 pairs horse->motorcycle, dog->cat)",
       "x": [
@@ -1135,7 +1157,7 @@ See ./claims.json — kept byte-identical with the block below.
           240,
           800
         ],
-        "note": "Paper margins >= 1.2 CLIP-x100 points at every beta (paper/artefacts/tables/diffusion_flip_tables_noclip.tex, Table 16). Backed by figure reads: figure_reads/transcript.md Q3/Q4 (dominant method = MiDSteer)."
+        "note": "Paper margins >= 1.2 CLIP-x100 points at every beta (paper/artefacts/tables/diffusion_flip_tables_noclip.tex, tab:flip_sdxl_noclip_horse_to_motorcycle). Backed by figure reads: figure_reads/transcript.md Q3/Q4 (dominant method = MiDSteer); 2026-08-17 re-verification of the SDXL panel returned empty from the vision endpoint, so the table margins are the primary evidence."
       },
       "against": "[measured.midsteer.horse_cs_on_horse(beta) for beta in x]"
     },
@@ -1181,7 +1203,8 @@ See ./claims.json — kept byte-identical with the block below.
     "GPT-4o-mini judge cross-validation (paper/content/suppl.tex:657-664): needs OPENAI_API_KEY; main-text judge (Llama-3.1-8B-Instruct) is what the paper's headline claims are computed with.",
     "Exact BERT-Precision/F1 magnitudes (paper/content/experiments.tex:98) and MMLU subset composition: BERTScore backbone and MMLU prompt count unstated (G11); only the ordering claim C13 touches this family.",
     "Qualitative figures (paper/img/teaser.png, paper/artefacts/pic_llms_main.tex): not quantitative claims.",
-    "Full per-beta tables K.2/K.3 (paper/artefacts/tables/*_noclip.tex): locked into per-cell ordering claims at the tested betas only."
+    "Full per-beta tables (paper/artefacts/tables/llm_flip_tables_noclip.tex, paper/artefacts/tables/diffusion_flip_tables_noclip.tex, appendix paper/content/switching_suppl.tex:50-63): locked into per-cell ordering claims at the tested betas only.",
+    "The unbalanced class-prior reading of Sigma_XZi estimation (SPEC.md gap G3): printed Eq. 23 is implemented under the balanced-prior specialisation that the per-concept N=1000 wording and upstream code both admit; the commented-out ratio-parametrisation (paper/main.tex:494-504) is a different formula from the printed one and is not implemented."
   ]
 }
 ```
@@ -1205,10 +1228,15 @@ unstated BERTScore backbone of gap G11 re-enters and medium would overstate it).
   the paper and we test the main-text judge only. Recorded as untested rather than weakened.
 - Exact BERT-Precision/F1 magnitudes on MMLU and "Unrel." CS averages across all models: rated
   too jumpy for value claims (BERTScore backbone unstated, G11); only the LLM-safety ordering
-  claim C14 (LEACE best MMLU, medium) touches this family.
+  claim C13 (LEACE best MMLU, medium) touches this family.
 - Qualitative figures (Fig. 3 `paper/img/teaser.png`, Fig. 4 `paper/artefacts/pic_llms_main.tex`):
   not quantitative claims; used only as motivation.
-- Full per-β tables (K.2, K.3): locked into per-cell ordering claims at tested β only.
+- Full per-β tables (`paper/artefacts/tables/llm_flip_tables_noclip.tex`,
+  `paper/artefacts/tables/diffusion_flip_tables_noclip.tex`, appendix
+  `paper/content/switching_suppl.tex:50-63`): locked into per-cell ordering claims at tested β only.
+- The unbalanced class-prior reading of Σ_XZi estimation (G3): the printed Eq. 23 is implemented
+  under the balanced-prior specialisation; the commented-out ratio-parametrisation
+  (`paper/main.tex:494-504`) is a different formula and is not what the paper prints.
 
 ## 11. Figure-reading log
 
@@ -1234,4 +1262,12 @@ required (no deliberation flags triggered). Readings:
   the M ≥ 5000 plateau (~0.95–0.97) sits next to the paper's own Llama-2-7B BERT-F1 column
   (0.936–0.975 across β, `paper/artefacts/tables/safety_table.tex`), confirming the tick-value
   assignment.
-Each figure's underlying PDF was rendered to PNG at 150 dpi from the arXiv source artefacts.
+
+Figure provenance: the arXiv LaTeX tarball on disk does NOT ship the figure image files (no
+`paper/img/`, no `paper/artefacts/**/*.pdf` — only `.tex`). The read figures were PNG renditions
+of the same plots taken from the arXiv HTML version (`arxiv.org/html/2605.05220v3/*.png`);
+Fig. 5's `artefacts/phase/llama2_noclip.pdf` corresponds to `llama2_noclip.png` there. On
+2026-08-17 a re-verification pass re-downloaded two Pareto PNGs and re-asked the constrained
+questions: Fig. 2a (LLM) re-confirmed "MiDSteer"; Fig. 2c (SDXL) returned empty answers twice
+(vision-endpoint behaviour) — appended to `figure_reads/transcript.md`, and C21's margins rest on
+the appendix table, not on the figure read.

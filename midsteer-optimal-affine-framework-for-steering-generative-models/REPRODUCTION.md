@@ -35,6 +35,16 @@ code** as the base implementation. No running code yet.
   x' = x − β·Q(x−μ) ≡ Âx + b̂). Recorded 6 candidate divergences in SPEC.md §1 (projection-score
   clipping ON by default and not in the paper; mean-diff vs literal Cov(X,Z); pinv tolerance;
   per-head stats; hooks vs weight-folding; diffusion-step indexing).
+- [x] SPEC audit pass (2026-08-17): re-verified all 22 claim quotes against cited on-disk lines
+  (fixed C1 citation to `guardedness.tex:73-77`, C20 to `switching_suppl.tex:21`); C7 arithmetic
+  broadened to both baselines named in its quote (`min(vanilla, leace_switch) - midsteer`); C1–C3
+  synthetic predicates made implementable (feasible-set perturbations, unit-norm s made explicit
+  per the authors' own commented caveat `main.tex:302,381`); re-verified upstream claims against
+  HEAD `0f3b31e` (clipping lines/default, mu_neutral mean-difference construction — which matches
+  the G3 balanced-prior pair reading — pinv tolerance, per-head Welford, diffusion-step indexing);
+  G3 sharpened with the balanced-prior precision note; figure re-verification pass appended to
+  `figure_reads/transcript.md` (Fig 2a re-confirmed "MiDSteer"; SDXL panel endpoint returned
+  empty twice, C21 margins rest on the appendix table).
 - [ ] Vendor/clone upstream into the repo; get the smallest end-to-end case running
   (E1 synthetic closed-form checks first — CPU-only, then E2 smallest model arm) and produce a
   parsed number.

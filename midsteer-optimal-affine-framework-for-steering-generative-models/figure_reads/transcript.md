@@ -24,3 +24,14 @@
 {"asked_at": "2026-08-16T20:41:38+00:00", "figure": "/tmp/opencode/figs/fig5_num_prompts_v2-0.png", "figure_bytes": 121406, "model": "moonshotai/Kimi-K3", "question": "What is the x-axis value of the leftmost triangle marker? Answer with only the number.", "answer": "", "looks_like_reasoning": false}
 {"asked_at": "2026-08-16T20:41:44+00:00", "figure": "/tmp/opencode/figs/fig5_plateau_crop.png", "figure_bytes": 155036, "model": "moonshotai/Kimi-K3", "question": "Reply with exactly three words: the n labels of the three leftmost points.", "answer": "", "looks_like_reasoning": false}
 {"asked_at": "2026-08-16T20:42:08+00:00", "figure": "/tmp/opencode/figs/fig5_plateau_crop.png", "figure_bytes": 155036, "model": "moonshotai/Kimi-K3", "question": "Answer with only the annotation labels visible next to the leftmost cluster of points, comma separated.", "answer": "", "looks_like_reasoning": false}
+
+
+# 2026-08-17 re-verification pass (SPEC audit)
+# Re-downloaded two Pareto PNGs from the arXiv HTML rendition (arxiv.org/html/2605.05220v3/*)
+# and re-asked the constrained questions. fig2a (LLM) re-confirmed "MiDSteer";
+# fig2c (SDXL) returned empty answers twice (vision-endpoint behaviour on 2026-08-17);
+# the SDXL curve claim C21 does not rest on the figure read alone: its margins are taken
+# from paper/artefacts/tables/diffusion_flip_tables_noclip.tex (tab:flip_sdxl_noclip_horse_to_motorcycle).
+{"asked_at": "2026-08-17T01:06:40+00:00", "figure": "/tmp/opencode/figs_check/fig2c.png", "figure_bytes": 74201, "model": "moonshotai/Kimi-K3", "question": "Pareto plot, x-axis avg CS of unrelated concepts, y-axis delta CS. Which single method has curves closest to the top-right corner? Answer with exactly the method name.", "answer": "", "looks_like_reasoning": false}
+{"asked_at": "2026-08-17T01:06:58+00:00", "figure": "/tmp/opencode/figs_check/fig2c.png", "figure_bytes": 74201, "model": "moonshotai/Kimi-K3", "question": "Reply with exactly two words: the method whose points sit highest on this plot.", "answer": "", "looks_like_reasoning": false}
+{"asked_at": "2026-08-17T01:07:06+00:00", "figure": "/tmp/opencode/figs_check/fig2a.png", "figure_bytes": 81946, "model": "moonshotai/Kimi-K3", "question": "Answer with one word: which method is closest to the top-right corner?", "answer": "MiDSteer", "looks_like_reasoning": false}
