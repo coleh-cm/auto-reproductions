@@ -29,6 +29,7 @@ import torch
 
 from core.runner import ARM_CONFIG, is_arm_feasible
 from core.eval.metrics import MissingEvaluatorError
+from core.invariants import cpu_invariant_metrics
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CLAIMS_PATH = os.path.join(REPO, "claims.json")
@@ -81,6 +82,15 @@ def main():
                 for m in metrics:
                     measured[arm][seed][m] = "BLOCKED"
                     reasons[arm][seed][m] = why
+                # CPU-runnable invariants (e.g. the pure-math `house`
+                # Householder norm-preservation claim) are filled in EVEN when
+                # the diffusion arm is BLOCKED: they need no GPU and no
+                # generation. The numbers gate evaluates claim `house`'s
+                # predicate against these real values, so it settles to
+                # `reproduced` (or `refuted`) rather than `unevaluable`/`blocked`.
+                inv = cpu_invariant_metrics(arm, seed)
+                for im, iv in inv.items():
+                    measured[arm][seed][im] = iv
                 continue
             # Feasible (GPU host): run + evaluate. On a CPU host we never reach
             # here. Wrapped so a MissingEvaluatorError -> BLOCKED, not a crash.

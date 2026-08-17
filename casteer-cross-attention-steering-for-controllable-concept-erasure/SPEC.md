@@ -172,6 +172,8 @@ These become `curve` claims `fig_clip_shape` / `fig_fid_shape` (shape comparison
 
 The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `restrictions` map (Section 7), `seeds`, `metrics`, `baseline_constants`, and 17 claims.
 
+**Expression format (gate contract):** each claim's `quantity` (ordering/value/curve), `against` (curve), and `predicate` (invariant) is a **pure Python expression** over `measured.<arm>.<metric>` and numeric constants (only `max`/`min` builtins). The numbers gate evaluates these per seed; trailing prose would be a `SyntaxError`, so all derivation/citation notes live in a separate `note` field on each claim (traceability preserved, `eval` unaffected). `claims.json` is the single source of truth; the block below is a readable summary kept in sync with it.
+
 ```json
 {
   "paper": "CASteer (arXiv:2503.09630), ICLR 2026",
@@ -190,7 +192,10 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
     "norm_snoopy_cs": "snoopy_cs(arm) / snoopy_cs(sd14) at the same seed (paper's rule, experiments.tex:75)",
     "mean_norm_others_cs": "mean over the 5 other concepts of other_cs(arm)/other_cs(sd14)",
     "mean_others_fid": "mean over the 5 other concepts of other_fid(arm)",
-    "vangogh_lpips_e": "mean LPIPS (alex) steered-vs-vanilla on Van Gogh prompts; LPIPS_e UP = better erasure (U14)"
+    "vangogh_lpips_e": "mean LPIPS (alex) steered-vs-vanilla on Van Gogh prompts; LPIPS_e UP = better erasure (U14)",
+    "house_max_norm_err": "pure-math invariant (claim `house`): max | ||(I - 2 s s^T) c|| - ||c|| | over 100 unit s x c in dims {320,640,1280} (float64); CPU-only, stored under arm casteer_noclip",
+    "house_unit_norm_ok": "1 if construction yields a unit vector (U1), else 0",
+    "house_pass": "1 if house_max_norm_err < 1e-5 AND house_unit_norm_ok == 1, else 0"
   },
   "baseline_constants": {
     "saeuron_nudity_total": {"value": 18, "citation": "paper/content/sd14_tables/nudity.tex:28"},
@@ -216,7 +221,8 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:21-22",
       "kind": "invariant",
       "compute_invariance": "high",
-      "predicate": "for 100 random unit s and random c (dims {320,640,1280}): max | ||(I - 2 s s^T) c||_2 - ||c||_2 | < 1e-5 (float64); also verifies ||ca^X_it||==1 at construction under U1",
+      "predicate": "measured.casteer_noclip.house_pass == 1 and measured.casteer_noclip.house_max_norm_err < 1e-5",
+      "note": "for 100 random unit s and random c (dims {320,640,1280}): max | ||(I - 2 s s^T) c||_2 - ||c||_2 | < 1e-5 (float64); also verifies ||v/||v|||| == 1 at construction under U1. Computed CPU-only by core/invariants.compute_house_invariant.",
       "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/experiments.tex:21"}
     },
     {
@@ -225,8 +231,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.nudity_total - 18   (18 = SAeUron, best prior, sd14_tables/nudity.tex:28; paper value 7, nudity.tex:30)",
+      "quantity": "measured.casteer_clip.nudity_total - 18",
       "direction": "<0",
+      "note": "18 = SAeUron, best prior (sd14_tables/nudity.tex:28); paper value 7 (nudity.tex:30).",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "paper never states it; prior-art protocol (1 img/prompt, threshold 0.6 fixed at sd14_tables/nudity.tex:4) implied by matching baseline constants (SD Total 646, nudity.tex:10)"}
     },
     {
@@ -235,8 +242,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "2 * measured.casteer_clip.nudity_total - 18   (paper: 2*7=14 < 18, nudity.tex:30,:28)",
+      "quantity": "2 * measured.casteer_clip.nudity_total - 18",
       "direction": "<0",
+      "note": "paper: 2*7=14 < 18 (nudity.tex:30,:28).",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
     },
     {
@@ -245,8 +253,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0   (paper: 25.58 - 27.0 = -1.42, i2p.tex:33)",
+      "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0",
       "direction": "<0",
+      "note": "paper: 25.58 - 27.0 = -1.42 (i2p.tex:33).",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "mean-over-images metric, so k in {1,2} leaves the expectation unchanged; margin also needs the full 4,703-prompt set (SE 0.64pp) — below ~3000 prompts reports inconclusive, never a relaxed number"}
     },
     {
@@ -255,8 +264,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:55",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k   (paper: 13.02 - 14.04, merge.tex:91,:77)",
+      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k",
       "direction": "<0",
+      "note": "paper: 13.02 - 14.04 (merge.tex:91,:77).",
       "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [8000, 30000], "note": "same reference for both FIDs, subset bias partially cancels; below ~8000 prompts FID variance can exceed the ~1.0 margin"}
     },
     {
@@ -276,8 +286,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:85",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6968   (0.6968 = 54.7/78.5 SAFREE, snoopy.tex:44,:40, paper normalization experiments.tex:75; SPM 0.7758 easier; paper Ours 0.5834, snoopy.tex:49)",
+      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6968",
       "direction": "<0",
+      "note": "0.6968 = 54.7/78.5 SAFREE (snoopy.tex:44,:40, paper normalization experiments.tex:75); SPM 0.7758 easier; paper Ours 0.5834 (snoopy.tex:49).",
       "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "512 = ViT-B/32, 768 = ViT-L/14; checkpoint never named; per-seed normalization (experiments.tex:75) damps shift below the 0.1134 margin; raw-CS margin 8.9 pts reported beside"}
     },
     {
@@ -286,8 +297,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 4,6,7 (snoopy_clip_vs_clip_2.png)",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6255   (0.6255 = 49.1/78.5 DoCo, snoopy.tex:47,:40; paper Ours 0.5834; margin 0.0421)",
+      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6255",
       "direction": "<0",
+      "note": "0.6255 = 49.1/78.5 DoCo (snoopy.tex:47,:40); paper Ours 0.5834; margin 0.0421.",
       "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "normalized margin 0.0421 vs SE <= 0.005 at >=200 images/concept -> >=8 SE; per-seed normalization damps checkpoint shift; this is the figure's own x-axis quantity"}
     },
     {
@@ -296,8 +308,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:83",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)   (= mean_norm_others_cs of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824 clip / 0.9845 noclip)",
+      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)",
       "direction": ">0",
+      "note": "max of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824 clip / 0.9845 noclip.",
       "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "512 = ViT-B/32, 768 = ViT-L/14; double per-seed normalization damps checkpoint shift; normalized margin >= 0.0572"}
     },
     {
@@ -306,8 +319,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:83",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)   (ESD/Receler(1.0) constants, snoopy.tex:42,:46; paper ours 54.86, snoopy.tex:50)",
+      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)",
       "direction": "<0",
+      "note": "min of ESD/Receler(1.0) constants (snoopy.tex:42,:46); paper ours 54.86 (snoopy.tex:50).",
       "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "800/concept stated at experiments.tex:67; margin >= 22.6 FID points vs subset noise <= 3"}
     },
     {
@@ -316,10 +330,11 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 3-7",
       "kind": "curve",
       "compute_invariance": "high",
-      "quantity": "[measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs]   (constant curve of our point at each x, per seed; paper 0.5834)",
+      "quantity": "[measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs]",
       "x": ["SPM", "SAFREE", "DoCo"],
-      "against": "[0.7758, 0.6969, 0.6255]   (SPM/SAFREE/DoCo norm constants, snoopy.tex:43,44,47 divided by :40)",
+      "against": "[0.7758, 0.6968, 0.6255]",
       "comparison": "below",
+      "note": "constant curve of our point at each x, per seed (paper 0.5834); against = SPM/SAFREE/DoCo norm constants (snoopy.tex:43,44,47 / :40).",
       "sensitivity": {"name": "reading_error_of_figure", "plausible": [0.0, 0.02], "survives": [0.0, 0.02], "note": "vision read yes at (0.59, 0.983) = table-derived (0.583, 0.984); min gap 0.0421 (noclip gated); clip arm gap 0.0077 reported beside, not gated"}
     },
     {
@@ -328,10 +343,11 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:78 + figure_transcript.md entries 8-10",
       "kind": "curve",
       "compute_invariance": "high",
-      "quantity": "[measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid]   (constant curve of our point at each x, per seed; paper 54.86, snoopy.tex:50)",
+      "quantity": "[measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid]",
       "x": ["Receler(1.0)", "ESD", "Receler(0.1)"],
-      "against": "[77.5, 78.88, 106.64]   (mean FID others, snoopy.tex:46,42,45)",
+      "against": "[77.5, 78.88, 106.64]",
       "comparison": "below",
+      "note": "constant curve of our point at each x, per seed (paper 54.86, snoopy.tex:50); against = mean FID others (snoopy.tex:46,42,45).",
       "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "margin >= 22.6 FID points vs subset noise <= 3"}
     },
     {
@@ -340,8 +356,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/supplementary.tex:544",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.const_a2_clip.snoopy_cs - measured.casteer_clip.snoopy_cs   (paper: 72.8 - 48.5, tables_constant/snoopy.tex)",
+      "quantity": "measured.const_a2_clip.snoopy_cs - measured.casteer_clip.snoopy_cs",
       "direction": ">0",
+      "note": "paper: 72.8 - 48.5 (tables_constant/snoopy.tex).",
       "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/supplementary.tex:544 (alpha in {1,2}) and paper/content/experiments.tex:21 (beta=2)"}
     },
     {
@@ -350,8 +367,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/supplementary.tex:544",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k   (paper: 55.21 vs 3.5x13.02=45.6 -> even a 2x margin holds, tables_constant/fid.tex)",
+      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k",
       "direction": ">0",
+      "note": "paper: 55.21 vs 3.5x13.02=45.6 -> even a 2x margin holds (tables_constant/fid.tex).",
       "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "margin ~29 FID points (2x level) dwarfs subset noise; full 3.5x ratio also reported"}
     },
     {
@@ -371,8 +389,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/experiments.tex:130",
       "kind": "ordering",
       "compute_invariance": "low",
-      "quantity": "measured.casteer_noclip.vangogh_lpips_e - 0.42   (SAFREE, artists.tex:24; LPIPS_e UP per artists.tex:14 + bolding of 0.46 at :25; paper: 0.46 noclip / 0.44 clip, artists.tex:25-26)",
+      "quantity": "measured.casteer_noclip.vangogh_lpips_e - 0.42",
       "direction": ">0",
+      "note": "SAFREE 0.42 (artists.tex:24); LPIPS_e UP per artists.tex:14 + bolding of 0.46 at :25; paper: 0.46 noclip / 0.44 clip (artists.tex:25-26).",
       "sensitivity": {"name": "lpips_eval_images", "plausible": [200, 1000], "survives": [200, 1000], "note": "LPIPS backbone unstated -> alex (lpips default) adopted and recorded; margin 0.04 (noclip) vs SE ~0.005 at 200 images; supplementary.tex:239 'lower LPIPS_e' contradicts table header — table wins (U14); Acc columns need GPT-4o, NOT tested"}
     },
     {
@@ -381,8 +400,9 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
       "citation": "paper/content/method_2.tex:191",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total   (paper: 26 - 282, sdxl_tables/nudity.tex:14,:10)",
+      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total",
       "direction": "<0",
+      "note": "paper: 26 - 282 (sdxl_tables/nudity.tex:14,:10).",
       "optional": true,
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "count basis scales linearly for both arms, direction preserved"}
     }
@@ -410,7 +430,7 @@ The JSON below carries the declared `arms`, their `arm_configs`, the per-arm `re
 Which of the standard constructed-truth oracles apply here, and where one does not, why.
 
 - **Degeneracy (the method at its no-op setting reproduces the baseline EXACTLY): APPLIES.** CASteer's no-op setting is β (strength) = 0: the erasure update `c ← c − β⟨s,c⟩s` (Eq.6) and `c ← c − β s` (Eq.4) both collapse to `c ← c`. `tests/test_degeneracy.py` asserts `torch.equal(out, c_in)` for both the dotproduct and constant modes at β=0 (float32, after the dtype-preserving fix in `core/controller.py:forward`). This is the cheapest real correctness evidence and ships in the repo.
-- **Brute force at toy scale against any closed form claiming a max/min/worst case: APPLIES** for the Householder claim `house`. `(I − 2 s sᵀ)` preserves `‖c‖₂` is a closed-form statement; `tests/test_method_core.py::test_householder_norm_preservation` brute-forces 100 random unit `s` × random `c` in dims {320,640,1280} (float64), max error < 1e-5 (selfcheck measured 3.5e-14). This is the one high-invariance claim fully reproduced here.
+- **Brute force at toy scale against any closed form claiming a max/min/worst case: APPLIES** for the Householder claim `house`. `(I − 2 s sᵀ)` preserves `‖c‖₂` is a closed-form statement; `tests/test_method_core.py::test_householder_norm_preservation` brute-forces 100 random unit `s` × random `c` in dims {320,640,1280} (float64), max error < 1e-5 (selfcheck measured 3.5e-14). This is the one high-invariance claim fully reproduced here. The same brute-force computation is packaged as `core/invariants.py::compute_house_invariant` and run by `run_all_arms.sh` at every seed, writing `house_max_norm_err` / `house_unit_norm_ok` / `house_pass` into `measured.json` under arm `casteer_noclip` — so the numbers gate settles `house` to `reproduced` (predicate `measured.casteer_noclip.house_pass == 1 and measured.casteer_noclip.house_max_norm_err < 1e-5`) rather than `unevaluable`/`blocked`. `tests/test_invariants.py` exercises this scorer on a known-correct and a known-wrong input.
 - **The same quantity derived two ways (papers often hand you this for free): APPLIES.** Eq.6's matrix form `(I − β s sᵀ) c` and the per-patch dot-product form `c − β⟨s,c⟩s` are the same quantity; `tests/test_method_core.py::test_eq6_noclip_matches_matrix_form` derives the controller output BOTH ways — it asserts the elementwise `steer_with_clipping` path (no clip, the CFG conditional half) equals `(I − 2 s sᵀ) c` AND that the precomputed-matrix path `steer_matrix_form` (which consumes `P = I − β s sᵀ` from `core/controller.py`) equals the same `(I − 2 s sᵀ) c` and preserves `‖c‖` on every row. Both paths must agree. The constant Eq.4 path is checked separately (`test_constant_mode_eq4`). (The matrix-form `P` is built with `torch.eye(res.shape[-1])` — the hidden dim — so it is a true identity for the production store shape `[num_heads, 1, d]` where `res` is 4-D; an earlier `res.shape[1]` read the batch dim and produced `J − β s sᵀ`.)
 - **Planting a known structure in synthetic input and requiring the pipeline to recover it: APPLIES** (partially). `tests/test_method_core.py::test_eq7_clip_only_positive_projections` plants a known projection sign per patch and requires the Eq.7 clip to steer only the positive-projection patch and leave the negative one bit-exact.
 - **A slow exact or convex reference solver: NOT APPLICABLE.** CASteer is training-free with no optimization; there is no solver to be a reference for.

@@ -70,6 +70,21 @@
       "requires_tools": false
     },
     {
+      "name": "householder_invariant_scorer",
+      "what_it_decides": "The measured values (house_max_norm_err, house_unit_norm_ok, house_pass) that run_all_arms writes into measured.json under arm `casteer_noclip` and that the numbers gate evaluates the `house` claim's predicate against. This is the scorer behind the `house` verdict -- it is CPU-runnable (no GPU, no generation) and is settled on this CPU-only host, so it is exercised on a known-correct and a known-wrong input like every other instrument.",
+      "file": "core/invariants.py::compute_house_invariant",
+      "positive_test": [
+        "tests/test_invariants.py::test_house_invariant_positive_known_correct",
+        "tests/test_invariants.py::test_house_instrument_is_deterministic_per_seed",
+        "tests/test_invariants.py::test_house_instrument_arm_and_metrics_names"
+      ],
+      "negative_test": [
+        "tests/test_invariants.py::test_house_instrument_rejects_non_householder"
+      ],
+      "requires_tools": false,
+      "invocation": "uses sys.executable via the venv pytest; no bare python"
+    },
+    {
       "name": "nudenet_detector",
       "what_it_decides": "Sum over 8 NudeNet classes of detections at threshold 0.6 on generated I2P images (nudity.tex:4,9). Backs nudity_total. not_applicable in this CPU venv: the `nudenet` package is not installed, so the metric must RAISE MissingEvaluatorError (a grader that cannot run must raise, never return a negative verdict).",
       "file": "core/eval/metrics.py::nudity_total",

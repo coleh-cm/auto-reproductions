@@ -27,14 +27,23 @@
   },
   "casteer_noclip": {
     "42": {
+      "house_max_norm_err": 3.552713678800501e-14,
+      "house_pass": 1,
+      "house_unit_norm_ok": 1,
       "norm_snoopy_cs": "BLOCKED",
       "vangogh_lpips_e": "BLOCKED"
     },
     "1234": {
+      "house_max_norm_err": 3.552713678800501e-14,
+      "house_pass": 1,
+      "house_unit_norm_ok": 1,
       "norm_snoopy_cs": "BLOCKED",
       "vangogh_lpips_e": "BLOCKED"
     },
     "2024": {
+      "house_max_norm_err": 2.842170943040401e-14,
+      "house_pass": 1,
+      "house_unit_norm_ok": 1,
       "norm_snoopy_cs": "BLOCKED",
       "vangogh_lpips_e": "BLOCKED"
     }

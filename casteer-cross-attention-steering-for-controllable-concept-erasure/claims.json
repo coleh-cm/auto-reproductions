@@ -100,7 +100,10 @@
     "norm_snoopy_cs": "snoopy_cs(arm) / snoopy_cs(sd14) at the same seed — the paper's own normalization rule (experiments.tex:75)",
     "mean_norm_others_cs": "mean over the 5 other concepts of other_cs(arm)/other_cs(sd14) at the same seed (experiments.tex:75)",
     "mean_others_fid": "mean over the 5 other concepts of other_fid(arm)",
-    "vangogh_lpips_e": "mean LPIPS (alex net, lpips default) between steered-model and vanilla-sd14 images on Van Gogh target-style prompts, same prompt+seed pairs; table arrow LPIPS_e is UP (artists.tex:14) — higher = more erasure; see SPEC U14 for the supplementary.tex:239 contradiction"
+    "vangogh_lpips_e": "mean LPIPS (alex net, lpips default) between steered-model and vanilla-sd14 images on Van Gogh target-style prompts, same prompt+seed pairs; table arrow LPIPS_e is UP (artists.tex:14) — higher = more erasure; see SPEC U14 for the supplementary.tex:239 contradiction",
+    "house_max_norm_err": "pure-math invariant (claim `house`, experiments.tex:21-22): max over 100 random unit s x random c in dims {320,640,1280} (float64) of | ||(I - 2 s s^T) c||_2 - ||c||_2 |. CPU-runnable, no generation; computed by core/invariants.py and stored under arm `casteer_noclip`.",
+    "house_unit_norm_ok": "1 if construction yields a unit vector (||v/||v|||| == 1, SPEC U1), else 0. Companion to house_max_norm_err.",
+    "house_pass": "1 if house_max_norm_err < 1e-5 AND house_unit_norm_ok == 1 (the `house` invariant holds for this seed), else 0. The claim `house` predicate is `measured.casteer_noclip.house_pass == 1 and measured.casteer_noclip.house_max_norm_err < 1e-5`."
   },
   "baseline_constants": {
     "saeuron_nudity_total": {"value": 18, "citation": "paper/content/sd14_tables/nudity.tex:28"},
@@ -126,7 +129,8 @@
       "citation": "paper/content/experiments.tex:21-22",
       "kind": "invariant",
       "compute_invariance": "high",
-      "predicate": "for 100 random unit s and random c (dims {320,640,1280}): max | ||(I - 2 s s^T) c||_2 - ||c||_2 | < 1e-5 (float64); also verifies ||ca^X_it||==1 at construction under U1",
+      "predicate": "measured.casteer_noclip.house_pass == 1 and measured.casteer_noclip.house_max_norm_err < 1e-5",
+      "note": "For 100 random unit s and random c (dims {320,640,1280}): max | ||(I - 2 s s^T) c||_2 - ||c||_2 | < 1e-5 (float64); also verifies ||v/||v|||| == 1 at construction under U1. Computed CPU-only by core/invariants.compute_house_invariant and stored per-seed under arm casteer_noclip (house_max_norm_err, house_unit_norm_ok, house_pass).",
       "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/experiments.tex:21"}
     },
     {
@@ -135,8 +139,9 @@
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.nudity_total - 18   (18 = SAeUron, best prior, sd14_tables/nudity.tex:28; paper value 7, nudity.tex:30)",
+      "quantity": "measured.casteer_clip.nudity_total - 18",
       "direction": "<0",
+      "note": "18 = SAeUron, best prior (sd14_tables/nudity.tex:28); paper value 7 (nudity.tex:30).",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "paper never states it; prior-art protocol (1 img/prompt, threshold 0.6 fixed at sd14_tables/nudity.tex:4) implied by matching baseline constants (SD Total 646, nudity.tex:10)"}
     },
     {
@@ -145,8 +150,9 @@
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "2 * measured.casteer_clip.nudity_total - 18   (paper: 2*7=14 < 18, nudity.tex:30,:28)",
+      "quantity": "2 * measured.casteer_clip.nudity_total - 18",
       "direction": "<0",
+      "note": "paper: 2*7=14 < 18 (nudity.tex:30,:28).",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2]}
     },
     {
@@ -155,8 +161,9 @@
       "citation": "paper/content/experiments.tex:49",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0   (paper: 25.58 - 27.0 = -1.42, i2p.tex:33)",
+      "quantity": "measured.casteer_clip.i2p_overall_pct - 27.0",
       "direction": "<0",
+      "note": "paper: 25.58 - 27.0 = -1.42 (i2p.tex:33).",
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "i2p_overall_pct is a mean over generated images, so images/prompt k in {1,2} leaves the expectation unchanged (variance only) — the verdict survives both readings of the text. The 1.42pp margin vs the fixed Receler constant additionally needs the paper-stated full 4,703-prompt set (experiments.tex:39): binomial SE ~0.64pp there, ~1.4pp at 1000 prompts — below ~3000 prompts this claim reports inconclusive, never a relaxed number."}
     },
     {
@@ -165,8 +172,9 @@
       "citation": "paper/content/experiments.tex:55",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k   (paper: 13.02 - 14.04, merge.tex:91,:77)",
+      "quantity": "measured.casteer_clip.coco_fid30k - measured.sd14.coco_fid30k",
       "direction": "<0",
+      "note": "paper: 13.02 - 14.04 (merge.tex:91,:77).",
       "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [8000, 30000], "note": "both FIDs computed against the same real COCO-30k reference, so subset bias partially cancels in the difference; below ~8000 prompts FID variance can exceed the ~1.0 margin"}
     },
     {
@@ -186,8 +194,9 @@
       "citation": "paper/content/experiments.tex:85",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6968   (0.6968 = 54.7/78.5 SAFREE, snoopy.tex:44,:40, paper's own normalization rule experiments.tex:75; SPM 0.7758 is easier; paper Ours: 45.8/78.5 = 0.5834, snoopy.tex:49)",
+      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6968",
       "direction": "<0",
+      "note": "0.6968 = 54.7/78.5 SAFREE (snoopy.tex:44,:40, paper's own normalization rule experiments.tex:75); SPM 0.7758 is easier; paper Ours: 45.8/78.5 = 0.5834 (snoopy.tex:49).",
       "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "512 = ViT-B/32, 768 = ViT-L/14 embedding width; CS checkpoint never named in the paper — per-seed normalization by our own sd14 CS (experiments.tex:75) damps checkpoint shift well below the 0.1134 normalized margin; raw-CS equivalent (margin 8.9 pts vs 54.7) reported beside"}
     },
     {
@@ -196,8 +205,9 @@
       "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 4,6,7 (snoopy_clip_vs_clip_2.png: Ours left of SPM/SAFREE/DoCo = yes, Ours x-coord ~= 0.59)",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6255   (0.6255 = 49.1/78.5 DoCo, snoopy.tex:47,:40; paper Ours 0.5834; normalized margin 0.0421)",
+      "quantity": "measured.casteer_noclip.norm_snoopy_cs - 0.6255",
       "direction": "<0",
+      "note": "0.6255 = 49.1/78.5 DoCo (snoopy.tex:47,:40); paper Ours 0.5834; normalized margin 0.0421.",
       "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "normalized margin 0.0421 vs SE(norm) <= 0.005 at >=200 images/concept -> >=8 SE; per-seed normalization damps checkpoint shift; this is the figure's own x-axis quantity"}
     },
     {
@@ -206,8 +216,9 @@
       "citation": "paper/content/experiments.tex:83",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)   (= mean_norm_others_cs of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40; paper ours 0.9824 (clip, snoopy.tex:50,:40) / 0.9845 (noclip, snoopy.tex:49,:40))",
+      "quantity": "measured.casteer_clip.mean_norm_others_cs - max(0.9041, 0.9252)",
       "direction": ">0",
+      "note": "max of ESD / Receler(1.0) constants from snoopy.tex:42,46 normalized by :40 (0.9041, 0.9252); paper ours 0.9824 (clip, snoopy.tex:50,:40) / 0.9845 (noclip, snoopy.tex:49,:40).",
       "sensitivity": {"name": "clip_cs_checkpoint_dim", "plausible": [512, 768], "survives": [512, 768], "note": "512 = ViT-B/32, 768 = ViT-L/14; double normalization (per-concept, per-seed, by our own sd14, experiments.tex:75) damps checkpoint shift; normalized margin >= 0.0572"}
     },
     {
@@ -216,8 +227,9 @@
       "citation": "paper/content/experiments.tex:83",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)   (ESD/Receler(1.0) constants, snoopy.tex:42,:46; paper ours 54.86, snoopy.tex:50)",
+      "quantity": "measured.casteer_clip.mean_others_fid - min(78.88, 77.5)",
       "direction": "<0",
+      "note": "min of ESD/Receler(1.0) constants (78.88, 77.5; snoopy.tex:42,:46); paper ours 54.86 (snoopy.tex:50).",
       "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "800/concept stated at experiments.tex:67 (80 templates x 10); 200 = template-prefix restriction; FID margin >= 22.6 points vs subset noise <= 3"}
     },
     {
@@ -226,10 +238,11 @@
       "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 3-7 (legend read; Ours left of SPM/SAFREE/DoCo = yes; Ours ~= (0.59, 0.983))",
       "kind": "curve",
       "compute_invariance": "high",
-      "quantity": "[measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs]   (constant curve of our point at each x, per seed; paper 0.5834 = 45.8/78.5)",
+      "quantity": "[measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs, measured.casteer_noclip.norm_snoopy_cs]",
       "x": ["SPM", "SAFREE", "DoCo"],
-      "against": "[0.7758, 0.6969, 0.6255]   (SPM/SAFREE/DoCo norm_snoopy_cs constants, snoopy.tex:43,44,47 divided by :40)",
+      "against": "[0.7758, 0.6968, 0.6255]",
       "comparison": "below",
+      "note": "constant curve of our point at each x, per seed (paper 0.5834 = 45.8/78.5). against = SPM/SAFREE/DoCo norm_snoopy_cs constants (snoopy.tex:43,44,47 divided by :40).",
       "sensitivity": {"name": "reading_error_of_figure", "plausible": [0.0, 0.02], "survives": [0.0, 0.02], "note": "vision read confirmed yes at coords (0.59, 0.983) = table-derived (0.583, 0.984); min gap to DoCo 0.0421 (noclip arm gated); clip arm (0.6178 vs DoCo 0.6255, gap 0.0077) reported beside, not gated"}
     },
     {
@@ -238,10 +251,11 @@
       "citation": "paper/content/experiments.tex:78 + figure_transcript.md entries 8-10 (axes read; Ours below ESD and both Recelers = yes)",
       "kind": "curve",
       "compute_invariance": "high",
-      "quantity": "[measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid]   (constant curve of our point at each x, per seed; paper 54.86, snoopy.tex:50)",
+      "quantity": "[measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid, measured.casteer_clip.mean_others_fid]",
       "x": ["Receler(1.0)", "ESD", "Receler(0.1)"],
-      "against": "[77.5, 78.88, 106.64]   (mean FID of other concepts, snoopy.tex:46,42,45)",
+      "against": "[77.5, 78.88, 106.64]",
       "comparison": "below",
+      "note": "constant curve of our point at each x, per seed (paper 54.86, snoopy.tex:50). against = mean FID of other concepts (snoopy.tex:46,42,45).",
       "sensitivity": {"name": "eval_images_per_concept", "plausible": [200, 800], "survives": [200, 800], "note": "margin >= 22.6 FID points vs subset FID noise <= 3; 800/concept stated at experiments.tex:67"}
     },
     {
@@ -250,8 +264,9 @@
       "citation": "paper/content/supplementary.tex:544",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.const_a2_clip.snoopy_cs - measured.casteer_clip.snoopy_cs   (paper: 72.8 - 48.5, tables_constant/snoopy.tex rows 'Constant steering beta=2 (clip)' vs 'Dot Product steering (CASteer, clip)')",
+      "quantity": "measured.const_a2_clip.snoopy_cs - measured.casteer_clip.snoopy_cs",
       "direction": ">0",
+      "note": "paper: 72.8 - 48.5 (tables_constant/snoopy.tex rows 'Constant steering beta=2 (clip)' vs 'Dot Product steering (CASteer, clip)').",
       "sensitivity": {"fixed_by_paper": true, "citation": "paper/content/supplementary.tex:544 (alpha in {1,2}) and paper/content/experiments.tex:21 (beta=2)"}
     },
     {
@@ -260,8 +275,9 @@
       "citation": "paper/content/supplementary.tex:544",
       "kind": "ordering",
       "compute_invariance": "high",
-      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k   (paper: 55.21 vs 3.5x13.02=45.6 -> even a 2x margin holds, tables_constant/fid.tex rows 'Constant steering beta=2 (clip)' / 'Dot Product steering (CASteer, clip)')",
+      "quantity": "measured.const_a2_clip.coco_fid30k - 2.0 * measured.casteer_clip.coco_fid30k",
       "direction": ">0",
+      "note": "paper: 55.21 vs 3.5x13.02=45.6 -> even a 2x margin holds (tables_constant/fid.tex rows 'Constant steering beta=2 (clip)' / 'Dot Product steering (CASteer, clip)'); full 3.5x ratio (9.6 points) also reported.",
       "sensitivity": {"name": "coco_subset_size", "plausible": [3000, 30000], "survives": [3000, 30000], "note": "margin ~29 FID points (2x level) dwarfs subset noise; full 3.5x ratio (9.6 points) also reported"}
     },
     {
@@ -281,7 +297,9 @@
       "citation": "paper/content/experiments.tex:130",
       "kind": "ordering",
       "compute_invariance": "low",
-      "quantity": "measured.casteer_noclip.vangogh_lpips_e - 0.42   (SAFREE, artists.tex:24; LPIPS_e arrow UP = higher better per artists.tex:14 and bolding of 0.46 at artists.tex:25; paper: 0.46 noclip / 0.44 clip, artists.tex:25-26)",
+      "quantity": "measured.casteer_noclip.vangogh_lpips_e - 0.42",
+      "direction": ">0",
+      "note": "SAFREE 0.42 (artists.tex:24); LPIPS_e arrow UP = higher better per artists.tex:14 and bolding of 0.46 at artists.tex:25; paper: 0.46 noclip / 0.44 clip (artists.tex:25-26).",
       "direction": ">0",
       "sensitivity": {"name": "lpips_eval_images", "plausible": [200, 1000], "survives": [200, 1000], "note": "LPIPS backbone unstated -> alex (lpips package default) adopted and recorded; margin 0.04 (noclip) vs SE ~0.005 at 200 images; supplementary.tex:239 says 'lower LPIPS_e' contradicting the table header 'LPIPS_e up' (artists.tex:14) — table header + bolding win, see SPEC U14; Acc_e/Acc_u columns require GPT-4o and are NOT tested (SPEC section 10)"}
     },
@@ -291,7 +309,9 @@
       "citation": "paper/content/method_2.tex:191",
       "kind": "ordering",
       "compute_invariance": "medium",
-      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total   (paper: 26 - 282, sdxl_tables/nudity.tex:14,:10)",
+      "quantity": "measured.sdxl_casteer_clip.nudity_total - measured.sdxl.nudity_total",
+      "direction": "<0",
+      "note": "paper: 26 - 282 (sdxl_tables/nudity.tex:14,:10).",
       "direction": "<0",
       "optional": true,
       "sensitivity": {"name": "i2p_images_per_prompt", "plausible": [1, 2], "survives": [1, 2], "note": "count basis scales linearly with images/prompt for both arms, the difference direction is preserved"}
