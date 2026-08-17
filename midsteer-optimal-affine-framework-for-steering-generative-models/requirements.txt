@@ -1,0 +1,40 @@
+# MidSteer reproduction — pinned dependencies for the upstream implementation
+# (https://github.com/Atmyre/MidSteer, HEAD 0f3b31e) vendored into this repo.
+# Python 3.13. Target: CPU build of the environment; model arms run on CUDA in
+# the Dockerfile (see ./Dockerfile) but the import gate is CPU-only.
+
+# --- Deep-learning stack -------------------------------------------------
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+transformers==4.47.1
+diffusers==0.32.2
+accelerate==1.4.0
+datasets==3.2.0
+
+# --- Numerics / data -----------------------------------------------------
+numpy==2.2.3
+scipy==1.15.2
+pandas==2.2.3
+pillow==11.1.0
+
+# --- Steering / eval libraries ------------------------------------------
+steering-vectors==0.12.2
+clean-fid==0.1.35
+clip-anytorch==2.6.0
+detoxify==0.5.2
+bert-score==0.3.13
+nltk==3.9.1
+openai==1.63.0
+
+# --- Misc ----------------------------------------------------------------
+tqdm==4.67.1
+pydantic==2.10.2
+python-dotenv==1.0.1
+matplotlib==3.10.1
+jupyterlab==4.3.5
+# clip-anytorch imports `pkg_resources` (provided by setuptools)
+setuptools==75.8.0
+
+# --- Test runner ---------------------------------------------------------
+pytest==8.3.4
