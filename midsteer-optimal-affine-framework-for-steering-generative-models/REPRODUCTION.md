@@ -545,3 +545,22 @@ Whitening $W = (\Sigma_{XX}^{1/2})^+$, cross-covariances $\Sigma_{XZ_i} = \mathr
 - LEACE-Switch: $\hat{A} = I - 2W^+(W\Sigma_{XZ})(W\Sigma_{XZ})^+ W$ (Eq. 13)
 - MidSteer: $\hat{A} = I + W^+(\Sigma_{WX,Z_2} - \Sigma_{WX,Z_1})\Sigma_{WX,Z_1}^+ W$ (Eq. 19), with $\hat{b} = \mathbb{E}[X] - \hat{A}\mathbb{E}[X]$ and steering strength $\beta$ scaling the non-identity term (Eqs. 22–23).
 - Vanilla steering baselines: erasure $(I - ss^T)$ and Householder switching $(I - 2ss^T)$ with unit-norm steering vector $s$ (Eqs. 24–25).
+
+### Setup log (2026-08-17, this run — re-verification on existing work)
+
+- [x] Repo re-cloned `--depth 1 --filter=blob:none` into `$HOME/auto-reproductions`;
+      `$HOME/.repro_dir` and `$HOME/.repro_branch` written (no trailing newline).
+- [x] The slug folder already exists on `main` from the 2026-08-16/17 run above; this run
+      continues on it. Branch `repro/midsteer-optimal-affine-framework-for-steering-generative-models`
+      already existed on the remote at `65feaf6` — one unpublished commit ahead of `main@4f205c6`
+      ("empirical cov check, byte-verbatim judge, single FINAL/arm, configs, +2 mutations") — so
+      the local branch was created from that tip (not from `main`, which would have dropped it)
+      and is tracked/pushed.
+- [x] Paper re-fetched from arXiv 2605.05220 on 2026-08-17 and verified byte-for-byte against
+      the committed copy: `paper/paper.html` md5 `c8af1af4b6384912aaa1a215d6bb3260` matches the
+      live `https://arxiv.org/html/2605.05220`; every `.tex`/`.bib` in the fresh e-print tarball
+      is identical to the committed files (`main.tex`, `flipping_main.tex`, `content/*.tex`,
+      `artefacts/**/*.tex`, `example_paper.bib`). The tarball contains **no `.bbl`** (build per
+      `00README.json`: pdflatex + texlive 2025, `icml2026` style, styles/bst ignored). 28 files
+      tracked under `paper/`; the 7.8MB `eprint.tar.gz`, figure PDFs/PNGs, and style files remain
+      gitignored per `paper/.gitignore`.
