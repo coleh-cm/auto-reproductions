@@ -1,5 +1,5 @@
 {
-  "_comment": "Every thing that decides whether an output is correct -- grader, scorer, equivalence check, data loader -- with a name, what_it_decides, a positive_test proving it accepts a known-correct input, and a negative_test proving it rejects a known-wrong one. requires_tools lists anything genuinely external (a closed-book run that fell back to a synthetic corpus passed every gate and meant nothing; the data-loader fingerprint catches that). A grader that cannot run must raise, never return a negative verdict -- the *_blocked_here tests assert the real backbones raise BlockedException in this CPU sandbox rather than fabricating a score. Subprocess invocations inside the tests use sys.executable (never bare python). Schema validated by tests/test_instruments.py. If nothing here judged an output we would say so with not_applicable and a reason; this reproduction has nine instruments, so not_applicable does not apply.",
+  "_comment": "Every thing that decides whether an output is correct -- grader, scorer, equivalence check, data loader -- with a name, what_it_decides, a positive_test proving it accepts a known-correct input, and a negative_test proving it rejects a known-wrong one. requires_tools lists anything genuinely external (a closed-book run that fell back to a synthetic corpus passed every gate and meant nothing; the data-loader fingerprint catches that). A grader that cannot run must raise, never return a negative verdict -- the *_blocked_here tests assert the real backbones raise BlockedException in this CPU sandbox rather than fabricating a score. Subprocess invocations inside the tests use sys.executable (never bare python). Schema validated by tests/test_instruments.py. not_applicable is OMITTED here because this reproduction has nine output-deciding instruments: not_applicable excuses the WHOLE reproduction (it is a single sentence saying nothing here judges an output, present only when there are no instruments), so it must not appear alongside a non-empty instruments array. To exempt a single instrument, put not_applicable with its reason ON that instrument; the rest still run.",
   "instruments": [
     {
       "name": "data_loader",
@@ -105,9 +105,5 @@
       "requires_tools": [],
       "produces": "claims_result.json (workflow artifact; the agent's own check writes selfcheck.json, a different filename)"
     }
-  ],
-  "not_applicable": {
-    "applies": false,
-    "reason": "This reproduction has nine output-deciding instruments (one data loader, six eval-metric scorers, one closed-form invariant checker, one claims evaluator), so the not_applicable case (nothing here judges an output) does not apply. not_applicable is reserved for a reproduction where no instrument judges correctness; here every arm's measured number is produced or blocked by one of the listed instruments."
-  }
+  ]
 }

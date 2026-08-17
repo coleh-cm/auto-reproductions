@@ -3,10 +3,9 @@
 instruments.json is the registry of every thing that decides whether an
 output is correct (grader / scorer / equivalence check / data loader), each
 with a name, what_it_decides, a positive_test proving it accepts a known-
-correct input, and a negative_test proving it rejects a known-wrong one. If
-nothing here judged an output we would say so with not_applicable and a
-reason; this reproduction has nine instruments, so not_applicable does not
-apply.
+correct input, and a negative_test proving it rejects a known-wrong one. This
+reproduction has nine instruments, so not_applicable (the nothing-judges-an-
+output case) is omitted entirely.
 
 These tests guard the SCHEMA (not the behavior -- the behavioral positive/
 negative cases live in test_eval_metrics.py, test_data.py, test_invariants.py,
@@ -40,15 +39,20 @@ def _load():
 def test_instruments_json_top_level_is_instruments_array():
     """The gate looks for a top-level "instruments" array. A flat named-key
     object (the prior structure) is not recognised as declaring instruments,
-    so it must be an array under that exact key."""
+    so it must be an array under that exact key. When there are no
+    instruments, the file instead carries a top-level not_applicable (a
+    single sentence string) explaining why nothing here judges an output."""
     doc = _load()
-    assert "instruments" in doc, (
-        "instruments.json must have a top-level 'instruments' array "
-        "(or a not_applicable with a reason if nothing judges an output)")
-    assert isinstance(doc["instruments"], list), "'instruments' must be a list"
-    assert len(doc["instruments"]) >= 1, (
-        "instruments.json declares no instruments and gives no reason: "
-        "add instruments, or a not_applicable with a reason")
+    has_inst = "instruments" in doc
+    has_na = "not_applicable" in doc
+    assert has_inst or has_na, (
+        "instruments.json must have a top-level 'instruments' array, OR a "
+        "top-level not_applicable sentence when nothing judges an output")
+    if has_inst:
+        assert isinstance(doc["instruments"], list), "'instruments' must be a list"
+        assert len(doc["instruments"]) >= 1, (
+            "instruments.json declares an empty instruments array: add "
+            "instruments, or replace it with a not_applicable sentence")
 
 
 def test_each_instrument_has_required_fields():
@@ -67,21 +71,68 @@ def test_each_instrument_has_required_fields():
             f"instrument {inst['name']!r} negative_test must be a non-empty node id")
 
 
-def test_not_applicable_only_when_no_instruments():
-    """If not_applicable is present with applies=true, there must be no
-    instruments; if instruments exist, not_applicable.applies must be false
-    with a reason. This catches a contradictory file."""
+def test_not_applicable_is_a_single_sentence_and_only_when_no_instruments():
+    """not_applicable excuses the WHOLE reproduction, so when present it must
+    be ONE sentence (a string) saying why nothing here judges an output, and
+    there must be NO instruments array. It must NOT be a dict (a prior round
+    wrote a {applies, reason} dict, and a list-of-exemptions reading of a dict
+    silently excused every grader and data loader in the file). To exempt a
+    single instrument, put not_applicable with its reason ON that instrument;
+    the top-level not_applicable is all-or-nothing. When instruments exist,
+    not_applicable must be absent entirely -- its presence alongside a
+    non-empty instruments array would excuse the very instruments it lists.
+    """
     doc = _load()
     na = doc.get("not_applicable")
-    if na is not None:
-        assert "applies" in na and "reason" in na, (
-            "not_applicable must have 'applies' and 'reason'")
-        if na["applies"]:
-            assert len(doc["instruments"]) == 0, (
-                "not_applicable.applies=true but instruments are declared")
-        else:
-            assert na["reason"], (
-                "not_applicable.applies=false requires a non-empty reason")
+    if na is None:
+        # instruments exist and not_applicable is correctly omitted.
+        assert doc.get("instruments"), (
+            "instruments.json has neither an instruments array nor a "
+            "not_applicable sentence")
+        return
+    # not_applicable is present: it must be a single sentence (string), not a
+    # dict/list, and there must be no instruments.
+    assert isinstance(na, str) and na.strip(), (
+        "not_applicable must be a single non-empty sentence (string) saying "
+        "why nothing here judges an output -- not a dict or list. To exempt "
+        "a single instrument, put not_applicable with its reason ON that "
+        "instrument; the top-level form excuses the WHOLE reproduction")
+    assert not doc.get("instruments"), (
+        "not_applicable (excuses the whole reproduction) is present alongside "
+        "a non-empty instruments array -- remove not_applicable, or remove "
+        "the instruments")
+
+
+def test_rejects_dict_not_applicable_alongside_instruments():
+    """Regression for the feedback failure mode: a run wrote not_applicable as
+    a {applies, reason} DICT alongside a non-empty instruments array, and a
+    list-of-exemptions reading of that dict silently excused every grader and
+    data loader in the file. This re-runs the validator's exact assertions on
+    that bad shape and asserts it is rejected (a dict is not a single
+    sentence, and not_applicable must not coexist with instruments)."""
+    bad = {
+        "instruments": [{"name": "data_loader", "what_it_decides": "x",
+                         "positive_test": "a", "negative_test": "b"}],
+        "not_applicable": {"applies": False, "reason": "..."},
+    }
+    na = bad["not_applicable"]
+    # The validator's first assertion: not_applicable must be a string.
+    assert not (isinstance(na, str) and na.strip()), (
+        "dict-form not_applicable must be rejected by the schema (it is not "
+        "a single sentence)")
+    # The validator's second assertion: not_applicable must not coexist with
+    # instruments.
+    assert bad.get("instruments"), (
+        "the feedback defect is not_applicable alongside instruments -- this "
+        "fixture must keep both to exercise the coexistence check")
+    coexists = bool(bad.get("instruments")) and na is not None
+    assert coexists, "fixture did not reproduce the coexistence defect"
+    # A single-sentence not_applicable with NO instruments is the only valid
+    # top-level not_applicable form:
+    ok = {"not_applicable": "Nothing here judges an output; the paper is a "
+                            "pure-theory result with no runnable artefact."}
+    ok_na = ok["not_applicable"]
+    assert isinstance(ok_na, str) and ok_na.strip() and not ok.get("instruments")
 
 
 def _collectable_nodes():

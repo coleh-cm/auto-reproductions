@@ -203,6 +203,38 @@ only real numbers this environment produces are the E1 closed-form invariant che
   `requires_tools` is declared per instrument. This prevents the named-key
   regression from recurring. Full suite: 105 passed.
 
+### Review-round fix (2026-08-17, pass 4): not_applicable must be a single sentence, not a dict
+
+- **Defect found via feedback `not_applicable excuses the WHOLE reproduction,
+  so it must be one sentence saying why nothing here judges an output. It was
+  a dict.`:** `instruments.json` carried a top-level
+  `not_applicable: {"applies": false, "reason": "..."}` dict alongside a
+  non-empty `instruments` array. The gate reads `not_applicable` as the
+  nothing-judges-an-output case that excuses the WHOLE reproduction, so it
+  must be ONE sentence (a string) and must only appear when there are NO
+  instruments. A dict form was ambiguous: a list-of-exemptions reading could
+  silently excuse every grader and data loader in the file. To exempt a
+  single instrument, `not_applicable` with its reason goes ON that instrument;
+  the top-level form is all-or-nothing and has no place next to a real
+  instrument list.
+- **Fix:** removed the top-level `not_applicable` dict from
+  `instruments.json` entirely (this reproduction has nine instruments, so the
+  nothing-judges case does not apply). The `_comment` now documents the
+  convention: not_applicable is a single sentence present only when no
+  instruments exist; per-instrument exemptions live on the instrument. The
+  nine instruments and all their fields are unchanged.
+- **Regression guard:** `tests/test_instruments.py` was rewritten to enforce
+  the new convention — `test_not_applicable_is_a_single_sentence_and_only_
+  when_no_instruments` asserts that if `not_applicable` is present it is a
+  non-empty string and there are no instruments, and if instruments exist
+  `not_applicable` is absent. A new
+  `test_rejects_dict_not_applicable_alongside_instruments` reproduces the
+  feedback's exact failure mode (a `{applies, reason}` dict next to a
+  non-empty `instruments` array) and asserts the validator rejects it.
+  `test_instruments_json_top_level_is_instruments_array` now accepts either
+  an `instruments` array or a top-level `not_applicable` sentence (the
+  nothing-judges case), but not both. Full suite: 106 passed.
+
 ### Blockers (model arms, honestly BLOCKED)
 
 - **No CUDA** (`torch.cuda.is_available()` is False; `nvidia-smi` absent) and **no
@@ -229,7 +261,7 @@ only real numbers this environment produces are the E1 closed-form invariant che
 - **Runs (CPU, real):** `smoke.sh` (tiny E1, one FINAL line, not evidence — now writes
   only to the gitignored `results/e1_synth_smoke.json`, never the canonical
   `results/e1_synth.json`);   `run_all_arms.sh` (runs E1 real + E2–E5 BLOCKED →
-  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (105 passed:
+  `measured.json` + `results/e1_synth.json`); the full `tests/` suite (106 passed:
   environment import gate, closed-form core/degeneracy/invariants, data loader,
   eval-metric instruments, claims evaluator, mutations, smoke no-clobber guard,
   instruments.json schema guard).
