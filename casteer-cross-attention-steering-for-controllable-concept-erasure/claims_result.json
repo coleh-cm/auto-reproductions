@@ -18,8 +18,8 @@
       "quote": "This choice is motivated by the fact that with $\\beta=2$, the Eq.~\\ref{eq:casteer_erasure_matrix} becomes a Householder operator (reflection) of the CA activation vector $c$ across the hyperplane orthogonal to the steering vector $s$. This operation preserves $L_2$-norm of the vector $c$",
       "citation": "paper/content/experiments.tex:21-22",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "reproduced",
+      "why": "held at 3 of 3 seeds"
     },
     {
       "id": "nudity_beats_all_prior",
@@ -27,8 +27,8 @@
       "quote": "We show that both versions of CASteer outperform all prior models on nudity erasure",
       "citation": "paper/content/experiments.tex:49",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: expression cannot contain assignment, perhaps you meant \"==\"? (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "nudity_two_times_fewer",
@@ -36,8 +36,8 @@
       "quote": "with CASteer version with clipping having more than 2 times fewer images with detected nudity than the second-best result",
       "citation": "paper/content/experiments.tex:49",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "i2p_overall_beats_receler",
@@ -45,8 +45,8 @@
       "quote": "On the inappropriate content removal, CASteer version with clipping also achieves state-of-the-art result, surpassing second-best model Receler by $1.42\\%$ overall.",
       "citation": "paper/content/experiments.tex:49",
       "compute_invariance": "medium",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "coco_fid_vs_vanilla",
@@ -54,8 +54,8 @@
       "quote": "Thus, CASteer clearly is capable of deleting unwanted information while maintaining general high quality.",
       "citation": "paper/content/experiments.tex:55",
       "compute_invariance": "medium",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "coco_fid_beats_prior_art_value",
@@ -72,8 +72,8 @@
       "quote": "SAFREE shows a reduced level of \\textit{Snoopy} erasure compared to that of CASteer",
       "citation": "paper/content/experiments.tex:85",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: unterminated string literal (detected at line 1) (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "snoopy_erasure_vs_doco",
@@ -81,8 +81,8 @@
       "quote": "Methods on the left of the plot erase Snoopy well, and methods on top of the plot preserve other concepts well.",
       "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 4,6,7 (snoopy_clip_vs_clip_2.png: Ours left of SPM/SAFREE/DoCo = yes, Ours x-coord ~= 0.59)",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: expression cannot contain assignment, perhaps you meant \"==\"? (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "snoopy_preservation_vs_esd_receler",
@@ -90,8 +90,8 @@
       "quote": "ESD and Receler erase Snoopy well, but also highly affect other concepts, especially related ones such as \\textit{Mickey} or \\textit{Spongebob}.",
       "citation": "paper/content/experiments.tex:83",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "snoopy_fid_preservation_vs_esd_receler",
@@ -99,8 +99,8 @@
       "quote": "High FID of these methods on these concepts supports this observation.",
       "citation": "paper/content/experiments.tex:83",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax. Perhaps you forgot a comma? (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "fig_clip_shape",
@@ -108,8 +108,8 @@
       "quote": "Methods on the left of the plot erase Snoopy well, and methods on top of the plot preserve other concepts well.",
       "citation": "paper/content/experiments.tex:77 + figure_transcript.md entries 3-7 (legend read; Ours left of SPM/SAFREE/DoCo = yes; Ours ~= (0.59, 0.983))",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax. Perhaps you forgot a comma? (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "fig_fid_shape",
@@ -117,8 +117,8 @@
       "quote": "Fig.~\\ref{fig:snoopy_clip_vs_fid} pictures normalized clip score of source concept versus mean FID scores of other concepts (the lower the better).",
       "citation": "paper/content/experiments.tex:78 + figure_transcript.md entries 8-10 (axes read; Ours below ESD and both Recelers = yes)",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax. Perhaps you forgot a comma? (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "dotprod_weighting_matters_snoopy",
@@ -126,8 +126,8 @@
       "quote": "We see that for both values of $\\alpha$, ``Snoopy'' prompt is not erased well. Meanwhile, for $\\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer. This suggests that our proposed weighting mechanism is crucial for performance of our method.",
       "citation": "paper/content/supplementary.tex:544",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "dotprod_weighting_matters_fid",
@@ -135,8 +135,8 @@
       "quote": "Meanwhile, for $\\alpha=2$, image fidelity and prompt alignment suffer, with FID being 3.5 times higher than that of CASteer.",
       "citation": "paper/content/supplementary.tex:544",
       "compute_invariance": "high",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid decimal literal (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "nudity_total_value",
@@ -153,8 +153,8 @@
       "quote": "From Tab.~\\ref{tab:sd14_t2i_art}, we see that CASteer achieves the best results in style removal (see columns LPIPS$_e$ and Acc$_e$), while preserving other styles well (see columns LPIPS$_u$ and Acc$_u$).",
       "citation": "paper/content/experiments.tex:130",
       "compute_invariance": "low",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     },
     {
       "id": "sdxl_distilled_transfer_nudity",
@@ -162,8 +162,8 @@
       "quote": "We observe that steering vectors obtained from the distilled models can successfully be used for steering generations of its corresponding non-distilled variants.",
       "citation": "paper/content/method_2.tex:191",
       "compute_invariance": "medium",
-      "verdict": "unevaluable",
-      "why": "SyntaxError: invalid syntax (<string>, line 1)"
+      "verdict": "blocked",
+      "why": "every seed reported BLOCKED"
     }
   ]
 }

@@ -68,19 +68,24 @@ uv pip install --python .venv -r requirements.txt
 #    invariants from the paper's maths, and the fingerprinted data + eval
 #    instruments.
 source .venv/bin/activate
-python -m pytest tests/ -q          # 33 passed (CPU-only, no model download)
+python -m pytest tests/ -q          # 53 passed (CPU-only, no model download)
 
 # 4. Smoke-test the FULL code path on CPU: load SD-1.4, estimate steering
 #    vectors (Algorithm 1), steer (Eq. 7) and generate 1 image each for
 #    casteer_clip and sd14 at 4 steps / 256x256 / seed 42. ~1-2 min once
 #    SD-1.4 is cached. Prints one FINAL line; NOT evidence about the paper.
 bash smoke.sh
-# -> results/smoke/{casteer_clip,sd14}.png , FINAL smoke=...
+# -> results/smoke/{casteer_clip,sd14}.png , FINAL casteer_clip=...
 
 # 5. Run every arm at the paper's full config across all 3 seeds.
 #    On this CPU-only host every diffusion arm is BLOCKED (paper used 8xV100,
-#    supplementary.tex:30); on a CUDA host the same script runs them for real.
-#    Writes measured.json (+ measured_blocked_reasons.json sidecar).
+#    supplementary.tex:30). On a CUDA host the same script runs them for real
+#    via the implemented arm->eval->measured.json driver (per-task steering
+#    vector via TASK_VECTOR, 7-concept Eq.9 average for the I2P-overall task).
+#    Two metrics remain BLOCKED on every host until their references are
+#    supplied: i2p_overall_pct (the Q16 classifier checkpoint is not named by
+#    the paper and not vendored) and coco_fid30k (the real COCO-30k FID
+#    reference is not vendored; set COCO_REF_DIR to the 30k real COCO images).
 bash run_all_arms.sh
 # -> one "FINAL <arm>=BLOCKED" line per arm/seed on CPU; measured.json
 
@@ -114,11 +119,17 @@ python scripts/diffusion/estimate_steering_vectors.py \
     --output_dir ./results/sd14/steering_vectors
 
 # Step 2 — generate with steering (Algorithm 2; Eq. 6 no clip, or --intermediate_clipping for Eq. 7).
+#    NOTE: --use_all_diffusion_steps is REQUIRED for SD-1.4 per-step steering
+#    vectors (experiments.tex:19); omitting it silently runs the appendix
+#    single-step (sd14_0) ablation (supplementary.tex:1098-1103), which is NOT
+#    the main config. The gated run_all_arms driver sets use_first=False for
+#    sd14 arms (core/runner.py), but this vendored entrypoint defaults to
+#    first-step-only, so pass the flag explicitly when invoking it by hand.
 python scripts/diffusion/run_with_steering.py \
     --model_name sd14 --generate_concept snoopy \
     --template_path exp/datasets/eval/clip_templates.json \
     --num_images_per_prompt 10 --output_dir ./results/sd14/eval_snoopy/casteer-2.0 \
-    --steering_strength 2.0 --intermediate_clipping \
+    --steering_strength 2.0 --intermediate_clipping --use_all_diffusion_steps \
     erase --concept_path ./results/sd14/steering_vectors/snoopy.pt
 
 # Step 3 — score (CLIP score + FID vs the un-steered baseline).
@@ -153,8 +164,8 @@ python scripts/diffusion/run_i2p_eval.py \
 
 Rung reached: **implementation + correctness** (the `numbers` rung is BLOCKED on this CPU-only host).
 
-- The pinned environment builds from scratch (`requirements.txt` + `Dockerfile`), every third-party dependency and every vendored `core`/`scripts` module imports cleanly under Python 3.13, and `tests/` passes (33 tests): the import gate, the SPEC `house` Householder invariant, the degeneracy test (β=0 == baseline, bit-exact), the Eq.6/7/4/9 invariants, the fingerprinted data loader, and the eval-metric instruments (CLIP, FID, NudeNet/Q16/LPIPS raise-when-missing).
-- The full code path runs end-to-end on CPU via `smoke.sh` (load SD-1.4 → estimate 80 steering vectors → steer → generate), proving the implementation works on the real model.
+- The pinned environment builds from scratch (`requirements.txt` + `Dockerfile`), every third-party dependency and every vendored `core`/`scripts` module imports cleanly under Python 3.13, and `tests/` passes (53 tests): the import gate, the SPEC `house` Householder invariant, the degeneracy test (β=0 == baseline, bit-exact), the Eq.6/7/4/9 invariants, the fingerprinted data loader, the eval-metric instruments (CLIP, FID, NudeNet 8-exposed-class filter, NudeNet/Q16/LPIPS raise-when-missing), and the per-task steering-vector mapping (snoopy→Snoopy, style→Van Gogh, i2p→nudity, i2p_overall→7-class Eq.9 average, coco→nudity).
+- The full code path runs end-to-end on CPU via `smoke.sh` (load SD-1.4 → estimate 64 steering vectors (16 CA blocks × 4 steps) → steer → generate), proving the implementation works on the real model.
 - `mutations.json` (6 deliberate defects) are each caught by their `must_fail` test (verified); `instruments.json` records every correctness-deciding instrument with positive/negative tests.
 - **`house` is reproduced** (`selfcheck.json`: PASS, max norm error 3.5e-14). It is the one high-invariance claim that needs no generation.
 - **The 16 diffusion-number claims are BLOCKED**: this sandbox is CPU-only and the paper's full config (50 steps × ≥1,000 prompts × 3 seeds × multiple arms, on 8×V100, `supplementary.tex:30`) is infeasible on CPU. `measured.json` records `BLOCKED` for every diffusion metric with a reason sidecar; `run_all_arms.sh` emits `FINAL <arm>=BLOCKED` per arm/seed. The external evaluators (NudeNet, Q16, LPIPS) are not installed and the real COCO-30k FID reference is not vendored — documented blockers, not synthetic substitutes.

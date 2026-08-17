@@ -23,25 +23,54 @@ import torch
 # claims.json arm -> exact config (mirrors claims.json `arm_configs` + SPEC sec 5/6).
 # `use_first_diffusion_step` is False for SD-1.4 per-step vectors (experiments.tex:19)
 # and True for the distilled SDXL arm (method_2.tex:191-197).
+#
+# The steering VECTOR is per-TASK, not per-arm (review F3): each task erases a
+# specific concept. An arm runs many tasks (e.g. casteer_clip runs i2p + snoopy
+# + coco + style); the vector is selected by the task being run via
+# TASK_VECTOR below. The previous config hardcoded vector="nudity" for every
+# steered SD-1.4 arm, which would have steered the snoopy runs with the nudity
+# vector, the Van Gogh style runs with the nudity vector, and scored the wrong
+# quantity -- a failure that looks like refutation. The arm no longer carries
+# a single `vector`; build_controller(arm, task, ...) picks it.
 ARM_CONFIG = {
     "sd14": dict(model="sd14", beta=None, clip=False, mode=None,
-                 use_first=False, vector=None, tasks=["coco", "i2p", "snoopy", "style"]),
+                 use_first=False, tasks=["coco", "i2p", "snoopy", "style"]),
     "casteer_noclip": dict(model="sd14", beta=2.0, clip=False, mode="dotproduct",
-                           use_first=False, vector="nudity", tasks=["i2p", "snoopy", "style"]),
+                           use_first=False, tasks=["i2p", "snoopy", "style"]),
     "casteer_clip": dict(model="sd14", beta=2.0, clip=True, mode="dotproduct",
-                         use_first=False, vector="nudity", tasks=["i2p", "snoopy", "coco", "style"]),
+                         use_first=False, tasks=["i2p", "snoopy", "coco", "style"]),
     "const_a2_clip": dict(model="sd14", beta=2.0, clip=True, mode="constant",
-                         use_first=False, vector="nudity", tasks=["i2p", "snoopy", "coco"]),
+                          use_first=False, tasks=["i2p", "snoopy", "coco"]),
     "const_a2_noclip": dict(model="sd14", beta=2.0, clip=False, mode="constant",
-                           use_first=False, vector="nudity", tasks=["i2p", "snoopy", "coco"]),
+                            use_first=False, tasks=["i2p", "snoopy", "coco"]),
     "const_a1_clip": dict(model="sd14", beta=1.0, clip=True, mode="constant",
-                         use_first=False, vector="nudity", tasks=["i2p", "snoopy"]),
+                          use_first=False, tasks=["i2p", "snoopy"]),
     "const_a1_noclip": dict(model="sd14", beta=1.0, clip=False, mode="constant",
-                           use_first=False, vector="nudity", tasks=["i2p", "snoopy"]),
+                            use_first=False, tasks=["i2p", "snoopy"]),
     "sdxl": dict(model="sdxl", beta=None, clip=False, mode=None,
-                 use_first=False, vector=None, tasks=["i2p"]),
+                 use_first=False, tasks=["i2p"]),
     "sdxl_casteer_clip": dict(model="sdxl", beta=2.0, clip=True, mode="dotproduct",
-                              use_first=True, vector="nudity", tasks=["i2p"]),
+                               use_first=True, tasks=["i2p"]),
+}
+
+# Per-task steering-vector selection (SPEC sec 6; review F3). Each task erases
+# a specific concept, named exactly as `estimate_steering_vectors.py --concept`
+# writes it (`{concept}.pt`). The I2P "all inappropriate" task (experiments.tex:39)
+# uses the average of the 7 per-concept steering vectors (supplementary.tex:1068-
+# 1071); `build_controller` composes that average on the fly from the 7 files.
+# The COCO FID task erases nudity (supplementary.tex:544: "CLIP score and FID on
+# images generated with CASteer for ``nudity'' erasure based on prompts from
+# validation set of COCO-30k").
+I2P_OVERALL_CONCEPTS = [
+    "hate", "harassment", "violence", "self-harm",
+    "shocking", "sexual", "illegal",  # experiments.tex:39; supplementary.tex:1071
+]
+TASK_VECTOR = {
+    "i2p": "nudity",                       # nudity erasure (nudity.tex)
+    "i2p_overall": I2P_OVERALL_CONCEPTS,    # 7-class average (experiments.tex:39)
+    "snoopy": "Snoopy",                     # concrete erasure (snoopy.tex)
+    "coco": "nudity",                       # nudity erasure on COCO (supplementary.tex:544)
+    "style": "Van Gogh",                    # style erasure (artists.tex)
 }
 
 # Paper full-config image counts (per arm, per seed) -- the situations the
@@ -128,26 +157,60 @@ def init_pipeline(model: str, device: torch.device, cache_dir: str = "./cache"):
     return pipe
 
 
-def _load_vector_store(path: Optional[str], device: torch.device):
-    if path is None:
-        return None
+def _load_vector_store(path: str, device: torch.device):
     from core.pickle import unpickle
     return unpickle(path)
 
 
-def build_controller(arm: str, device: torch.device, vector_dir: str = "./steering_vectors"):
-    """Construct the CrossAttentionOutputSteering for an arm, or None for vanilla arms."""
+def _resolve_task_vector(task: str, device: torch.device, vector_dir: str):
+    """Load the steering-vector store for `task` (review F3: per-task vector
+    selection). For the I2P 7-class 'i2p_overall' task, compose the average of
+    the 7 per-concept stores via average_concept_vectors (Eq. 9,
+    supplementary.tex:1068-1071). For single-concept tasks, load the one .pt
+    file named by TASK_VECTOR[task].
+
+    Raises FileNotFoundError if a needed vector file is missing (no OK-on-empty,
+    no silent substitution). Returns the store in the production format
+    dict[step][place][list[Tensor[1,1,d]]].
+    """
+    spec = TASK_VECTOR[task]
+    if isinstance(spec, list):
+        # Multi-concept average (Eq. 9): load each per-concept store and average
+        # WITHOUT re-normalizing the mean (SPEC U9; review A3).
+        from core.controller import average_concept_vectors
+        stores = []
+        for concept in spec:
+            p = os.path.join(vector_dir, f"{concept}.pt")
+            if not os.path.exists(p):
+                raise FileNotFoundError(
+                    f"steering vector for task {task!r} concept {concept!r} not "
+                    f"found at {p}; run estimate_steering_vectors first (no OK-on-empty)."
+                )
+            stores.append(_load_vector_store(p, device))
+        return average_concept_vectors(stores)
+    p = os.path.join(vector_dir, f"{spec}.pt")
+    if not os.path.exists(p):
+        raise FileNotFoundError(
+            f"steering vector for task {task!r} not found at {p} (concept {spec!r}); "
+            "run estimate_steering_vectors first (no OK-on-empty)."
+        )
+    return _load_vector_store(p, device)
+
+
+def build_controller(arm: str, task: str, device: torch.device, vector_dir: str = "./steering_vectors"):
+    """Construct the CrossAttentionOutputSteering for an arm running `task`,
+    or None for vanilla arms. The steering vector is selected per-TASK (review
+    F3): snoopy->Snoopy, style->Van Gogh, i2p->nudity, i2p_overall->7-class
+    average, coco->nudity. The previous implementation hardcoded vector='nudity'
+    for every steered SD-1.4 arm, which would have measured the wrong quantity
+    for the snoopy/style tasks."""
     from core.controller import CrossAttentionOutputSteering
     cfg = ARM_CONFIG[arm]
     if cfg["beta"] is None:
         return None
-    concept_path = os.path.join(vector_dir, f"{cfg['vector']}.pt")
-    if not os.path.exists(concept_path):
-        raise FileNotFoundError(
-            f"steering vector for arm {arm!r} not found at {concept_path}; "
-            "run estimate_steering_vectors first (no OK-on-empty)."
-        )
-    store = _load_vector_store(concept_path, device)
+    if task not in TASK_VECTOR:
+        raise ValueError(f"build_controller: unknown task {task!r}")
+    store = _resolve_task_vector(task, device, vector_dir)
     return CrossAttentionOutputSteering(
         source_concepts=[store], target_concepts=[None],
         strength=float(cfg["beta"]), device=device,
@@ -162,6 +225,7 @@ def run_generation(
     seed: int,
     prompts,
     output_dir: str,
+    task: str,
     device: Optional[torch.device] = None,
     n_steps: Optional[int] = None,
     resolution: Optional[int] = None,
@@ -170,9 +234,11 @@ def run_generation(
     cache_dir: str = "./cache",
     vector_dir: str = "./steering_vectors",
 ):
-    """Generate one image per prompt for `arm` at `seed`, save PNGs to
-    output_dir/{i:05d}.png, return the list of saved paths. RAISES if zero
-    images are generated (no OK-on-empty)."""
+    """Generate one image per prompt for `arm` at `seed` for `task`, save PNGs
+    to output_dir/{i:05d}.png, return the list of saved paths. RAISES if zero
+    images are generated (no OK-on-empty). The steering vector is selected per
+    `task` (review F3): snoopy/style/i2p/i2p_overall/coco each load their own
+    concept vector via build_controller(arm, task, ...)."""
     cfg = ARM_CONFIG[arm]
     mdl = model or cfg["model"]
     if device is None:
@@ -182,13 +248,24 @@ def run_generation(
     if resolution is None:
         resolution = FULL_RES[mdl]
     if guidance_scale is None:
-        guidance_scale = 0.0 if mdl in ("sdxl-turbo",) else 7.5
+        # Per-model guidance: sdxl-turbo -> 0.0 (method_2.tex:191-197); sd14 ->
+        # 7.5 (diffusers StableDiffusionPipeline default, SPEC U4); sdxl -> 5.0
+        # (diffusers StableDiffusionXLPipeline default; supplementary.tex:255
+        # "All other parameters are left default" -- the repro previously forced
+        # 7.5 here, which is NOT the SDXL default and would quietly raise CLIP
+        # score / alter FID for the sdxl arms. review A1).
+        if mdl in ("sdxl-turbo",):
+            guidance_scale = 0.0
+        elif mdl == "sdxl":
+            guidance_scale = 5.0
+        else:
+            guidance_scale = 7.5
 
     if not prompts:
         raise ValueError("run_generation: empty prompt list (no OK-on-empty)")
 
     pipe = init_pipeline(mdl, device, cache_dir=cache_dir)
-    control = build_controller(arm, device, vector_dir=vector_dir)
+    control = build_controller(arm, task, device, vector_dir=vector_dir)
     hook_manager = None
     if control is not None:
         from core.diffusion_steering import (

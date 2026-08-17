@@ -152,16 +152,19 @@ class CrossAttentionOutputSteering(VectorControl):
             alpha = strength   (a FIXED constant, the same for every patch; NOT beta*<s,c>)
             if intermediate_clipping: alpha = max(alpha, 0)   # no-op for strength > 0 (SPEC U13)
             ca_out_new = ca_out - alpha * ca_X
-        The steering vector is re-normalized to unit L2 (consistent with the
-        dot-product path and SPEC U1).
+        The steering vector `b` is used AS STORED -- NOT re-normalized (review
+        A3 / SPEC U9). For single-concept stores `b` is already unit-L2 (so this
+        is a no-op relative to the prior `b/||b||`); for the Eq.9 multi-concept
+        average `b` is the sub-unit mean (||b|| < 1), and using it as-is honors
+        the paper's "simply averaging" (supplementary.tex:1068-1071) -- the
+        effective suppression is scaled by ||b|| rather than renormalized to 1.
         """
         (b, _) = steering_tensors
-        b_norm = b / torch.linalg.norm(b, dim=-1, keepdim=True).clamp(min=EPS)
         alpha = float(self.strength)
         if self.intermediate_clipping:
             alpha = max(alpha, 0.0)
-        # b_norm: [1, 1, d] -> broadcast as [1, 1, 1, d] over [B, seq, num_heads, d]
-        delta = -alpha * b_norm.to(vector.device).view(1, 1, 1, -1)
+        # b: [1, 1, d] -> broadcast as [1, 1, 1, d] over [B, seq, num_heads, d]
+        delta = -alpha * b.to(vector.device).view(1, 1, 1, -1)
         return vector.to(self.device) + delta
 
     def steer_with_clipping(self, vector: torch.Tensor, *steering_tensors: torch.Tensor) -> torch.Tensor:
@@ -169,6 +172,15 @@ class CrossAttentionOutputSteering(VectorControl):
         Apply steering with intermediate clipping (Eq. 6):
             alpha = max(beta * <ca_X, ca_out>, 0)
             ca_out_new = ca_out - alpha * ca_X
+        The steering vector `b` is used AS STORED -- NOT re-normalized (review
+        A3 / SPEC U9). For single-concept stores `b` is already unit-L2 (so the
+        prior `b_norm = b/||b||` was a no-op); for the Eq.9 multi-concept average
+        `b` is the sub-unit mean, and using it as-is applies (I - beta * b b^T) c
+        with the sub-unit `b` -- the paper-literal "simply averaging" form
+        (supplementary.tex:1068-1071), NOT the renormalized form that would
+        multiply effective suppression by ~1/||mean|| (~2.6x for 7 concepts).
+        This also makes the dot-product path consistent with the matrix form
+        `steer_matrix_form`, which already used `steering_vector` directly.
         """
         assert len(vector.shape) == 4
 
@@ -178,21 +190,19 @@ class CrossAttentionOutputSteering(VectorControl):
         hidden_dim = vector.shape[3]
         (b, _) = steering_tensors
 
-        b_norm = b / torch.linalg.norm(b, dim=-1, keepdim=True)
-
         vector_reshaped = vector.to(self.device).reshape(-1, num_heads, hidden_dim).transpose(0, 1)
-        b_norm_reshaped = b_norm.unsqueeze(-1)
+        b_reshaped = b.unsqueeze(-1)
 
-        # Compute dot products between vector components and steering vector
+        # Compute dot products between vector components and the (stored) steering vector
         projection_scores = (
-            vector_reshaped @ b_norm_reshaped
+            vector_reshaped @ b_reshaped
         ).transpose(0, 1).reshape(batch_size, -1, num_heads, 1)
 
         # Clip: only steer when dot product is positive (concept is present)
         if self.intermediate_clipping:
             projection_scores = torch.where(projection_scores > 0, projection_scores, 0)
 
-        steering_delta = -self.strength * projection_scores.to(vector.device) * b_norm.to(vector.device)
+        steering_delta = -self.strength * projection_scores.to(vector.device) * b.to(vector.device)
 
         return vector + steering_delta
 

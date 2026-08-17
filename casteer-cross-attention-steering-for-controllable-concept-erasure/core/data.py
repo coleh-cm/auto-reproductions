@@ -52,10 +52,19 @@ def load_clip_templates(path: str = "exp/datasets/eval/clip_templates.json") -> 
 
 def load_coco_captions(path: str = "exp/datasets/eval/coco/coco_30k.csv") -> list[str]:
     """The 30,000 COCO captions used for COCO-30k generation (paper 'coco_30k').
-    Returns the 'prompt' column in file order. The horse-filter that upstream's
-    run_with_steering.py applies is left to the caller (it removes 'horse'
-    captions because 'horse' is one of the 5 'other concepts' in the Snoopy
-    benchmark; experiments.tex:64).
+    Returns the 'prompt' column in file order. No caption filtering is applied
+    here: the loader returns ALL 30,000 prompts.
+
+    (Review note: upstream's `scripts/diffusion/run_with_steering.py:38` applies
+    a `horse` filter to COCO captions, but the paper never mentions any filter,
+    and the prior justification for it here -- that 'horse' is one of the 5
+    'other concepts' in the Snoopy benchmark -- was FALSE: the 5 other concepts
+    are Mickey, Spongebob, Pikachu, dog, legislator (experiments.tex:64), with no
+    horse. The filter is upstream's choice, not the paper's; this loader does
+    not apply it so the COCO-30k FID reference set matches the paper's 30k. The
+    gated driver in run_all_arms.py uses this loader directly, so the gated
+    COCO-30k FID is computed on the unfiltered 30k, matching the paper's
+    SD-1.4=14.04 anchor (merge.tex:77).)
     """
     p = _join_root(path)
     prompts: list[str] = []

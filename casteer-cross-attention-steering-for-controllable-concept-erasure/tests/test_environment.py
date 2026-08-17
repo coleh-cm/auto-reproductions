@@ -114,7 +114,8 @@ def test_controller_erasure_matches_householder():
     c = torch.randn(2, 4, 1, d)
     c_in = c.clone()
     out = ctrl.forward(c_in, diffusion_step=0, place_in_unet="down", block_index=0)
-    # controller.forward() returns vector.half(); cast back for comparison
+    # controller.forward() preserves the caller's dtype (no .half() cast);
+    # cast to float for the allclose tolerance comparison.
     out = out.float()
     # conditional half (index 1) should be the Householder reflection of input
     cond_in = c[1, :, 0, :]

@@ -32,8 +32,8 @@
       "covers": ["core"],
       "description": "Flip the sign of the Eq.4 constant-alpha update so c_new = c + alpha*s instead of c - alpha*s, breaking the constant-mode arm.",
       "file": "core/controller.py",
-      "find": "        delta = -alpha * b_norm.to(vector.device).view(1, 1, 1, -1)",
-      "replace": "        delta = alpha * b_norm.to(vector.device).view(1, 1, 1, -1)  # MUTATION constant_mode_sign_flip",
+      "find": "        delta = -alpha * b.to(vector.device).view(1, 1, 1, -1)",
+      "replace": "        delta = alpha * b.to(vector.device).view(1, 1, 1, -1)  # MUTATION constant_mode_sign_flip",
       "must_fail": "tests/test_method_core.py::test_constant_mode_eq4"
     },
     {
@@ -53,6 +53,33 @@
       "find": "    with open(p, \"r\") as f:\n        for line in f:",
       "replace": "    with open(p, \"r\") as f:\n        next(f)  # MUTATION imagenet_first_class_skipped\n        for line in f:",
       "must_fail": "tests/test_data.py::test_imagenet_classes_fingerprint"
+    },
+    {
+      "name": "nudenet_count_all_classes",
+      "covers": ["core", "eval"],
+      "description": "Remove the 8-exposed-class filter so nudity_total counts every detection >=0.6 over ALL NudeNet classes (faces, *_COVERED), inflating the total and falsely refuting the nudity claims (review F1). The filter test must catch this.",
+      "file": "core/eval/metrics.py",
+      "find": "            if d.get(\"class\", \"\") not in NUDENET_EXPOSED_CLASSES:\n                continue\n            if d.get(\"score\", 0.0) >= threshold:",
+      "replace": "            if d.get(\"score\", 0.0) >= threshold:  # MUTATION nudenet_count_all_classes (filter removed)",
+      "must_fail": "tests/test_eval.py::test_nudenet_label_filter_counts_only_exposed"
+    },
+    {
+      "name": "renormalize_multiconcept_mean_at_steer",
+      "covers": ["core"],
+      "description": "Re-normalize the steering vector b to unit L2 at steer time (the pre-F3/A3 behavior), so the Eq.9 multi-concept sub-unit mean is replaced by its unit direction -- multiplying effective suppression by ~1/||mean|| and contradicting the paper's 'simply averaging' (review A3 / SPEC U9). The no-renormalization test must catch this.",
+      "file": "core/controller.py",
+      "find": "        vector_reshaped = vector.to(self.device).reshape(-1, num_heads, hidden_dim).transpose(0, 1)\n        b_reshaped = b.unsqueeze(-1)",
+      "replace": "        vector_reshaped = vector.to(self.device).reshape(-1, num_heads, hidden_dim).transpose(0, 1)\n        b = b / torch.linalg.norm(b, dim=-1, keepdim=True).clamp(min=EPS)  # MUTATION renormalize_multiconcept_mean_at_steer\n        b_reshaped = b.unsqueeze(-1)",
+      "must_fail": "tests/test_method_core.py::test_multi_concept_no_renormalize_at_steer"
+    },
+    {
+      "name": "snoopy_task_uses_nudity_vector",
+      "covers": ["core", "runner"],
+      "description": "Make the snoopy task load the nudity vector instead of the Snoopy vector (the pre-F3 behavior), so the snoopy/style runs are steered with the wrong concept and the wrong quantity is measured (review F3). The per-task-vector test must catch this.",
+      "file": "core/runner.py",
+      "find": "    \"snoopy\": \"Snoopy\",                     # concrete erasure (snoopy.tex)",
+      "replace": "    \"snoopy\": \"nudity\",                    # MUTATION snoopy_task_uses_nudity_vector (wrong concept)",
+      "must_fail": "tests/test_runner.py::test_snoopy_style_tasks_use_their_own_vectors_not_nudity"
     }
   ],
   "note": "A suite nobody has broken on purpose is not evidence. Each mutation is a deliberately inserted defect; the named must_fail test node currently PASSES and must FAIL when the find->replace is applied. covers lists the aspects the mutation exercises; the set covers core, degeneracy, eval and data."

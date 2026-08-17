@@ -210,3 +210,77 @@ def test_householder_rejects_half_strength():
     out = c - 1.0 * (s @ c) * s
     assert abs(out.norm().item() - c.norm().item()) > 1e-5, (
         "half-strength projection must fail the norm-preservation invariant")
+
+
+def test_multi_concept_no_renormalize_at_steer():
+    """SPEC U9 / review A3: the Eq.9 multi-concept average is used AS-IS at steer
+    time -- NOT re-normalized to a unit vector. The paper says "simply averaging"
+    (supplementary.tex:1068-1071); re-normalizing the sub-unit mean would multiply
+    effective suppression by ~1/||mean|| (~2.6x for 7 near-orthogonal concepts).
+
+    This test builds a 3-concept averaged store (||mean|| < 1) and checks that
+    steer_with_clipping (no clip, Eq.6) applies (I - beta * b b^T) c with the
+    SUB-UNIT b -- i.e. the effective suppression is WEAKER than the unit-vector
+    case. A regression that re-normalizes b at steer time would make the output
+    equal the unit-vector Householder reflection and FAIL the weaker-suppression
+    check here.
+    """
+    torch.manual_seed(9)
+    d = 64
+    # 3 near-orthogonal unit concept vectors
+    stores = []
+    for _ in range(3):
+        v = torch.randn(d); v = v / v.norm()
+        stores.append(v)
+    mean_vec = torch.stack(stores).mean(dim=0)  # sub-unit
+    assert mean_vec.norm().item() < 0.9, "mean of 3 random unit vectors should be sub-unit"
+    avg_store = {0: {"down": [mean_vec.view(1, 1, d)]}}
+
+    ctrl = CrossAttentionOutputSteering(
+        source_concepts=[avg_store], target_concepts=[None], strength=2.0,
+        device=torch.device("cpu"), intermediate_clipping=False,
+        use_first_diffusion_step=True, num_layers=1, steering_mode='dotproduct',
+    )
+    c = torch.randn(2, 5, 1, d)
+    out = ctrl.forward(c.clone(), diffusion_step=0, place_in_unet="down", block_index=0)
+    cond_in = c[1, :, 0, :]
+    cond_out = out[1, :, 0, :]
+    # Paper-literal: c_new = (I - beta * b b^T) c with the sub-unit b (NOT b/||b||).
+    expected = cond_in - 2.0 * (cond_in @ mean_vec).unsqueeze(-1) * mean_vec
+    assert torch.allclose(cond_out, expected, atol=1e-5), (
+        "steer must use the sub-unit mean b directly (no re-normalization); "
+        f"max diff {(cond_out - expected).abs().max().item()}")
+    # The unit-normalized form would apply (I - 2 * b_hat b_hat^T) c, which
+    # suppresses MORE; assert the sub-unit output differs from that stronger form.
+    b_hat = mean_vec / mean_vec.norm()
+    stronger = cond_in - 2.0 * (cond_in @ b_hat).unsqueeze(-1) * b_hat
+    assert not torch.allclose(cond_out, stronger, atol=1e-3), (
+        "sub-unit steer must NOT equal the re-normalized (stronger) steer -- "
+        "re-normalization at steer time is the A3 defect")
+
+
+def test_multi_concept_no_renormalize_constant_mode():
+    """Same A3/U9 check for the constant-alpha Eq.4 path: the constant shift is
+    alpha * b (sub-unit), NOT alpha * b_hat (unit). A regression that re-normalizes
+    b would shift by a LARGER amount and fail this test."""
+    torch.manual_seed(10)
+    d = 48
+    stores = []
+    for _ in range(3):
+        v = torch.randn(d); v = v / v.norm()
+        stores.append(v)
+    mean_vec = torch.stack(stores).mean(dim=0)
+    assert mean_vec.norm().item() < 0.9
+    avg_store = {0: {"down": [mean_vec.view(1, 1, d)]}}
+    ctrl = CrossAttentionOutputSteering(
+        source_concepts=[avg_store], target_concepts=[None], strength=2.0,
+        device=torch.device("cpu"), intermediate_clipping=True,
+        use_first_diffusion_step=True, num_layers=1, steering_mode='constant',
+    )
+    c = torch.randn(2, 3, 1, d)
+    out = ctrl.forward(c.clone(), diffusion_step=0, place_in_unet="down", block_index=0)
+    cond_in = c[1, :, 0, :]
+    cond_out = out[1, :, 0, :]
+    expected = cond_in - 2.0 * mean_vec  # sub-unit shift
+    assert torch.allclose(cond_out, expected, atol=1e-5), (
+        "constant mode must use the sub-unit mean b (no re-normalization)")
